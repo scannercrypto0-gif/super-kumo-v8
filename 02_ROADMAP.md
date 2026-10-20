@@ -33,3 +33,9 @@ Design considerations for future foundation work:
 - Defer dashboard implementation until operational records exist and data coverage/quality can support the views. Access model and technical choices remain subject to review and owner approval.
 
 No UI code, API endpoints, tables, migrations or infrastructure are authorized by recording this requirement. It does not approve architecture, authorize trading or close G0/G0-001.
+
+## Provisional G1 preparation — secretarial data architecture
+G0 is still OPEN. [G1-ARCH-01–11](03_DECISIONS.md#g1-secretarial-data-architecture--provisional-owner-clarifications) record conceptual preparation, not authorization to implement G1. Preserve the independent future dashboard requirement and all existing gates.
+Future G1 documentary/acceptance preparation must cover durable Inbox receipt/commit, independent Fast/Slow consumers and crash-safe archive acknowledgment/reclaim; nonblocking office fan-out; owning-trader decision authority; common quality with policy-specific eligibility; bounded capacity/backpressure and restart/gap recovery evidence. Parameter choices and benchmarks remain separate approved work.
+Initial Research Library preparation remains separately scheduled and cost-controlled; resuming eligible live data service must not await archive or deep-quality catch-up. Every decision-critical monitoring event survives any safe Scanner coalescing. Priority covers all shared resources and provider budgets, with measured hysteresis/office lag rather than fixed SLA promises.
+The owner defers all merges of PRs #6–#11. This new proposal preserves #11 by ancestry without modifying it; its own merge also requires separate authorization. No automatic source-PR merge or closure is proposed.

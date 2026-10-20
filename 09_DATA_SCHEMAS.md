@@ -65,3 +65,28 @@ Register policy is in HANDOFF_REGISTER.md; this is only the conceptual data rela
 ## Integration evidence requirements — INT-04/05/06
 Conceptual documentation only. Every observation reference includes observation class (live trade/price, provisional intrabar indicator, completed candle), candle completion state, source/version, event_at, received_at, available_at and decision_at. The trader's frozen input/fallback policy version and eligibility/block reason accompany decisions; unavailable evidence never implies permission to fall back.
 Current-state evidence: status, scope, verified_at with timezone, verification source, PR/branch/commit reference and uncertainty/conflict state. Historical event records preserve observed_at/recorded_at, original statement/source and separate subsequent correction/supersession links. Handoff event identity is not branch identity: one real-world event may have multiple source references without duplicate counting. No physical types, tables or operational constants are selected.
+
+## Conceptual secretarial data lifecycle — G1-ARCH-01–11
+Requirements only: no storage engine, table, migration, runtime setting, deployment or final physical type selected. Full owner requirements remain canonical in DECISIONS.
+
+- Inbox receipt/commit: stable source/event identity appropriate to data type, observation/version/payload reference, source/stream/symbol, event_at/received_at/committed_at/available_at, completion/finality/quality/health, integrity/checksum evidence and durable receipt status. Equal prices do not imply duplicate events. Never-received and received-but-uncommitted data remain distinct from successfully committed records.
+- Independent consumer progress: Fast delivery progress and Slow archival progress/acknowledgment have independent references; one consumer cannot destroy another's required evidence. Raw durable archive reference plus quality/provenance annotations, acknowledgment evidence and reclaim checkpoint link receipt -> committed -> independently delivered/archived -> confirmed archive acknowledgment -> reclaimable/reused capacity. A crash at each boundary must be recoverable idempotently; no unconditional zero-loss claim.
+- Capacity/reception: declared bounded capacity, disk usage/full state, backpressure/overflow-policy reference (unselected), corruption detection, durable checkpoint, alerts and incomplete/uncommitted gap evidence. Pausing deep Slow Lane processing is distinct from reception; finite capacity/failure cannot be concealed as continuous success.
+- Delivery/subscription: office_id, owning trader_id/secretary identity, declared scan stage, symbol/stream/fields, required policy/version/freshness, immutable position/exit-rule snapshot references, observation identity, per-office event ordering/delivery_at/available_at/lag/interruption state. Indexed open-position ownership maps to required fields; one observation may serve several traders without merging independent state or delaying other offices behind matching/analysis.
+- Quality/eligibility: common source/version/finality/event/receipt/availability/health annotations, office policy/version and essentiality, eligibility/fallback permission and reason. Preserve actual provisional indicator versus completed candle; later deep-review/correction annotations have their own time/version/lineage and never replace original decision-time evidence.
+- Resource adaptation: Fast latency, office lag, backlog and CPU/memory/I/O/network/DB/provider-budget pressure, Slow pause/yield/resume evidence and hysteresis-policy reference. No numeric threshold or guarantee chosen.
+- Research inputs: separate historical/version/coverage/gap/quality/recovery references and live Forward/Shadow receipt/availability records, interruptions/lag/missingness; development/OOS/forward evidence identities remain separate.
+- Gap/recovery ledger: Slow Lane owner, symbol/stream/missing range/source, gap detection evidence, recovery attempts/shared-acquisition authority/budget, recovered coverage/residual gaps/quality, declared-scope completeness check, idempotency/progress and live/recovered provenance. Recoverable candles may not establish exact historical tick/trade order.
+- Position recovery: owning trader and frozen recovery/exit policy, recovered factual crossing/gap/uncertainty, distinct current market facts, actual recovery-time availability/decision references, AMBIGUOUS and separate scenario paths. Historical crossing is not fill evidence. Conditional future execution records would require actual exchange orders/trades/fills/partial fills; this is not a current real-execution schema authorization.
+
+```mermaid
+flowchart TD
+  A[Shared collector] --> B[Durably committed Inbox]
+  B --> C[Fast safety and routing]
+  B --> D[Slow archive and deep quality]
+  C --> E[Independent office secretaries]
+  E --> F[Owning trader decisions]
+  D --> G[Durable archive acknowledgment]
+  G --> H[Crash-safe reclaim]
+```
+Fast delivery follows the necessary commit boundary, not the archive acknowledgment. Position matching is one priority branch of independent office delivery, never a serial gate before all offices. Full capacity/ack/recovery implementation is unselected.

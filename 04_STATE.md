@@ -4,14 +4,14 @@ Former name: SUPER KUMO V8
 Operational V8 implementation: not yet verified or started.
 
 Date: 2026-10-20
-Snapshot verified_at: 2026-10-20T10:47:11Z (13:47:11 Asia/Riyadh, UTC+03:00)
+Snapshot verified_at: 2026-10-20T13:38:18Z / 16:38:18 Asia/Riyadh (UTC+03:00)
 Verification source: GitHub main/ref, PR #6–#10 APIs, Issue #1 API and commit-pinned documentation. Scope: documentary state; runtime implementation UNVERIFIED.
 Gate: G0 OPEN (owner sign-off pending)
 Official repository: [scannercrypto0-gif/super-kumo-v8](https://github.com/scannercrypto0-gif/super-kumo-v8) — Public
 Official owner: `scannercrypto0-gif`
 Default branch: `main`
 Previously reviewed baseline: `f25f7072c9dea638d218c7f5e89f165e5a393096`
-Latest actual main inspected for G0 reconciliation: `ed188f1902d397fe74613dd966c5a3e88b32f8c0`.
+Latest actual main inspected for G1 secretarial documentation: `ed188f1902d397fe74613dd966c5a3e88b32f8c0`.
 Historical PR #2 head before remediation: `741719fc4e0aecced10fa3317dc354339178f56a`.
 
 ## Bootstrap and active work
@@ -36,8 +36,8 @@ Other open questions: event provider access/rights and PC OS/recovery constraint
 
 ## Next exact task
 
-Current documentation item: owner-authorized G0 integration reconciliation on `docs/g0-integration-reconciliation`, prepared for one documentation PR targeting main. Source proposals remain OPEN/unmerged; this branch preserves their requirements without modifying them. INT-01–06 are provisionally owner-approved, not final G0 approval. PR publication/review/merge is not inferred from this pre-publication snapshot.
-Next exact action: owner reviews the resulting reconciliation PR and validation evidence, decides source-PR disposition/integration sequence and separately authorizes any merge. No application implementation or source PR merge/closure is authorized.
+Current documentation item: owner-authorized G1 secretarial data architecture consolidation, documentation only, on `docs/g1-secretarial-data-consolidation`. The new branch starts from unmerged PR #11 head `fb79e13b58c91c6b53a7e0489114adcdcc577d15` to preserve its complete reconciliation; the new PR targets main and therefore has a cumulative diff. This does not modify or merge #11.
+Next exact action: owner reviews the new documentation PR and remaining unselected implementation parameters. All merges of PRs #6–#11 are explicitly owner-deferred. Any future merge, source-PR disposition, final G0 approval or implementation needs separate authorization.
 
 Claude reads `07_CLAUDE_HANDOFF.md` and independently challenges the architecture review; availability recorded in the handoff is Thu 2026-10-22 13:00 Asia/Riyadh. The owner resolves or explicitly defers critical questions, approves the final contract, and authorizes G0 closure before G1 Market Foundation / WP-001 implementation. G0 and G0-001 remain OPEN. No production implementation is authorized by this review.
 
@@ -79,7 +79,7 @@ Claude reads `07_CLAUDE_HANDOFF.md` and independently challenges the architectur
 
 ### Remaining unresolved governance tasks
 
-- Review this reconciliation proposal. PR #2 through PR #5 are merged; #6–#10 remain OPEN/unmerged at the evidence timestamp. Future dashboard requirement is preserved; implementation is owner-deferred until operational records exist.
+- Review this new G1 documentation proposal; PRs #6–#11 remain OPEN/unmerged and their merges are owner-deferred. Future dashboard implementation stays deferred until operational records exist. No source branch is changed.
 - Remaining `type:bug`, `type:proposal`, and `type:question` label inventory: UNVERIFIED in this task; earlier absence/tooling reports are historical. No labels are changed.
 - Verify remote .gitignore protections in a separately authorized task.
 - Hosted Issue Forms smoke verification remains blocked by browser sign-in; missing template labels remain a separate repository prerequisite.
@@ -87,8 +87,8 @@ Claude reads `07_CLAUDE_HANDOFF.md` and independently challenges the architectur
 
 SESSION END: changes/commit | tests/evidence | decisions | blockers | active WP | next exact task | reviewer.
 
-## Current evidence ledger — INT-06
-All rows share verified_at `2026-10-20T10:47:11Z (13:47:11 Asia/Riyadh, UTC+03:00)`. Current facts come from GitHub reads; proposal contents are only on the reconciliation branch until merged.
+## Historical evidence snapshot — INT-06, 2026-10-20T10:47:11Z
+The following rows preserve the earlier #11 snapshot, superseded for current status by the ledger below. Proposal content was only on its branch; no historical observation is rewritten as a merge.
 
 | Status / scope | Verification source and reference | Uncertainty / conflict |
 | --- | --- | --- |
@@ -104,4 +104,24 @@ All rows share verified_at `2026-10-20T10:47:11Z (13:47:11 Asia/Riyadh, UTC+03:0
 | Issue #1 owner/labels already corrected | Current Issue API: scannercrypto0-gif; type:work-package/status:review | Body still describes PR #2 as unmerged: stale current claim; Issue edit requires separate approval |
 | Originating chats / runtime evidence | Only visible conversation and accessed GitHub records | Other chats inaccessible; runtime tests NOT TESTED; implementation not independently established |
 
-Baseline now owner-confirmed: PR #10 / AQL-HO-20261020-003. Register's older PR #8 baseline describes the earlier handoff event and is preserved, not overwritten. Exactly INT-01–06 comprise the reported post-baseline decision delta. See the decision coverage matrix for source provenance, blockers and future integration choices.
+At the earlier #11 snapshot, baseline owner-confirmed: PR #10 / AQL-HO-20261020-003. Register's older PR #8 baseline describes the earlier handoff event and is preserved, not overwritten. Exactly INT-01–06 comprise the reported post-baseline decision delta. See the decision coverage matrix for source provenance, blockers and future integration choices.
+
+## Current evidence ledger — G1 secretarial consolidation
+Verified_at: 2026-10-20T13:38:18Z / 16:38:18 Asia/Riyadh (UTC+03:00). Source: current GitHub refs, all-open-PR inventory, PR #6–#11 metadata, Issue #1 and commit-pinned documentation; owner attachment supplies decision/deferral authority. This is a pre-publication snapshot of the new proposal, not a claim its PR has already been created.
+
+| Status / scope | Source / evidence | Uncertainty / conflict |
+| --- | --- | --- |
+| main `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | GitHub heads/main ref | Verified at snapshot; no source proposals merged |
+| G0 OPEN / Issue #1 OPEN | Main published identity and Issue API/body | No final sign-off; Issue's stale PR #2 sentence disclosed, not edited |
+| PR #6 OPEN / unmerged | [PR #6](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/6), head `93a1a537866fc20059d80f86061676e26fcd971e`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | Owner explicitly defers merge; original PR/branch unchanged |
+| PR #7 OPEN / unmerged | [PR #7](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/7), head `79bf0d902fab8fe766962425ca58d0d0528c152c`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | Owner explicitly defers merge; original PR/branch unchanged |
+| PR #8 OPEN / unmerged | [PR #8](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/8), head `19c5a747a568c727deb4cf7eb1320e30a7857241`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | Owner explicitly defers merge; original PR/branch unchanged |
+| PR #9 OPEN / unmerged | [PR #9](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/9), head `8886e69562b880e35c989009961959d4c9163791`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | Owner explicitly defers merge; original PR/branch unchanged |
+| PR #10 OPEN / unmerged | [PR #10](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/10), head `8f33b50dbec18ff472a59c3505c2dbf6d43b104d`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | Owner explicitly defers merge; original PR/branch unchanged |
+| PR #11 OPEN / unmerged | [PR #11](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/11), head `fb79e13b58c91c6b53a7e0489114adcdcc577d15`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | Owner explicitly defers merge; original PR/branch unchanged |
+| G1-ARCH-01–11 PROVISIONAL / docs-only | Owner-supplied Secretarial Data Architecture Consolidation handoff; canonical DECISIONS section | G1 prefix does not close G0 or permit implementation |
+| Latest returned Work result / continuity baseline | AQL-HO-20261020-004, PR #11; owner says returned/shared to architecture conversation | Independent access to that originating chat is unavailable; no inference of final approval/merge |
+| New handoff 005 / directly received | Attached owner instruction plus visible disclosure; delta = eleven decisions + merge deferral | No later Work submission visible in inspected GitHub inventory or supplied record; unseen submissions UNVERIFIED |
+| Implementation / runtime tests | Documentation tree and scope only | Application/recovery/load/CI NOT TESTED; no storage engine/schema/constants selected |
+
+Preserve PAPER/TIME/DATA/GOV/INT, A–G and future dashboard from #11. DATA-07 monitor authority is explicitly clarified by G1-ARCH-05: high-priority state/data support, owning trader decides. Critical events, freshness/fallback and recovery ambiguity remain mandatory. Remaining parameters: durable Inbox engine/capacity/integrity/pressure policy, acknowledgment mechanics, measured resource/hysteresis/concurrency/delivery targets, provider/source limits and permissions. No new paid or real-execution permission.

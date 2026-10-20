@@ -470,7 +470,7 @@ Requirements:
 The owner provisionally approves two logically independent operating paths that share a central market-data service:
 
 **Higher-priority Position Monitor**
-- Monitor open paper positions and evaluate their predeclared TP, SL, time-based, trailing, and early-exit policies.
+- Monitor open paper-position state and deliver relevant observations with high priority to the owning trader via its logical secretary. The owning trader evaluates its predeclared TP, SL, time-based, trailing and early-exit policies and retains decision authority (G1-ARCH-05); the Position Monitor/secretariat neither independently decides outcomes nor creates fills.
 - Do not wait for a full-universe scan to finish.
 - Preserve event chronology, point-in-time data validity, and same-bar ambiguity handling.
 - Never fabricate TP/SL hits or fills based on stale or later-discovered prices.
@@ -625,3 +625,211 @@ The rows below use D=03_DECISIONS.md and T=10_TEST_POLICY.md at the source commi
 - Review dependencies are #7 -> #8 -> #10 with independent #9 comparison and #6 preservation. The owner now explicitly authorizes one dedicated reconciliation PR incorporating source clauses; this is not a merge/rebase of those source PRs, nor a default replacement policy for future work.
 - Proposed next sequence: independently review this PR's decision/subrequirement coverage against the pinned sources; obtain separate owner authorization for a merge/disposition plan. If approved as the integration vehicle, merge this documentation PR only, then obtain explicit owner direction for each overlapping original PR (no blind sequential merging or automatic closure). Alternative source-PR sequencing would require separately approved updates and renewed overlap review. Nothing here authorizes either path.
 - No substantive unresolved owner-policy contradiction was found after applying INT-01–06; any later material contradiction is BLOCKED and must be referred to the owner, never filled by an invented rule. Runtime acceptance, recovery/load tests, CI and strategy performance are NOT TESTED by this task. G0/Issue #1 remain OPEN.
+
+## G1 secretarial data architecture — provisional owner clarifications
+Project: ATLAS Quant Lab / AQL-CRYPTO-RESEARCH-001. **All G1-ARCH-01–11 decisions are PROVISIONAL until final G0 owner approval. G0 remains OPEN; a G1-prefixed decision does not authorize entry into implementation.**
+Source: owner-submitted "ATLAS Quant Lab — G1 Secretarial Data Architecture Consolidation" attachment received 2026-10-20; normalized-text SHA-256 `47129ebbdf7d89b256f55faf6968692281fae3575f8f4efc159224c0164f4961`. The source sections below retain every supplied decision and correction verbatim. Option C is recorded where the source explicitly states it; no missing alternative is invented. Previous returned Work result: AQL-HO-20261020-004 / PR #11, OPEN/unmerged at `fb79e13b58c91c6b53a7e0489114adcdcc577d15`. The supplied post-result delta is G1-ARCH-01–11 plus the owner merge-deferral instruction; other chats are inaccessible, not inspected.
+
+### G1-ARCH-01 — Shared Data Inbox and two secretarial departments
+
+Use the owner's **secretarial office** architecture inside the Python modular monolith.
+
+A shared market-data collector acquires Binance Spot USDT data centrally, with deduplicated WS/REST access, cache and provider budgets.
+
+Data enters a common **Data Inbox** once.
+
+Two logically independent departments consume it:
+
+- **Fast Lane:** copies/routes current market observations to specialist office secretaries without waiting for archival review.
+- **Slow Lane:** preserves raw observations, organizes historical records, conducts deeper quality assessment, and attaches quality annotations.
+
+Do not serialize Fast Lane behind Slow Lane. Do not build redundant independent Binance collectors for each office. Neither department makes strategy decisions.
+
+The Fast Lane still performs minimal safety, timing, provenance and eligibility checks before making data usable for decisions.
+
+### G1-ARCH-02 — Adaptive resource priority
+
+Provisional option C.
+
+Monitor Fast Lane response latency, resource pressure and queue/backlog metrics together.
+
+Throttle, pause or yield Slow Lane's heavy processing when needed to protect Fast Lane; resume with hysteresis after stability.
+
+Priority applies to CPU, memory, I/O, network, database and shared provider budgets, not just CPU.
+
+Protect open-position data delivery above broad-universe scanning. Avoid starving other office deliveries unnecessarily.
+
+Do not invent numerical thresholds, latency guarantees, concurrency settings or fixed SLAs; document them as parameters requiring measurement.
+
+### G1-ARCH-03 — Durable, reusable Data Inbox
+
+The Inbox must survive process restarts and power loss for records **successfully committed to durable storage**.
+
+The owner requires a reusable temporary holding box:
+
+1. Receive and durably register observations.
+2. Make them available to Fast Lane immediately after the necessary receipt/commit boundary.
+3. Keep them available for Slow Lane independently of Fast Lane consumption.
+4. Slow Lane archives raw observations and quality/provenance information.
+5. Delete or reclaim Inbox records **only after confirmed durable archival**, with crash-safe acknowledgment and idempotent recovery.
+6. Reuse reclaimed capacity for new records.
+
+Pausing Slow Lane must not stop lightweight Inbox reception. Specify bounded capacity, disk-full/backpressure behavior, corruption checks, recovery checkpoints and alerting.
+
+Avoid claiming zero data loss under all failure conditions. Explicitly distinguish received-and-committed records from messages never received during an internet outage.
+
+Choose no storage engine or physical schema without separate authorization.
+
+### G1-ARCH-04 — Shared Trader Secretariat with one logical secretary per trader
+
+Provisional option C.
+
+Use one shared coordination/data-service layer and a dedicated **logical secretary for each independent trader**.
+
+Each secretary knows its trader's declared inputs, timing/freshness requirements, subscriptions, current positions, and data-quality status.
+
+No duplicate provider collection, no shared mutable strategy decisions, no cross-trader blocking, and no secretary deciding entries/exits.
+
+Logical isolation does not require one process/server per trader.
+
+### G1-ARCH-05 — Open-position data first, with nonblocking fan-out
+
+This decision includes mandatory owner corrections.
+
+Maintain an indexed list of open positions, their owning traders, and the current data fields required by each position's frozen/versioned strategy and exit rules.
+
+As market observations arrive, quickly match them to open positions and deliver updated relevant values to **the owning trader's secretary**, then to that trader.
+
+**The trader itself evaluates and decides** whether to hold, close, adjust, respond to TP1, stop-loss or changing market conditions.
+
+Neither the secretariat nor a centralized Position Monitor may independently decide a trade outcome or create a fill. Any existing Position Monitor must be reconciled as a high-priority data/state/observation function that supports the owning trader's decision logic, while preserving previously agreed monitoring and recovery responsibilities.
+
+Crucial: matching/extracting open-position data is a **high-priority branch, not a blocking gate**.
+
+The same observation must be available to Scanner, other traders and other offices through independent, nonblocking fan-out without waiting for position matching, trader analysis or exit decisions.
+
+Preserve ordering and all decision-critical events; never coalesce away potential TP/SL touches, fills, ambiguity or replay evidence. Measure per-office delivery lag and surface degradation rather than promise mathematically zero delay.
+
+If multiple traders hold the same symbol, reuse one market observation while preserving independent policies and position states.
+
+### G1-ARCH-06 — Adaptive Scanner Secretariat
+
+Provisional option C.
+
+Scanner's secretary distributes data according to each declared scan stage:
+
+- Immediate updates where the scan requires actual live observations.
+- Bounded aggregation or scheduled updates where the stage only needs completed candles or other slower inputs.
+
+Scanner independently evaluates opportunities. Its secretary does not generate trading signals.
+
+Keep scan workloads bounded/adaptive, with lower priority than open-position service, while avoiding unnecessary delivery delays to other offices.
+
+No provisional intrabar observation may masquerade as a completed candle.
+
+### G1-ARCH-07 — Research Lab Secretariat
+
+Provisional option C.
+
+Provide two distinct research inputs:
+
+- **Historical:** versioned archive data, quality annotations, provenance, coverage, gaps and recovery history.
+- **Forward/Shadow:** genuinely available live observations, with actual observation and receipt/availability times.
+
+Preserve historical development, historical OOS and prospective forward results as distinct evidence classes, never a blended score or backdated Shadow result.
+
+Heavy historical research must yield to live workloads. Forward/Shadow experiments must record interruption, lag and missing observations honestly rather than invent continuous coverage.
+
+### G1-ARCH-08 — Data quality and office-specific eligibility
+
+Provisional option C.
+
+Secretariat performs common validation and annotates data with source, version, quality, freshness, finality, event time, receipt time, availability time and relevant gap/health status.
+
+Each trader/office applies its own **predeclared, versioned eligibility policy**.
+
+Invalid/stale inputs are not presented as healthy. A qualifying last completed-candle fallback is allowed only if that trader's frozen policy explicitly permits it and freshness/availability checks pass; otherwise block the affected decision and record the reason.
+
+Late deeper quality assessments may add corrections/annotations with lineage but must never retroactively alter what was known to a past decision.
+
+### G1-ARCH-09 — Safe restart and recovery
+
+Provisional option C with explicit owner requirements:
+
+- No duplicate data or duplicated fills, closes, accounting or alerts.
+- Detect every identifiable coverage gap and attempt to recover every recoverable gap.
+- Recover durable Inbox state and archival acknowledgment/checkpoints idempotently.
+- Restore open positions and reconcile authoritative execution state where applicable before taking actions dependent on that state.
+- Reconnect/validate current market feeds and resume eligible live data service without waiting for historical archival catch-up.
+- Resume Slow Lane's backlog and quality work under resource limits.
+- Record irrecoverable gaps explicitly; never falsely mark a dataset complete.
+
+Recovered historical observations cannot be treated as if they were available during the outage.
+
+### G1-ARCH-10 — Gap ledger and budgeted recovery
+
+Provisional option C.
+
+Slow Lane owns the gap ledger and manages bounded, resumable, selective recovery through the **shared provider-budget/acquisition authority**.
+
+Track missing symbol/stream/time range, source, attempts, evidence, recovered coverage, remaining gaps and quality status.
+
+Deduplicate using stable source/event identity appropriate to the data type, not merely equal price values.
+
+Verify completeness against declared coverage before clearing a gap. Some historical candles may be recoverable while some exact tick/trade sequences are not.
+
+Gap recovery must yield to live needs, respect Binance limits and preserve original availability timelines.
+
+### G1-ARCH-11 — Stop-loss crossing discovered after an outage
+
+Provisional option C, explicitly separated by execution mode.
+
+**Current paper phase:**
+
+If recovered data shows a TP/SL threshold was crossed while ATLAS was disconnected, record the factual crossing, uncertainty and monitoring gap. Do **not** invent a historical fill, pretend the trader observed it live, or backdate a strategy decision.
+
+On recovery, deliver current market and recovered historical facts separately to the owning trader. The trader applies its predeclared recovery/exit policy to information actually available at that time.
+
+Preserve PAPER-02 factual `AMBIGUOUS` outcomes and isolated best/worst research scenarios when sequence or execution cannot be established.
+
+**Future real execution (not authorized now):**
+
+Prefer dual protection where supported: exchange-side protective orders plus trader-level monitoring/recovery. After reconnect, reconcile actual order states, trades, fills and partial fills with Binance before updating execution truth.
+
+A historical price touch alone does not prove an exchange order executed.
+
+No real trading, live order placement or funded account authorization is implied.
+
+### Explicit compatibility interpretation — recovery and responsibility
+The owner clarification G1-ARCH-05 refines DATA-07's earlier "evaluate" wording: the high-priority monitor retains state, observation delivery, ordering, gaps and recovery responsibilities; the owning trader alone applies its frozen strategy/exit/recovery policy. Shared PAPER-07 exit-evaluation logic may be used by that trader; a common engine is not a second strategy decision-maker. Secretaries do common validation, routing and quality annotation, not entry/exit decisions. Open-position routing is a high-priority independent branch, never a gate before Scanner/other offices receive the same observation.
+PAPER-08/DATA-08 recovery preserves facts, known policy versions, event identities, gaps and idempotency; G1-ARCH-11 forbids treating a recovered TP/SL touch alone as a historical fill or backdated strategy decision. Previously recorded accounting may be reconciled only against legitimate evidence, not an invented price-touch fill. Separate hypothetical best/worst PAPER-02 research remains labeled hypothetical, not confirmed execution. Current/recovered information reaches the owning trader in separate evidence classes; its predeclared policy governs decisions at the actual recovery-time availability. Future exchange-state reconciliation describes a conditional future mode and authorizes no real execution.
+The durable Inbox commit boundary precedes decision-usable Fast Lane delivery; it does not require completion of deep quality review or archival work. Fast Lane still performs minimal safety/timing/provenance/eligibility checks, including trader-specific fallback constraints. Lightweight reception can continue while heavy Slow Lane work is paused, subject to bounded durable capacity: no promise of unlimited reception, zero latency, or lossless delivery of never-received/uncommitted messages is made. Storage engine, physical schema, capacity/pressure thresholds, arbitration details and hysteresis parameters remain unselected.
+
+## G1 delta ledger, compatibility and exact destination traceability
+Verified sources: #11 `fb79e13b58c91c6b53a7e0489114adcdcc577d15` and main `ed188f1902d397fe74613dd966c5a3e88b32f8c0` at 2026-10-20T13:38:18Z / 16:38:18 Asia/Riyadh (UTC+03:00). Source line references below are pinned to #11, not future line numbers. Every source requirement remains canonical alongside the explicitly authorized role clarifications. No substantive contradiction remains unresolved within the supplied decisions; missing implementation parameters are disclosed, not invented. Other-chat coverage is not established.
+
+### Branch/base choice and merge deferral
+Candidate main `ed188f1902d397fe74613dd966c5a3e88b32f8c0` alone lacks #11's reconciled content; recreating it risks omissions. Candidate pinned #11 `fb79e13b58c91c6b53a7e0489114adcdcc577d15` preserves complete prior content and history by ancestry. Selected new isolated branch from #11, PR target main: nine-file G1 delta against #11, thirteen-file cumulative diff against main including the inherited prior reconciliation. Existing PRs #6–#11 and their branch refs remain unchanged. This is an owner-authorized new documentation proposal, not proof #11 is merged. All source merges remain owner-deferred; no PR is automatically superseded, closed or approved.
+
+| Delta item | Mandatory owner requirement/correction | Earlier source and compatibility judgment | Exact destination section | Disposition / evidence / owner resolution |
+| --- | --- | --- | --- | --- |
+| G1-ARCH-01 | Shared Inbox; independent Fast/Slow lanes, minimal safety; no duplicate collector | DATA-01/05/07, #11 D426–492; Compatible refinement; shared acquisition and no lane strategy authority preserved | DECISIONS: G1-ARCH-01 — Shared Data Inbox and two secretarial departments; CONTRACT: Provisional secretarial data-service invariants; SCHEMAS: Conceptual secretarial data lifecycle; RISKS: Secretarial architecture residual risks; TEST_POLICY: matching G1-ARCH-01 acceptance row | INCLUDED / PASS documentary; runtime NOT TESTED. No further owner policy resolution required for this clarification; implementation separately gated. |
+| G1-ARCH-02 | Latency+backlog+all-resource adaptive priority, hysteresis, no numeric SLA | DATA-02/04/06/07, #11 D303–372,445–492; Compatible; all-resource budgets and monitoring priority retained | DECISIONS: G1-ARCH-02 — Adaptive resource priority; CONTRACT: Provisional secretarial data-service invariants; SCHEMAS: Conceptual secretarial data lifecycle; RISKS: Secretarial architecture residual risks; TEST_POLICY: matching G1-ARCH-02 acceptance row | INCLUDED / PASS documentary; runtime NOT TESTED. No further owner policy resolution required for this clarification; implementation separately gated. |
+| G1-ARCH-03 | Committed-only durability; independent consumers; archive ack before reclaim; bounded capacity | PAPER-08/DATA-04/06/08, #11 D145–158,339–372,445–519; Compatible refinement; lightweight reception distinct from heavy pause; no storage engine selected | DECISIONS: G1-ARCH-03 — Durable, reusable Data Inbox; CONTRACT: Provisional secretarial data-service invariants; SCHEMAS: Conceptual secretarial data lifecycle; RISKS: Secretarial architecture residual risks; TEST_POLICY: matching G1-ARCH-03 acceptance row | INCLUDED / PASS documentary; runtime NOT TESTED. No further owner policy resolution required for this clarification; implementation separately gated. |
+| G1-ARCH-04 | One logical secretary per trader, shared coordination, independent strategy states | PAPER-05/DATA-05/07, #11 D87–98,426–492; Compatible; no process-per-trader or secretary strategy decisions | DECISIONS: G1-ARCH-04 — Shared Trader Secretariat with one logical secretary per trader; CONTRACT: Provisional secretarial data-service invariants; SCHEMAS: Conceptual secretarial data lifecycle; RISKS: Secretarial architecture residual risks; TEST_POLICY: matching G1-ARCH-04 acceptance row | INCLUDED / PASS documentary; runtime NOT TESTED. No further owner policy resolution required for this clarification; implementation separately gated. |
+| G1-ARCH-05 | Indexed owning positions/required fields; trader decides; nonblocking fan-out; retain events | DATA-07 #11 D466–492; C57; T71; Explicit owner correction resolves monitor-evaluate ambiguity; three minimal source clauses refined; no unresolved authority conflict | DECISIONS: G1-ARCH-05 — Open-position data first, with nonblocking fan-out; CONTRACT: Provisional secretarial data-service invariants; SCHEMAS: Conceptual secretarial data lifecycle; RISKS: Secretarial architecture residual risks; TEST_POLICY: matching G1-ARCH-05 acceptance row | INCLUDED / PASS documentary; runtime NOT TESTED. No further owner policy resolution required for this clarification; implementation separately gated. |
+| G1-ARCH-06 | Stage-specific live versus completed-candle routes; bounded Scanner; no secretary signals | TIME-01/02/09/INT-04/DATA-06/07, #11 D166–184,275–286,445–492,539–541; Compatible; no intrabar-to-final relabel or global fan-out gate | DECISIONS: G1-ARCH-06 — Adaptive Scanner Secretariat; CONTRACT: Provisional secretarial data-service invariants; SCHEMAS: Conceptual secretarial data lifecycle; RISKS: Secretarial architecture residual risks; TEST_POLICY: matching G1-ARCH-06 acceptance row | INCLUDED / PASS documentary; runtime NOT TESTED. No further owner policy resolution required for this clarification; implementation separately gated. |
+| G1-ARCH-07 | Separate historical and live Forward/Shadow input/evidence; interruptions explicit | TIME-04–08/owner A/F, #11 D199–273,378–395; Compatible; no blended historical/forward score or backdating | DECISIONS: G1-ARCH-07 — Research Lab Secretariat; CONTRACT: Provisional secretarial data-service invariants; SCHEMAS: Conceptual secretarial data lifecycle; RISKS: Secretarial architecture residual risks; TEST_POLICY: matching G1-ARCH-07 acceptance row | INCLUDED / PASS documentary; runtime NOT TESTED. No further owner policy resolution required for this clarification; implementation separately gated. |
+| G1-ARCH-08 | Common quality plus predeclared versioned office eligibility; qualified fallback; late lineage | TIME-01/02/09/INT-04, #11 D166–184,275–286,539–541; Compatible; original snapshots immutable and only policy-authorized fresh/available fallback | DECISIONS: G1-ARCH-08 — Data quality and office-specific eligibility; CONTRACT: Provisional secretarial data-service invariants; SCHEMAS: Conceptual secretarial data lifecycle; RISKS: Secretarial architecture residual risks; TEST_POLICY: matching G1-ARCH-08 acceptance row | INCLUDED / PASS documentary; runtime NOT TESTED. No further owner policy resolution required for this clarification; implementation separately gated. |
+| G1-ARCH-09 | Idempotent restart; restore positions/authoritative state; current feeds before archive catch-up | PAPER-08/DATA-05–08, #11 D145–158,426–519; Compatible refinement; current eligible service independent of backlog; no invented continuity | DECISIONS: G1-ARCH-09 — Safe restart and recovery; CONTRACT: Provisional secretarial data-service invariants; SCHEMAS: Conceptual secretarial data lifecycle; RISKS: Secretarial architecture residual risks; TEST_POLICY: matching G1-ARCH-09 acceptance row | INCLUDED / PASS documentary; runtime NOT TESTED. No further owner policy resolution required for this clarification; implementation separately gated. |
+| G1-ARCH-10 | Slow-owned gap ledger, shared budget, stable event identity, scoped completeness | DATA-01–04/08/owner C–E, #11 D290–372,384–392,493–519; Compatible; recoverable candles do not prove exact tick/trade order | DECISIONS: G1-ARCH-10 — Gap ledger and budgeted recovery; CONTRACT: Provisional secretarial data-service invariants; SCHEMAS: Conceptual secretarial data lifecycle; RISKS: Secretarial architecture residual risks; TEST_POLICY: matching G1-ARCH-10 acceptance row | INCLUDED / PASS documentary; runtime NOT TESTED. No further owner policy resolution required for this clarification; implementation separately gated. |
+| G1-ARCH-11 | Recovered paper crossing not fill; trader recovery policy; AMBIGUOUS; future actual execution evidence | PAPER-02/08/DATA-08, #11 D39–55,145–158,493–519; S23; Explicit owner clarification; facts/accounting evidence distinguished from invented fills, no real execution permission | DECISIONS: G1-ARCH-11 — Stop-loss crossing discovered after an outage; CONTRACT: Provisional secretarial data-service invariants; SCHEMAS: Conceptual secretarial data lifecycle; RISKS: Secretarial architecture residual risks; TEST_POLICY: matching G1-ARCH-11 acceptance row | INCLUDED / PASS documentary; runtime NOT TESTED. No further owner policy resolution required for this clarification; implementation separately gated. |
+| Owner merge deferral | Defer all merges #6–#11; do not modify/close/rebase/retarget/overwrite their branches | Source owner instruction section 2; governance instruction, no extra ADR | STATE: Current evidence ledger; HANDOFF_REGISTER: handoff 005 owner merge deferral; ROADMAP: Provisional G1 preparation | INCLUDED / DEFERRED by owner; ACTIVE until separate explicit authorization; no source mutation |
+
+Destination paths: DECISIONS=03_DECISIONS.md, CONTRACT=01_CONTRACT.md, SCHEMAS=09_DATA_SCHEMAS.md, RISKS=08_RISKS.md, TEST_POLICY=10_TEST_POLICY.md, STATE=04_STATE.md. Exact canonical headings identify sections despite future line shifts. Each G1 canonical section preserves the entire supplied decision, including every sub-bullet, exception and prohibition.
+
+### Preservation and unresolved evidence
+PAPER-01–08, TIME-01–09, DATA-01–08, GOV-01, INT-01–06, owner A–G, independent future dashboard, handoffs 001–004 and every prior WORK_LOG observation are retained from #11. Owner clarifications G1-ARCH-05/11 refine responsibility and evidence interpretation openly; they do not silently remove monitoring, recovery, ambiguity or accounting safeguards. Full clause-level provenance remains in the inherited #11 matrix. Three existing monitor-authority clauses in DECISIONS/CONTRACT/TEST_POLICY were minimally corrected; historical source descriptions and source commit references are retained as provenance.
+Documentary verification states: PASS for checked requirements; BLOCKED for material unresolved contradiction; DEFERRED only for owner-authorized deferral with revisit condition; UNVERIFIED for unseen submissions/chats or insufficient factual evidence; NOT TESTED for runtime behavior. No runtime/CI success follows from documentation consistency.
+Remaining unselected parameters: Inbox storage engine/physical schema, durability implementation details, bounded capacity/disk-full/backpressure response, corruption/recovery mechanics, thresholds/hysteresis/concurrency/latency targets, exact source limits and quality policies. Separate implementation approval and measurement required. Source Issue #1 stale PR #2 sentence remains disclosed and unchanged. No paid resource or real execution authorized.
+Next: owner reviews this new documentation PR and the twelve delta dispositions. All merges remain deferred pending separate explicit authorization; no G0 closure, strategy promotion, deployment, source PR action or application implementation follows automatically.

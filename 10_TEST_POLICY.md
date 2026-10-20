@@ -68,7 +68,7 @@ Specification only; no application tests executed. [Canonical rules](03_DECISION
 | DATA-05/08 | REST recovers past data: chronological/idempotent facts, no retroactive live signals or fictional paper fills. |
 | DATA-06 | Slow core cycle: bounded overlap/backlog/deadlines and logged skipped/coalesced scanning; no invented 30-second SLA. |
 | DATA-06 | Safe scanning snapshot coalescing retains all events required for open paper positions, fill ambiguity, replay and audit. |
-| DATA-07 | Large-universe scan yields; Position Monitor evaluates frozen exits without waiting, scanner remains bounded/adaptive. |
+| DATA-07 | Large-universe scan yields; Position Monitor delivers frozen-policy-relevant data without waiting; the owning trader evaluates/decides exits, and scanner remains bounded/adaptive. The same observation reaches other offices independently without waiting for position matching or trader analysis. |
 | DATA-05/07 | Both paths/traders share central WS/REST/context/cache/provider authority: no duplicated Binance requests or multiplied limits. |
 | DATA-08 | Degraded BTC context blocks dependent new entries but unrelated traders with independently valid essential inputs continue. |
 | DATA-07/08 | Missing required price cannot create paper TP/SL/entry/exit fill; positions stay open with explicit monitoring gap/uncertainty. |
@@ -93,3 +93,26 @@ Documentation checks are distinct from future runtime tests. Runtime status for 
 | INT-06 | Later PR merge updates current STATE and appends a new log/register event; the earlier OPEN observation is unchanged. Missing evidence is UNVERIFIED; material contradiction is BLOCKED. |
 
 Documentary acceptance additionally requires 8 PAPER + 9 TIME + 8 DATA + GOV-01 + 6 INT records, owner A–G coverage, one canonical GOV-01 definition, preserved historical log/register events, and the independent future dashboard requirement. Exact evidence and dispositions are in the decision register's reconciliation matrix.
+
+## Future secretarial acceptance and negative scenarios — G1-ARCH-01–11
+All runtime/application/recovery/load/CI behavior below is **NOT TESTED** in this documentation task. These are future expectations, not executed fixtures or permission to implement.
+
+| ID | Scenario and required evidence |
+| --- | --- |
+| G1-ARCH-01 | Slow archival/deep review stalls: minimally qualified committed observations continue to offices via Fast Lane without a second Binance collector or strategy decisions by either lane. |
+| G1-ARCH-02 | Combined latency/backlog/resource/provider pressure causes bounded Slow yield/pause; resume uses measured hysteresis, with no hard-coded SLA and no unnecessary starvation of other office deliveries. |
+| G1-ARCH-03 | Crash before commit, after commit/before delivery, after Fast consumption/before archive, after archive/before ack, and after ack/before reclaim: report actual durability boundary, retain required consumer state, no premature deletion, replay/ack/reclaim idempotently. |
+| G1-ARCH-03 | Disk-full, corrupt record or finite capacity under paused Slow processing: explicit bounded-capacity/backpressure/alert/gap behavior under a later approved policy, never false continuous reception or zero-loss claim. Heavy pause is not itself reception shutdown while capacity permits. |
+| G1-ARCH-04 | Two traders hold one symbol with different policies: one acquired observation reaches both logical secretaries; no shared mutable decisions, provider duplication, cross-trader blocking or secretary-generated fills. |
+| G1-ARCH-05 | Delay position matching or trader evaluation: Scanner/other offices still receive the observation independently; higher priority is not a blocking fan-out gate. Owning trader alone makes hold/close/adjust/TP1/SL decisions; measure office lag/degradation. |
+| G1-ARCH-05/06 | Rapid equal-price distinct events and potential TP/SL touches survive fan-out/replay despite safe Scanner snapshot aggregation; stable identity/order, not equal price, determines dedup. |
+| G1-ARCH-06 | Live scan stage receives eligible provisional live observations; completed-candle stage receives bounded/scheduled final inputs. No provisional observation relabeled final; Scanner secretary generates no signal. |
+| G1-ARCH-07 | Interrupt Forward/Shadow and delay historical jobs: retain real interruption/lag/missingness, no invented continuous coverage; historical development/OOS/forward stay separate and heavy jobs yield. |
+| G1-ARCH-08 | Two frozen eligibility policies allow/prohibit fallback differently: only explicitly permitted fresh/available completed-candle fallback qualifies; missing essential evidence blocks with reason. Later deep-quality annotation cannot rewrite past knowledge. |
+| G1-ARCH-09 | Restart restores durable Inbox/acks/open positions idempotently, reconciles authoritative state where applicable before dependent actions, reconnects eligible current service without historical catch-up, and resumes bounded Slow backlog. |
+| G1-ARCH-10 | Recover candles but lack exact trade sequence: gap ledger tracks attempts/evidence/residual coverage, uses shared budget, yields to live needs and never clears an unverified scope or fabricates availability/order. |
+| G1-ARCH-11 | Recovered paper TP/SL crossing is recorded as fact/uncertainty/gap, not historical fill or old live decision; owning trader receives current and recovered facts separately and applies predeclared recovery policy at actual availability. Ambiguity/scenario bounds persist. |
+| G1-ARCH-11 future only | If separately authorized someday, reconnect must reconcile actual exchange orders/trades/fills/partial fills and protection status before execution-dependent truth updates; historical touch alone fails execution-proof acceptance. No real orders run here. |
+| Merge deferral / GOV-01 | Source PRs/branches #6–#11 remain unchanged/open; main is not claimed to contain unmerged proposals; register preserves old observations and appends actual new lifecycle evidence. |
+
+Documentation acceptance: verify all eleven canonical definitions and owner corrections, 12-item delta ledger (eleven decisions plus merge deferral), exact destinations/source conflicts, inherited PAPER/TIME/DATA/GOV/INT+A–G/dashboard/history, nine-file delta against #11 and thirteen-file cumulative documentation scope against main. Runtime acceptance remains NOT TESTED.
