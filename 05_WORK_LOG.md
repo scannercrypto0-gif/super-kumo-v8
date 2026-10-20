@@ -27,3 +27,13 @@ Created local Git repository baseline, README, .gitignore, session/handoff proto
 - Verification: only STATE and WORK_LOG added to the original six-file PR scope; historical log preserved; consistency reviewed against README and governance documents; no application tests executed, secrets, architecture approvals, application changes, or issue-form edits introduced by this remediation.
 - Remaining blockers/tasks: PR re-review and owner merge approval; three missing type labels; remote .gitignore verification; pre-existing issue-form schema concerns. Five architecture areas and Claude review/owner sign-off remain unresolved. G0 and G0-001 remain OPEN.
 - Next exact task: reviewer checks the amended eight-file PR; owner decides whether to merge. This entry does not approve or merge the PR.
+
+## 2026-10-20 — PR #2 merge and issue-form repair
+
+- Confirmed [PR #2](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/2) was squash merged into main at [cc32203300a7c71b089811c90920beb6e39a48ac](https://github.com/scannercrypto0-gif/super-kumo-v8/commit/cc32203300a7c71b089811c90920beb6e39a48ac). Earlier pending-merge entries above remain intact as historical records.
+- Read latest main `cc32203300a7c71b089811c90920beb6e39a48ac` before editing. Authorized scope is only the three issue forms, STATE, and WORK_LOG; a new branch/PR carries this work and is not merged.
+- Repaired comma-containing attributes labels using expanded YAML mappings in `02_bug.yml`, `03_proposal.yml`, and `04_question.yml`; preserved full intended question text, IDs, types, required fields, dropdown choices and template labels.
+- Validation: YAML parsing plus local structural validation against GitHub Issue Forms documentation; checked top-level fields, allowed element/attribute keys, unique IDs, nonempty string labels, dropdown options and boolean required flags. Compared form semantics with the intended original labels and checked append-only log preservation.
+- STATE now distinguishes merged PR #2 governance cleanup from this proposed form-repair PR. No application tests executed; no CI success or GitHub-hosted form acceptance is claimed.
+- No Issues or labels created/edited; no credentials, secrets, architecture files, or application code added. Missing `type:bug`, `type:proposal`, `type:question` labels and remote .gitignore verification remain separate tasks.
+- Next exact task: review the new five-file PR and decide whether to merge; no merge performed. G0 and G0-001 remain OPEN; architecture approval remains pending.

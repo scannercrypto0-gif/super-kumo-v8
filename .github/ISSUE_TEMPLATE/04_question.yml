@@ -11,9 +11,11 @@ body:
     validations: {required: true}
   - type: textarea
     id: context
-    attributes: {label: Context, related issue/PR, commit SHA}
+    attributes:
+      label: "Context, related issue/PR, commit SHA"
     validations: {required: true}
   - type: textarea
     id: question
-    attributes: {label: Specific question and desired answer}
+    attributes:
+      label: "Specific question and desired answer"
     validations: {required: true}
