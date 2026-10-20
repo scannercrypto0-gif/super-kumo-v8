@@ -66,3 +66,14 @@ Created local Git repository baseline, README, .gitignore, session/handoff proto
 - SESSION_PROTOCOL is the behavior source; COMMUNICATION_PROTOCOL and START_HERE link to it; HANDOFF_TEMPLATE contains one reusable Work instruction block. STATE records branch-only implementation pending merge.
 - Smart Validation limited to identity/protocol consistency and exact six-document scope; all previous log entries preserved. No application tests or unrelated reviews run.
 - No architecture/trading approvals, Issues, labels, settings or application code changed. G0 and Issue #1 remain OPEN. Next: owner reviews PR #5; merge is not authorized.
+
+## 2026-10-20 — Consolidated provisional G0 TIME and DATA decisions
+
+- Verified ATLAS Quant Lab / `AQL-CRYPTO-RESEARCH-001` / `scannercrypto0-gif/super-kumo-v8`; latest main `ed188f1902d397fe74613dd966c5a3e88b32f8c0`. PR #6 dashboard and PR #7 PAPER decisions remain OPEN/unmerged and untouched; review overlapping documentation after either merges.
+- Canonical register captures G0-TIME-01–09 and G0-DATA-01–04, selected C, with mandatory owner clarifications A–F taking precedence; G requires explicit cross-document acceptance/traceability before PR creation. All remain PROVISIONALLY OWNER-APPROVED, not final G0 approval.
+- Contract, roadmap G1 and conceptual MarketBar wording explicitly reconcile eligible verified intra-candle observations with closed-bar fallback; receipt/availability integrity remains mandatory. Existing decisions/history preserved.
+- Specialist reporting separates historical development/OOS/forward, target/off-target counts/net costs/drawdown-risk/uncertainty/sample adequacy, detector evaluation and divergence causes; rich all-opportunity snapshots remain immutable with separate later observations.
+- Pre-operational initial backfill has a scoped coverage inventory; incremental repairs update same library without core dependency. Independent bounded queues/shared API budgets/resource controls keep background work from blocking/starving core. Monitor paid-service budgets and require prior owner approval; no zero-cost/30-second guarantee.
+- Future tests specify negative temporal/news/version/research/context/backfill/budget/isolation/gap cases; no application tests or CI pass claimed.
+- Acceptance G verified owner A–F against contract, register, conceptual schemas, risks and test policy; completion/PR description contains decision/extension traceability matrix. Lightweight checks: 13 unique IDs, internal refs/identity, explicit closed-bar reconciliation, pending PAPER-01–08 cross-references, preserved log prefix and documentation-only scope.
+- Branch `docs/g0-time-data-decisions`; one documentation PR targeting main; no code, executable schema, migration, paid action, strategy promotion, Issue edit or merge. G0 and Issue #1 remain OPEN. Next: independent review and owner approval before final G0 or implementation.
