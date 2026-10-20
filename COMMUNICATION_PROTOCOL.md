@@ -1,4 +1,5 @@
-# Three-party Communication Protocol — V8
+# Three-party Communication Protocol — ATLAS Quant Lab
+Project ID: `AQL-CRYPTO-RESEARCH-001`; canonical repository: `scannercrypto0-gif/super-kumo-v8`.
 Status: PROPOSED
 Communication is asynchronous and auditable, not a claim of persistent AI presence.
 
@@ -21,6 +22,7 @@ Communication is asynchronous and auditable, not a claim of persistent AI presen
 In case of contradiction, raise a decision-request issue rather than silently choosing.
 
 ## At every session start
+Verify the canonical identity using `00_START_HERE.md` and `SESSION_PROTOCOL.md` before using previous context; stop on a Project ID or repository mismatch.
 Read README, 00_START_HERE, 04_STATE, 02_ROADMAP, GITHUB_OPERATING_MODEL, open assigned issues, relevant PRs.
 Record last reviewed commit SHA; do not trust old copies.
 At every session end update state, work log, unresolved issues and handoff.

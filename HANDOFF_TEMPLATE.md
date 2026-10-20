@@ -1,4 +1,7 @@
-# V8 session handoff
+# ATLAS Quant Lab session handoff
+- Project ID: `AQL-CRYPTO-RESEARCH-001`
+- Canonical repository: `scannercrypto0-gif/super-kumo-v8`
+- Identity verified against current GitHub files:
 - Date/time (Asia/Riyadh):
 - Branch / commit:
 - Gate:
