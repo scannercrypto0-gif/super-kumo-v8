@@ -1,5 +1,5 @@
 # GitHub Automation Roadmap
-Status: DESIGN ONLY — not deployed to remote
+Status: DESIGN ONLY — automation runtime not deployed; issue-form templates are published on remote
 
 Phase A (no AI agent credentials):
 - PR checks: Python tests, format, lint, secret scan once code is present.
@@ -9,7 +9,7 @@ Phase A (no AI agent credentials):
 - Require linked issue and evidence for PRs.
 
 Phase B (actual AI integrations):
-- Determine whether ChatGPT and Claude can access this private repository through authorized connectors in their respective products.
+- Determine whether ChatGPT and Claude can access this public repository through authorized connectors in their respective products.
 - If not, build a dedicated broker service using GitHub App credentials and the approved AI provider APIs.
 - Event intake: GitHub webhooks or polling; queue with idempotency keys and retry.
 - Agent identities: separate bot accounts or GitHub App audit metadata.

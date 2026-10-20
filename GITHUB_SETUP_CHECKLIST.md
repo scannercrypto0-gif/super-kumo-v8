@@ -1,7 +1,7 @@
 # GitHub setup checklist — requires owner access
-- [ ] Confirm private repository exists and main is initialized.
-- [ ] Upload/merge this bootstrap pack to main; do not upload the ZIP itself as sole source.
-- [ ] Enable Issues.
+- [x] Confirm public repository exists and main is initialized: https://github.com/scannercrypto0-gif/super-kumo-v8.
+- [x] Upload/merge this bootstrap pack to main; do not upload the ZIP itself as sole source.
+- [x] Enable Issues.
 - [ ] Enable Discussions (optional, useful for broad architectural debates).
 - [ ] Create labels: type:work-package, type:bug, type:proposal, type:question, type:research, type:incident, status:blocked, status:review, priority:high, area:data, area:trading, area:research, area:ops.
 - [ ] Protect main: pull request review, prevent force pushes, require checks once configured.
@@ -10,3 +10,5 @@
 - [ ] Verify ChatGPT access independently; verify Claude access independently.
 - [ ] Open initial WP-000 governance issue and WP-001 data-contract issue.
 - [ ] Keep secrets out of git history; rotate any previously exposed tokens.
+
+Verified 2026-10-20: public main and bootstrap files are present; Issue #1 is open. Other unchecked items remain unverified or pending. G0 is OPEN.
