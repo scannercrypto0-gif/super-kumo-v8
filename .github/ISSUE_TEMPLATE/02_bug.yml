@@ -1,0 +1,21 @@
+name: Bug / incident
+description: Reproducible issue and impact
+title: "[BUG] "
+labels: ["type:bug"]
+body:
+  - type: textarea
+    id: observed
+    attributes: {label: Observed behavior}
+    validations: {required: true}
+  - type: textarea
+    id: expected
+    attributes: {label: Expected behavior}
+  - type: textarea
+    id: reproduction
+    attributes: {label: Steps to reproduce and commit SHA}
+  - type: textarea
+    id: impact
+    attributes: {label: Impact, severity, affected data and workaround}
+  - type: textarea
+    id: evidence
+    attributes: {label: Logs and evidence (redact secrets)}

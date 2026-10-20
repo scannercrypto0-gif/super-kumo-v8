@@ -1,0 +1,19 @@
+name: Cross-agent question
+description: Track a question between owner, ChatGPT and Claude
+title: "[QUESTION] "
+labels: ["type:question"]
+body:
+  - type: dropdown
+    id: recipient
+    attributes:
+      label: Intended recipient
+      options: ["Owner", "ChatGPT", "Claude", "All"]
+    validations: {required: true}
+  - type: textarea
+    id: context
+    attributes: {label: Context, related issue/PR, commit SHA}
+    validations: {required: true}
+  - type: textarea
+    id: question
+    attributes: {label: Specific question and desired answer}
+    validations: {required: true}

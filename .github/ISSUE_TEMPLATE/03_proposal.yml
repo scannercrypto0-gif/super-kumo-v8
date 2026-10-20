@@ -1,0 +1,18 @@
+name: Research / change proposal
+description: Hypothesis or architectural improvement
+title: "[PROPOSAL] "
+labels: ["type:proposal"]
+body:
+  - type: textarea
+    id: hypothesis
+    attributes: {label: Proposed change and hypothesis}
+    validations: {required: true}
+  - type: textarea
+    id: evidence
+    attributes: {label: Evidence and alternatives}
+  - type: textarea
+    id: evaluation
+    attributes: {label: Test design, leakage controls, expected costs and risks}
+  - type: textarea
+    id: approval
+    attributes: {label: Decision needed from project owner}
