@@ -30,7 +30,7 @@ Only the visible current Work thread and GitHub PRs actually retrieved were used
 - Addenda: none supplied with this instruction as of registration; later addenda must be recorded.
 - Delta disposition: rule INCLUDED in DECISIONS; workflow links INCLUDED in START_HERE/SESSION/COMMUNICATION; audit fields INCLUDED in HANDOFF_TEMPLATE; initial evidence/coverage gaps INCLUDED here; STATE/LOG INCLUDED. No new architectural decision or application work.
 - Completeness audit: PASS for this visible rule implementation only; COVERAGE GAP for unaccessed earlier/originating-chat records. The audit does not certify the prior TIME/DATA handoff's external completeness.
-- Resulting PR: pending creation on `docs/g0-handoff-completeness`; update this entry with verified PR evidence when available.
+- Resulting PR: [PR #9](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/9), verified created OPEN on `docs/g0-handoff-completeness`; initial implementation commit `ed217a63d70e66e4d9e49ce14c98cd0a0083529c`.
 - Review/merge: pending; no merge authorized. G0 and Issue #1 remain OPEN.
 
 ## Unresolved continuity references
