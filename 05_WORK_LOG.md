@@ -66,3 +66,13 @@ Created local Git repository baseline, README, .gitignore, session/handoff proto
 - SESSION_PROTOCOL is the behavior source; COMMUNICATION_PROTOCOL and START_HERE link to it; HANDOFF_TEMPLATE contains one reusable Work instruction block. STATE records branch-only implementation pending merge.
 - Smart Validation limited to identity/protocol consistency and exact six-document scope; all previous log entries preserved. No application tests or unrelated reviews run.
 - No architecture/trading approvals, Issues, labels, settings or application code changed. G0 and Issue #1 remain OPEN. Next: owner reviews PR #5; merge is not authorized.
+
+## 2026-10-20 — Future dashboard requirement recorded
+
+- Read current main `ed188f1902d397fe74613dd966c5a3e88b32f8c0`, architecture contract, roadmap and conceptual schemas after verifying ATLAS Quant Lab / `AQL-CRYPTO-RESEARCH-001`.
+- Added the requirement once in [the roadmap](02_ROADMAP.md#future-requirement--unified-monitoring-dashboard); STATE links to that source instead of duplicating its specification.
+- Future views cover paper positions/signals, independent trader performance, Lab/Shadow comparisons, historical outcomes, health/freshness/errors. Telegram remains the notification channel; design considerations preserve consistent records/events, identifiers/timestamps/history/outcomes and secure read-only initial access.
+- No frontend or final architecture choice made. Implementation is deferred until operational data exists and requires a separately approved work package. No UI, API endpoints, tables, migrations, infrastructure or schema changes.
+- Synchronized stale STATE references to [PR #5](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/5), merged as `ed188f1902d397fe74613dd966c5a3e88b32f8c0`; older log entries remain historical snapshots.
+- Smart Validation: documentation-only scope and consistency; original roadmap gate text and historical WORK_LOG prefix preserved. No application tests or repeated architecture review.
+- New documentation PR is not merged. G0 and Issue #1 remain OPEN. Next: review the recorded requirement; continue G0-001 before gated implementation.

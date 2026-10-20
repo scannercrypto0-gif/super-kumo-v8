@@ -9,7 +9,7 @@ Official repository: [scannercrypto0-gif/super-kumo-v8](https://github.com/scann
 Official owner: `scannercrypto0-gif`
 Default branch: `main`
 Previously reviewed baseline: `f25f7072c9dea638d218c7f5e89f165e5a393096`
-Latest actual main inspected for ATLAS-002: `64b47b5c929221277456a85f549183f9e5757d40`.
+Latest actual main inspected for future dashboard requirement: `ed188f1902d397fe74613dd966c5a3e88b32f8c0`.
 Historical PR #2 head before remediation: `741719fc4e0aecced10fa3317dc354339178f56a`.
 
 ## Bootstrap and active work
@@ -34,7 +34,7 @@ Other open questions: event provider access/rights and PC OS/recovery constraint
 
 ## Next exact task
 
-Current documentation item: **ATLAS-002 — Session Continuity and Mandatory Automatic Work Handoff**, proposed in [PR #5](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/5) on `docs/atlas-session-continuity`; review before deciding on merge. No merge is authorized by this task. After documentation sync, the next substantive work item remains G0-001: Claude independent review and owner resolution of the open architecture questions. No implementation is authorized.
+Current documentation item: record the future dashboard requirement in the roadmap via a documentation PR; review before any merge. Dashboard implementation is deferred until operational data exists. The next substantive work item remains G0-001: Claude independent review and owner resolution of the open architecture questions. No implementation is authorized.
 
 Claude reads `07_CLAUDE_HANDOFF.md` and independently challenges the architecture review; availability recorded in the handoff is Thu 2026-10-22 13:00 Asia/Riyadh. The owner resolves or explicitly defers critical questions, approves the final contract, and authorizes G0 closure before G1 Market Foundation / WP-001 implementation. G0 and G0-001 remain OPEN. No production implementation is authorized by this review.
 
@@ -68,15 +68,15 @@ Claude reads `07_CLAUDE_HANDOFF.md` and independently challenges the architectur
 - New sessions must verify Project ID and canonical repository before using earlier context; stop on mismatch. Unrelated V7 step 311, `gate_spot_cvd.py`, or other-project conversations are not authoritative implementation evidence.
 - G0 and G0-001 remain OPEN. No architecture approval, operational implementation, repository rename or settings change is authorized by this migration.
 
-### ATLAS-002 — proactive handoff implementation pending merge
+### ATLAS-002 — proactive handoff merged
 
 - PR #5 integrates the owner-approved logical pending-change ledger, proactive checkpoints, one consolidated Work instruction, direct authorized-write alternative and next-session reconciliation into existing protocols and template.
 - Confirmed facts/hypotheses and approved/proposed decisions remain distinct; no upload is claimed without tool evidence. No duplicate governance document or background agent runtime is created.
-- Implementation is on the PR branch, not published on main until merge. G0 and Issue #1 remain OPEN.
+- [PR #5](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/5) was squash merged as [ed188f1902d397fe74613dd966c5a3e88b32f8c0](https://github.com/scannercrypto0-gif/super-kumo-v8/commit/ed188f1902d397fe74613dd966c5a3e88b32f8c0); session continuity and proactive handoff instructions are published on main. G0 and Issue #1 remain OPEN.
 
 ### Remaining unresolved governance tasks
 
-- Review ATLAS-002 session-continuity documentation; its merge remains pending. PR #2, PR #3 and PR #4 are already merged.
+- Review the proposed [future dashboard requirement](02_ROADMAP.md#future-requirement--unified-monitoring-dashboard); its documentation PR is not merged. PR #2 through PR #5 are already merged. Dashboard scope/architecture/implementation remain deferred and unapproved.
 - Create remaining `type:bug`, `type:proposal`, and `type:question` labels: previously verified absent; creation remains blocked by available tooling/authentication and is not performed in this remediation.
 - Verify remote .gitignore protections in a separately authorized task.
 - Hosted Issue Forms smoke verification remains blocked by browser sign-in; missing template labels remain a separate repository prerequisite.
