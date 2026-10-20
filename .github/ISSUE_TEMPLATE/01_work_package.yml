@@ -1,0 +1,19 @@
+name: Work package
+description: Bounded engineering task with acceptance evidence
+title: "[WP] "
+labels: ["type:work-package"]
+body:
+  - type: textarea
+    id: objective
+    attributes: {label: Objective}
+    validations: {required: true}
+  - type: textarea
+    id: dependencies
+    attributes: {label: Dependencies and affected modules}
+  - type: textarea
+    id: acceptance
+    attributes: {label: Acceptance tests and required evidence}
+    validations: {required: true}
+  - type: textarea
+    id: handoff
+    attributes: {label: Owner, reviewer and next action}
