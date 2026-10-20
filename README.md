@@ -21,14 +21,22 @@ Read `GITHUB_OPERATING_MODEL.md`, `COMMUNICATION_PROTOCOL.md`, and `GITHUB_SETUP
 - Never commit credentials, raw personal data, or proprietary market-data dumps.
 - `git status` and `git log -5 --oneline` at each session start.
 
-## Setup
-This is a **local Git repository**, not a GitHub/GitLab remote.
-To publish it later, create a private empty remote repository and run:
+## Official repository and setup
+- Source of truth: [scannercrypto0-gif/super-kumo-v8](https://github.com/scannercrypto0-gif/super-kumo-v8) (Public).
+- Official owner: `scannercrypto0-gif`.
+- Default branch: `main`.
+- Bootstrap: WP-000 governance files are published; owner review remains pending.
+- Active work: [G0-001 architecture review — Issue #1](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/1) (OPEN).
+- [ChatGPT architecture review — Round 1](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/1#issuecomment-6285495222): **CONDITIONALLY ACCEPTABLE — NOT YET APPROVED**.
+
+To obtain a local checkout:
+
 ```bash
-git remote add origin <YOUR_PRIVATE_REMOTE_URL>
-git push -u origin main
+git clone https://github.com/scannercrypto0-gif/super-kumo-v8.git
+cd super-kumo-v8
+git switch main
 ```
 Do not share a Supabase service-role key or exchange secret in chat.
 
 ## Current next step
-Review and approve G0 contract, then Claude reviews `07_CLAUDE_HANDOFF.md` and proposes WP-001.
+Claude performs an independent architecture review using `07_CLAUDE_HANDOFF.md`. The owner resolves or explicitly defers critical questions with rationale and approves the final contract before authorizing G0 closure and G1 work. The five unresolved areas are paper execution, temporal integrity, recovery/idempotency, research methodology, and operational budgets; see [current state](04_STATE.md). G0 and G0-001 remain OPEN; this review does not authorize production implementation.
