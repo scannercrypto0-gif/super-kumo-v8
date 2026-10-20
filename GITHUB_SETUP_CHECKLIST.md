@@ -1,0 +1,12 @@
+# GitHub setup checklist — requires owner access
+- [ ] Confirm private repository exists and main is initialized.
+- [ ] Upload/merge this bootstrap pack to main; do not upload the ZIP itself as sole source.
+- [ ] Enable Issues.
+- [ ] Enable Discussions (optional, useful for broad architectural debates).
+- [ ] Create labels: type:work-package, type:bug, type:proposal, type:question, type:research, type:incident, status:blocked, status:review, priority:high, area:data, area:trading, area:research, area:ops.
+- [ ] Protect main: pull request review, prevent force pushes, require checks once configured.
+- [ ] Enable GitHub Actions only for vetted workflows.
+- [ ] Decide whether AI access is via product connector or custom agent broker.
+- [ ] Verify ChatGPT access independently; verify Claude access independently.
+- [ ] Open initial WP-000 governance issue and WP-001 data-contract issue.
+- [ ] Keep secrets out of git history; rotate any previously exposed tokens.

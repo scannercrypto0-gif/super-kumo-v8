@@ -1,0 +1,13 @@
+# V8 session handoff
+- Date/time (Asia/Riyadh):
+- Branch / commit:
+- Gate:
+- Active WP:
+- Completed:
+- Files changed:
+- Test commands and results:
+- Evidence / artifacts:
+- Decisions added or changed:
+- Known failures / risks:
+- Approval needed from owner:
+- **Next exact task**:
