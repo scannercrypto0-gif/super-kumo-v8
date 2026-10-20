@@ -45,7 +45,7 @@ The current directly received owner handoff explicitly identifies **PR #8** as t
 - Current submission: directly received in this Work conversation via owner attachment; no claim of unseen external Work execution. Addenda: none separately supplied with this handoff; all owner extensions in sections 2–10 included.
 - Accessed evidence: current visible Work history/received attachments and live GitHub PR #6/#7/#8/#9 plus their retrieved documentation. Other chats were NOT accessed; completeness is bounded to accessible evidence.
 - Additional since-baseline item found: G0-GOV-01 proposal already in [PR #9](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/9), head `8886e69562b880e35c989009961959d4c9163791`, OPEN/unmerged. Its rule/protocol/register contents are reused in this consolidated branch, not merged or silently discarded.
-- Resulting consolidated PR: pending creation on `docs/g0-live-data-governance`. Review pending; merge not authorized.
+- Resulting consolidated PR: [PR #10](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/10), verified created OPEN on `docs/g0-live-data-governance`; initial head `8b858dc981541226ba3f24f5ba7653ee98acc8eb`. Review pending; merge not authorized.
 
 | Delta item | Disposition and evidence |
 | --- | --- |
