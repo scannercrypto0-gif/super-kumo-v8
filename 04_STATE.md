@@ -6,8 +6,8 @@ Official repository: [scannercrypto0-gif/super-kumo-v8](https://github.com/scann
 Official owner: `scannercrypto0-gif`
 Default branch: `main`
 Previously reviewed baseline: `f25f7072c9dea638d218c7f5e89f165e5a393096`
-Latest main inspected before PR #2 remediation: `879233525b2b716514076654d7c9195efaaf70b0`.
-PR head inspected before remediation: `741719fc4e0aecced10fa3317dc354339178f56a`.
+Latest main inspected before issue-form repair: `cc32203300a7c71b089811c90920beb6e39a48ac`.
+Historical PR #2 head before remediation: `741719fc4e0aecced10fa3317dc354339178f56a`.
 
 ## Bootstrap and active work
 
@@ -41,20 +41,27 @@ Claude reads `07_CLAUDE_HANDOFF.md` and independently challenges the architectur
 - Issue checklist reflects completed ChatGPT Round 1, documented open questions, STATE/WORK_LOG sync, and the documented WP-001 handoff. Claude review, critical-question resolution, contract/roadmap finalization, and owner approval remain unchecked.
 - [Traceability annotation](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/1#issuecomment-6285973428) associates the unchanged original architecture review with baseline `f25f7072c9dea638d218c7f5e89f165e5a393096` and distinguishes later documentation commit `879233525b2b716514076654d7c9195efaaf70b0`.
 
-### Proposed in PR #2 — not merged
+### Merged PR #2 — documentation governance cleanup
 
-- [PR #2](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/2) corrects canonical repository references, bootstrap/status documentation, and WP-000 remote acceptance; its .gitignore acceptance item remains unchecked.
+- [PR #2](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/2) was squash merged on 2026-10-20 as [cc32203300a7c71b089811c90920beb6e39a48ac](https://github.com/scannercrypto0-gif/super-kumo-v8/commit/cc32203300a7c71b089811c90920beb6e39a48ac), now published on main.
+- Canonical repository references, bootstrap/status documentation, and WP-000 public-remote acceptance are synchronized. The .gitignore acceptance item remains unchecked.
 - The one-time owner-authorized direct-to-main exception for `8792335` is documented; PR-first policy remains unchanged.
-- Owner explicitly expanded the original six-file PR scope to eight files by adding only `04_STATE.md` and `05_WORK_LOG.md` for documentation consistency.
-- The independent read-only review returned REQUEST CHANGES for STATE/WORK_LOG consistency. [Review findings and remediation record](05_WORK_LOG.md#2026-10-20--pr-2-governance-cleanup-and-consistency-remediation) preserve that result; this update addresses it without declaring subsequent review approval.
-- Merge remains pending. No application tests were executed.
+- The initial REQUEST CHANGES for STATE/WORK_LOG consistency and owner-authorized expansion to eight files remain recorded in [the historical work log](05_WORK_LOG.md#2026-10-20--pr-2-governance-cleanup-and-consistency-remediation). Final documentation verification recommended APPROVE; this was not architecture approval.
+- No application tests or CI success are claimed.
+
+### Current proposed work — issue-form repair, not merged
+
+- A new branch/PR repairs only `02_bug.yml`, `03_proposal.yml`, `04_question.yml`, `04_STATE.md`, and `05_WORK_LOG.md`.
+- Expanded attributes mappings preserve intended questions, IDs, required fields, dropdown choices, and template label names.
+- YAML parsing and local GitHub Issue Forms structure validation are performed against published GitHub documentation; no Issue submission or hosted form acceptance test is performed.
+- Form repairs remain proposed until this new PR is reviewed and merged. G0 and G0-001 remain OPEN.
 
 ### Remaining unresolved governance tasks
 
-- Review and approve or request changes on the amended PR; do not treat its unmerged file corrections as changes already present on main.
+- Review the new five-file issue-form repair PR; merge remains pending for that PR. PR #2 is already merged.
 - Create remaining `type:bug`, `type:proposal`, and `type:question` labels: previously verified absent; creation remains blocked by available tooling/authentication and is not performed in this remediation.
 - Verify remote .gitignore protections in a separately authorized task.
-- Existing issue-form schema concerns in `02_bug.yml` line 18, `03_proposal.yml` line 15, and `04_question.yml` line 14 remain outside this remediation: comma-containing inline label values need quoting or expanded mappings. YAML parsing success alone is not form-schema validation.
+- Previously invalid comma-containing inline label mappings in the three forms are repaired on this branch; verify the proposed PR before merge. Missing template labels remain a separate repository prerequisite.
 - Obtain Claude independent architecture review, resolve or explicitly defer critical questions with rationale, and obtain final owner approval. G0 and G0-001 remain OPEN; no architecture approval is complete.
 
 SESSION END: changes/commit | tests/evidence | decisions | blockers | active WP | next exact task | reviewer.
