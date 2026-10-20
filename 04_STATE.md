@@ -9,13 +9,13 @@ Official repository: [scannercrypto0-gif/super-kumo-v8](https://github.com/scann
 Official owner: `scannercrypto0-gif`
 Default branch: `main`
 Previously reviewed baseline: `f25f7072c9dea638d218c7f5e89f165e5a393096`
-Latest actual main inspected for ATLAS-001: `b98b4231447b3f57570628b0808496439c745d80`.
+Latest actual main inspected for ATLAS-002: `64b47b5c929221277456a85f549183f9e5757d40`.
 Historical PR #2 head before remediation: `741719fc4e0aecced10fa3317dc354339178f56a`.
 
 ## Bootstrap and active work
 
 - WP-000 repository/governance bootstrap: governance files and Issue templates published on GitHub; owner review remains pending. This is not a gate-completion claim.
-- Active work: [G0-001 architecture review — Issue #1](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/1) — OPEN.
+- Active architecture work: [G0-001 architecture review — Issue #1](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/1) — OPEN.
 - Done: initial architecture pack, repository publication, session/handoff protocols, work-package tracking, and [ChatGPT architecture review — Round 1](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/1#issuecomment-6285495222).
 - Review verdict: **CONDITIONALLY ACCEPTABLE — NOT YET APPROVED**.
 - Pending: Claude independent review, resolution or explicit justified deferral of critical questions, final owner contract approval, and gate sign-off.
@@ -33,6 +33,8 @@ Historical PR #2 head before remediation: `741719fc4e0aecced10fa3317dc354339178f
 Other open questions: event provider access/rights and PC OS/recovery constraints.
 
 ## Next exact task
+
+Current documentation item: **ATLAS-002 — Session Continuity and Mandatory Automatic Work Handoff**, proposed in [PR #5](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/5) on `docs/atlas-session-continuity`; review before deciding on merge. No merge is authorized by this task. After documentation sync, the next substantive work item remains G0-001: Claude independent review and owner resolution of the open architecture questions. No implementation is authorized.
 
 Claude reads `07_CLAUDE_HANDOFF.md` and independently challenges the architecture review; availability recorded in the handoff is Thu 2026-10-22 13:00 Asia/Riyadh. The owner resolves or explicitly defers critical questions, approves the final contract, and authorizes G0 closure before G1 Market Foundation / WP-001 implementation. G0 and G0-001 remain OPEN. No production implementation is authorized by this review.
 
@@ -58,17 +60,23 @@ Claude reads `07_CLAUDE_HANDOFF.md` and independently challenges the architectur
 - The repaired mappings preserve intended questions, IDs, required fields, dropdown choices and labels. Prior YAML parsing and local structure evidence is retained; no repeated form tests are performed by ATLAS-001.
 - GitHub UI smoke test was BLOCKED by browser sign-in; hosted functional PASS is not claimed.
 
-### ATLAS-001 — identity migration proposed in this PR
+### ATLAS-001 — identity migration merged
 
 - Owner approved ATLAS Quant Lab as the provisional name and `AQL-CRYPTO-RESEARCH-001` as the canonical Project ID; repository and owner remain `scannercrypto0-gif/super-kumo-v8` and `scannercrypto0-gif`.
-- Current-facing documentation and session identity checks are updated on `docs/atlas-project-identity`; merge of this identity PR remains pending.
+- [PR #4](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/4) was squash merged as [64b47b5c929221277456a85f549183f9e5757d40](https://github.com/scannercrypto0-gif/super-kumo-v8/commit/64b47b5c929221277456a85f549183f9e5757d40); canonical identity and session checks are published on main.
 - Former name SUPER KUMO V8, legitimate history, commit/Issue/PR links, legacy technical version names and architecture meaning are preserved.
 - New sessions must verify Project ID and canonical repository before using earlier context; stop on mismatch. Unrelated V7 step 311, `gate_spot_cvd.py`, or other-project conversations are not authoritative implementation evidence.
 - G0 and G0-001 remain OPEN. No architecture approval, operational implementation, repository rename or settings change is authorized by this migration.
 
+### ATLAS-002 — proactive handoff implementation pending merge
+
+- PR #5 integrates the owner-approved logical pending-change ledger, proactive checkpoints, one consolidated Work instruction, direct authorized-write alternative and next-session reconciliation into existing protocols and template.
+- Confirmed facts/hypotheses and approved/proposed decisions remain distinct; no upload is claimed without tool evidence. No duplicate governance document or background agent runtime is created.
+- Implementation is on the PR branch, not published on main until merge. G0 and Issue #1 remain OPEN.
+
 ### Remaining unresolved governance tasks
 
-- Review this identity migration PR; its merge remains pending. PR #2 and PR #3 are already merged.
+- Review ATLAS-002 session-continuity documentation; its merge remains pending. PR #2, PR #3 and PR #4 are already merged.
 - Create remaining `type:bug`, `type:proposal`, and `type:question` labels: previously verified absent; creation remains blocked by available tooling/authentication and is not performed in this remediation.
 - Verify remote .gitignore protections in a separately authorized task.
 - Hosted Issue Forms smoke verification remains blocked by browser sign-in; missing template labels remain a separate repository prerequisite.
