@@ -1,4 +1,5 @@
-# GitHub Operating Model — V8
+# GitHub Operating Model — ATLAS Quant Lab
+Project ID: `AQL-CRYPTO-RESEARCH-001`.
 Status: PROPOSED — requires owner approval
 Canonical remote: https://github.com/scannercrypto0-gif/super-kumo-v8
 

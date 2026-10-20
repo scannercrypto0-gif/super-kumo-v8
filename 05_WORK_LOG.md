@@ -37,3 +37,15 @@ Created local Git repository baseline, README, .gitignore, session/handoff proto
 - STATE now distinguishes merged PR #2 governance cleanup from this proposed form-repair PR. No application tests executed; no CI success or GitHub-hosted form acceptance is claimed.
 - No Issues or labels created/edited; no credentials, secrets, architecture files, or application code added. Missing `type:bug`, `type:proposal`, `type:question` labels and remote .gitignore verification remain separate tasks.
 - Next exact task: review the new five-file PR and decide whether to merge; no merge performed. G0 and G0-001 remain OPEN; architecture approval remains pending.
+
+## 2026-10-20 — ATLAS-001 project identity migration
+
+- Owner approved provisional project name **ATLAS Quant Lab** and Project ID `AQL-CRYPTO-RESEARCH-001`; former name SUPER KUMO V8 is retained for historical traceability.
+- Official owner `scannercrypto0-gif` and repository [scannercrypto0-gif/super-kumo-v8](https://github.com/scannercrypto0-gif/super-kumo-v8) remain unchanged; no repository rename or GitHub settings change.
+- Latest main inspected: `b98b4231447b3f57570628b0808496439c745d80`. [PR #3](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/3) is already merged at `b98b4231447b3f57570628b0808496439c745d80`; prior pending-merge entries above are historical snapshots. Its UI smoke test was blocked by sign-in, not passed.
+- Branch `docs/atlas-project-identity` carries only current-facing documentation identity updates, session/context isolation, and STATE/WORK_LOG synchronization. The identity PR is not merged.
+- New ChatGPT, Work and Claude sessions must verify Project ID and canonical repository before using previous context; stop and report a possible cross-project context collision if either mismatches.
+- Unrelated V7 step 311, `gate_spot_cvd.py`, and other-project conversations are not authoritative evidence of ATLAS Quant Lab implementation. Legitimate repository history, legacy references, Issues, PRs and commits remain intact.
+- Smart Validation only: changed-file/scope check, canonical identity/link consistency, and append-only historical log preservation. No application tests or unrelated reviews run.
+- Operational V8 implementation is not yet verified or started; architecture decisions, strategy logic, data schemas and application code are unchanged. G0 and G0-001 remain OPEN; architecture approval remains pending.
+- Next exact task: review the identity migration PR; merge remains pending.

@@ -1,4 +1,5 @@
-# V8 Architecture & Engineering Contract v1.0 — DRAFT
+# ATLAS Quant Lab Architecture & Engineering Contract v1.0 — DRAFT
+Project ID: `AQL-CRYPTO-RESEARCH-001`. Former project name: SUPER KUMO V8. This identity-only heading update does not alter the technical contract.
 Goal: Binance Spot USDT research platform, momentum first, then pre-run and accumulation; independent paper traders; news/event intelligence; controlled shadow experiments.
 Architecture: Python modular monolith, shared market-data adapter/cache, point-in-time feature engine, observation and outcome tracker, versioned trader plug-ins, deterministic paper fill engine, event adapters, research lab, scheduler, Supabase operational storage, durable local offline spool. Bulk historical datasets may live in object storage.
 Trader output: WATCH / ARMED / TRIGGERED / CLOSED, plus EXPIRED / CANCELLED. Conditional entry, invalidation, stops, targets and expiry. Independent same-symbol trades; flag correlated outcomes.

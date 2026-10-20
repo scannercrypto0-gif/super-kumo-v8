@@ -1,4 +1,7 @@
-# CURRENT STATE — update every session
+# ATLAS Quant Lab — CURRENT STATE
+Project ID: `AQL-CRYPTO-RESEARCH-001`
+Former name: SUPER KUMO V8
+Operational V8 implementation: not yet verified or started.
 
 Date: 2026-10-20
 Gate: G0 OPEN (owner sign-off pending)
@@ -6,7 +9,7 @@ Official repository: [scannercrypto0-gif/super-kumo-v8](https://github.com/scann
 Official owner: `scannercrypto0-gif`
 Default branch: `main`
 Previously reviewed baseline: `f25f7072c9dea638d218c7f5e89f165e5a393096`
-Latest main inspected before issue-form repair: `cc32203300a7c71b089811c90920beb6e39a48ac`.
+Latest actual main inspected for ATLAS-001: `b98b4231447b3f57570628b0808496439c745d80`.
 Historical PR #2 head before remediation: `741719fc4e0aecced10fa3317dc354339178f56a`.
 
 ## Bootstrap and active work
@@ -49,19 +52,26 @@ Claude reads `07_CLAUDE_HANDOFF.md` and independently challenges the architectur
 - The initial REQUEST CHANGES for STATE/WORK_LOG consistency and owner-authorized expansion to eight files remain recorded in [the historical work log](05_WORK_LOG.md#2026-10-20--pr-2-governance-cleanup-and-consistency-remediation). Final documentation verification recommended APPROVE; this was not architecture approval.
 - No application tests or CI success are claimed.
 
-### Current proposed work — issue-form repair, not merged
+### Merged PR #3 — issue-form repair
 
-- A new branch/PR repairs only `02_bug.yml`, `03_proposal.yml`, `04_question.yml`, `04_STATE.md`, and `05_WORK_LOG.md`.
-- Expanded attributes mappings preserve intended questions, IDs, required fields, dropdown choices, and template label names.
-- YAML parsing and local GitHub Issue Forms structure validation are performed against published GitHub documentation; no Issue submission or hosted form acceptance test is performed.
-- Form repairs remain proposed until this new PR is reviewed and merged. G0 and G0-001 remain OPEN.
+- [PR #3](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/3) was squash merged as [b98b4231447b3f57570628b0808496439c745d80](https://github.com/scannercrypto0-gif/super-kumo-v8/commit/b98b4231447b3f57570628b0808496439c745d80).
+- The repaired mappings preserve intended questions, IDs, required fields, dropdown choices and labels. Prior YAML parsing and local structure evidence is retained; no repeated form tests are performed by ATLAS-001.
+- GitHub UI smoke test was BLOCKED by browser sign-in; hosted functional PASS is not claimed.
+
+### ATLAS-001 — identity migration proposed in this PR
+
+- Owner approved ATLAS Quant Lab as the provisional name and `AQL-CRYPTO-RESEARCH-001` as the canonical Project ID; repository and owner remain `scannercrypto0-gif/super-kumo-v8` and `scannercrypto0-gif`.
+- Current-facing documentation and session identity checks are updated on `docs/atlas-project-identity`; merge of this identity PR remains pending.
+- Former name SUPER KUMO V8, legitimate history, commit/Issue/PR links, legacy technical version names and architecture meaning are preserved.
+- New sessions must verify Project ID and canonical repository before using earlier context; stop on mismatch. Unrelated V7 step 311, `gate_spot_cvd.py`, or other-project conversations are not authoritative implementation evidence.
+- G0 and G0-001 remain OPEN. No architecture approval, operational implementation, repository rename or settings change is authorized by this migration.
 
 ### Remaining unresolved governance tasks
 
-- Review the new five-file issue-form repair PR; merge remains pending for that PR. PR #2 is already merged.
+- Review this identity migration PR; its merge remains pending. PR #2 and PR #3 are already merged.
 - Create remaining `type:bug`, `type:proposal`, and `type:question` labels: previously verified absent; creation remains blocked by available tooling/authentication and is not performed in this remediation.
 - Verify remote .gitignore protections in a separately authorized task.
-- Previously invalid comma-containing inline label mappings in the three forms are repaired on this branch; verify the proposed PR before merge. Missing template labels remain a separate repository prerequisite.
+- Hosted Issue Forms smoke verification remains blocked by browser sign-in; missing template labels remain a separate repository prerequisite.
 - Obtain Claude independent architecture review, resolve or explicitly defer critical questions with rationale, and obtain final owner approval. G0 and G0-001 remain OPEN; no architecture approval is complete.
 
 SESSION END: changes/commit | tests/evidence | decisions | blockers | active WP | next exact task | reviewer.
