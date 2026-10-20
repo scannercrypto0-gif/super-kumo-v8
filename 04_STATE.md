@@ -9,7 +9,7 @@ Official repository: [scannercrypto0-gif/super-kumo-v8](https://github.com/scann
 Official owner: `scannercrypto0-gif`
 Default branch: `main`
 Previously reviewed baseline: `f25f7072c9dea638d218c7f5e89f165e5a393096`
-Latest actual main inspected for ATLAS-002: `64b47b5c929221277456a85f549183f9e5757d40`.
+Latest actual main inspected for provisional Paper Trading decisions: `ed188f1902d397fe74613dd966c5a3e88b32f8c0`.
 Historical PR #2 head before remediation: `741719fc4e0aecced10fa3317dc354339178f56a`.
 
 ## Bootstrap and active work
@@ -22,11 +22,11 @@ Historical PR #2 head before remediation: `741719fc4e0aecced10fa3317dc354339178f
 - Not implemented/verified: application code/tests, Supabase provisioning, and Binance benchmarks. No application tests were executed during this documentation review.
 - Remote inventory: `.gitignore` is absent from the inspected main tree; earlier local bootstrap records do not establish remote presence.
 
-## Five unresolved architecture areas
+## Five architecture areas — provisional progress, final review open
 
-1. Paper execution: deterministic entry/fill rules, fees, slippage, no-fill, gaps, and same-bar TP/SL ambiguity.
+1. Paper execution: owner selected provisional G0-PAPER-01–07 rules; detailed parameters, independent review and final approval remain open.
 2. Temporal integrity: candle close time, ingestion time, decision cutoff, and historical replay visibility.
-3. Recovery/idempotency: durable queue ownership, idempotency keys, duplicate detection, restart behavior, and recovery acceptance tests.
+3. Recovery/idempotency: G0-PAPER-08 provisionally records continuity/replay requirements; physical durable queue ownership, exact keys and implementation evidence remain open.
 4. Research methodology: baselines, sample eligibility, experiment registration, temporal holdouts, and shadow promotion criteria.
 5. Operational budgets: initial Binance API budget, Supabase storage, and data-retention assumptions; any deferral needs bounded risk and rationale.
 
@@ -34,7 +34,7 @@ Other open questions: event provider access/rights and PC OS/recovery constraint
 
 ## Next exact task
 
-Current documentation item: **ATLAS-002 — Session Continuity and Mandatory Automatic Work Handoff**, proposed in [PR #5](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/5) on `docs/atlas-session-continuity`; review before deciding on merge. No merge is authorized by this task. After documentation sync, the next substantive work item remains G0-001: Claude independent review and owner resolution of the open architecture questions. No implementation is authorized.
+Current documentation item: provisional G0-PAPER-01–08 architecture documentation on `docs/g0-paper-decisions`, awaiting PR review and merge authorization. Next: Claude independent review and owner resolution of deferred parameters/final G0 approval. No implementation, live trading or gate closure is authorized.
 
 Claude reads `07_CLAUDE_HANDOFF.md` and independently challenges the architecture review; availability recorded in the handoff is Thu 2026-10-22 13:00 Asia/Riyadh. The owner resolves or explicitly defers critical questions, approves the final contract, and authorizes G0 closure before G1 Market Foundation / WP-001 implementation. G0 and G0-001 remain OPEN. No production implementation is authorized by this review.
 
@@ -68,15 +68,24 @@ Claude reads `07_CLAUDE_HANDOFF.md` and independently challenges the architectur
 - New sessions must verify Project ID and canonical repository before using earlier context; stop on mismatch. Unrelated V7 step 311, `gate_spot_cvd.py`, or other-project conversations are not authoritative implementation evidence.
 - G0 and G0-001 remain OPEN. No architecture approval, operational implementation, repository rename or settings change is authorized by this migration.
 
-### ATLAS-002 — proactive handoff implementation pending merge
+### ATLAS-002 — proactive handoff merged
 
 - PR #5 integrates the owner-approved logical pending-change ledger, proactive checkpoints, one consolidated Work instruction, direct authorized-write alternative and next-session reconciliation into existing protocols and template.
 - Confirmed facts/hypotheses and approved/proposed decisions remain distinct; no upload is claimed without tool evidence. No duplicate governance document or background agent runtime is created.
-- Implementation is on the PR branch, not published on main until merge. G0 and Issue #1 remain OPEN.
+- [PR #5](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/5) is merged at `ed188f1902d397fe74613dd966c5a3e88b32f8c0`; proactive handoff instructions are on main. G0 and Issue #1 remain OPEN.
+
+### G0 Paper Trading decisions — provisional, documentation PR not merged
+
+- Project: ATLAS Quant Lab / `AQL-CRYPTO-RESEARCH-001`. Owner selected option C for all eight [G0-PAPER-01–08](03_DECISIONS.md#g0-paper-trading-decisions--owner-selected-provisional-rules), including ambiguity best/worst aggregates and exit-research extensions.
+- Status: **PROVISIONALLY OWNER-APPROVED — NOT FINAL G0 APPROVAL**. New rules in this PR are documentation proposals until merge; no implemented functionality is claimed.
+- Reference notional: provisionally 1,000 USDT; 100/10,000 USDT sensitivity examples depend on evidence. Future capital/10% allocation brainstorming is not risk policy or live authorization.
+- Deferred: execution thresholds/sources, exact dedup keys, fee schedules/effective-date evidence, strategy expiry, TP1/TP2 levels, stop timing, partial exits, post-exit horizons and promotion criteria. Best/worst outcome bounds and stress costs remain independent; gaps/AMBIGUOUS are not verified results.
+- Future Lab/Shadow counterfactuals remain isolated from original closed paper trades. Final architecture review and owner gate approval remain pending.
+- [PR #6](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/6) independently proposes future dashboard documentation and is still OPEN/unmerged at inspection. Do not treat that requirement as implemented; preserve its roadmap/STATE/LOG changes when later reconciling overlapping documentation.
 
 ### Remaining unresolved governance tasks
 
-- Review ATLAS-002 session-continuity documentation; its merge remains pending. PR #2, PR #3 and PR #4 are already merged.
+- Review this provisional Paper Trading documentation PR; reconcile its overlapping STATE/WORK_LOG edits with PR #6 before merging either after the other. PR #2 through PR #5 are already merged.
 - Create remaining `type:bug`, `type:proposal`, and `type:question` labels: previously verified absent; creation remains blocked by available tooling/authentication and is not performed in this remediation.
 - Verify remote .gitignore protections in a separately authorized task.
 - Hosted Issue Forms smoke verification remains blocked by browser sign-in; missing template labels remain a separate repository prerequisite.

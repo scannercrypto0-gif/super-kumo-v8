@@ -66,3 +66,14 @@ Created local Git repository baseline, README, .gitignore, session/handoff proto
 - SESSION_PROTOCOL is the behavior source; COMMUNICATION_PROTOCOL and START_HERE link to it; HANDOFF_TEMPLATE contains one reusable Work instruction block. STATE records branch-only implementation pending merge.
 - Smart Validation limited to identity/protocol consistency and exact six-document scope; all previous log entries preserved. No application tests or unrelated reviews run.
 - No architecture/trading approvals, Issues, labels, settings or application code changed. G0 and Issue #1 remain OPEN. Next: owner reviews PR #5; merge is not authorized.
+
+## 2026-10-20 — Provisional G0 Paper Trading decisions 01–08
+
+- Verified ATLAS Quant Lab / `AQL-CRYPTO-RESEARCH-001` and canonical repository `scannercrypto0-gif/super-kumo-v8`; current main `ed188f1902d397fe74613dd966c5a3e88b32f8c0`. ATLAS-002 / PR #5 is merged; PR #6 dashboard documentation is OPEN/unmerged and left untouched.
+- Owner-provided handoff selects option C for G0-PAPER-01–08 with ambiguity and exit-research extensions. Status: **PROVISIONALLY OWNER-APPROVED — NOT FINAL G0 APPROVAL**.
+- Captured full owner rules in the existing decision register; contract invariants, residual risks, conceptual schema/event requirements and future regression expectations refer to that source. Existing ADR IDs, enums, versions and technical history preserved.
+- Provisional 1,000 USDT reference notional is research-only; 100/10,000 USDT are sensitivity examples. Future real-capital/10% allocation discussion is nonbinding, not funded capital, approved risk policy or live authorization. No fixed Binance fee percentage adopted; official effective schedule must be checked at implementation.
+- Exact strategy entry/expiry/exit values, adjustment timing, partial quantities, post-exit horizons, identity keys and promotion criteria remain deferred. Future Lab/Shadow paths must not rewrite original trade decisions/results.
+- Documentation-only branch `docs/g0-paper-decisions`; one consolidated PR targeting main, no merge. STATE/WORK_LOG overlap with pending PR #6 requires preserving both sets on later reconciliation; no dashboard changes overwritten.
+- Lightweight validation: eight unique decision IDs, canonical internal references/identity, full owner-decision text preservation, historical log prefix and documentation-only scope. Future scenarios specified, not executed; no application tests or implementation.
+- No Issues closed or edited, strategy promoted, live execution, tables/migrations or infrastructure created. G0/G0-001 remain OPEN; next action is independent review and owner resolution/final approval.

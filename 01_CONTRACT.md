@@ -10,3 +10,17 @@ Data: only closed bars at decision cutoff, UTC times, versioned features and sch
 Operations: adaptive API-weight-aware scans, cache, retry/backoff, idempotency, offline spool, restore tests, telemetry, secrets in environment, migration control.
 Change control: all interface/schema changes require ADR; every work package needs scope, non-goals, measurable tests, evidence, rollback, reviewer verdict and owner signoff.
 Known unknowns: API budgets, Supabase retention/cost, provider rights, PC restart reliability, exact paper fill model. These are work packages, not assumptions.
+
+## Provisional paper-trading invariants — G0-PAPER-01–08
+
+**Status: PROVISIONALLY OWNER-APPROVED — NOT FINAL G0 APPROVAL.**
+The detailed owner-selected rules, rationale, extensions and unresolved parameters are canonical in [03_DECISIONS.md](03_DECISIONS.md#g0-paper-trading-decisions--owner-selected-provisional-rules). This addendum refines the draft only; no functionality is implemented or final G0 approval granted.
+
+- G0-PAPER-01: conditional fills only; immediate entry uses the first eligible observable price after signal availability. No-fill, expiry and rejection remain distinguishable; no look-ahead.
+- G0-PAPER-02: legitimately available finer data may resolve ordering. Otherwise factual AMBIGUOUS persists; separate worst-stop-first/best-target-first research scenarios propagate to aggregate performance. Best case is not verified realized performance; ordering and cost uncertainty stay separate.
+- G0-PAPER-03/04: record gross, baseline net and stress-cost results with versioned assumptions, fee provenance/effective dates and liquidity evidence. Reference notional is provisionally 1,000 USDT; 100/10,000 USDT are proposed sensitivity examples, not portfolio sizing or live risk policy. Missing data cannot imply perfect execution; no fixed Binance fee is adopted.
+- G0-PAPER-05/06: traders and Shadows remain independent; deduplicate materially identical active opportunities within each trader under explicit identity rules, report overlap/correlation, and allow Telegram grouping without record merging. Freeze strategy-specific validity/invalidation policies; entry expiry differs from post-fill holding duration. No universal Momentum expiry is fixed.
+- G0-PAPER-07: common exit evaluator supports predeclared strategy-specific exit rules. Snapshot rules at trade creation, timestamp permitted adjustments, separate exit reason/price/cost, and retain chronological ambiguity. Future partial exits remain deferred. Post-exit observation and fixed/raised-stop comparisons belong to isolated reproducible Lab/Shadow paths, never rewriting original closed trades.
+- G0-PAPER-08: durable recovery retains pending/open state, versions and progress; replay missing eligible market events chronologically and idempotently. Separate market/ingestion/recovery times, preserve corrections with audit history, never exit solely at stale prices, and never fabricate real-time decisions. Unrecoverable gaps remain unresolved and outside confirmed performance unless resolved or transparently scenario-analyzed.
+
+Exact execution parameters, strategy TP/SL values, stop timing, partial quantities, post-exit horizons and promotion thresholds remain undecided. Numerical capital brainstorming in the register is explicitly nonbinding. Temporal/research/operations questions beyond this subset and final independent review remain open. No live trading or portfolio implementation is authorized.
