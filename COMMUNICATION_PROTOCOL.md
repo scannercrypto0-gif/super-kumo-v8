@@ -31,6 +31,10 @@ At every session end update state, work log, unresolved issues and handoff.
 
 The owner-approved proactive checkpoint/ledger behavior is defined once in [SESSION_PROTOCOL.md](SESSION_PROTOCOL.md#proactive-work-handoff--owner-approved-atlas-002-requirement). Use [HANDOFF_TEMPLATE.md](HANDOFF_TEMPLATE.md) for ONE consolidated copy-ready Work instruction when direct authorized writes are unavailable; no repeated user request is needed. Existing comment format above still applies to actual issue/PR communication. A handoff is not proof of upload or approval; report tool-confirmed links and distinguish pending, branch and merged outcomes. Reading this protocol grants no extra write/merge or person-directed messaging authorization.
 
+## Cross-chat completeness
+
+[G0-GOV-01](03_DECISIONS.md#g0-gov-01--work-handoff-continuity-and-completeness) is the owner-approved provisional rule for all future Work handoffs. Read [HANDOFF_REGISTER.md](HANDOFF_REGISTER.md) before constructing a new delta. Another chat or claimed submission is evidence only when actually retrieved or explicitly owner-confirmed; identify inaccessible references and request them instead of claiming complete coverage. Use the existing handoff template to record the audit and register update.
+
 ## Example
 From: Claude
 To: ChatGPT
