@@ -58,3 +58,11 @@ Created local Git repository baseline, README, .gitignore, session/handoff proto
 - STATE identifies ATLAS-002 as the proposed documentation task and G0-001 as the next substantive architecture-review work. Branch `docs/atlas-session-continuity`; PR merge remains pending.
 - Smart Validation: canonical identity consistency, startup targets exist, necessary documentation-only scope; previous log preserved. No application tests or unrelated reviews run.
 - No architecture decisions, strategy logic, schemas, application code, Issues or settings changed. G0 and Issue #1 remain OPEN. Next: review this continuity PR; no implementation or gate closure authorized.
+
+## 2026-10-20 — ATLAS-002 mandatory proactive Work handoff
+
+- Updated existing [PR #5](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/5); no duplicate PR or governance document created.
+- Integrated owner-approved pending-change ledger categories, checkpoint triggers, automatic consolidated copy-ready Work instruction, confirmed direct-write alternative, evidence-based persistence reporting and next-session reconciliation.
+- SESSION_PROTOCOL is the behavior source; COMMUNICATION_PROTOCOL and START_HERE link to it; HANDOFF_TEMPLATE contains one reusable Work instruction block. STATE records branch-only implementation pending merge.
+- Smart Validation limited to identity/protocol consistency and exact six-document scope; all previous log entries preserved. No application tests or unrelated reviews run.
+- No architecture/trading approvals, Issues, labels, settings or application code changed. G0 and Issue #1 remain OPEN. Next: owner reviews PR #5; merge is not authorized.

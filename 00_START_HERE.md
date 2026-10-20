@@ -44,4 +44,8 @@ Resume map: current phase and active task → STATE's “Bootstrap and active wo
 
 ## Reusable startup prompt
 
-> Resume ATLAS Quant Lab, Project ID AQL-CRYPTO-RESEARCH-001, from https://github.com/scannercrypto0-gif/super-kumo-v8. Verify both identity fields on latest main before using previous context; stop on mismatch. Follow 00_START_HERE.md's reading order, report current gate, active task, blockers and next authorized action, then work only within approved scope. Update STATE and append WORK_LOG with evidence links through the authorized PR workflow; do not close G0 without owner approval.
+> Resume ATLAS Quant Lab (AQL-CRYPTO-RESEARCH-001) from https://github.com/scannercrypto0-gif/super-kumo-v8 and follow 00_START_HERE.md. Verify identity on latest main; stop on mismatch. Activate SESSION_PROTOCOL.md's proactive pending-change ledger and checkpoint handoffs: automatically provide one consolidated copy-ready Work instruction when meaningful work is ready, or perform already-authorized direct writes and return evidence. Reconcile pending items with GitHub; keep G0 OPEN.
+
+## Proactive documentation and Work handoff
+
+Every session must follow [SESSION_PROTOCOL.md](SESSION_PROTOCOL.md#proactive-work-handoff--owner-approved-atlas-002-requirement) and use [HANDOFF_TEMPLATE.md](HANDOFF_TEMPLATE.md). The user need not ask again to document meaningful completed work or prepare a consolidated Work instruction. No handoff is needed for an empty change set; do not duplicate already-confirmed direct GitHub work.

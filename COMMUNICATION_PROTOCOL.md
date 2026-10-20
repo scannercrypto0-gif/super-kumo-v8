@@ -27,6 +27,10 @@ Read README, 00_START_HERE, 04_STATE, 02_ROADMAP, GITHUB_OPERATING_MODEL, open a
 Record last reviewed commit SHA; do not trust old copies.
 At every session end update state, work log, unresolved issues and handoff.
 
+## Work handoff delivery
+
+The owner-approved proactive checkpoint/ledger behavior is defined once in [SESSION_PROTOCOL.md](SESSION_PROTOCOL.md#proactive-work-handoff--owner-approved-atlas-002-requirement). Use [HANDOFF_TEMPLATE.md](HANDOFF_TEMPLATE.md) for ONE consolidated copy-ready Work instruction when direct authorized writes are unavailable; no repeated user request is needed. Existing comment format above still applies to actual issue/PR communication. A handoff is not proof of upload or approval; report tool-confirmed links and distinguish pending, branch and merged outcomes. Reading this protocol grants no extra write/merge or person-directed messaging authorization.
+
 ## Example
 From: Claude
 To: ChatGPT
