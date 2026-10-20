@@ -4,12 +4,14 @@ Former name: SUPER KUMO V8
 Operational V8 implementation: not yet verified or started.
 
 Date: 2026-10-20
+Snapshot verified_at: 2026-10-20T10:47:11Z (13:47:11 Asia/Riyadh, UTC+03:00)
+Verification source: GitHub main/ref, PR #6–#10 APIs, Issue #1 API and commit-pinned documentation. Scope: documentary state; runtime implementation UNVERIFIED.
 Gate: G0 OPEN (owner sign-off pending)
 Official repository: [scannercrypto0-gif/super-kumo-v8](https://github.com/scannercrypto0-gif/super-kumo-v8) — Public
 Official owner: `scannercrypto0-gif`
 Default branch: `main`
 Previously reviewed baseline: `f25f7072c9dea638d218c7f5e89f165e5a393096`
-Latest actual main inspected for ATLAS-002: `64b47b5c929221277456a85f549183f9e5757d40`.
+Latest actual main inspected for G0 reconciliation: `ed188f1902d397fe74613dd966c5a3e88b32f8c0`.
 Historical PR #2 head before remediation: `741719fc4e0aecced10fa3317dc354339178f56a`.
 
 ## Bootstrap and active work
@@ -22,19 +24,20 @@ Historical PR #2 head before remediation: `741719fc4e0aecced10fa3317dc354339178f
 - Not implemented/verified: application code/tests, Supabase provisioning, and Binance benchmarks. No application tests were executed during this documentation review.
 - Remote inventory: `.gitignore` is absent from the inspected main tree; earlier local bootstrap records do not establish remote presence.
 
-## Five unresolved architecture areas
+## Five architecture areas — provisional requirements, final review OPEN
 
-1. Paper execution: deterministic entry/fill rules, fees, slippage, no-fill, gaps, and same-bar TP/SL ambiguity.
-2. Temporal integrity: candle close time, ingestion time, decision cutoff, and historical replay visibility.
-3. Recovery/idempotency: durable queue ownership, idempotency keys, duplicate detection, restart behavior, and recovery acceptance tests.
-4. Research methodology: baselines, sample eligibility, experiment registration, temporal holdouts, and shadow promotion criteria.
-5. Operational budgets: initial Binance API budget, Supabase storage, and data-retention assumptions; any deferral needs bounded risk and rationale.
+1. Paper execution: PAPER-01–08 are preserved in this reconciliation proposal, including conditional fills, factual ambiguity, independent cost stress, reference-notional limits, independent traders, frozen validity/exits and isolated counterfactuals. Numeric execution/policy parameters and implementation evidence remain open.
+2. Temporal integrity: TIME-01–09 and INT-04 require trader-specific proven availability, provisional/completed status and explicit policy permission for any qualifying completed-candle fallback; otherwise block and record why. No later recovered/finalized values become earlier knowledge.
+3. Recovery/idempotency: PAPER-08 and DATA-05–08 preserve durable state, chronological event replay, no duplicated fills/closes/alerts/accounting, residual gaps and ambiguity. Physical queue ownership/keys and runtime acceptance remain unresolved/NOT TESTED.
+4. Research methodology: historical development/OOS/prospective forward and target/off-target specialist evidence remain separate; all-opportunity context stays immutable. Owner A–G, detector reliability, sample adequacy and independent Shadow/Lab evidence are preserved. Thresholds and final promotion approval remain open.
+5. Operational budgets: DATA-01–08 preserve shared acquisition/cache/provider budgets, pre-operational library coverage and strict background isolation. Numeric budgets, providers/rights, retention, concurrency and measured objectives remain unresolved; no guaranteed zero cost or 30-second SLA. Paid services require prior owner approval.
 
 Other open questions: event provider access/rights and PC OS/recovery constraints.
 
 ## Next exact task
 
-Current documentation item: **ATLAS-002 — Session Continuity and Mandatory Automatic Work Handoff**, proposed in [PR #5](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/5) on `docs/atlas-session-continuity`; review before deciding on merge. No merge is authorized by this task. After documentation sync, the next substantive work item remains G0-001: Claude independent review and owner resolution of the open architecture questions. No implementation is authorized.
+Current documentation item: owner-authorized G0 integration reconciliation on `docs/g0-integration-reconciliation`, prepared for one documentation PR targeting main. Source proposals remain OPEN/unmerged; this branch preserves their requirements without modifying them. INT-01–06 are provisionally owner-approved, not final G0 approval. PR publication/review/merge is not inferred from this pre-publication snapshot.
+Next exact action: owner reviews the resulting reconciliation PR and validation evidence, decides source-PR disposition/integration sequence and separately authorizes any merge. No application implementation or source PR merge/closure is authorized.
 
 Claude reads `07_CLAUDE_HANDOFF.md` and independently challenges the architecture review; availability recorded in the handoff is Thu 2026-10-22 13:00 Asia/Riyadh. The owner resolves or explicitly defers critical questions, approves the final contract, and authorizes G0 closure before G1 Market Foundation / WP-001 implementation. G0 and G0-001 remain OPEN. No production implementation is authorized by this review.
 
@@ -68,18 +71,37 @@ Claude reads `07_CLAUDE_HANDOFF.md` and independently challenges the architectur
 - New sessions must verify Project ID and canonical repository before using earlier context; stop on mismatch. Unrelated V7 step 311, `gate_spot_cvd.py`, or other-project conversations are not authoritative implementation evidence.
 - G0 and G0-001 remain OPEN. No architecture approval, operational implementation, repository rename or settings change is authorized by this migration.
 
-### ATLAS-002 — proactive handoff implementation pending merge
+### ATLAS-002 — proactive handoff merged
 
 - PR #5 integrates the owner-approved logical pending-change ledger, proactive checkpoints, one consolidated Work instruction, direct authorized-write alternative and next-session reconciliation into existing protocols and template.
 - Confirmed facts/hypotheses and approved/proposed decisions remain distinct; no upload is claimed without tool evidence. No duplicate governance document or background agent runtime is created.
-- Implementation is on the PR branch, not published on main until merge. G0 and Issue #1 remain OPEN.
+- [PR #5](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/5) was squash merged as [ed188f1902d397fe74613dd966c5a3e88b32f8c0](https://github.com/scannercrypto0-gif/super-kumo-v8/commit/ed188f1902d397fe74613dd966c5a3e88b32f8c0); session continuity and proactive handoff instructions are published on main. G0 and Issue #1 remain OPEN.
 
 ### Remaining unresolved governance tasks
 
-- Review ATLAS-002 session-continuity documentation; its merge remains pending. PR #2, PR #3 and PR #4 are already merged.
-- Create remaining `type:bug`, `type:proposal`, and `type:question` labels: previously verified absent; creation remains blocked by available tooling/authentication and is not performed in this remediation.
+- Review this reconciliation proposal. PR #2 through PR #5 are merged; #6–#10 remain OPEN/unmerged at the evidence timestamp. Future dashboard requirement is preserved; implementation is owner-deferred until operational records exist.
+- Remaining `type:bug`, `type:proposal`, and `type:question` label inventory: UNVERIFIED in this task; earlier absence/tooling reports are historical. No labels are changed.
 - Verify remote .gitignore protections in a separately authorized task.
 - Hosted Issue Forms smoke verification remains blocked by browser sign-in; missing template labels remain a separate repository prerequisite.
 - Obtain Claude independent architecture review, resolve or explicitly defer critical questions with rationale, and obtain final owner approval. G0 and G0-001 remain OPEN; no architecture approval is complete.
 
 SESSION END: changes/commit | tests/evidence | decisions | blockers | active WP | next exact task | reviewer.
+
+## Current evidence ledger — INT-06
+All rows share verified_at `2026-10-20T10:47:11Z (13:47:11 Asia/Riyadh, UTC+03:00)`. Current facts come from GitHub reads; proposal contents are only on the reconciliation branch until merged.
+
+| Status / scope | Verification source and reference | Uncertainty / conflict |
+| --- | --- | --- |
+| main `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | GitHub heads/main ref | Verified current at snapshot; later changes require re-read |
+| G0 OPEN / G0-001 Issue #1 OPEN | main START_HERE and Issue #1 API/body | No final owner sign-off; Claude review remains pending in published state |
+| PR #5 MERGED; protocols published | main commit `ed188f1902d397fe74613dd966c5a3e88b32f8c0` and source state evidence | Historical WORK_LOG pending observations remain unchanged |
+| PR #6 OPEN / unmerged | [PR #6](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/6), head `93a1a537866fc20059d80f86061676e26fcd971e`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | Individually mergeable/clean at read; sequential semantic integration not established |
+| PR #7 OPEN / unmerged | [PR #7](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/7), head `79bf0d902fab8fe766962425ca58d0d0528c152c`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | Individually mergeable/clean at read; sequential semantic integration not established |
+| PR #8 OPEN / unmerged | [PR #8](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/8), head `19c5a747a568c727deb4cf7eb1320e30a7857241`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | Individually mergeable/clean at read; sequential semantic integration not established |
+| PR #9 OPEN / unmerged | [PR #9](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/9), head `8886e69562b880e35c989009961959d4c9163791`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | Individually mergeable/clean at read; sequential semantic integration not established |
+| PR #10 OPEN / unmerged | [PR #10](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/10), head `8f33b50dbec18ff472a59c3505c2dbf6d43b104d`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | Individually mergeable/clean at read; sequential semantic integration not established |
+| INT-01–06 C / provisional; execution docs-only authorized | Visible owner read-only handoff plus Execute authorization dated 2026-10-20; canonical decision sections in this branch | No final G0 approval or merge authority |
+| Issue #1 owner/labels already corrected | Current Issue API: scannercrypto0-gif; type:work-package/status:review | Body still describes PR #2 as unmerged: stale current claim; Issue edit requires separate approval |
+| Originating chats / runtime evidence | Only visible conversation and accessed GitHub records | Other chats inaccessible; runtime tests NOT TESTED; implementation not independently established |
+
+Baseline now owner-confirmed: PR #10 / AQL-HO-20261020-003. Register's older PR #8 baseline describes the earlier handoff event and is preserved, not overwritten. Exactly INT-01–06 comprise the reported post-baseline decision delta. See the decision coverage matrix for source provenance, blockers and future integration choices.

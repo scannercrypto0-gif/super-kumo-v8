@@ -7,3 +7,89 @@ Failure: 429, timeout, delisting, missing candles, same-bar TP/SL, offline write
 Load: measured symbol coverage, API weights, CPU/RAM, Supabase rows/egress, backlog.
 Research: distinguish forward max return from realized paper PnL; report full denominators; compare against random and simple momentum baselines; purged time splits for overlapping 72h labels; all experiments registered; parent/shadow paired and forward-validated.
 Gate evidence: commit + test command/output + fixture hash + failure cases + benchmark + known limitations + reviewer + owner signature.
+
+## Future acceptance/regression scenarios — G0-PAPER-01–08
+
+Specification only; none of these tests is claimed executed by this documentation task. Use focused deterministic fixtures and frozen policy versions; add risk-based integration/recovery coverage when implementation is authorized. Reference: [canonical provisional decisions](03_DECISIONS.md#g0-paper-trading-decisions--owner-selected-provisional-rules).
+
+| Decision | Scenario | Required evidence / expected behavior |
+| --- | --- | --- |
+| 01 | Entry condition never met | No manufactured fill; NO_FILL/expiry reason retained; rejection distinguishable. |
+| 01 | Immediate entry and delayed availability | First eligible price strictly after availability; no earlier price or future-data entry selection. |
+| 02 | Same-bar TP/SL with/without finer evidence | Resolve only with legitimate ordering; otherwise factual AMBIGUOUS plus separate best/worst paths and aggregate trader bounds; best case not verified performance. |
+| 03 | Fees, missing execution evidence and stressed costs | Gross/baseline-net/stress reported independently; version/source/effective date recorded; no hard-coded 0.01% or perfect missing-data fallback. |
+| 04 | Reference and smaller/larger notionals | Provisional 1,000 USDT and feasible sensitivity scenarios reflect available liquidity; insufficient evidence flagged; no portfolio/live-capital interpretation. |
+| 05 | Two traders same symbol; duplicate active signal in one trader | Cross-trader independence preserved, within-trader duplicate suppressed per versioned identity; overlap reported, grouped Telegram does not merge records. |
+| 06 | Expiry/early invalidation; configuration later changes | Frozen original validity remains; expired opportunities retained; entry validity does not cap filled holding duration. |
+| 07 | Early exit then original TP reached | Original trade stays closed; preregistered post-exit research captures target touch independently. |
+| 07 | TP1 raised stop hit before later TP2 | Record missed upside on isolated fixed/raised-stop comparison with event ordering/ambiguity; no original-path rewrite. |
+| 07 | TP1 raised stop followed by further fall | Record protected downside and aggregate paired risk-adjusted costs/sample-size evidence, not anecdotal superiority. |
+| 07 | Adjustment conflicts and future partial exits | Only predeclared timestamped adjustments; conflicting order uses 02; partial mechanics remain unimplemented until separately specified. |
+| 08 | Outage spans TP/SL | Chronological missing-interval recovery, event vs ingestion/recovery times, no stale-last-price exit or invented offline strategy decision; unresolved ordering uses 02. |
+| 08 | Restart/replay repeated | Same fills/closes/accounting/alerts produced once; durable progress and correction lineage; original decisions unchanged. |
+| 08 | Irrecoverable data gap | Explicit unresolved status; exclude from confirmed performance; report unresolved denominator and any transparent scenarios. |
+| 02/07/08 | Counterfactual/recovered-data leakage | Same frozen initial conditions and visibility boundaries, separate variants, no mutation/reopening or hindsight decision fabrication. |
+
+Implementation evidence must include fixture/data hashes, source visibility/availability assumptions, policy versions, expected/actual outputs and aggregate reconciliation. No gate completion or promotion follows from documenting these scenarios.
+
+## Future TIME/DATA acceptance and negative scenarios
+Documentation expectations only, not executed tests. [Canonical provisional decisions](03_DECISIONS.md#g0-time-and-data-provisional-decisions). Freeze fixtures, source visibility assumptions and versions; compare original and corrected runs without silently rewriting evidence.
+
+| IDs / owner extension | Scenario and required result |
+| --- | --- |
+| TIME-01/02 | Event occurs before decision but receipt/availability afterward: earlier decision cannot use it. Verified intra-candle observation may qualify; missing intrabar evidence permits a qualifying completed-candle fallback only when the trader's predeclared policy explicitly allows it and availability/freshness checks pass; otherwise block the affected decision and record the reason. Later final OHLCV cannot masquerade as earlier live data. Clock-skew/quality failures remain explicit. |
+| TIME-03 | News published before decision, added to ATLAS later: not live-known; publication-only archive stays distinct from historically verified/observed-live evidence. Editing article cannot retroactively change version visible to past decisions. Scheduled preannounced event differs from unexpected news. |
+| TIME-04 | Dataset correction creates new checksummed version/experiment references, retains original results and review flags; simulator/code correction has distinct lineage. Shared objects avoid full per-experiment copies. |
+| TIME-05, A/F | Historical development, historical OOS and prospective forward reports stay separate, displayed side by side with no combined success score or backdated Shadow result. Candidate nomination does not promote automatically; failures remain. |
+| TIME-06/07, A/F | Specialist evaluated over multiple regimes/independent target occurrences where available; target/off-target opportunity/trade counts, costs/net outcomes, drawdown/risk, uncertainty and sample adequacy shown for candidates AND forward traders. Strong target specialist not globally rejected for off-target weakness; insufficient evidence never proves profitability. Detector reliability tested independently. |
+| TIME-05–07, A/F | Historical/forward divergence investigation distinguishes regime-distribution shifts, detector errors, costs, data quality and possible overfit; hypotheses not facts. Untouched holdout/purged later windows resist repeated tuning/overlap leakage. Forward entry requires predeclared regime and actually available inputs; hindsight-only labels never authorize earlier entry. |
+| TIME-07/08, B | Rich feasible context for executed/rejected/expired/no-fill opportunities includes BTC dominance/trend, both BTC/ETH relationships, altseason/breadth, liquidity/volatility and relative strength. Missing/quality/cost limitations explicit; original snapshot immutable. During open position, context changes create separate timestamped events, never replace original. Observed, assumed-reconstruction and retrospective classes remain distinct. |
+| TIME-08 | Transition can block new entries but not retroactively close an open trade outside frozen exit policy; alternate regime exits/stops are isolated cost-aware Research/Shadow versions compatible with proposed PAPER-07. |
+| TIME-09 | Missing/stale essential indicator prevents affected new entries and records missed reason; optional context gaps do not halt unrelated traders. Slow daily indicators need not match intraminute cadence. |
+| DATA-01, TIME-09 | Shared BTC/ETH/context requirements across traders/runs deduplicate requests and reuse cache/local calculation. Provider-specific real weights/backoff/circuit policies govern all workers; unavailable source never reports fake freshness. Each external indicator has provider/local method, provenance, freshness, budget and limitations. |
+| DATA-02/03, C | Initial backfill is a separately scheduled throttled/resumable pre-operational phase with bounded cost. Inventory assets/markets/timeframes/dates/indicators/news archives, missing/unsupported/quality gaps, progress/validation/versions; completeness only verified against declared scope. Later incremental data/repairs update same library without blocking core. |
+| DATA-03/04, E | Selective partition retrieval/shared cache/object reuse reduce unnecessary downloads; measure latency/footprint/transfer/cost. New paid data source, storage upgrade, compute or chargeable service rejected/deferred without prior owner approval. Workload growth triggers budget control, never silent spend or zero-cost promise. |
+| DATA-04 | Partial archive gap requests only missing/changed ranges, not default full redownload; verify continuity/timestamps/duplicates/integrity/version before publication. Interrupted jobs resume idempotently and retain incomplete/error state. |
+| DATA-01/02/04, D | Heavy archive downloads/repairs/news enrichment/backtests/reports NEVER become synchronous prerequisites to core live monitoring/open-position tracking. Independent schedules/queues, bounded concurrency and resource reservations/equivalents keep CPU/memory/I/O/DB/network available; background yields before starvation, shared provider budgets remain respected. |
+| DATA-04, D | Overlong core cycle cannot accumulate uncontrolled overlapping runs; dedup prevents duplicate Binance requests across workers, no budget multiplication. Observe run duration/deadline misses/backlog/freshness/budgets under load and derive objectives; illustrative 30 seconds is not an SLA. |
+| DATA-02/04 | Rate pressure degrades lower-priority jobs first without bypassing limits. Provider outage/gap yields explicit degraded/unknown and preserves PAPER-08 no-fabricated-fill/no-retroactive-decision semantics. |
+
+Evidence in future implementation: versions/fixture hashes, event/receipt/availability/decision clocks, report sections and sample denominators, coverage inventory, provider/resource/cost budgets, scheduling contention and recovery traces. No application tests, CI success, paid actions or G0 approval follow from this document.
+
+## Future GOV-01 and live-data acceptance scenarios
+Specification only; no application tests executed. [Canonical rules](03_DECISIONS.md#g0-live-data-operations-decisions--data-0508).
+
+| Rule | Scenario / required outcome |
+| --- | --- |
+| GOV-01 | Another-chat handoff is inaccessible: report gap/request reference; do not claim inspection/completeness. |
+| GOV-01 | Decision/clarification/correction/exception after last owner-confirmed submitted baseline appears exactly once in delta dispositions with evidence. |
+| GOV-01 | Draft unsent prompt is not submitted, tool receipt not external confirmation, PR-open not merged; addenda/covered range and audit recorded durably. |
+| DATA-05 | WS interruption: bounded reconnect/REST recovery under joint budgets; preserved event/receipt/availability evidence, no fabricated live-observation time. |
+| DATA-05/08 | REST recovers past data: chronological/idempotent facts, no retroactive live signals or fictional paper fills. |
+| DATA-06 | Slow core cycle: bounded overlap/backlog/deadlines and logged skipped/coalesced scanning; no invented 30-second SLA. |
+| DATA-06 | Safe scanning snapshot coalescing retains all events required for open paper positions, fill ambiguity, replay and audit. |
+| DATA-07 | Large-universe scan yields; Position Monitor evaluates frozen exits without waiting, scanner remains bounded/adaptive. |
+| DATA-05/07 | Both paths/traders share central WS/REST/context/cache/provider authority: no duplicated Binance requests or multiplied limits. |
+| DATA-08 | Degraded BTC context blocks dependent new entries but unrelated traders with independently valid essential inputs continue. |
+| DATA-07/08 | Missing required price cannot create paper TP/SL/entry/exit fill; positions stay open with explicit monitoring gap/uncertainty. |
+| DATA-08 | Healthy liveness but no recent trades: do not automatically declare feed broken. |
+| DATA-06/07 | Historical backfill/news/reports/Research Lab pressure cannot synchronously block or starve monitor/core; shared API/resource controls still apply. |
+| DATA-08 | Recovery retains order, unresolved ambiguity, provenance, reproducibility, state transition/outage/residual-gap logs; no guaranteed recovery during provider outage. |
+
+Use future fixtures with source/symbol/stream/type failure domains, clock/availability evidence, idempotency keys, budgets/lag/queue metrics and monitoring-event retention; independent trader state preserved. Pending PR #8 TIME/DATA and PR #7 PAPER cases remain separate proposals and must survive later reconciliation.
+
+## Reconciliation acceptance scenarios — INT-01–06
+Documentation checks are distinct from future runtime tests. Runtime status for every case below: **NOT TESTED**. No CI success is asserted.
+
+| Decision/dependency | Future acceptance condition |
+| --- | --- |
+| INT-04 / TIME-01/02/09 / DATA-05/08 | For the same unavailable intrabar input, policy A explicitly allows a qualifying completed-candle fallback and policy B prohibits it: only A may use that fallback after availability/freshness checks; B blocks with reason. Missing policy evidence also blocks. |
+| INT-04 / TIME-01/02 | Live price and provisional intrabar value retain their original version/completion state; final H/L/C cannot appear before completion and actual availability. Event-before-decision but receipt/availability-after-decision is ineligible. |
+| PAPER-08 / DATA-06/08 | Repeated recovery preserves required event sequences, deterministic chronology and idempotency for fills/closes/accounting/alerts; recovered facts never fabricate earlier live decisions. Unresolved order stays AMBIGUOUS with separate best/worst aggregates. |
+| TIME-09 / DATA-07/08 | Stale essential regime input blocks only dependent entries; unrelated eligible traders continue. Open-position tracking retains gaps/uncertainty and frozen exits without invented fills. |
+| DATA-01–08 / owner D/E | Background backfill/research/report pressure yields before core starvation; shared budgets still apply, monitoring does not wait for scanner and safe scanner coalescing never drops monitor/audit events. Objectives require later measurement. |
+| TIME-05–08 / owner A/B/F | Historical development/OOS/forward stay separate, all opportunity contexts immutable, later observations append, specialist sample adequacy/detector evidence remains visible and nomination is not promotion. |
+| INT-05 / GOV-01 | Two branch references to one handoff event count once; distinct submission/addendum/correction events remain distinct with source evidence. Clause changes require explicit semantic review. |
+| INT-06 | Later PR merge updates current STATE and appends a new log/register event; the earlier OPEN observation is unchanged. Missing evidence is UNVERIFIED; material contradiction is BLOCKED. |
+
+Documentary acceptance additionally requires 8 PAPER + 9 TIME + 8 DATA + GOV-01 + 6 INT records, owner A–G coverage, one canonical GOV-01 definition, preserved historical log/register events, and the independent future dashboard requirement. Exact evidence and dispositions are in the decision register's reconciliation matrix.

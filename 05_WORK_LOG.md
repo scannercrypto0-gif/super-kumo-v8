@@ -66,3 +66,61 @@ Created local Git repository baseline, README, .gitignore, session/handoff proto
 - SESSION_PROTOCOL is the behavior source; COMMUNICATION_PROTOCOL and START_HERE link to it; HANDOFF_TEMPLATE contains one reusable Work instruction block. STATE records branch-only implementation pending merge.
 - Smart Validation limited to identity/protocol consistency and exact six-document scope; all previous log entries preserved. No application tests or unrelated reviews run.
 - No architecture/trading approvals, Issues, labels, settings or application code changed. G0 and Issue #1 remain OPEN. Next: owner reviews PR #5; merge is not authorized.
+
+## 2026-10-20 — Future dashboard requirement recorded
+
+- Read current main `ed188f1902d397fe74613dd966c5a3e88b32f8c0`, architecture contract, roadmap and conceptual schemas after verifying ATLAS Quant Lab / `AQL-CRYPTO-RESEARCH-001`.
+- Added the requirement once in [the roadmap](02_ROADMAP.md#future-requirement--unified-monitoring-dashboard); STATE links to that source instead of duplicating its specification.
+- Future views cover paper positions/signals, independent trader performance, Lab/Shadow comparisons, historical outcomes, health/freshness/errors. Telegram remains the notification channel; design considerations preserve consistent records/events, identifiers/timestamps/history/outcomes and secure read-only initial access.
+- No frontend or final architecture choice made. Implementation is deferred until operational data exists and requires a separately approved work package. No UI, API endpoints, tables, migrations, infrastructure or schema changes.
+- Synchronized stale STATE references to [PR #5](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/5), merged as `ed188f1902d397fe74613dd966c5a3e88b32f8c0`; older log entries remain historical snapshots.
+- Smart Validation: documentation-only scope and consistency; original roadmap gate text and historical WORK_LOG prefix preserved. No application tests or repeated architecture review.
+- New documentation PR is not merged. G0 and Issue #1 remain OPEN. Next: review the recorded requirement; continue G0-001 before gated implementation.
+
+## 2026-10-20 — Provisional G0 Paper Trading decisions 01–08
+
+- Verified ATLAS Quant Lab / `AQL-CRYPTO-RESEARCH-001` and canonical repository `scannercrypto0-gif/super-kumo-v8`; current main `ed188f1902d397fe74613dd966c5a3e88b32f8c0`. ATLAS-002 / PR #5 is merged; PR #6 dashboard documentation is OPEN/unmerged and left untouched.
+- Owner-provided handoff selects option C for G0-PAPER-01–08 with ambiguity and exit-research extensions. Status: **PROVISIONALLY OWNER-APPROVED — NOT FINAL G0 APPROVAL**.
+- Captured full owner rules in the existing decision register; contract invariants, residual risks, conceptual schema/event requirements and future regression expectations refer to that source. Existing ADR IDs, enums, versions and technical history preserved.
+- Provisional 1,000 USDT reference notional is research-only; 100/10,000 USDT are sensitivity examples. Future real-capital/10% allocation discussion is nonbinding, not funded capital, approved risk policy or live authorization. No fixed Binance fee percentage adopted; official effective schedule must be checked at implementation.
+- Exact strategy entry/expiry/exit values, adjustment timing, partial quantities, post-exit horizons, identity keys and promotion criteria remain deferred. Future Lab/Shadow paths must not rewrite original trade decisions/results.
+- Documentation-only branch `docs/g0-paper-decisions`; one consolidated PR targeting main, no merge. STATE/WORK_LOG overlap with pending PR #6 requires preserving both sets on later reconciliation; no dashboard changes overwritten.
+- Lightweight validation: eight unique decision IDs, canonical internal references/identity, full owner-decision text preservation, historical log prefix and documentation-only scope. Future scenarios specified, not executed; no application tests or implementation.
+- No Issues closed or edited, strategy promoted, live execution, tables/migrations or infrastructure created. G0/G0-001 remain OPEN; next action is independent review and owner resolution/final approval.
+
+## 2026-10-20 — Consolidated provisional G0 TIME and DATA decisions
+
+- Verified ATLAS Quant Lab / `AQL-CRYPTO-RESEARCH-001` / `scannercrypto0-gif/super-kumo-v8`; latest main `ed188f1902d397fe74613dd966c5a3e88b32f8c0`. PR #6 dashboard and PR #7 PAPER decisions remain OPEN/unmerged and untouched; review overlapping documentation after either merges.
+- Canonical register captures G0-TIME-01–09 and G0-DATA-01–04, selected C, with mandatory owner clarifications A–F taking precedence; G requires explicit cross-document acceptance/traceability before PR creation. All remain PROVISIONALLY OWNER-APPROVED, not final G0 approval.
+- Contract, roadmap G1 and conceptual MarketBar wording explicitly reconcile eligible verified intra-candle observations with closed-bar fallback; receipt/availability integrity remains mandatory. Existing decisions/history preserved.
+- Specialist reporting separates historical development/OOS/forward, target/off-target counts/net costs/drawdown-risk/uncertainty/sample adequacy, detector evaluation and divergence causes; rich all-opportunity snapshots remain immutable with separate later observations.
+- Pre-operational initial backfill has a scoped coverage inventory; incremental repairs update same library without core dependency. Independent bounded queues/shared API budgets/resource controls keep background work from blocking/starving core. Monitor paid-service budgets and require prior owner approval; no zero-cost/30-second guarantee.
+- Future tests specify negative temporal/news/version/research/context/backfill/budget/isolation/gap cases; no application tests or CI pass claimed.
+- Acceptance G verified owner A–F against contract, register, conceptual schemas, risks and test policy; completion/PR description contains decision/extension traceability matrix. Lightweight checks: 13 unique IDs, internal refs/identity, explicit closed-bar reconciliation, pending PAPER-01–08 cross-references, preserved log prefix and documentation-only scope.
+- Branch `docs/g0-time-data-decisions`; one documentation PR targeting main; no code, executable schema, migration, paid action, strategy promotion, Issue edit or merge. G0 and Issue #1 remain OPEN. Next: independent review and owner approval before final G0 or implementation.
+
+## 2026-10-20 — G0-GOV-01 handoff continuity and completeness
+
+- Owner explicitly approved provisional rule G0-GOV-01. Canonical identity verified: ATLAS Quant Lab / `AQL-CRYPTO-RESEARCH-001`; current main `ed188f1902d397fe74613dd966c5a3e88b32f8c0`.
+- Added rule to existing decision register and linked startup/session/communication instructions; expanded existing handoff template with submitted-baseline/addenda evidence, complete delta dispositions, coverage gaps and final audit.
+- No canonical handoff register existed in inspected main, so added the single necessary HANDOFF_REGISTER.md. Initial records distinguish direct instruction receipt, owner approval, unverified external submission confirmation, PR execution evidence and review/merge state.
+- Verified PR #6/#7/#8 OPEN/unmerged; originating chats were not accessed. Coverage gaps are explicit; no exhaustive prior cross-chat audit claimed. Prior TIME/DATA addendum A–G noted without inventing further addenda.
+- Smart Validation: provisional rule's ten obligations represented, identity/references/scope checked; historical WORK_LOG preserved. No application tests or unrelated architecture reviews run.
+- Documentation branch `docs/g0-handoff-completeness`; PR review/merge pending. No application code, paid action, Issues or settings changes; G0 and Issue #1 remain OPEN. Next: review this PR; request missing baseline confirmation/references before a future completeness claim.
+
+## 2026-10-20 — Consolidated governance and live-data operations handoff
+- Verified ATLAS Quant Lab / `AQL-CRYPTO-RESEARCH-001`, main `ed188f1902d397fe74613dd966c5a3e88b32f8c0`. PR #6/#7/#8/#9 OPEN/unmerged; no branches merged/edited. Reused PR #9 governance text in this new consolidated proposal to avoid divergent duplicate policy.
+- Current owner attachment explicitly confirms PR #8 as submitted baseline, updating prior register uncertainty via dated evidence, not rewriting history. Delta ledger covers GOV-01 and DATA-05–08, owner extensions and inaccessible-chat gap.
+- Preserved full four owner DATA rules; documented hybrid WS/REST, bounded scheduling with monitoring-event retention, higher-priority independent Position Monitor and selective health/recovery. Conceptual records and 14 future acceptance scenarios specified; no executable design/constants.
+- Earlier TIME/DATA/PAPER/dashboard proposals remain referenced as unmerged dependencies, not silently approved or simplified. Shared docs will need reconciliation on later merges; do not double-apply PR #9.
+- Smart Validation: five-item uniqueness/completeness, owner-text retention, references/identity, delta dispositions, documentation-only scope and log preservation. PASS is scoped to received instructions; originating chats were not inspected. No CI/application tests or paid actions.
+- One new PR on `docs/g0-live-data-governance`, targeting main; no merge authorized. G0 and Issue #1 OPEN; decisions remain provisional. Next: owner review.
+
+## 2026-10-20 — G0 documentation reconciliation authorized and prepared
+- Verified 2026-10-20T10:47:11Z (13:47:11 Asia/Riyadh, UTC+03:00): main `ed188f1902d397fe74613dd966c5a3e88b32f8c0`, PR #6–#10 OPEN/unmerged at the source heads in the decision coverage matrix; Issue #1 OPEN. Project identity verified against current 00_START_HERE.md. Source PRs and Issue #1 are unchanged.
+- Owner confirms PR #10 / AQL-HO-20261020-003 as last submitted baseline; subsequent delta INT-01–06, all C/provisional. Earlier read-only report and draft were analysis/preparation, not repository execution. This later explicit Execute instruction authorizes this dedicated documentation branch and one PR only.
+- Reconciled decision-level clauses in review order #7 -> #8 -> #10, compared #9 independently, preserved #6 dashboard. Retained PAPER-01–08, TIME-01–09, DATA-01–08 and owner A–G. Added INT-01–06 with owner clarifications, restricted completed-candle fallback to explicit predeclared trader policy, and removed conflicting current-only closed-bar restrictions.
+- Kept one identical GOV-01 definition with clause provenance; retained distinct handoffs 001/002/003 once. Historical source log entries above remain unchanged; original OPEN observations and prior initial-head references are historical, not current claims.
+- Current snapshot and handoff evidence distinguish main/branch/proposal/receipt/submission/review/merge. Proposed PR on `docs/g0-integration-reconciliation`; opening/number is not claimed in this pre-publication snapshot. The resulting PR body supplies publication evidence and validation summary.
+- Documentation consistency/traceability validation only. Application/runtime/recovery tests: NOT TESTED. No CI success, paid action, provider selection, code, Issue edit, source PR closure/rebase/merge or final G0 approval. Other originating chats inaccessible; no exhaustive cross-chat claim.
+- Next: owner reviews reconciliation PR and separately authorizes any integration/merge disposition. G0 and G0-001 remain OPEN.
