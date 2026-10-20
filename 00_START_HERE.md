@@ -49,3 +49,7 @@ Resume map: current phase and active task → STATE's “Bootstrap and active wo
 ## Proactive documentation and Work handoff
 
 Every session must follow [SESSION_PROTOCOL.md](SESSION_PROTOCOL.md#proactive-work-handoff--owner-approved-atlas-002-requirement) and use [HANDOFF_TEMPLATE.md](HANDOFF_TEMPLATE.md). The user need not ask again to document meaningful completed work or prepare a consolidated Work instruction. No handoff is needed for an empty change set; do not duplicate already-confirmed direct GitHub work.
+
+## Handoff continuity and completeness — G0-GOV-01
+
+Before generating any new Work handoff, read [HANDOFF_REGISTER.md](HANDOFF_REGISTER.md) and apply [G0-GOV-01](03_DECISIONS.md#g0-gov-01--work-handoff-continuity-and-completeness). Use the latest owner-confirmed submitted baseline plus addenda, account for every delta, and audit completeness. Ask for inaccessible handoff references; never claim unseen cross-chat or execution coverage. The rule remains owner-approved provisional; G0 remains OPEN.

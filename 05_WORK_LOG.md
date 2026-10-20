@@ -66,3 +66,20 @@ Created local Git repository baseline, README, .gitignore, session/handoff proto
 - SESSION_PROTOCOL is the behavior source; COMMUNICATION_PROTOCOL and START_HERE link to it; HANDOFF_TEMPLATE contains one reusable Work instruction block. STATE records branch-only implementation pending merge.
 - Smart Validation limited to identity/protocol consistency and exact six-document scope; all previous log entries preserved. No application tests or unrelated reviews run.
 - No architecture/trading approvals, Issues, labels, settings or application code changed. G0 and Issue #1 remain OPEN. Next: owner reviews PR #5; merge is not authorized.
+
+## 2026-10-20 — G0-GOV-01 handoff continuity and completeness
+
+- Owner explicitly approved provisional rule G0-GOV-01. Canonical identity verified: ATLAS Quant Lab / `AQL-CRYPTO-RESEARCH-001`; current main `ed188f1902d397fe74613dd966c5a3e88b32f8c0`.
+- Added rule to existing decision register and linked startup/session/communication instructions; expanded existing handoff template with submitted-baseline/addenda evidence, complete delta dispositions, coverage gaps and final audit.
+- No canonical handoff register existed in inspected main, so added the single necessary HANDOFF_REGISTER.md. Initial records distinguish direct instruction receipt, owner approval, unverified external submission confirmation, PR execution evidence and review/merge state.
+- Verified PR #6/#7/#8 OPEN/unmerged; originating chats were not accessed. Coverage gaps are explicit; no exhaustive prior cross-chat audit claimed. Prior TIME/DATA addendum A–G noted without inventing further addenda.
+- Smart Validation: provisional rule's ten obligations represented, identity/references/scope checked; historical WORK_LOG preserved. No application tests or unrelated architecture reviews run.
+- Documentation branch `docs/g0-handoff-completeness`; PR review/merge pending. No application code, paid action, Issues or settings changes; G0 and Issue #1 remain OPEN. Next: review this PR; request missing baseline confirmation/references before a future completeness claim.
+
+## 2026-10-20 — Consolidated governance and live-data operations handoff
+- Verified ATLAS Quant Lab / `AQL-CRYPTO-RESEARCH-001`, main `ed188f1902d397fe74613dd966c5a3e88b32f8c0`. PR #6/#7/#8/#9 OPEN/unmerged; no branches merged/edited. Reused PR #9 governance text in this new consolidated proposal to avoid divergent duplicate policy.
+- Current owner attachment explicitly confirms PR #8 as submitted baseline, updating prior register uncertainty via dated evidence, not rewriting history. Delta ledger covers GOV-01 and DATA-05–08, owner extensions and inaccessible-chat gap.
+- Preserved full four owner DATA rules; documented hybrid WS/REST, bounded scheduling with monitoring-event retention, higher-priority independent Position Monitor and selective health/recovery. Conceptual records and 14 future acceptance scenarios specified; no executable design/constants.
+- Earlier TIME/DATA/PAPER/dashboard proposals remain referenced as unmerged dependencies, not silently approved or simplified. Shared docs will need reconciliation on later merges; do not double-apply PR #9.
+- Smart Validation: five-item uniqueness/completeness, owner-text retention, references/identity, delta dispositions, documentation-only scope and log preservation. PASS is scoped to received instructions; originating chats were not inspected. No CI/application tests or paid actions.
+- One new PR on `docs/g0-live-data-governance`, targeting main; no merge authorized. G0 and Issue #1 OPEN; decisions remain provisional. Next: owner review.
