@@ -84,3 +84,10 @@ Remaining implementation parameters include technical dependency/rule catalogs, 
 - Latency misattribution, metric cardinality and clock skew: scoped correlation, distinguish queue/wait/compute and clock uncertainty; numerical objectives unselected.
 - Alert flooding or operational misprioritization: impact-aware dedupe and escalation, protect Fast/open positions, Telegram notification only; dashboard remains deferred.
 - No runtime, recovery, notification, load, CI or performance tests have been run by this documentation task. G0 OPEN.
+
+## G0-REV-01 / C — Review remediation boundaries
+
+- Revision/snapshot gap, old epoch, stale computation: fail closed for affected eligibility, record rejection and reconcile authoritative state; future race tests T33/T39 required, NOT TESTED.
+- Measurement clock skew, trace gaps and overlapping wait: explicitly report UNKNOWN/unattributed spans and avoid numerical SLA claims; future trace test T40 required, NOT TESTED.
+- Optional work starvation or resource oscillation: measured hysteresis and protected Fast/open-position service, future T32/T42; thresholds UNSELECTED.
+- Documentary specification is not evidence of correct runtime behavior. Owner-approved G0-REV-01/C closes only documentation clarity concerns; G0 remains OPEN and PR #15 remains review-only.
