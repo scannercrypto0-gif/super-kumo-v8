@@ -987,3 +987,129 @@ Paths: DECISIONS=03_DECISIONS.md, CONTRACT=01_CONTRACT.md, SCHEMAS=09_DATA_SCHEM
 Main alone lacks #13's reconciled proposals; recopying them risks omissions. Chosen new isolated branch inherits pinned #13, targets main: nine incremental Markdown changes, thirteen cumulative Markdown changes including prior proposal commits. Existing PRs/branches #6–#13 stay unchanged/open; no merger, overwrite, retarget, rebase or automatic closure implied. Current direct handoff requests one documentation proposal; no runtime or merge authority follows.
 Unresolved implementation parameters: actual indicator dependency/validity catalogs; validation/evidence rules; full identity representation; single-flight/demand/cancellation mechanics; publication revision/generation fencing; notification ordering/snapshot/reconnect protocol; storage/transport/durable integrity and recovery details; strategy manifests/fallback; measured latency/throughput/budgets/capacity policies. No technologies, universal TTLs, numeric thresholds or guarantees chosen.
 Inaccessible originating chats/unseen external changes remain UNVERIFIED; audit bounded to supplied scope. Existing Issue #1 stale PR #2 sentence remains disclosed, unchanged. No substantive unresolved policy contradiction found within the supplied decisions; any later such conflict is BLOCKED and escalated, not invented. Runtime/concurrency/notification/recovery/performance/CI NOT TESTED. Next owner review and separate explicit merge/implementation/final G0 decision. G0 and Issue #1 OPEN.
+
+
+## G1 indicator catalog, quality and observability — owner provisional decisions ARCH-29–44 (2026-10-21)
+
+**Authority:** owner explicitly approved ARCH-29/C, ARCH-30–34/C, ARCH-35–39/C, ARCH-40–44/C in the accessible conversation; all provisional until final G0. **Baseline:** last actually owner-submitted `AQL-HO-20261021-002` / PR #14 head `275c856c61452fb2fdee2c3de30a2ae9907646a8` (OPEN, unmerged at verification). This documentation proposal is not a Work submission by the owner and does not change the last-owner-submitted baseline. Other originating chats are inaccessible; unseen submissions remain UNVERIFIED. No runtime/CI tests or final G0 approval.
+
+### G1-ARCH-29 — Versioned indicator catalog (C, PROVISIONAL)
+
+Central manager owns versioned technical indicator definitions: formula, parameters, input identity, timeframe, finality, quality requirements, temporal context, provenance, output identity and exact event/dependency invalidation triggers. Secretaries reference definitions via versioned strategy manifests and cannot redefine technical validity. Rule changes produce new versions without rewriting past point-in-time evidence.
+
+**Inherited compatibility:** G1-ARCH-21–28;19; earlier G0 TIME/DATA/PAPER/INT, owner addenda A–G, research-library phase and deferred dashboard preserved. **Destination cross-reference:** 03_DECISIONS;09_DATA_SCHEMAS;01_CONTRACT. **Status:** conceptual, no chosen physical technology, thresholds, paid actions, code or merge.
+
+### G1-ARCH-30 — Central dependency graph (C, PROVISIONAL)
+
+Model directed source/intermediate/result dependencies, detect cycles, propagate qualified changes and revoke only affected ACTIVE bindings; reuse unaffected valid computations, preserve full version/provenance identity.
+
+**Inherited compatibility:** G1-ARCH-19;21–23;29; earlier G0 TIME/DATA/PAPER/INT, owner addenda A–G, research-library phase and deferred dashboard preserved. **Destination cross-reference:** 03_DECISIONS;09_DATA_SCHEMAS. **Status:** conceptual, no chosen physical technology, thresholds, paid actions, code or merge.
+
+### G1-ARCH-31 — Demand-driven dynamic subscriptions (C, PROVISIONAL)
+
+Versioned per-secretary demand tracks trader, symbol, stage, open position and mandatory/optional manifest inputs; shared computation survives cancellation by one consumer while another still needs it. WATCH/READY transitions need no forced BUILDING; no duplicate provider feed.
+
+**Inherited compatibility:** G1-ARCH-12–18;22;26;28; earlier G0 TIME/DATA/PAPER/INT, owner addenda A–G, research-library phase and deferred dashboard preserved. **Destination cross-reference:** 03_DECISIONS;09_DATA_SCHEMAS. **Status:** conceptual, no chosen physical technology, thresholds, paid actions, code or merge.
+
+### G1-ARCH-32 — Protected priority computation (C, PROVISIONAL)
+
+Prioritize live source delivery and open-position monitoring; then decision-critical readiness and eligible stage-aware prefetch. Slow history/enrichment yields under measured provider/CPU/memory/backlog pressure. Do not choose fixed worker counts or numeric latency guarantees.
+
+**Inherited compatibility:** G1-ARCH-01–03;05;16–18;28; earlier G0 TIME/DATA/PAPER/INT, owner addenda A–G, research-library phase and deferred dashboard preserved. **Destination cross-reference:** 03_DECISIONS;02_ROADMAP. **Status:** conceptual, no chosen physical technology, thresholds, paid actions, code or merge.
+
+### G1-ARCH-33 — Revisioned notification and state reconciliation (C, PROVISIONAL)
+
+Authoritative revision/generation, scoped ordered notifications and snapshot-plus-changes reconciliation prevent missed, reordered, duplicated or late messages from restoring obsolete ACTIVE results. Unreconciled gaps block affected eligibility. Storage/transport/fencing mechanism remains unselected.
+
+**Inherited compatibility:** G1-ARCH-24–27; earlier G0 TIME/DATA/PAPER/INT, owner addenda A–G, research-library phase and deferred dashboard preserved. **Destination cross-reference:** 03_DECISIONS;09_DATA_SCHEMAS;10_TEST_POLICY. **Status:** conceptual, no chosen physical technology, thresholds, paid actions, code or merge.
+
+### G1-ARCH-34 — Cause-aware computation failures (C, PROVISIONAL)
+
+Publish reasoned UPDATING/UNAVAILABLE state; retry recoverable failures only with bounded demand-, priority- and resource-aware policy; avoid retry storms and stale active fallbacks. Mandatory evidence remains blocked unless predeclared qualified alternative applies.
+
+**Inherited compatibility:** G1-ARCH-08;18;24;28; earlier G0 TIME/DATA/PAPER/INT, owner addenda A–G, research-library phase and deferred dashboard preserved. **Destination cross-reference:** 03_DECISIONS;08_RISKS. **Status:** conceptual, no chosen physical technology, thresholds, paid actions, code or merge.
+
+### G1-ARCH-35 — Input technical quality validation (C, PROVISIONAL)
+
+Technical manager checks required source, availability time, finality, completeness, quality and provenance against versioned indicator definition before VALID. Secretary independently evaluates per-manifest consumer suitability; no look-ahead or silent quality downgrade.
+
+**Inherited compatibility:** G1-ARCH-08;18–21;27; earlier G0 TIME/DATA/PAPER/INT, owner addenda A–G, research-library phase and deferred dashboard preserved. **Destination cross-reference:** 03_DECISIONS;09_DATA_SCHEMAS. **Status:** conceptual, no chosen physical technology, thresholds, paid actions, code or merge.
+
+### G1-ARCH-36 — Historical sufficiency and warm-up (C, PROVISIONAL)
+
+Catalog defines lookback, warm-up/initialization and eligible history range for each computation. Inadequate data yields explicit non-ready state; Slow progressively fills required gaps without full archive completion as a live prerequisite.
+
+**Inherited compatibility:** G1-ARCH-03;07;16–18;29; earlier G0 TIME/DATA/PAPER/INT, owner addenda A–G, research-library phase and deferred dashboard preserved. **Destination cross-reference:** 03_DECISIONS;09_DATA_SCHEMAS. **Status:** conceptual, no chosen physical technology, thresholds, paid actions, code or merge.
+
+### G1-ARCH-37 — Selective historical correction propagation (C, PROVISIONAL)
+
+Corrected historical input invalidates affected ACTIVE dependencies and triggers demand-aware recomputation; preserve immutable original evidence, knowable-at-time snapshots, correction lineage and original consumer decisions. No retroactive rewriting.
+
+**Inherited compatibility:** G1-ARCH-08–10;19;21–23;30; earlier G0 TIME/DATA/PAPER/INT, owner addenda A–G, research-library phase and deferred dashboard preserved. **Destination cross-reference:** 03_DECISIONS;09_DATA_SCHEMAS. **Status:** conceptual, no chosen physical technology, thresholds, paid actions, code or merge.
+
+### G1-ARCH-38 — Manifest-scoped decision evidence readiness (C, PROVISIONAL)
+
+Secretary verifies all mandatory technically valid and consumer-eligible evidence for a specific trader/symbol/decision/manifest revision, with explicit missing/stale reasons. Scanner READY is not decision readiness or trade authorization; owning trader alone decides.
+
+**Inherited compatibility:** G1-ARCH-05–06;12–18;27; earlier G0 TIME/DATA/PAPER/INT, owner addenda A–G, research-library phase and deferred dashboard preserved. **Destination cross-reference:** 03_DECISIONS;09_DATA_SCHEMAS. **Status:** conceptual, no chosen physical technology, thresholds, paid actions, code or merge.
+
+### G1-ARCH-39 — Safe reconciliation after data repair (C, PROVISIONAL)
+
+Reconcile input completeness, versions, gaps, current revisions and subscriptions after outage/correction. Reject stale computations and restore demanded current results progressively, protecting Fast and open positions. Preserve Inbox ACK/reclaim safety and never invent retrospective paper fills.
+
+**Inherited compatibility:** G1-ARCH-02–03;09–11;23–28; earlier G0 TIME/DATA/PAPER/INT, owner addenda A–G, research-library phase and deferred dashboard preserved. **Destination cross-reference:** 03_DECISIONS;10_TEST_POLICY. **Status:** conceptual, no chosen physical technology, thresholds, paid actions, code or merge.
+
+### G1-ARCH-40 — Stage-attributed latency telemetry (C, PROVISIONAL)
+
+Correlate source receive/Inbox commit, Fast office delivery, computation queue/execute/publish, targeted secretary delivery, mandatory readiness, strategy waiting and trader processing. Account for clock domains/uncertainty and overlapping intervals; avoid double counting or fabricated SLA.
+
+**Inherited compatibility:** G1-ARCH-16;25–28; earlier G0 TIME/DATA/PAPER/INT, owner addenda A–G, research-library phase and deferred dashboard preserved. **Destination cross-reference:** 03_DECISIONS;09_DATA_SCHEMAS. **Status:** conceptual, no chosen physical technology, thresholds, paid actions, code or merge.
+
+### G1-ARCH-41 — Demand-aware indicator box health (C, PROVISIONAL)
+
+Report scoped VALID/UPDATING/UNAVAILABLE counts and reasons, technical revisions, quality, subscriptions, evidence age and consumer eligibility distinctly. Unrequested dormant indicators are not failures simply because no recomputation was scheduled.
+
+**Inherited compatibility:** G1-ARCH-24–28;31; earlier G0 TIME/DATA/PAPER/INT, owner addenda A–G, research-library phase and deferred dashboard preserved. **Destination cross-reference:** 03_DECISIONS;09_DATA_SCHEMAS. **Status:** conceptual, no chosen physical technology, thresholds, paid actions, code or merge.
+
+### G1-ARCH-42 — Adaptive resource-pressure diagnosis (C, PROVISIONAL)
+
+Measure provider budgets, backlog/queue age, computation resource contention and Fast/position impact; hysteretic load shedding delays optional Slow work before critical streams, then resumes safely. Numeric thresholds and technology require measured approval.
+
+**Inherited compatibility:** G1-ARCH-02;16;28;32; earlier G0 TIME/DATA/PAPER/INT, owner addenda A–G, research-library phase and deferred dashboard preserved. **Destination cross-reference:** 03_DECISIONS;08_RISKS. **Status:** conceptual, no chosen physical technology, thresholds, paid actions, code or merge.
+
+### G1-ARCH-43 — Per-secretary/trader latency attribution (C, PROVISIONAL)
+
+Separate shared manager compute, targeted delivery, secretary eligibility evaluation, mandatory-data wait, strategy wait and trader active processing using traceable context; slow consumers cannot block other consumers.
+
+**Inherited compatibility:** G1-ARCH-04–06;16;26–27;40; earlier G0 TIME/DATA/PAPER/INT, owner addenda A–G, research-library phase and deferred dashboard preserved. **Destination cross-reference:** 03_DECISIONS;09_DATA_SCHEMAS. **Status:** conceptual, no chosen physical technology, thresholds, paid actions, code or merge.
+
+### G1-ARCH-44 — Impact-aware operational alerts (C, PROVISIONAL)
+
+Deduplicate/escalate sustained incidents by affected positions, mandatory evidence, subscriptions and priority; record recovery and resolution. Telegram is notification only, not trading authority. Future dashboard remains deferred and read-only planning only.
+
+**Inherited compatibility:** G1-ARCH-05;16;24;41–43; earlier G0 TIME/DATA/PAPER/INT, owner addenda A–G, research-library phase and deferred dashboard preserved. **Destination cross-reference:** 03_DECISIONS;02_ROADMAP;08_RISKS. **Status:** conceptual, no chosen physical technology, thresholds, paid actions, code or merge.
+
+**Boundary reconciliation:** Technical VALID belongs to manager; manifest eligibility belongs to secretary; entry/exit/hold belongs to owning trader. Invalidation revokes ACTIVE eligibility immediately upon observed qualifying trigger independently of Slow archival ACK, while immutable historical evidence and durable Inbox/reclaim constraints survive. Recompute is demand-aware; late computation, missed notifications, replay and reconnection must not resurrect stale results. READY is not permission to trade. Fast/open-position delivery always protected. Historical repair never creates retrospective paper fills. These decisions refine rather than supersede ARCH-01–28.
+
+**Decision coverage matrix:**
+
+| Decision | Choice | Inherited decisions | Documentation destinations | Evidence |
+|---|---|---|---|---|
+| G1-ARCH-29 | C / provisional | 21–28;19 | 03_DECISIONS;09_DATA_SCHEMAS;01_CONTRACT | Owner visible approval; documentary only |
+| G1-ARCH-30 | C / provisional | 19;21–23;29 | 03_DECISIONS;09_DATA_SCHEMAS | Owner visible approval; documentary only |
+| G1-ARCH-31 | C / provisional | 12–18;22;26;28 | 03_DECISIONS;09_DATA_SCHEMAS | Owner visible approval; documentary only |
+| G1-ARCH-32 | C / provisional | 01–03;05;16–18;28 | 03_DECISIONS;02_ROADMAP | Owner visible approval; documentary only |
+| G1-ARCH-33 | C / provisional | 24–27 | 03_DECISIONS;09_DATA_SCHEMAS;10_TEST_POLICY | Owner visible approval; documentary only |
+| G1-ARCH-34 | C / provisional | 08;18;24;28 | 03_DECISIONS;08_RISKS | Owner visible approval; documentary only |
+| G1-ARCH-35 | C / provisional | 08;18–21;27 | 03_DECISIONS;09_DATA_SCHEMAS | Owner visible approval; documentary only |
+| G1-ARCH-36 | C / provisional | 03;07;16–18;29 | 03_DECISIONS;09_DATA_SCHEMAS | Owner visible approval; documentary only |
+| G1-ARCH-37 | C / provisional | 08–10;19;21–23;30 | 03_DECISIONS;09_DATA_SCHEMAS | Owner visible approval; documentary only |
+| G1-ARCH-38 | C / provisional | 05–06;12–18;27 | 03_DECISIONS;09_DATA_SCHEMAS | Owner visible approval; documentary only |
+| G1-ARCH-39 | C / provisional | 02–03;09–11;23–28 | 03_DECISIONS;10_TEST_POLICY | Owner visible approval; documentary only |
+| G1-ARCH-40 | C / provisional | 16;25–28 | 03_DECISIONS;09_DATA_SCHEMAS | Owner visible approval; documentary only |
+| G1-ARCH-41 | C / provisional | 24–28;31 | 03_DECISIONS;09_DATA_SCHEMAS | Owner visible approval; documentary only |
+| G1-ARCH-42 | C / provisional | 02;16;28;32 | 03_DECISIONS;08_RISKS | Owner visible approval; documentary only |
+| G1-ARCH-43 | C / provisional | 04–06;16;26–27;40 | 03_DECISIONS;09_DATA_SCHEMAS | Owner visible approval; documentary only |
+| G1-ARCH-44 | C / provisional | 05;16;24;41–43 | 03_DECISIONS;02_ROADMAP;08_RISKS | Owner visible approval; documentary only |
+
+**Open implementation choices:** catalog representation/validation, dependency graph engine, physical state store, snapshot/change protocol, revision fencing, subscription transport, concurrency/single-flight mechanics, bounded retry policy, priority/hysteresis measurements, history warm-up rules by actual indicator, instrumentation clock quality, alert thresholds, provider budgets, numerical SLA. Escalate conflicts; do not silently select.
