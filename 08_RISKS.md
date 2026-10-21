@@ -74,3 +74,13 @@ All earlier durability/health/gap/ambiguity/cost controls and final owner approv
 - Eager recomputation across every symbol starves Fast/positions: immediate invalidation is independent from demand-aware scheduling; shared qualified updates follow subscribed positions/READY/earlier relevant stages under resource/provider budgets. No mandatory linear stages or delay to critical fan-out.
 - Active expiration destroys audit history or later historical fallback rewrites past knowledge: retain result/event/version/correction lineage via existing durable Inbox/Slow archive; separately qualify historical evidence with predeclared policy, never bypass mandatory inputs or restore a technically invalid current binding.
 Remaining implementation parameters include technical dependency/rule catalogs, validation criteria, exact generation/fencing/snapshot protocol, consumer demand/cancellation mechanics, transport/storage/integrity choices and measured budgets/targets. All remain unselected and gated; runtime NOT TESTED, no paid services/real trading/final G0 approval.
+
+
+## G1-ARCH-29–44 provisional risks and controls
+
+- Catalog definition drift, hidden cycles or partial dependency propagation: versioned definitions, cycle checks, selective invalidation and immutable PIT lineage; negative tests pending.
+- Subscription cancellation/reconnect, stale notification and retry storms: authoritative revision/snapshot reconciliation, independent consumers, bounded cause-aware retries; transport/fencing unspecified.
+- Inadequate warm-up, source correction and stale quality: definition-specific sufficiency, scoped invalidation, explicit UNAVAILABLE and no retroactive paper fills.
+- Latency misattribution, metric cardinality and clock skew: scoped correlation, distinguish queue/wait/compute and clock uncertainty; numerical objectives unselected.
+- Alert flooding or operational misprioritization: impact-aware dedupe and escalation, protect Fast/open positions, Telegram notification only; dashboard remains deferred.
+- No runtime, recovery, notification, load, CI or performance tests have been run by this documentation task. G0 OPEN.
