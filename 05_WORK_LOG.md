@@ -158,3 +158,7 @@ Created local Git repository baseline, README, .gitignore, session/handoff proto
 - G0-GOV-01 baseline: last actually owner-submitted AQL-HO-20261021-002 / PR #14, pinned head 275c856c61452fb2fdee2c3de30a2ae9907646a8; PRs #6–#14 OPEN, Issue #1 and G0 OPEN at inspection. No newer owner-submitted Work handoff evidenced. Other conversations inaccessible; unseen submissions UNVERIFIED.
 - Sixteen decisions (ARCH-29–44) option C recorded canonically; reconcile inherited 01–28, A–G, deferred dashboard and research-library phase. New proposal ID AQL-HO-20261021-003 is documentary identifier, NOT a claim owner submitted it to Work.
 - Documentation checks only; runtime, CI, concurrency, notifications, recovery, performance NOT TESTED. No numerical thresholds, physical implementation, paid actions, code, merges or G0 approval.
+
+## 2026-10-21 — G0-REV-01/C documentation remediation of draft PR #15
+
+Owner explicitly approved C: improve documentary acceptance scenarios, notification/recovery invariants and performance measurement criteria, without code, merge, technology selection or fabricated numerical SLA. Same draft PR #15 branch updated. New test cases T29–T44 are SPECIFIED / NOT EXECUTED; conceptual evidence fields added. No independent runtime, concurrency, recovery, notification, CI or performance test performed. G0 OPEN; all earlier PRs preserved; owner review required.
