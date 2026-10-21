@@ -150,3 +150,11 @@ Created local Git repository baseline, README, .gitignore, session/handoff proto
 - Added conceptual states/subscriptions, eight example event sequences and negative acceptance cases including stale-completion overwrite, subscription race, missed notification/restart, cancellation of one consumer and demand-aware invalidation without all-symbol recomputation. Existing Fast/position priority and Slow budget/durability/recovery constraints retained.
 - Nine incremental Markdown files above #13; thirteen cumulative above main. Documentary consistency checks only; application/runtime/concurrency/notification/recovery/cache/CI/performance NOT TESTED. No secrets, new provider/technology, numerical TTL/latency/capacity guarantee, paid action or real trading.
 - Pre-publication entry: future PR number not guessed; actual PR/tool result supplies publication evidence. Next owner review and separate authorization before merge/implementation/final G0 decision. G0 and Issue #1 remain OPEN.
+
+
+## 2026-10-21 — G1-ARCH-29–44 owner-provisional documentary consolidation
+
+- Owner explicitly authorized documentation execution in this conversation after ChatGPT Work paste stalled; scope limited to a new reviewable documentation PR, no code or merges.
+- G0-GOV-01 baseline: last actually owner-submitted AQL-HO-20261021-002 / PR #14, pinned head 275c856c61452fb2fdee2c3de30a2ae9907646a8; PRs #6–#14 OPEN, Issue #1 and G0 OPEN at inspection. No newer owner-submitted Work handoff evidenced. Other conversations inaccessible; unseen submissions UNVERIFIED.
+- Sixteen decisions (ARCH-29–44) option C recorded canonically; reconcile inherited 01–28, A–G, deferred dashboard and research-library phase. New proposal ID AQL-HO-20261021-003 is documentary identifier, NOT a claim owner submitted it to Work.
+- Documentation checks only; runtime, CI, concurrency, notifications, recovery, performance NOT TESTED. No numerical thresholds, physical implementation, paid actions, code, merges or G0 approval.
