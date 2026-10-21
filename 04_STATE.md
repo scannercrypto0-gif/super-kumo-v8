@@ -4,14 +4,14 @@ Former name: SUPER KUMO V8
 Operational V8 implementation: not yet verified or started.
 
 Date: 2026-10-21
-Snapshot verified_at: 2026-10-21T06:11:44Z / 09:11:44 Asia/Riyadh (UTC+03:00)
+Snapshot verified_at: 2026-10-21T06:42:12Z / 09:42:12 Asia/Riyadh (UTC+03:00)
 Verification source: GitHub main/ref, PR #6–#10 APIs, Issue #1 API and commit-pinned documentation. Scope: documentary state; runtime implementation UNVERIFIED.
 Gate: G0 OPEN (owner sign-off pending)
 Official repository: [scannercrypto0-gif/super-kumo-v8](https://github.com/scannercrypto0-gif/super-kumo-v8) — Public
 Official owner: `scannercrypto0-gif`
 Default branch: `main`
 Previously reviewed baseline: `f25f7072c9dea638d218c7f5e89f165e5a393096`
-Latest actual main inspected for consolidated G1 ARCH-12–20: `ed188f1902d397fe74613dd966c5a3e88b32f8c0`.
+Latest actual main inspected for G1 shared indicator box: `ed188f1902d397fe74613dd966c5a3e88b32f8c0`.
 Historical PR #2 head before remediation: `741719fc4e0aecced10fa3317dc354339178f56a`.
 
 ## Bootstrap and active work
@@ -36,8 +36,8 @@ Other open questions: event provider access/rights and PC OS/recovery constraint
 
 ## Next exact task
 
-Current documentation item: provisionally approved G1-ARCH-12–20 screening/readiness/reuse reconciliation on `docs/g1-scanner-readiness-architecture`, documentation only. Baseline owner-submitted handoff AQL-HO-20261020-005 / PR #12 is independently verified OPEN/unmerged at `1948132315ee6a5b3174c56f767c84d1063251cd`. The new branch preserves it by ancestry; a new PR targets main with a cumulative documentation diff, not a claim of source merges.
-Next exact action: owner reviews the new documentation PR, coverage and proposed measurement specification. All existing source PRs #6–#12 remain unmodified/unmerged; no merge, code, final G0 approval or real execution is authorized.
+Current documentation item: owner-submitted G1-ARCH-21–28 shared indicator box documentation/consistency review, on `docs/g1-shared-indicator-box`. Latest owner-confirmed submitted baseline AQL-HO-20261021-001 / PR #13 remains OPEN/unmerged at `4a9bd25672d462f6b6b66beae55716942bb4a183`. New branch inherits it by ancestry, targeting main with a cumulative documentation proposal, not a source merge.
+Next exact action: owner reviews the new shared-box proposal, consistency matrix and unselected implementation parameters. No existing PR/branch is altered; no merge, runtime implementation, paid action, trading or final G0 approval is authorized.
 
 Claude reads `07_CLAUDE_HANDOFF.md` and independently challenges the architecture review; availability recorded in the handoff is Thu 2026-10-22 13:00 Asia/Riyadh. The owner resolves or explicitly defers critical questions, approves the final contract, and authorizes G0 closure before G1 Market Foundation / WP-001 implementation. G0 and G0-001 remain OPEN. No production implementation is authorized by this review.
 
@@ -126,8 +126,8 @@ Historical snapshot, superseded for current status by the ledger below. Verified
 
 Preserve PAPER/TIME/DATA/GOV/INT, A–G and future dashboard from #11. DATA-07 monitor authority is explicitly clarified by G1-ARCH-05: high-priority state/data support, owning trader decides. Critical events, freshness/fallback and recovery ambiguity remain mandatory. Remaining parameters: durable Inbox engine/capacity/integrity/pressure policy, acknowledgment mechanics, measured resource/hysteresis/concurrency/delivery targets, provider/source limits and permissions. No new paid or real-execution permission.
 
-## Current evidence ledger — consolidated G1 ARCH-12–20
-Verified_at: 2026-10-21T06:11:44Z / 09:11:44 Asia/Riyadh (UTC+03:00); source: GitHub main ref, open PR inventory, PR #12 metadata/tree and pinned canonical docs, Issue #1; owner-visible handoff supplies approval/baseline/delta evidence. Earlier ledgers preserve earlier observations, not current baseline assertions.
+## Historical evidence snapshot — consolidated G1 ARCH-12–20, 2026-10-21T06:11:44Z
+Earlier snapshot, superseded for current status by the ledger below. Verified_at: 2026-10-21T06:11:44Z / 09:11:44 Asia/Riyadh (UTC+03:00); source: GitHub main ref, open PR inventory, PR #12 metadata/tree and pinned canonical docs, Issue #1; owner-visible handoff supplies approval/baseline/delta evidence. Earlier ledgers preserve earlier observations, not current baseline assertions.
 
 | Scope/status | Evidence | Uncertainty/approval |
 | --- | --- | --- |
@@ -146,3 +146,25 @@ Verified_at: 2026-10-21T06:11:44Z / 09:11:44 Asia/Riyadh (UTC+03:00); source: Gi
 | Runtime/CI/performance | No application execution in this task | NOT TESTED; measurement spec proposed, no numeric targets/TTL/thresholds/capacity guarantee |
 
 Candidate screening, mandatory evidence readiness and trade decisions are separate; no forced BUILDING path. Shared calculations require full matching identity/temporal evidence and consumer eligibility. LIVE/HISTORICAL classification never guarantees freshness or speed. Fast fan-out/position service and durable Inbox/recovery controls remain intact. Unselected parameters: stage policies/inputs per strategy, actual validity/cache policies, timestamp instrumentation/clock-quality handling and measured service objectives, capacity/resource/provider settings. Only later reviewed authorized work may implement them.
+
+## Current evidence ledger — shared indicator box ARCH-21–28
+Verified_at: 2026-10-21T06:42:12Z / 09:42:12 Asia/Riyadh (UTC+03:00). Sources: current GitHub main ref/startup identity, open PR inventory, #13 metadata/commit ancestry/tree and canonical pinned documentation, Issue #1; visible current owner handoff confirms submitted baseline and eight-decision delta. Older ledgers retain earlier observations, not current baseline claims.
+
+| Scope/status | Evidence | Uncertainty/approval |
+| --- | --- | --- |
+| main `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | GitHub heads/main ref and startup identity | No architecture proposal merged at snapshot |
+| G0 OPEN / Issue #1 OPEN | Published startup and current Issue API/body | No final approval; stale Issue PR #2 sentence unchanged |
+| PR #6 OPEN / unmerged | [PR #6](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/6), head `93a1a537866fc20059d80f86061676e26fcd971e`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | No merge or existing PR/branch mutation authorized |
+| PR #7 OPEN / unmerged | [PR #7](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/7), head `79bf0d902fab8fe766962425ca58d0d0528c152c`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | No merge or existing PR/branch mutation authorized |
+| PR #8 OPEN / unmerged | [PR #8](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/8), head `19c5a747a568c727deb4cf7eb1320e30a7857241`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | No merge or existing PR/branch mutation authorized |
+| PR #9 OPEN / unmerged | [PR #9](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/9), head `8886e69562b880e35c989009961959d4c9163791`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | No merge or existing PR/branch mutation authorized |
+| PR #10 OPEN / unmerged | [PR #10](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/10), head `8f33b50dbec18ff472a59c3505c2dbf6d43b104d`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | No merge or existing PR/branch mutation authorized |
+| PR #11 OPEN / unmerged | [PR #11](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/11), head `fb79e13b58c91c6b53a7e0489114adcdcc577d15`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | No merge or existing PR/branch mutation authorized |
+| PR #12 OPEN / unmerged | [PR #12](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/12), head `1948132315ee6a5b3174c56f767c84d1063251cd`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | No merge or existing PR/branch mutation authorized |
+| PR #13 OPEN / unmerged | [PR #13](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/13), head `4a9bd25672d462f6b6b66beae55716942bb4a183`, base `ed188f1902d397fe74613dd966c5a3e88b32f8c0` | No merge or existing PR/branch mutation authorized |
+| Last actually owner-confirmed submitted handoff | AQL-HO-20261021-001 / PR #13, explicit current owner instruction | Originating conversations not independently accessible |
+| New handoff AQL-HO-20261021-002 / directly received | G1-ARCH-21–28, cross-decision checks and doc-only constraints | No newer confirmed submission evidenced in accessible inventory/records; unseen submissions UNVERIFIED |
+| New shared-box documentation proposal | `docs/g1-shared-indicator-box` from pinned unmerged #13, targeting main | Pre-publication snapshot; actual PR body/tool result supplies later publication link |
+| Runtime/concurrency/notifications/recovery/CI/performance | Not executed | NOT TESTED; technical mechanism/parameters and final G0 review remain gated |
+
+Manager technical validity, secretary per-manifest eligibility and owning-trader decisions are distinct. Invalidate active eligibility independently of archival/recomputation; preserve immutable history. No stale completion/notification may restore an obsolete binding. READY and LIVE/HISTORICAL remain separate from readiness/technical validity. Unselected parameters: dependency catalogs/rules, validation evidence, revision/snapshot/notification protocol, single-flight/cancellation mechanics, storage/transport, recovery/integrity behavior, measured budgets/targets and per-strategy policies. No numeric TTL/latency guarantee or technology selected.
