@@ -168,3 +168,14 @@ Preserve event/receipt/availability/generation times, decision references and re
 | OperationalIncident | affected consumer/position, impact, dedupe key, first/last observed, escalation, recovery evidence, Telegram notification reference; not a trading command |
 
 **Illustrative event paths:** qualifying tick invalidates live quote-dependent ACTIVE binding; closed 5m candle invalidates matching closed-candle indicator but not unrelated 1h candle result; correction propagates only through dependency graph while retaining historical evidence; missing warm-up blocks mandatory readiness; reconnect reconciles snapshot and changes before eligibility; optional subscriber removal preserves other consumer demand; Slow pressure yields to open-position updates; failed calculation publishes reasoned UNAVAILABLE and bounded retry; recovered gap reconciles current revision without backdating fills; clock-domain mismatch is surfaced rather than hidden.
+
+## G0-REV-01 / C — Conceptual evidence for notification and measurement acceptance
+
+| Evidence object | Conceptual required fields | Validation boundary |
+|---|---|---|
+| RevisionReconciliationEvidence | result scope/full identity, authoritative generation, snapshot revision, last contiguous cursor, received revision sequence, gap reason, reconciled_at, subscription/manifest version | Gaps and old epochs cannot authorize ACTIVE eligibility; no transport/storage chosen |
+| InvalidationPublicationEvidence | observed trigger identity/time, dependency revision, previous active binding, revocation revision, subsequent candidate result identity, publication decision, rejection reason | Expiry independent of Slow ACK; stale candidate cannot overwrite current |
+| TraceCoverageEvidence | correlation ID, stage names/start/end, clock domain, uncertainty, missing span flags, overlap relation, priority, trader/secretary scope, provider pressure | Cross-clock and overlapping latency cannot be represented as falsely exact totals |
+| IncidentAcceptanceEvidence | incident key, affected positions/consumers, severity rationale, first/last observed, dedupe count, escalation, recovery evidence, notification outcome | Telegram informational only; no trading side effect |
+
+Future fixture/rejection scenarios T29–T44 and measurement/notification protocols are specified in `10_TEST_POLICY.md`; all executable evidence **NOT TESTED**. No physical schema, chosen thresholds or guaranteed latency.
