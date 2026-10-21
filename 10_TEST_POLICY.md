@@ -116,3 +116,23 @@ All runtime/application/recovery/load/CI behavior below is **NOT TESTED** in thi
 | Merge deferral / GOV-01 | Source PRs/branches #6–#11 remain unchanged/open; main is not claimed to contain unmerged proposals; register preserves old observations and appends actual new lifecycle evidence. |
 
 Documentation acceptance: verify all eleven canonical definitions and owner corrections, 12-item delta ledger (eleven decisions plus merge deferral), exact destinations/source conflicts, inherited PAPER/TIME/DATA/GOV/INT+A–G/dashboard/history, nine-file delta against #11 and thirteen-file cumulative documentation scope against main. Runtime acceptance remains NOT TESTED.
+
+## Future progressive screening and readiness acceptance — G1-ARCH-12–20
+Every application/runtime/cache/performance/recovery/CI scenario below is **NOT TESTED** by this documentation task. No executable tests or application code are added.
+
+| Decision | Negative/acceptance scenario and required evidence |
+| --- | --- |
+| G1-ARCH-12 | Two traders have different preliminary filters for one symbol: central Scanner routes only qualifying candidates per trader, shares acquisition/computation when valid, secretary adds inputs and no Scanner/secretary opens a trade. |
+| G1-ARCH-13 | Screening passes but a mandatory additional input is missing/stale/invalid: affected entry cannot pass. Preserve both manifest lists/versions, original context and reasons; optional evidence must not be mislabeled mandatory or vice versa. |
+| G1-ARCH-14 | Candidate qualifies before READY: preparation begins at the actual earliest relevant stage and increases with development; no late result is backdated, duplicate acquisition or Fast/position starvation. |
+| G1-ARCH-15 | Same symbol follows different per-trader stage graphs, including skip/reverse/exit edges where declared: transitions/states remain independent despite shared calculations; no invented compulsory sequence. |
+| G1-ARCH-16 | Historical result is an eligible cache hit: return without heavy Slow queue waiting. Cache miss/stale/invalid result records actual analysis wait and cannot masquerade as ready. A delayed secretary/history request never blocks independent live fan-out. |
+| G1-ARCH-16 | Queue/analysis delay, missing clock endpoint and concurrent office deliveries: measure ingestion/delivery, history service, readiness, strategy wait and active trader processing separately; no upstream wait charged to trader, zero substituted or parallel wait double-counting. |
+| G1-ARCH-17 | Demotion/exit reduces unnecessary historical prefetch; another trader still needs shared work: preserve that consumer/result, raw archive/history and demand evidence. Refresh historical precomputation when policy/input context requires, not merely because LIVE/HISTORICAL label exists. |
+| G1-ARCH-18 | Scanner READY occurs while mandatory evidence incomplete; available evidence is delivered progressively but entry blocks. Later completion/freshness invalidation updates decision-specific readiness; trader alone decides whether to act. |
+| G1-ARCH-19 | Vary one of symbol/timeframe/definition/parameters/version/input provenance/finality/temporal context: incompatible computation cannot reuse a result. Exact match still requires consumer eligibility. Identical price alone is not identity; no shared mutable strategy decisions. |
+| G1-ARCH-20 | LIVE label on stale data and HISTORICAL label on fast valid cache hit: classify planning separately from freshness/provenance. Preserve timestamps, validity, input range, completeness/version; no assumed latency. |
+| G1-ARCH-20 | Declared WATCH -> READY condition becomes true during heavy-job cooldown: record the transition and adjust preparation priorities immediately; do not require BUILDING or delay live delivery/position protection. Cooldown affects unnecessary heavy scheduling only. |
+| Cross-cutting | Inbox crash-safe commit/independent consumers, event ordering, selective recovery, budget throttling, policy-specific fallback and no backdated decisions/fills remain as specified by prior PAPER/TIME/DATA/INT and G1-ARCH-01–11 scenarios. Historical recovery ownership does not make eligible live restart wait for archival catch-up. |
+
+Documentary acceptance requires nine unique new provisional decision definitions, complete owner subrequirements/cross-cutting constraints, a nine-item source/destination ledger, inherited decisions/addenda/dashboard/history preserved, and separate incremental/cumulative scope verification. Numeric targets, TTLs, thresholds and capacity promises remain unselected.
