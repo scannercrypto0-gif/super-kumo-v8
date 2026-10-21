@@ -157,3 +157,10 @@ All runtime/application/cache/concurrency/notification/recovery/performance/CI b
 | Archive / replay / shared providers | Archive backlog/crash replay retains immutable result history and decision-critical events, idempotent progress and shared API budget authority. Internal indicator subscriptions do not duplicate Binance feeds; no universal TTL, numeric latency or capacity claim. |
 
 Documentation acceptance: eight unique canonical definitions with all owner subrequirements; eight-item compatibility/destination ledger; explicit result-state/subscription model and eight example sequences; inherited G0/G1/A–G/dashboard/history preserved; nine incremental/thirteen cumulative Markdown files only. Runtime/CI/performance evidence not inferred from documentary checks.
+
+
+## G1-ARCH-29–44 proposed documentary and future executable acceptance
+
+Documentation checks: 16 unique canonical decisions numbered 29–44, all C and provisional; sixteen-row inherited compatibility/destination matrix; full conceptual catalog/dependency/subscription/failure/quality/warm-up/correction/recovery/observability models; inherited G0/G1/A–G and dashboard preserved; no physical technology, numerical SLA, code or merge.
+
+**Future negative/positive tests — NOT TESTED:** dependency cycle rejection; unrelated indicator remains valid on scoped correction; definition version migration and PIT preservation; two subscribers with one cancellation; high-priority position event during Slow backlog; delayed computation fencing; missed/duplicate/reordered notifications; reconnect snapshot gap; bounded retries and retry storm avoidance; warm-up insufficient; mandatory READY evidence missing; historical correction and immutable prior evidence; restart/Inbox ACK safety; Slow secretary cannot block others; overlapping latency attribution and clock skew; dormant demand not counted as failure; alert dedupe/escalation/recovery. Executable CI, runtime, performance, concurrency, notification, recovery and provider budgets remain NOT TESTED until separately authorized.
