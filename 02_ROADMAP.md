@@ -48,3 +48,8 @@ This is G1 preparation documentation while G0 remains OPEN. Existing dashboard d
 ## Provisional shared-box preparation — G1-ARCH-21–28
 G0 remains OPEN. Future preparation must define indicator dependency/invalidation rules, full computation identities, technical result lifecycle, targeted subscriptions and per-secretary eligibility responsibilities before implementation. Plan acceptance for invalidation without archival waiting, demand-aware single-flight updates, stale-completion/notification rejection and reconnect/state reconciliation.
 Shared box planning preserves the earlier non-linear Scanner stages and progressive readiness, priority/durability/budget obligations, independent deferred dashboard and separate research-library phase. Eligible historical evidence is not an automatically valid active result; runtime/performance/notification guarantees require later evidence. No TTL, numerical latency, technology, paid resource, merge or implementation approval is introduced.
+
+
+## Provisional G1 preparation — ARCH-29–44
+
+Prepare versioned catalog and dependency rules, demand-aware shared computation, targeted revision-safe subscriptions, quality/warm-up/correction propagation, per-decision evidence readiness, restart reconciliation and stage-attributed operational measurements. Documentary acceptance: sixteen canonical C definitions, cross-decision matrix, conceptual schemas, positive/negative scenarios and explicit untested status. Executable acceptance requires separately approved implementation, synthetic replay, negative race tests, measured resource budgets, recovery and notification validation. Preserve G0 OPEN, deferred dashboard, research-library separate preparation, source PRs unmerged and no automatic merge.
