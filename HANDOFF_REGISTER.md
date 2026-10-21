@@ -119,3 +119,8 @@ At 2026-10-21T06:42:12Z / 09:42:12 Asia/Riyadh (UTC+03:00), GitHub verifies [PR 
 - **G0-GOV-01 audit:** current PR #14 OPEN/unmerged head 275c856c61452fb2fdee2c3de30a2ae9907646a8; PRs #6–#14 OPEN, Issue #1 and G0 OPEN; pinned parent branch ancestry. Accessible conversation covers all sixteen post-baseline approvals; other chats inaccessible, unseen submissions UNVERIFIED.
 - **Decision coverage:** ARCH-29–44, option C, sixteen unique canonical definitions, compatibility/destination matrix, conceptual schema and test policy; earlier ARCH-01–28, A–G, future dashboard and PIT/recovery constraints preserved.
 - **Limits:** documentation-only proposal; no code, no merge, no G0 closure, no live/paid actions, no technology or numeric SLA selected. Runtime/CI/performance/concurrency/notification/recovery NOT TESTED. Owner review and separate merge approval required.
+
+
+### G0-REV-01/C addendum to AQL-HO-20261021-003 documentary proposal
+
+Owner approved C documentary remediation on PR #15: sixteen future executable fixtures T29–T44, authoritative revision/reconnect/fencing acceptance, measurement uncertainty and trace criteria, evidence schemas, risks and review log. Existing PR #15 remains Draft, no merge/code/runtime tests; last owner-actually-submitted Work handoff still AQL-HO-20261021-002 / PR #14. G0 OPEN.
