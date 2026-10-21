@@ -111,3 +111,11 @@ At 2026-10-21T06:42:12Z / 09:42:12 Asia/Riyadh (UTC+03:00), GitHub verifies [PR 
 - Result preparation: isolated `docs/g1-shared-indicator-box`, parent `4a9bd25672d462f6b6b66beae55716942bb4a183`, target main. Nine incremental/thirteen cumulative Markdown paths. [Resulting PR lookup](https://github.com/scannercrypto0-gif/super-kumo-v8/pulls?q=is%3Apr+head%3Adocs%2Fg1-shared-indicator-box); PR number/publication not yet observed in this commit, actual PR body/tool result supplies later evidence. Review/merge pending; all existing PRs unchanged and no merge authorized.
 - Delta dispositions: eight ARCH-21–28 items INCLUDED with canonical bodies and compatibility/source/destination matrix; inherited G0/G1/A–G/dashboard and each prior handoff/log event preserved. Scope completeness is documentary only and bounded to accessed evidence; originating conversations not claimed inspected.
 - Runtime/application/concurrency/notification/recovery/cache/CI/performance NOT TESTED. Implementation mechanisms/numeric parameters remain unselected. No paid service, real execution or final G0 permission. G0/Issue #1 OPEN.
+
+
+## AQL-HO-20261021-003 — G1 indicator catalog, quality and observability documentation proposal
+
+- **Status:** owner provisionally approved ARCH-29–44/C and explicitly authorized direct documentation execution after Work paste stalled. This is an assistant-created documentary proposal ID, **not** a new owner-actually-submitted Work handoff. Last owner-actually-submitted remains `AQL-HO-20261021-002` / PR #14.
+- **G0-GOV-01 audit:** current PR #14 OPEN/unmerged head 275c856c61452fb2fdee2c3de30a2ae9907646a8; PRs #6–#14 OPEN, Issue #1 and G0 OPEN; pinned parent branch ancestry. Accessible conversation covers all sixteen post-baseline approvals; other chats inaccessible, unseen submissions UNVERIFIED.
+- **Decision coverage:** ARCH-29–44, option C, sixteen unique canonical definitions, compatibility/destination matrix, conceptual schema and test policy; earlier ARCH-01–28, A–G, future dashboard and PIT/recovery constraints preserved.
+- **Limits:** documentation-only proposal; no code, no merge, no G0 closure, no live/paid actions, no technology or numeric SLA selected. Runtime/CI/performance/concurrency/notification/recovery NOT TESTED. Owner review and separate merge approval required.
