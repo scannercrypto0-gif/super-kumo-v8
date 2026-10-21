@@ -173,3 +173,7 @@ Manager technical validity, secretary per-manifest eligibility and owning-trader
 ## Provisional current decision delta — AQL-HO-20261021-003 (2026-10-21)
 
 Owner provisionally approved G1-ARCH-29–44, all option C, since last actually submitted AQL-HO-20261021-002 / PR #14. This branch starts at pinned unmerged PR #14 head 275c856c61452fb2fdee2c3de30a2ae9907646a8; PRs #6–#14 were OPEN and Issue #1 OPEN at audit. No evidence of owner-submitted newer Work handoff; other chats inaccessible, unseen changes UNVERIFIED. New documentation proposal does not close G0 or merge prior PRs. Implementation, concurrency, latency, notification, recovery, performance, CI NOT TESTED. New physical mechanisms and thresholds UNSELECTED. Future dashboard deferred.
+
+## G0-REV-01 / C — Review remediation state
+
+Draft PR #15 documentation clarification authorized and applied on its existing branch: test fixture/trigger/expected/forbidden cases T29–T44; revision-safe notification/restart protocol; clock-aware stage latency acceptance and evidence fields. Documentary clarification only, executable tests NOT TESTED, no merge, no final G0. Last owner-actually-submitted Work handoff remains AQL-HO-20261021-002 / PR #14; PR #15 is directly authorized GitHub documentation work.
