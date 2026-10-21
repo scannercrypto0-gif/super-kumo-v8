@@ -150,3 +150,21 @@ Preserve event/receipt/availability/generation times, decision references and re
 | Multiple subscribers / cancellation | S1 and S2 request identical full computation identity -> one shared execution, independent result qualification -> S1 unsubscribes -> S2's work remains -> S2 may accept while another policy rejects. No shared trader decision and no second provider subscription. |
 | Missed push / reconnect | Secretary held revision R -> invalidation/new state occurs while disconnected -> old VALID message arrives late -> do not restore R -> reconcile authoritative current snapshot plus ordered changes, gaps and subscription context -> eligibility only under current technical and manifest evidence. |
 | No demand / renewed interest | Result invalidates with no interested consumer -> revoke eligibility without computing every symbol -> later qualifying WATCH/READY/position subscription receives current state -> schedule/reuse only eligible identity by priority. No forced BUILDING or suppression of genuine stage transitions. |
+
+
+## Conceptual G1-ARCH-29–44 extensions — no physical schema selected
+
+| Concept | Minimum conceptual fields / invariant |
+|---|---|
+| IndicatorDefinition | definition_id, version, formula/parameters, timeframe, finality, required quality, dependency identities, lookback/warm-up, PIT policy, invalidation trigger set; immutable version semantics |
+| DependencyEdge | from input/result revision to dependent computation, scoped identity, correction lineage; cycle rejection |
+| DemandSubscription | trader/secretary, symbol, stage, position context, manifest revision, indicator identity, priority, generation; reference-count shared work without consumer coupling |
+| ComputationAttempt | full input identity, single-flight key, revision fence, demand, priority, queue/execute timestamps, failure cause, bounded retry state |
+| QualityEvidence | source, event/availability times, finality, completeness, provenance, correction revision, acceptance reason; no retroactive knowability rewrite |
+| HistoricalSufficiency | definition version, required lookback, warm-up, eligible range, gap ledger, ready/not-ready reason |
+| ResultStateChange | scoped result binding, VALID/UPDATING/UNAVAILABLE, authoritative revision/generation, cause, invalidation event, snapshot cursor; late writes rejected |
+| DecisionEvidenceManifest | trader, symbol, decision context, manifest version, mandatory inputs, per-input technical/consumer eligibility, missing reasons; READY != authorization |
+| TraceSegment | correlated source/Inbox/Fast/compute/secretary/readiness/strategy/trader timestamps, clock domain and uncertainty; do not double count overlaps |
+| OperationalIncident | affected consumer/position, impact, dedupe key, first/last observed, escalation, recovery evidence, Telegram notification reference; not a trading command |
+
+**Illustrative event paths:** qualifying tick invalidates live quote-dependent ACTIVE binding; closed 5m candle invalidates matching closed-candle indicator but not unrelated 1h candle result; correction propagates only through dependency graph while retaining historical evidence; missing warm-up blocks mandatory readiness; reconnect reconciles snapshot and changes before eligibility; optional subscriber removal preserves other consumer demand; Slow pressure yields to open-position updates; failed calculation publishes reasoned UNAVAILABLE and bounded retry; recovered gap reconciles current revision without backdating fills; clock-domain mismatch is surfaced rather than hidden.
