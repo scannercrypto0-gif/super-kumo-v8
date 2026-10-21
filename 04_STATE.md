@@ -168,3 +168,8 @@ Verified_at: 2026-10-21T06:42:12Z / 09:42:12 Asia/Riyadh (UTC+03:00). Sources: c
 | Runtime/concurrency/notifications/recovery/CI/performance | Not executed | NOT TESTED; technical mechanism/parameters and final G0 review remain gated |
 
 Manager technical validity, secretary per-manifest eligibility and owning-trader decisions are distinct. Invalidate active eligibility independently of archival/recomputation; preserve immutable history. No stale completion/notification may restore an obsolete binding. READY and LIVE/HISTORICAL remain separate from readiness/technical validity. Unselected parameters: dependency catalogs/rules, validation evidence, revision/snapshot/notification protocol, single-flight/cancellation mechanics, storage/transport, recovery/integrity behavior, measured budgets/targets and per-strategy policies. No numeric TTL/latency guarantee or technology selected.
+
+
+## Provisional current decision delta — AQL-HO-20261021-003 (2026-10-21)
+
+Owner provisionally approved G1-ARCH-29–44, all option C, since last actually submitted AQL-HO-20261021-002 / PR #14. This branch starts at pinned unmerged PR #14 head 275c856c61452fb2fdee2c3de30a2ae9907646a8; PRs #6–#14 were OPEN and Issue #1 OPEN at audit. No evidence of owner-submitted newer Work handoff; other chats inaccessible, unseen changes UNVERIFIED. New documentation proposal does not close G0 or merge prior PRs. Implementation, concurrency, latency, notification, recovery, performance, CI NOT TESTED. New physical mechanisms and thresholds UNSELECTED. Future dashboard deferred.
