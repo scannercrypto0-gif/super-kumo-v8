@@ -51,6 +51,13 @@ class UncertaintyTests(unittest.TestCase):
             paired_moving_block_interval([0., 1.], [0., 1.],
                                          block_length=3, replicates=100, seed=3)
 
+    def test_full_length_circular_block_is_rejected(self):
+        # Every circular full-block draw has the same sum: artificial zero CI width.
+        with self.assertRaises(ValueError):
+            paired_moving_block_interval([0., 0., 0., 0.],
+                                          [4., -1., -1., -1.],
+                                          block_length=4, replicates=200, seed=2)
+
     def test_block_size_records_dependence_assumption(self):
         baseline = [0., 0.01, 0.02, 0., -0.01] * 10
         candidate = [x + (0.01 if i % 5 < 3 else -0.005)
