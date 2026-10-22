@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - feat/research-wp-r0-synthetic-20261022
-  pull_request:
-    paths:
-      - "research_wp_r0/**"
-      - "tests/test_research_wp_r0.py"
-      - ".github/workflows/research-wp-r0-tests.yml"
 
 permissions:
   contents: read

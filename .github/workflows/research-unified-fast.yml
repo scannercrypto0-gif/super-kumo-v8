@@ -1,0 +1,46 @@
+name: Research Unified Fast CI
+
+on:
+  push:
+    branches:
+      - ci/research-unified-fast-suite-20261022
+  pull_request:
+    paths:
+      - "research_wp_r0/**"
+      - "tests/test_research_wp_r*.py"
+      - ".github/workflows/research-unified-fast.yml"
+      - ".github/workflows/research-wp-r*-tests.yml"
+      - ".github/workflows/research-audit-remediation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-unified-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  research:
+    name: Full research suite + e2e (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Python
+        run: python --version
+      - name: All research regression tests, exactly once per OS
+        run: python -B -m unittest discover -s tests -p 'test_research_wp_r*.py'
+      - name: End-to-end research evidence and checkpoint
+        run: python -B -m research_wp_r0.measured_pipeline
+      - name: Disposable telemetry loss isolation
+        run: python -B -m research_wp_r0.isolated_telemetry
+      - name: Telemetry queue backpressure and worker failure
+        run: python -B -m research_wp_r0.telemetry_pressure
