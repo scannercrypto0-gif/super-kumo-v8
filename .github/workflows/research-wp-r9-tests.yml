@@ -1,0 +1,31 @@
+name: Research WP-R9 Windows Audit Fixes
+
+on:
+  push:
+    branches:
+      - fix/research-wp-r9-windows-audit-20261022
+  pull_request:
+    paths:
+      - "research_wp_r0/**"
+      - "tests/test_research_wp_r*.py"
+      - ".github/workflows/research-wp-r9-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-audit-regressions:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python runtime
+        run: python --version
+      - name: Compile
+        run: python -m compileall -q research_wp_r0 tests
+      - name: R0-R9 synthetic research tests
+        run: python -B -m unittest discover -s tests -p 'test_research_wp_r*.py' -v
