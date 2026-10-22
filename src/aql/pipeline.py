@@ -145,18 +145,32 @@ def run_pipeline(
     # This runs before WebSocket connection so any gap from the previous process
     # is detected and recovered, even if _on_close was never called.
     startup_recovery_result = None
+    startup_reconcile_error: str | None = None
+    startup_replay_inserted: int = 0
+    startup_replay_errors: int = 0
+    startup_bars_replayed: int = 0
     try:
-        bars_replayed, startup_gap_start, startup_gap_end = journal.startup_reconcile(
+        (startup_bars_replayed,
+         startup_replay_inserted,
+         startup_replay_errors,
+         startup_gap_start,
+         startup_gap_end) = journal.startup_reconcile(
             store=store,
             symbol=symbol,
             interval=interval,
         )
         logger.info(
-            "Startup reconciliation complete: bars_replayed=%d gap=[%s, %s]",
-            bars_replayed,
-            startup_gap_start,
-            startup_gap_end,
+            "Startup reconciliation complete: bars_replayed=%d "
+            "replay_inserted=%d replay_errors=%d gap=[%s, %s]",
+            startup_bars_replayed, startup_replay_inserted, startup_replay_errors,
+            startup_gap_start, startup_gap_end,
         )
+        if startup_replay_errors > 0:
+            logger.error(
+                "Startup reconciliation: %d bar(s) failed to replay into store — "
+                "unresolved backlog exists",
+                startup_replay_errors,
+            )
         if startup_gap_start is not None and startup_gap_end is not None:
             startup_recovery_result = _run_gap_recovery(
                 journal=journal,
@@ -167,7 +181,8 @@ def run_pipeline(
                 gap_end_ms=startup_gap_end,
             )
     except Exception as exc:
-        logger.error("Startup reconciliation failed (non-fatal): %s", exc)
+        startup_reconcile_error = str(exc)
+        logger.error("Startup reconciliation FAILED: %s", startup_reconcile_error)
 
     # --- WebSocket collection ---
     collector = BinanceCollector(
@@ -207,6 +222,8 @@ def run_pipeline(
             "expected": gr.expected_bars,
             "recovered": gr.recovered_bars,
             "unresolved": gr.unresolved,
+            "missing_opens": gr.missing_opens,
+            "http_error": gr.http_error,
             "weight_cost": gr.weight_cost,
             "last_seen_window_weight": gr.last_seen_window_weight,
             "inserted": recovery_result["recovery_inserted"],
@@ -234,6 +251,14 @@ def run_pipeline(
             "max_open_ms": max_open,
         },
         "startup_gap_recovery": _report_from(startup_recovery_result),
+        "startup_reconcile": {
+            "bars_replayed": startup_bars_replayed,
+            "replay_inserted": startup_replay_inserted,
+            "replay_errors": startup_replay_errors,
+            "error": startup_reconcile_error,
+            # Machine-readable: any non-zero value here means unresolved backlog
+            "unresolved_backlog": startup_replay_errors > 0 or startup_reconcile_error is not None,
+        },
         "ws_gap_recovery": _report_from(ws_recovery_result),
         "supabase_status": OperationalStore.SUPABASE_STATUS,
     }

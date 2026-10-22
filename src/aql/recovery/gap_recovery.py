@@ -58,9 +58,11 @@ class RecoveryReport:
     recovered_bars: int
     already_stored: int
     unresolved: int
-    status: str  # "FULL" | "PARTIAL" | "UNRESOLVED_DATA_GAP"
+    missing_opens: list        # exact bar_open timestamps that were expected but not received
+    status: str  # "FULL" | "PARTIAL" | "UNRESOLVED_DATA_GAP" | "HTTP_ERROR"
     weight_cost: int           # cost = requests_made * KLINES_WEIGHT_PER_REQUEST
     last_seen_window_weight: int  # last X-MBX-USED-WEIGHT-1M value (cumulative, for observation)
+    http_error: Optional[str]  # set when REST fetch failed entirely (traceable unresolved evidence)
 
 
 def _binance_interval_ms(interval: str) -> int:
@@ -159,6 +161,7 @@ def recover_gap(
     all_bars: List[MarketBar] = []
     requests_made = 0
     last_seen_window_weight = 0
+    http_error: Optional[str] = None
     cursor = aligned_start
 
     while cursor <= aligned_end and expected > 0:
@@ -178,7 +181,8 @@ def recover_gap(
             requests_made += 1
             last_seen_window_weight = window_weight
         except Exception as exc:
-            logger.warning("REST fetch failed: %s", exc)
+            http_error = str(exc)
+            logger.warning("REST fetch failed (traceable): %s", http_error)
             break
 
         if not rows:
@@ -186,12 +190,21 @@ def recover_gap(
 
         for row in rows:
             bar = MarketBar.from_binance_rest_kline(row, symbol, interval)
-            # Filter: only include bars whose open time is within the aligned gap.
-            # Binance may return bars starting before startTime in rare edge cases.
+            # Filter 1: open time must be within aligned gap boundaries.
             if bar.bar_open < aligned_start or bar.bar_open > aligned_end:
                 logger.debug(
                     "Skipping out-of-range bar: bar_open=%d not in [%d, %d]",
                     bar.bar_open, aligned_start, aligned_end,
+                )
+                continue
+            # Filter 2: bar must be fully closed — bar_open + interval_ms <= gap_end_ms.
+            # aligned_end is the open time of the last CLOSED bar; a bar at aligned_end
+            # closes at aligned_end + interval_ms.  We accept it only when that close
+            # time is <= gap_end_ms (i.e. the candle has finished).
+            if bar.bar_open + interval_ms > gap_end_ms:
+                logger.debug(
+                    "Skipping unfinished bar: bar_open=%d close=%d > gap_end=%d",
+                    bar.bar_open, bar.bar_open + interval_ms, gap_end_ms,
                 )
                 continue
             all_bars.append(bar)
@@ -211,19 +224,44 @@ def recover_gap(
             unique_bars.append(bar)
     all_bars = unique_bars
 
+    # Build the exact set of bar_open timestamps we EXPECTED to receive.
+    # Comparing this to what we actually collected catches interior gaps and
+    # off-grid extras that a simple row-count comparison misses.
+    expected_opens: set = set()
+    if expected > 0:
+        for i in range(expected):
+            expected_opens.add(aligned_start + i * interval_ms)
+
+    fetched_opens: set = {b.bar_open for b in all_bars}
+    missing_opens: set = expected_opens - fetched_opens          # bars we should have but don't
+    extra_opens:   set = fetched_opens - expected_opens          # bars outside expected grid
+
+    if extra_opens:
+        logger.warning(
+            "Gap recovery: %d bar(s) outside expected grid discarded: %s",
+            len(extra_opens), sorted(extra_opens),
+        )
+        all_bars = [b for b in all_bars if b.bar_open not in extra_opens]
+        fetched_opens -= extra_opens
+
+    unresolved = len(missing_opens)
+
     # Separate new bars from already-stored ones
     recovered_new = [b for b in all_bars if b.bar_open not in existing_keys]
     already_stored = len(all_bars) - len(recovered_new)
-    unresolved = max(0, expected - len(all_bars))
 
     if unresolved > 0:
         status = "UNRESOLVED_DATA_GAP"
-    elif expected > 0 and len(all_bars) >= expected:
+    elif expected > 0 and not missing_opens:
         status = "FULL"
     else:
         status = "PARTIAL"
 
     weight_cost = requests_made * KLINES_WEIGHT_PER_REQUEST
+
+    # If REST fetch errored and we have unresolved bars, force status to HTTP_ERROR
+    if http_error and unresolved > 0:
+        status = "HTTP_ERROR"
 
     report = RecoveryReport(
         symbol=symbol,
@@ -234,18 +272,20 @@ def recover_gap(
         recovered_bars=len(all_bars),
         already_stored=already_stored,
         unresolved=unresolved,
+        missing_opens=sorted(missing_opens),
         status=status,
         weight_cost=weight_cost,
         last_seen_window_weight=last_seen_window_weight,
+        http_error=http_error,
     )
 
     logger.info(
         "Gap recovery: symbol=%s interval=%s expected=%d recovered=%d "
-        "already_stored=%d unresolved=%d status=%s "
-        "weight_cost=%d window_weight=%d",
+        "already_stored=%d unresolved=%d missing=%s status=%s "
+        "weight_cost=%d window_weight=%d http_error=%s",
         symbol, interval, expected, len(all_bars),
-        already_stored, unresolved, status,
-        weight_cost, last_seen_window_weight,
+        already_stored, unresolved, sorted(missing_opens), status,
+        weight_cost, last_seen_window_weight, http_error,
     )
 
     return recovered_new, report

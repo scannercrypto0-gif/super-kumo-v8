@@ -245,78 +245,104 @@ class DurableJournal:
         store,
         symbol: str,
         interval: str,
-    ) -> Tuple[int, Optional[int], Optional[int]]:
+    ) -> Tuple[int, int, int, Optional[int], Optional[int]]:
         """
-        On process restart (including after SIGKILL), determine:
-          1. How many journal entries are not yet reflected in the store,
-             and mark them PERSISTED if the store already has them (replay
-             any that need re-upsert is done by the caller / pipeline).
-          2. The gap between the last durably stored bar and "now" that
-             the WebSocket missed because the process was not running.
+        On process restart (including after SIGKILL):
+
+        1. Replay journal LOCAL_COMMITTED entries absent from the operational
+           store and upsert them directly — every missing bar gets a confirmed
+           write, with per-key ACK and journal state update.  This is the
+           real journal-to-store replay that guarantees no bar is permanently
+           lost between a durable journal commit and a store write.
+
+        2. Compute the gap from the last durably known bar to now for the
+           subsequent REST recovery pass.
 
         Returns:
-          (bars_replayed, gap_start_ms, gap_end_ms)
+          (bars_replayed, replay_inserted, replay_errors, gap_start_ms, gap_end_ms)
 
-          bars_replayed: number of journal entries found not yet PERSISTED
-          gap_start_ms:  open_time of first potentially-missing bar
-                         (last_known_bar_open + interval_ms), or None
-          gap_end_ms:    current time in ms (start of "now"), or None
+          bars_replayed:   number of journal bars found missing from the store
+          replay_inserted: number successfully upserted into the store this call
+          replay_errors:   number that failed to upsert (store write error)
+          gap_start_ms:    open_time of first potentially-missing bar
+                           (last_known_bar_open + interval_ms), or None
+          gap_end_ms:      current time in ms, or None
 
-        If there is no stored data at all, returns (0, None, None) — the
-        caller should treat this as a clean start (no gap to recover).
+        If there is no stored data at all, returns (0, 0, 0, None, None).
 
-        Design note: this method does NOT fetch from Binance REST.  It only
-        reads local state and returns the gap bounds.  The caller (pipeline)
-        is responsible for calling recover_gap() with those bounds.
+        Design note: REST gap recovery is NOT called from here.  The caller
+        (pipeline) uses the returned gap bounds to invoke recover_gap().
         """
         from ..recovery.gap_recovery import _binance_interval_ms
 
         interval_ms = _binance_interval_ms(interval)
 
-        # Step 1: replay journal to find entries not yet persisted in store
+        # Step 1: replay journal — find bars committed locally but absent from store
         journal_bars = self.replay(symbol=symbol, interval=interval, final_only=True)
         stored_keys = store.get_stored_keys(symbol, interval)
 
         bars_replayed = 0
+        replay_inserted = 0
+        replay_errors = 0
+
         for bar in journal_bars:
             if bar.bar_open in stored_keys:
-                # Already in store — ensure journal state is PERSISTED
-                self.mark_persisted(bar.stable_key())
+                # Already in store — sync journal state to PERSISTED
+                try:
+                    self.mark_persisted(bar.stable_key())
+                except Exception as exc:
+                    logger.warning(
+                        "startup_reconcile: mark_persisted failed for %s (non-fatal): %s",
+                        bar.stable_key(), exc,
+                    )
             else:
-                # Not yet in store — caller will upsert
+                # Missing from store — perform real upsert (journal-to-store replay)
                 bars_replayed += 1
+                try:
+                    store.upsert(bar)
+                    replay_inserted += 1
+                    try:
+                        self.mark_persisted(bar.stable_key())
+                    except Exception as exc:
+                        logger.warning(
+                            "startup_reconcile: mark_persisted failed after upsert "
+                            "for %s (non-fatal): %s", bar.stable_key(), exc,
+                        )
+                except Exception as exc:
+                    replay_errors += 1
+                    logger.error(
+                        "startup_reconcile: store upsert failed for %s: %s",
+                        bar.stable_key(), exc,
+                    )
 
-        # Step 2: compute gap from last known bar to now
-        # Use max of: last journal bar and last store bar
-        last_journal_open: Optional[int] = None
-        if journal_bars:
-            last_journal_open = max(b.bar_open for b in journal_bars)
-
+        # Step 2: compute REST recovery gap from last known bar to now
+        # Re-read stored_keys to include bars just replayed
         _, last_store_open = store.get_range(symbol, interval)
+        last_journal_open: Optional[int] = (
+            max(b.bar_open for b in journal_bars) if journal_bars else None
+        )
 
         candidates = [x for x in [last_journal_open, last_store_open] if x is not None]
         if not candidates:
-            # No local data at all — no gap to compute
-            return bars_replayed, None, None
+            return bars_replayed, replay_inserted, replay_errors, None, None
 
         last_known_open = max(candidates)
-        # The next expected bar starts at last_known_open + interval_ms
         gap_start_ms = last_known_open + interval_ms
         gap_end_ms = int(time.time() * 1000)
 
-        # If the gap start is in the future (process restarted within same bar),
-        # there is no meaningful gap yet.
         if gap_start_ms >= gap_end_ms:
-            return bars_replayed, None, None
+            return bars_replayed, replay_inserted, replay_errors, None, None
 
         logger.info(
-            "startup_reconcile: symbol=%s interval=%s bars_replayed=%d "
+            "startup_reconcile: symbol=%s interval=%s "
+            "bars_replayed=%d replay_inserted=%d replay_errors=%d "
             "gap_start=%d gap_end=%d gap_duration_s=%.0f",
-            symbol, interval, bars_replayed,
+            symbol, interval,
+            bars_replayed, replay_inserted, replay_errors,
             gap_start_ms, gap_end_ms,
             (gap_end_ms - gap_start_ms) / 1000,
         )
-        return bars_replayed, gap_start_ms, gap_end_ms
+        return bars_replayed, replay_inserted, replay_errors, gap_start_ms, gap_end_ms
 
     def count_by_state(self) -> dict:
         conn = self._connect()

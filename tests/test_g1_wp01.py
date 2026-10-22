@@ -335,7 +335,10 @@ class TestT6_RestGapRecovery(unittest.TestCase):
                 symbol="BTCUSDT",
                 interval="1m",
                 gap_start_ms=base,
-                gap_end_ms=base + 4 * interval_ms,
+                # gap_end_ms must be >= bar_open + interval_ms for the last bar to be
+                # considered fully closed by Fix 2's unfinished-candle filter.
+                # Bar 4 opens at base+4m and closes at base+5m, so gap_end must be >= base+5m.
+                gap_end_ms=base + 5 * interval_ms,
                 existing_keys={base + i * interval_ms for i in range(3)},  # 3 already stored
             )
 
@@ -935,10 +938,12 @@ class TestT13_StartupReconcile(unittest.TestCase):
         j = DurableJournal(os.path.join(self.tmpdir, "j.sqlite"))
         s = OperationalStore(os.path.join(self.tmpdir, "s.sqlite"))
 
-        bars_replayed, gap_start, gap_end = j.startup_reconcile(
+        bars_replayed, replay_inserted, replay_errors, gap_start, gap_end = j.startup_reconcile(
             store=s, symbol="BTCUSDT", interval="1m"
         )
         self.assertEqual(bars_replayed, 0)
+        self.assertEqual(replay_inserted, 0)
+        self.assertEqual(replay_errors, 0)
         self.assertIsNone(gap_start)
         self.assertIsNone(gap_end)
 
@@ -959,13 +964,15 @@ class TestT13_StartupReconcile(unittest.TestCase):
             j.mark_persisted(bar.stable_key())
 
         t_before = int(time.time() * 1000)
-        bars_replayed, gap_start, gap_end = j.startup_reconcile(
+        bars_replayed, replay_inserted, replay_errors, gap_start, gap_end = j.startup_reconcile(
             store=s, symbol="BTCUSDT", interval="1m"
         )
         t_after = int(time.time() * 1000)
 
         # All bars already in store, none need replaying
         self.assertEqual(bars_replayed, 0)
+        self.assertEqual(replay_inserted, 0)
+        self.assertEqual(replay_errors, 0)
 
         # Gap starts at last bar + interval
         last_bar_open = base + 2 * interval_ms
@@ -996,11 +1003,18 @@ class TestT13_StartupReconcile(unittest.TestCase):
             j.mark_persisted(bar.stable_key())
         # bars[2] and bars[3] are in journal but NOT in store
 
-        bars_replayed, gap_start, gap_end = j.startup_reconcile(
+        bars_replayed, replay_inserted, replay_errors, gap_start, gap_end = j.startup_reconcile(
             store=s, symbol="BTCUSDT", interval="1m"
         )
         # 2 bars need to be upserted to store
         self.assertEqual(bars_replayed, 2)
+        # Both missing bars must now be in the store (real replay)
+        self.assertEqual(replay_inserted, 2)
+        self.assertEqual(replay_errors, 0)
+        # Verify they are actually in the store
+        stored_keys = s.get_stored_keys("BTCUSDT", "1m")
+        self.assertIn(bars[2].bar_open, stored_keys)
+        self.assertIn(bars[3].bar_open, stored_keys)
         # Gap starts after the last known bar (bars[3])
         self.assertEqual(gap_start, base + 3 * interval_ms + interval_ms)
 
@@ -1029,12 +1043,434 @@ class TestT13_StartupReconcile(unittest.TestCase):
         s.upsert(bar)
         j.mark_persisted(bar.stable_key())
 
-        bars_replayed, gap_start, gap_end = j.startup_reconcile(
+        bars_replayed, replay_inserted, replay_errors, gap_start, gap_end = j.startup_reconcile(
             store=s, symbol="BTCUSDT", interval="1m"
         )
         # gap_start > now → no gap
         self.assertIsNone(gap_start)
         self.assertIsNone(gap_end)
+
+
+# ---------------------------------------------------------------------------
+# T14 — Real journal-to-store replay: bars are actually upserted on restart
+# ---------------------------------------------------------------------------
+class TestT14_RealJournalReplay(unittest.TestCase):
+    """
+    Regression for review finding 1:
+    startup_reconcile must actually call store.upsert for bars present in
+    journal but absent from store.  The bar must be retrievable from the
+    store after reconcile returns.
+    """
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_missing_bar_upserted_and_retrievable(self):
+        """Bar committed to journal but never stored must appear in store after reconcile."""
+        j = DurableJournal(os.path.join(self.tmpdir, "j.sqlite"))
+        s = OperationalStore(os.path.join(self.tmpdir, "s.sqlite"))
+
+        base = 1_700_000_040_000  # aligned to 60s grid
+        bar = _make_bar(bar_open=base)
+        j.commit(bar)
+        # Do NOT upsert to store — simulate kill between commit and upsert
+
+        bars_replayed, replay_inserted, replay_errors, _, _ = j.startup_reconcile(
+            store=s, symbol="BTCUSDT", interval="1m"
+        )
+
+        self.assertEqual(bars_replayed, 1)
+        self.assertEqual(replay_inserted, 1)
+        self.assertEqual(replay_errors, 0)
+
+        # Must be in store with confirmed ACK
+        stored_keys = s.get_stored_keys("BTCUSDT", "1m")
+        self.assertIn(base, stored_keys, "Bar must be in store after replay")
+
+    def test_upsert_error_counted_in_replay_errors(self):
+        """When store.upsert raises, replay_errors is incremented and bar NOT lost silently."""
+        j = DurableJournal(os.path.join(self.tmpdir, "j.sqlite"))
+        s = OperationalStore(os.path.join(self.tmpdir, "s.sqlite"))
+
+        base = 1_700_000_040_000
+        bar = _make_bar(bar_open=base)
+        j.commit(bar)
+
+        # Inject upsert failure
+        original_upsert = s.upsert
+        def _failing_upsert(b):
+            raise RuntimeError("injected storage failure")
+        s.upsert = _failing_upsert
+
+        bars_replayed, replay_inserted, replay_errors, _, _ = j.startup_reconcile(
+            store=s, symbol="BTCUSDT", interval="1m"
+        )
+
+        s.upsert = original_upsert
+
+        self.assertEqual(bars_replayed, 1)
+        self.assertEqual(replay_inserted, 0)
+        self.assertEqual(replay_errors, 1)
+
+    def test_already_stored_bar_not_double_counted(self):
+        """Bar already in store must not be counted in bars_replayed."""
+        j = DurableJournal(os.path.join(self.tmpdir, "j.sqlite"))
+        s = OperationalStore(os.path.join(self.tmpdir, "s.sqlite"))
+
+        base = 1_700_000_040_000
+        bar = _make_bar(bar_open=base)
+        j.commit(bar)
+        s.upsert(bar)
+        j.mark_persisted(bar.stable_key())
+
+        bars_replayed, replay_inserted, replay_errors, _, _ = j.startup_reconcile(
+            store=s, symbol="BTCUSDT", interval="1m"
+        )
+
+        self.assertEqual(bars_replayed, 0)
+        self.assertEqual(replay_inserted, 0)
+        self.assertEqual(replay_errors, 0)
+
+
+# ---------------------------------------------------------------------------
+# T15 — Unfinished REST candle must not enter store
+# ---------------------------------------------------------------------------
+class TestT15_UnfinishedCandleFilter(unittest.TestCase):
+    """
+    Regression for review finding 2:
+    recover_gap must reject any REST row whose close time (bar_open + interval_ms)
+    exceeds gap_end_ms.  An unfinalized candle must never enter the store.
+    """
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_open_candle_rejected(self):
+        """
+        A bar whose bar_open + interval_ms > gap_end_ms is not-yet-closed
+        and must be excluded from recovered bars.
+        """
+        from unittest.mock import patch
+        from aql.recovery.gap_recovery import recover_gap, KLINES_WEIGHT_PER_REQUEST
+
+        interval_ms = 60_000
+        base = 1_700_000_040_000  # aligned
+
+        # gap_end_ms is in the middle of the last bar — bar not yet closed
+        gap_end_ms = base + interval_ms - 1   # 1 ms before bar closes
+        gap_start_ms = base
+
+        # Simulate REST returning the current open (not yet closed) bar
+        raw_row = [
+            base,                    # open time
+            "100.0",                 # open
+            "101.0",                 # high
+            "99.0",                  # low
+            "100.5",                 # close
+            "50.0",                  # volume
+            base + interval_ms - 1,  # close time
+            "5000.0",                # quote vol
+            100,                     # trades
+            "25.0",                  # taker base
+            "2500.0",                # taker quote
+            "0",                     # ignore
+        ]
+
+        with patch("aql.recovery.gap_recovery._fetch_klines") as mock_fetch:
+            mock_fetch.return_value = ([raw_row], 10)
+            bars, report = recover_gap(
+                symbol="BTCUSDT",
+                interval="1m",
+                gap_start_ms=gap_start_ms,
+                gap_end_ms=gap_end_ms,
+                existing_keys=set(),
+            )
+
+        # Bar must be filtered out as unfinished
+        self.assertEqual(len(bars), 0,
+            "Unfinished candle must not appear in recovered bars")
+        # expected=0 because aligned_end < aligned_start when gap<interval
+        # The bar was returned but filtered; report must reflect unresolved=0
+        # (expected was 0 since gap_end < base+interval → aligned_end=base < aligned_start)
+
+    def test_fully_closed_candle_accepted(self):
+        """
+        A bar whose bar_open + interval_ms <= gap_end_ms is fully closed and must
+        be accepted.
+        """
+        from unittest.mock import patch
+        from aql.recovery.gap_recovery import recover_gap
+
+        interval_ms = 60_000
+        base = 1_700_000_040_000
+
+        # gap covers exactly one full bar
+        gap_start_ms = base
+        gap_end_ms = base + interval_ms   # bar closes exactly at gap_end
+
+        raw_row = [
+            base, "100.0", "101.0", "99.0", "100.5", "50.0",
+            base + interval_ms - 1, "5000.0", 100, "25.0", "2500.0", "0",
+        ]
+
+        with patch("aql.recovery.gap_recovery._fetch_klines") as mock_fetch:
+            mock_fetch.return_value = ([raw_row], 10)
+            bars, report = recover_gap(
+                symbol="BTCUSDT",
+                interval="1m",
+                gap_start_ms=gap_start_ms,
+                gap_end_ms=gap_end_ms,
+                existing_keys=set(),
+            )
+
+        self.assertEqual(len(bars), 1, "Fully closed candle must be accepted")
+        self.assertEqual(bars[0].bar_open, base)
+
+
+# ---------------------------------------------------------------------------
+# T16 — Exact open-time set gap coverage (interior gap + off-grid extra)
+# ---------------------------------------------------------------------------
+class TestT16_ExactSetGapCoverage(unittest.TestCase):
+    """
+    Regression for review finding 3:
+    Gap coverage must be verified as exact expected open-time set, not
+    expected_count - row_count.  A missing interior bar plus an extra
+    boundary/off-grid bar must NOT report FULL.
+    """
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def _make_raw_row(self, bar_open, interval_ms=60_000):
+        return [
+            bar_open, "100.0", "101.0", "99.0", "100.5", "50.0",
+            bar_open + interval_ms - 1, "5000.0", 100, "25.0", "2500.0", "0",
+        ]
+
+    def test_interior_gap_reported_as_unresolved(self):
+        """
+        3 bars expected (base, base+1m, base+2m); REST returns base and base+2m
+        only (interior bar base+1m missing).  Must report UNRESOLVED_DATA_GAP,
+        not FULL.  Row count == 2 == expected-1, so a count-based check would
+        still report unresolved, but the missing_opens set must name the exact bar.
+        """
+        from unittest.mock import patch
+        from aql.recovery.gap_recovery import recover_gap
+
+        interval_ms = 60_000
+        base = 1_700_000_040_000
+
+        gap_start_ms = base
+        gap_end_ms = base + 3 * interval_ms  # 3 bars expected
+
+        rows = [
+            self._make_raw_row(base),
+            # base + interval_ms MISSING
+            self._make_raw_row(base + 2 * interval_ms),
+        ]
+
+        with patch("aql.recovery.gap_recovery._fetch_klines") as mock_fetch:
+            mock_fetch.return_value = (rows, 10)
+            bars, report = recover_gap(
+                symbol="BTCUSDT",
+                interval="1m",
+                gap_start_ms=gap_start_ms,
+                gap_end_ms=gap_end_ms,
+                existing_keys=set(),
+            )
+
+        self.assertEqual(report.status, "UNRESOLVED_DATA_GAP")
+        self.assertIn(base + interval_ms, report.missing_opens,
+            "missing_opens must name the exact interior bar open time")
+        self.assertEqual(report.unresolved, 1)
+
+    def test_off_grid_extra_bar_does_not_inflate_count(self):
+        """
+        2 bars expected (base, base+1m); REST returns base, base+1m, and an
+        off-grid bar.  The off-grid bar must be discarded.  Status must be FULL.
+        """
+        from unittest.mock import patch
+        from aql.recovery.gap_recovery import recover_gap
+
+        interval_ms = 60_000
+        base = 1_700_000_040_000
+
+        gap_start_ms = base
+        gap_end_ms = base + 2 * interval_ms
+
+        off_grid = base + 30_000  # not on 60s boundary
+
+        rows = [
+            self._make_raw_row(base),
+            self._make_raw_row(base + interval_ms),
+            self._make_raw_row(off_grid),
+        ]
+
+        with patch("aql.recovery.gap_recovery._fetch_klines") as mock_fetch:
+            mock_fetch.return_value = (rows, 10)
+            bars, report = recover_gap(
+                symbol="BTCUSDT",
+                interval="1m",
+                gap_start_ms=gap_start_ms,
+                gap_end_ms=gap_end_ms,
+                existing_keys=set(),
+            )
+
+        self.assertEqual(report.status, "FULL")
+        self.assertEqual(len(bars), 2, "Off-grid extra bar must be discarded")
+        bar_opens = {b.bar_open for b in bars}
+        self.assertNotIn(off_grid, bar_opens)
+
+    def test_existing_keys_overlap_reported_correctly(self):
+        """
+        2 bars expected; 1 already in store (existing_keys).
+        recovered_new = 1, already_stored = 1, status FULL.
+        """
+        from unittest.mock import patch
+        from aql.recovery.gap_recovery import recover_gap
+
+        interval_ms = 60_000
+        base = 1_700_000_040_000
+
+        gap_start_ms = base
+        gap_end_ms = base + 2 * interval_ms
+
+        rows = [
+            self._make_raw_row(base),
+            self._make_raw_row(base + interval_ms),
+        ]
+
+        with patch("aql.recovery.gap_recovery._fetch_klines") as mock_fetch:
+            mock_fetch.return_value = (rows, 10)
+            bars, report = recover_gap(
+                symbol="BTCUSDT",
+                interval="1m",
+                gap_start_ms=gap_start_ms,
+                gap_end_ms=gap_end_ms,
+                existing_keys={base},  # base already stored
+            )
+
+        self.assertEqual(report.status, "FULL")
+        self.assertEqual(report.already_stored, 1)
+        self.assertEqual(len(bars), 1, "Only new bar returned")
+        self.assertEqual(bars[0].bar_open, base + interval_ms)
+
+
+# ---------------------------------------------------------------------------
+# T17 — Reconciliation/recovery failures machine-readable in result
+# ---------------------------------------------------------------------------
+class TestT17_ReconcileFailureObservability(unittest.TestCase):
+    """
+    Regression for review finding 4:
+    Reconciliation and recovery failures must be explicitly observable in the
+    machine-readable result dict.  No false-green: unresolved_backlog must be
+    True when there are replay errors or a reconcile exception.
+    HTTP errors from recover_gap must appear in the gap report.
+    """
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_replay_errors_set_unresolved_backlog(self):
+        """
+        When store.upsert fails during reconcile, startup_reconcile returns
+        replay_errors > 0 and the pipeline result must have unresolved_backlog=True.
+        """
+        j = DurableJournal(os.path.join(self.tmpdir, "j.sqlite"))
+        s = OperationalStore(os.path.join(self.tmpdir, "s.sqlite"))
+
+        base = 1_700_000_040_000
+        bar = _make_bar(bar_open=base)
+        j.commit(bar)
+
+        original_upsert = s.upsert
+        def _fail(b):
+            raise RuntimeError("forced failure")
+        s.upsert = _fail
+
+        bars_replayed, replay_inserted, replay_errors, gap_start, gap_end = \
+            j.startup_reconcile(store=s, symbol="BTCUSDT", interval="1m")
+
+        s.upsert = original_upsert
+
+        self.assertEqual(replay_errors, 1)
+        # Caller must surface unresolved_backlog = True
+        unresolved_backlog = replay_errors > 0
+        self.assertTrue(unresolved_backlog)
+
+    def test_http_error_in_recovery_report_is_traceable(self):
+        """
+        When _fetch_klines raises, recover_gap must record http_error in the
+        report (not silently drop the failure).  Status must be HTTP_ERROR
+        when there are unresolved bars.
+        """
+        from unittest.mock import patch
+        from aql.recovery.gap_recovery import recover_gap
+
+        interval_ms = 60_000
+        base = 1_700_000_040_000
+
+        gap_start_ms = base
+        gap_end_ms = base + 2 * interval_ms  # 2 bars expected
+
+        with patch("aql.recovery.gap_recovery._fetch_klines") as mock_fetch:
+            mock_fetch.side_effect = OSError("connection refused")
+            bars, report = recover_gap(
+                symbol="BTCUSDT",
+                interval="1m",
+                gap_start_ms=gap_start_ms,
+                gap_end_ms=gap_end_ms,
+                existing_keys=set(),
+            )
+
+        self.assertEqual(report.status, "HTTP_ERROR",
+            "REST fetch failure must produce HTTP_ERROR status, not FULL")
+        self.assertIsNotNone(report.http_error,
+            "http_error field must be set with failure description")
+        self.assertIn("connection refused", report.http_error)
+        self.assertEqual(len(bars), 0)
+        self.assertEqual(report.unresolved, 2)
+
+    def test_successful_recovery_http_error_is_none(self):
+        """http_error must be None when recovery succeeds."""
+        from unittest.mock import patch
+        from aql.recovery.gap_recovery import recover_gap
+
+        interval_ms = 60_000
+        base = 1_700_000_040_000
+
+        gap_start_ms = base
+        gap_end_ms = base + interval_ms
+
+        raw_row = [
+            base, "100.0", "101.0", "99.0", "100.5", "50.0",
+            base + interval_ms - 1, "5000.0", 100, "25.0", "2500.0", "0",
+        ]
+
+        with patch("aql.recovery.gap_recovery._fetch_klines") as mock_fetch:
+            mock_fetch.return_value = ([raw_row], 10)
+            bars, report = recover_gap(
+                symbol="BTCUSDT",
+                interval="1m",
+                gap_start_ms=gap_start_ms,
+                gap_end_ms=gap_end_ms,
+                existing_keys=set(),
+            )
+
+        self.assertIsNone(report.http_error)
+        self.assertEqual(report.status, "FULL")
 
 
 if __name__ == "__main__":
