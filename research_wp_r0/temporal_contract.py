@@ -64,12 +64,15 @@ class FrozenTemporalManifest:
     source_version: str
     horizon_name: str
     ordered: tuple[TemporalOpportunity, ...]
+    horizon_seconds: int = 3600
 
     def __post_init__(self) -> None:
         if not self.protocol_digest or not self.source_version or not self.horizon_name:
             raise ValueError("Frozen protocol, source version and horizon required")
         if not self.ordered:
             raise ValueError("Empty opportunity universe")
+        if not isinstance(self.horizon_seconds, int) or self.horizon_seconds <= 0:
+            raise ValueError("Frozen horizon duration must be positive integer seconds")
         ids = set()
         previous = None
         for event in self.ordered:
@@ -77,6 +80,8 @@ class FrozenTemporalManifest:
                 raise ValueError("Duplicate opportunity identity")
             ids.add(event.opportunity_id)
             t = _utc(event.decision_at)
+            if int((_utc(event.baseline_horizon_end_at) - t).total_seconds()) != self.horizon_seconds or (_utc(event.baseline_horizon_end_at) - t).total_seconds() != self.horizon_seconds:
+                raise ValueError("Opportunity horizon differs from frozen study horizon")
             if previous is not None and t <= previous:
                 raise ValueError("Decision times must be strictly increasing in manifest order")
             previous = t
@@ -89,6 +94,7 @@ class FrozenTemporalManifest:
             "protocol_digest": self.protocol_digest,
             "source_version": self.source_version,
             "horizon_name": self.horizon_name,
+            "horizon_seconds": self.horizon_seconds,
             "ordered": [
                 {
                     "opportunity_id": o.opportunity_id,
