@@ -135,6 +135,7 @@ def evaluate_opportunity_clusters(
     seed: int,
     confidence: float = 0.95,
     minimum_effect: float = 0.0,
+    temporal_manifest=None,
 ) -> OpportunityAssessment:
     """Provide only a conservative *research screening*, never a promotion.
 
@@ -143,6 +144,9 @@ def evaluate_opportunity_clusters(
     or two-way clustered confidence interval. Sector correlations across shocks,
     opportunity selection and model-search selection require further validation.
     """
+    if temporal_manifest is not None:
+        from research_wp_r0.temporal_contract import validate_temporal_pairs
+        validate_temporal_pairs([row.pair for row in rows], temporal_manifest)
     if not rows or not isinstance(replicates, int) or replicates < 100:
         raise ValueError("Need rows and >=100 fixed bootstrap replicates")
     if not 0 < confidence < 1 or not math.isfinite(minimum_effect):
@@ -180,6 +184,8 @@ def evaluate_opportunity_clusters(
         "No-fill zero represents confirmed zero *realized exposure* under the frozen policy; missed upside and execution propensity remain unestimated.",
         "Intervals are axis-wise cluster sensitivity, not formal simultaneous/multiway coverage.",
         "Cluster identifiers require point-in-time provenance; small/uneven clusters and outcome selection may bias inference.",
+        ("UNVERIFIED_TEMPORAL_CONTEXT: no frozen manifest supplied." if temporal_manifest is None
+         else "STRUCTURALLY_VALIDATED_TEMPORAL_CONTEXT: supplied manifest checked, external receipt provenance unverified."),
         "UNADJUSTED_FOR_SEARCH: trial-family selection and independent validation are not proven.",
         "No positive screening flag is issued until a dependence-calibrated confirmatory protocol exists.",
         "Relative improvement can occur even when both strategies have negative average net returns.",
