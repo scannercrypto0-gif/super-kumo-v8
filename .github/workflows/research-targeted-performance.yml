@@ -1,0 +1,48 @@
+name: Research Targeted Performance
+
+on:
+  push:
+    branches:
+      - ci/research-r18-targeted-performance-20261022
+    paths:
+      - "research_wp_r0/durable_journal.py"
+      - "research_wp_r0/journal_benchmark.py"
+      - "research_wp_r0/group_commit_experiment.py"
+      - "research_wp_r0/isolated_telemetry.py"
+      - "research_wp_r0/telemetry_pressure.py"
+      - ".github/workflows/research-targeted-performance.yml"
+  pull_request:
+    paths:
+      - "research_wp_r0/durable_journal.py"
+      - "research_wp_r0/journal_benchmark.py"
+      - "research_wp_r0/group_commit_experiment.py"
+      - "research_wp_r0/isolated_telemetry.py"
+      - "research_wp_r0/telemetry_pressure.py"
+      - ".github/workflows/research-targeted-performance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-performance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  targeted-performance:
+    name: Focused synthetic performance (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Journal append and restart, real per-event fsync
+        run: python -B research_wp_r0/journal_benchmark.py --module-root . --sizes 16,32,64 --repeats 3
+      - name: Group-commit tradeoff (EXPERIMENT ONLY, never authoritative)
+        run: python -B -m research_wp_r0.group_commit_experiment
