@@ -153,7 +153,19 @@ class DurableTrialJournal:
             self._lock_path.unlink()
 
     def report(self):
+        """Verify current disk evidence before exposing a research report.
+
+        A cached ledger is not evidence that the file still exists, has its
+        original identity, or satisfies its pinned checkpoint. Read failures
+        poison this instance just like failed append/anchor verification.
+        This still cannot authenticate a fully rewritten unanchored journal.
+        """
         self._require_healthy()
+        try:
+            self._restore()
+        except BaseException:
+            self._poisoned = True
+            raise
         return self._ledger.report()
 
     def verify_anchor(self, *, expected_head: str | None,
@@ -361,3 +373,4 @@ class DurableTrialJournal:
         changed = self._append(kind, data, event_id)
         if changed:
             self._ledger = shadow
+

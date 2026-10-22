@@ -50,3 +50,11 @@ All tests use temporary local directories; no third-party packages, provider acc
 - No source permissions to alter research candidate authority; `confirmatory_eligible` remains false in inherited WP-R6.
 
 **Do not merge before owner G0 review and dedicated durability/security audit.**
+
+## WP-R19 read-boundary verification
+`DurableTrialJournal.report()` now replays/verifies current disk evidence (and any pinned prefix) before returning, and poisons the instance on failure. Reports never repair/write evidence; reads have linear validation cost. Checkpoint independent-trust assertions accept only literal `True`; this is still not authentication. Frozen scalar identity/provenance references must be nonempty strings. Journal bytes/hash format, per-event fsync/ACK and all holdout fail-closed gates remain unchanged.
+See [executed adversarial cases, measurements and source limitations](READ_BOUNDARY_REVIEW.md). Fully rewritten unanchored history is still unauthenticated; no hardware power-loss or actual external-custody proof is claimed.
+
+## WP-R19 read-boundary verification
+`DurableTrialJournal.report()` now replays/verifies current disk evidence (and any pinned prefix) before returning, and poisons the instance on failure. Reports never repair/write evidence; reads have linear validation cost. Checkpoint independent-trust assertions accept only literal `True`; this is still not authentication. Frozen scalar identity/provenance references must be nonempty strings. Journal bytes/hash format, per-event fsync/ACK and all holdout fail-closed gates remain unchanged.
+See [executed adversarial cases, measurements and source limitations](READ_BOUNDARY_REVIEW.md). Fully rewritten unanchored history is still unauthenticated; no hardware power-loss or actual external-custody proof is claimed.

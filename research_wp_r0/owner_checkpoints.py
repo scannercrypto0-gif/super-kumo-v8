@@ -98,9 +98,10 @@ def verify_owner_checkpoint(
     This flag is a contract assertion, NOT cryptographic proof of authenticity.
     The on-disk prefix is replayed and pinned by verify_anchor.
     """
-    if not independently_trusted:
+    if independently_trusted is not True:
         raise JournalIntegrityError("Checkpoint not independently trusted")
     if checkpoint.family_digest != journal.family.digest:
         raise JournalIntegrityError("Checkpoint belongs to another research family")
     journal.verify_anchor(expected_head=checkpoint.head,
                           expected_sequence=checkpoint.sequence)
+
