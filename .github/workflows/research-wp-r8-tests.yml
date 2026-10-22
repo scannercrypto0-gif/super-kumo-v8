@@ -1,0 +1,24 @@
+name: Research WP-R8 Journal Audit Tests
+
+on:
+  push:
+    branches:
+      - fix/research-wp-r8-journal-hardening-20261022
+  pull_request:
+    paths:
+      - "research_wp_r0/**"
+      - "tests/test_research_wp_r*.py"
+      - ".github/workflows/research-wp-r8-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  journal-hardening:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 --version
+      - run: python3 -m compileall -q research_wp_r0 tests
+      - run: python3 -m unittest discover -s tests -p 'test_research_wp_r*.py' -v

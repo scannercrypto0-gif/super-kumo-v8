@@ -15,6 +15,14 @@
 
 `close()` / `with` releases the cooperative lock. If a process crashes, a stale lock **must be investigated manually**, never automatically deleted or broken by untrusted code.
 
+## WP-R8 audit hardening (follow-up)
+
+- External anchor checks pin an **exact checkpoint prefix** at the trusted sequence, so valid subsequent appends remain possible. The pin is rechecked whenever the full journal is replayed, including before every mutation.
+- The writer detects replacement of the journal's file identity (device/inode, where the OS provides it), refuses nonregular journal files and uses no-follow flags where available.
+- The anchor is still only as trustworthy as its *external* custodian. Hashes alone cannot authenticate original author, arrival time or historical completeness.
+- File-identity checks do not block hostile **in-place** rewriting and are not a filesystem security boundary; external signing/ACLs and OS-specific crash testing are still required.
+- Lock files remain cooperative and stale locks must not be automatically broken. Windows storage and power-loss durability are not certified by the Linux CI runs.
+
 ## External anchor and threat model
 
 Once an external system separately records a **trusted** `{family_digest, sequence, head}` checkpoint, pass `expected_head` and `expected_sequence` to the constructor (or call `verify_anchor`). Failure must stop processing.

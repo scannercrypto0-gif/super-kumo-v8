@@ -13,6 +13,7 @@ from __future__ import annotations
 from datetime import datetime
 import json
 import os
+import stat
 from pathlib import Path
 from typing import Any
 
@@ -88,6 +89,14 @@ class DurableTrialJournal:
     def __init__(self, path: str | Path, family: FrozenSearchFamily, *,
                  expected_head: str | None = None,
                  expected_sequence: int | None = None) -> None:
+        if (expected_head is None) != (expected_sequence is None):
+            raise ValueError("External anchors require both head and sequence")
+        if expected_sequence is not None and (type(expected_sequence) is not int or expected_sequence < 1):
+            raise ValueError("External anchor sequence must be a positive integer")
+        if expected_head is not None and (len(expected_head) != 64 or any(c not in "0123456789abcdef" for c in expected_head)):
+            raise ValueError("External anchor must be a canonical SHA-256 hex digest")
+        self._trusted_head = expected_head
+        self._trusted_sequence = expected_sequence
         self.path = Path(path)
         self.family = family
         self._lock_path = self.path.with_name(self.path.name + ".lock")
@@ -97,6 +106,7 @@ class DurableTrialJournal:
         self._events: dict[str, bytes] = {}
         self._sequence = 0
         self._head = self.GENESIS
+        self._journal_identity: tuple[int, int] | None = None
         self._ledger = TrialFamilyLedger(family)
 
         if not self.path.parent.is_dir():
@@ -111,8 +121,8 @@ class DurableTrialJournal:
                 raise JournalIntegrityError("Missing journal cannot satisfy an external anchor")
             else:
                 self._append("FAMILY", _family_data(family), "family:" + family.digest)
-            self.verify_anchor(expected_head=expected_head,
-                               expected_sequence=expected_sequence)
+            # _restore verifies the externally anchored prefix, including
+            # when later journal records have legitimately been appended.
         except BaseException:
             self.close()
             raise
@@ -188,7 +198,13 @@ class DurableTrialJournal:
         try:
             fd = os.open(self.path, flags, 0o600)
             try:
-                size = os.fstat(fd).st_size
+                metadata = os.fstat(fd)
+                size = metadata.st_size
+                identity = (metadata.st_dev, metadata.st_ino)
+                if not stat.S_ISREG(metadata.st_mode):
+                    raise JournalIntegrityError("Journal must be a regular file")
+                if self._journal_identity is not None and identity != self._journal_identity:
+                    raise JournalIntegrityError("Journal file replaced during writer lifetime")
                 if self._sequence and size != self._persisted_size:
                     raise JournalIntegrityError("Journal changed outside active writer")
                 if not self._sequence and size != 0:
@@ -205,6 +221,7 @@ class DurableTrialJournal:
         except BaseException:
             self._poisoned = True
             raise
+        self._journal_identity = identity
         self._persisted_size = (getattr(self, "_persisted_size", 0) + len(encoded))
         self._sequence = number
         self._head = record["hash"]
@@ -212,7 +229,23 @@ class DurableTrialJournal:
         return True
 
     def _restore(self) -> None:
-        raw = self.path.read_bytes()
+        flags = os.O_RDONLY
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        fd = os.open(self.path, flags)
+        try:
+            metadata = os.fstat(fd)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise JournalIntegrityError("Journal must be a regular file")
+            identity = (metadata.st_dev, metadata.st_ino)
+            if self._journal_identity is not None and identity != self._journal_identity:
+                raise JournalIntegrityError("Journal file replaced during writer lifetime")
+            with os.fdopen(fd, "rb") as source:
+                fd = -1
+                raw = source.read()
+        finally:
+            if fd >= 0:
+                os.close(fd)
         if not raw or not raw.endswith(b"\n"):
             raise JournalIntegrityError("Empty or truncated journal (no automatic repair)")
         parts = raw.splitlines(keepends=True)
@@ -250,14 +283,19 @@ class DurableTrialJournal:
                     if record["kind"] == "FAMILY":
                         raise ValueError("Redefined trial family")
                     _replay_event(reconstructed, record["kind"], record["data"])
+                if self._trusted_sequence == idx and self._trusted_head != claim:
+                    raise ValueError("Externally anchored prefix hash mismatch")
                 seen[record["event_id"]] = _canonical(payload)
                 expected = claim
             except (ValueError, TypeError, KeyError, UnicodeError, AttributeError) as exc:
                 raise JournalIntegrityError(f"Invalid journal at record {idx}") from exc
+        if self._trusted_sequence is not None and len(parts) < self._trusted_sequence:
+            raise JournalIntegrityError("Journal rollback before externally trusted checkpoint")
         self._sequence = len(parts)
         self._head = expected
         self._events = seen
         self._ledger = reconstructed
+        self._journal_identity = identity
         self._persisted_size = len(raw)
 
     def record_attempt(self, attempt: Attempt, *, event_id: str) -> None:
