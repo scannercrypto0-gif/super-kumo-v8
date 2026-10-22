@@ -1,0 +1,27 @@
+name: Research WP-R2 Evaluation Tests
+
+on:
+  push:
+    branches:
+      - feat/research-wp-r2-evaluation-20261022
+  pull_request:
+    paths:
+      - "research_wp_r0/**"
+      - "tests/test_research_wp_r*.py"
+      - ".github/workflows/research-wp-r2-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  research-evaluation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record Python
+        run: python3 --version
+      - name: Compile
+        run: python3 -m compileall -q research_wp_r0 tests
+      - name: Run all WP-R0, WP-R1 and WP-R2 unit tests
+        run: python3 -m unittest discover -s tests -p 'test_research_wp_r*.py' -v
