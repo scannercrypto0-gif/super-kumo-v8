@@ -1,0 +1,32 @@
+name: Research WP-R14 Measured Group Commit Experiment
+
+on:
+  push:
+    branches:
+      - experiment/research-wp-r14-group-commit-20261022
+  pull_request:
+    paths:
+      - "research_wp_r0/**"
+      - "tests/test_research_wp_r*.py"
+      - ".github/workflows/research-wp-r14-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  experiment:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Full research regressions (unchanged strict journal)
+        run: python -B -m unittest discover -s tests -p 'test_research_wp_r*.py' -v
+      - name: Measure group commit with real fsync
+        run: python -B -m research_wp_r0.group_commit_experiment
