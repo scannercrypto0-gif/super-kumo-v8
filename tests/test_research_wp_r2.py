@@ -57,6 +57,17 @@ class EvaluationAcceptance(unittest.TestCase):
         r = evaluate_paired(pairs, block_length=4, replicates=200, seed=99, minimum_paired=20)
         self.assertEqual(r.decision, "DO_NOT_NOMINATE")
 
+    def test_one_correlated_group_cannot_be_nominated(self):
+        pairs = [OpportunityPair(
+            outcome(i, group="single-market-shock"),
+            outcome(i, gross=0.02, group="single-market-shock"),
+        ) for i in range(30)]
+        r = evaluate_paired(pairs, block_length=5, replicates=150,
+                            seed=3, minimum_paired=10)
+        self.assertEqual(r.observed_group_count, 1)
+        self.assertEqual(r.evidence_status, "INSUFFICIENT_GROUP_DIVERSITY")
+        self.assertNotEqual(r.decision, "HISTORICAL_CANDIDATE_ONLY")
+
     def test_report_is_deterministic(self):
         pairs = [pair(i, gain=(0.01 if i % 3 == 0 else -0.004)) for i in range(40)]
         args = {"block_length": 4, "replicates": 250, "seed": 6, "minimum_paired": 10}
