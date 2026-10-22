@@ -101,7 +101,7 @@ class JournalAcceptance(unittest.TestCase):
             record["hash"] = fingerprint({k: v for k, v in record.items() if k != "hash"})
             previous = record["hash"]
         self.path.write_text("".join(
-            json.dumps(r, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\\n"
+            json.dumps(r, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
             for r in records
         ))
         with self.assertRaises(JournalIntegrityError):
