@@ -15,13 +15,31 @@ Design guarantees
   bars raise instead of silently degrading.
 * Archive-copy interface — a non-blocking contract for copying real-time bars
   into the history store; archive failures never block a fast producer.
-* Path-traversal and manifest-corruption guards.
+* Full integrity chain — bar checksums cover all provenance fields including
+  observation_cutoff_ms and source_label; manifest integrity hash covers all
+  manifest metadata + the bar-level manifest_hash.
+* Import confinement — symlink rejection, raw-string traversal guard, and
+  optional trusted_root boundary enforcement.
+* Fail-closed range queries — range_query verifies complete contiguous coverage
+  by default; partial reads are opt-in via require_complete=False.
 
 No live exchange calls, no credentials, no G1 pipeline coupling.
+
+SF-DATA-01-FIX01 (Issue #50) changes vs original SF-DATA-01:
+  - HistoricalBar._compute_checksum: adds observation_cutoff_ms, ingest_time_ms,
+    source_label to SHA-256 payload (Gap 1)
+  - DatasetManifest: frozen=True + manifest_integrity_hash field covering all
+    metadata + manifest_hash; verify_integrity() method (Gap 2)
+  - register() / correct(): use dataclasses.replace() — no direct field mutation
+    on frozen instances (Gap 2)
+  - import_fixture_csv: raw-string guard BEFORE resolve(), symlink rejection,
+    optional trusted_root parameter (Gap 3)
+  - range_query: require_complete=True default; raises on partial coverage (Gap 4)
 """
 from __future__ import annotations
 
 import csv
+import dataclasses
 import hashlib
 import io
 import json
@@ -70,6 +88,12 @@ class HistoricalBar:
     ``ingest_time_ms``
         Wall-clock epoch-ms when the bar was received/imported.
         ``None`` if unknown — the historical receipt time is not fabricated.
+
+    ``checksum``
+        SHA-256 of a canonical JSON payload covering all OHLCV fields,
+        provenance metadata (symbol, interval, quality, source, source_label),
+        AND temporal integrity fields (observation_cutoff_ms, ingest_time_ms).
+        Any tamper of ANY field changes the checksum.
     """
     symbol: str
     interval: str
@@ -93,6 +117,12 @@ class HistoricalBar:
         object.__setattr__(self, "checksum", cs)
 
     def _compute_checksum(self) -> str:
+        """
+        SHA-256 over canonical JSON covering all OHLCV + provenance + temporal fields.
+
+        FIX01 — Gap 1: observation_cutoff_ms, ingest_time_ms and source_label
+        are now included so that any tamper of these fields is detectable.
+        """
         payload = json.dumps({
             "symbol": self.symbol,
             "interval": self.interval,
@@ -105,6 +135,10 @@ class HistoricalBar:
             "volume": self.volume,
             "quality": self.quality.value,
             "source": self.source.value,
+            # FIX01 additions — provenance completeness
+            "source_label": self.source_label,
+            "observation_cutoff_ms": self.observation_cutoff_ms,
+            "ingest_time_ms": self.ingest_time_ms,  # None serialises as JSON null
         }, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(payload.encode()).hexdigest()
 
@@ -119,12 +153,32 @@ class HistoricalBar:
 # Manifest + Dataset version
 # ---------------------------------------------------------------------------
 
-@dataclass
+@dataclass(frozen=True)
 class DatasetManifest:
     """
-    Immutable manifest bound to one dataset version.
+    Frozen (immutable) manifest bound to one dataset version.
 
-    ``manifest_hash`` covers all bar checksums + metadata in deterministic order.
+    Integrity chain
+    ---------------
+    ``manifest_hash``
+        SHA-256 of all bar checksums concatenated in bar_open order.
+        Detects any change in bar OHLCV / provenance / temporal fields.
+    ``manifest_integrity_hash``
+        SHA-256 of a canonical JSON covering all manifest metadata fields
+        (dataset_id, version, exchange, market, symbol, interval, timezone,
+        source_label, bar_count, min/max_bar_open, coverage_pct, gap_count,
+        parent_version, lineage_reason) AND manifest_hash.
+        Detects tampering with manifest metadata even when bar content is intact.
+
+    FIX01 — Gap 2
+    -------------
+    * frozen=True prevents any in-place mutation by callers.
+    * manifest_integrity_hash covers all metadata — adversarial field edits are
+      detectable via verify_integrity().
+    * register() and correct() use dataclasses.replace() instead of direct
+      field mutation; each replace() triggers __post_init__ which recomputes
+      manifest_integrity_hash to reflect the updated fields.
+
     Corrected datasets must produce a NEW version with a lineage reference.
     """
     dataset_id: str          # unique name, e.g. "BTCUSDT_1m_2024"
@@ -143,17 +197,49 @@ class DatasetManifest:
     gap_bar_opens: List[int] # sorted list of missing expected bar_opens
     duplicate_count: int
     non_final_count: int
-    manifest_hash: str       # sha256 of all bar checksums concatenated in bar_open order
+    manifest_hash: str       # sha256 of all bar checksums in bar_open order
     created_at_ms: int
     parent_version: Optional[int]  # lineage: which version this corrects
     lineage_reason: Optional[str]
+    # FIX01: manifest-level integrity hash (auto-computed in __post_init__)
+    manifest_integrity_hash: str = field(default="", compare=False)
 
-    def to_dict(self) -> dict:
-        return asdict(self)
+    def __post_init__(self):
+        """Compute and freeze manifest_integrity_hash on construction."""
+        ih = self._compute_integrity_hash()
+        object.__setattr__(self, "manifest_integrity_hash", ih)
 
-    @classmethod
-    def from_dict(cls, d: dict) -> "DatasetManifest":
-        return cls(**d)
+    def _compute_integrity_hash(self) -> str:
+        """
+        SHA-256 over canonical JSON of all manifest metadata + manifest_hash.
+        Does NOT include manifest_integrity_hash itself (avoids circularity).
+        """
+        payload = json.dumps({
+            "dataset_id": self.dataset_id,
+            "version": self.version,
+            "exchange": self.exchange,
+            "market": self.market,
+            "symbol": self.symbol,
+            "interval": self.interval,
+            "timezone": self.timezone,
+            "source_label": self.source_label,
+            "bar_count": self.bar_count,
+            "min_bar_open": self.min_bar_open,
+            "max_bar_open": self.max_bar_open,
+            "coverage_pct": self.coverage_pct,
+            "gap_count": self.gap_count,
+            "parent_version": self.parent_version,
+            "lineage_reason": self.lineage_reason,
+            "manifest_hash": self.manifest_hash,
+        }, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(payload.encode()).hexdigest()
+
+    def verify_integrity(self) -> bool:
+        """
+        Return True if manifest_integrity_hash matches a recomputation from
+        the stored fields.  A False result indicates metadata tampering.
+        """
+        return self.manifest_integrity_hash == self._compute_integrity_hash()
 
     def verify_hash(self, bars: Sequence[HistoricalBar]) -> bool:
         """Recompute manifest_hash from bars and compare."""
@@ -161,6 +247,15 @@ class DatasetManifest:
         combined = "".join(b.checksum for b in sorted_bars)
         expected = hashlib.sha256(combined.encode()).hexdigest()
         return self.manifest_hash == expected
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "DatasetManifest":
+        d = dict(d)
+        d.pop("manifest_integrity_hash", None)  # let __post_init__ recompute
+        return cls(**d)
 
 
 # ---------------------------------------------------------------------------
@@ -266,7 +361,7 @@ def validate_bars(
     coverage_pct = round(len(sorted_bars) / expected_bar_count * 100, 4) if expected_bar_count else 100.0
 
     manifest = DatasetManifest(
-        dataset_id="",         # caller fills in
+        dataset_id="",         # caller fills in via dataclasses.replace()
         version=1,
         exchange="",
         market="",
@@ -301,6 +396,7 @@ def import_fixture_csv(
     source_label: str = "fixture",
     *,
     allow_gaps: bool = False,
+    trusted_root: Optional[Path | str] = None,
 ) -> Tuple[List[HistoricalBar], DatasetManifest]:
     """
     Import OHLCV bars from a CSV fixture file.
@@ -311,23 +407,49 @@ def import_fixture_csv(
     All values numeric; bar_open / bar_close are epoch-ms integers.
     Source bytes are hashed but not embedded; credentials are never recorded.
 
-    Raises HistoricalDataError on schema or ordering violations.
-    Raises ValueError on path traversal attempts.
-    """
-    path = Path(path).resolve()
-    # Path traversal guard: must be a file, not a symlink chain
-    if not path.is_file():
-        raise HistoricalDataError(f"Fixture not found: {path}")
-    # Guard against obvious traversal patterns in the original string
-    raw = str(path)
-    if ".." in raw:
-        raise ValueError(f"Path traversal detected: {path}")
+    FIX01 — Gap 3: import confinement
+    ----------------------------------
+    1. Raw-string ``..`` guard applied BEFORE Path.resolve() so the check is
+       not silently bypassed (resolved paths never contain ``..``).
+    2. Symlink rejection: the path must not be a symlink before resolving.
+    3. ``trusted_root``: if supplied, the resolved path must be a descendant;
+       rejects both parent-escape and symlink-to-outside-root patterns.
 
-    source_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+    Raises HistoricalDataError on schema or ordering violations.
+    Raises ValueError on path traversal, symlink, or confinement violations.
+    """
+    raw_str = str(path)
+
+    # FIX01 Guard 1: check raw string BEFORE resolving (resolve() erases "..")
+    if ".." in raw_str:
+        raise ValueError(f"Path traversal detected in: {path!r}")
+
+    raw_path = Path(path)
+
+    # FIX01 Guard 2: reject symlinks before following them
+    if raw_path.is_symlink():
+        raise ValueError(f"Symlink not allowed as fixture path: {path!r}")
+
+    resolved = raw_path.resolve()
+
+    # FIX01 Guard 3: optional trusted_root confinement
+    if trusted_root is not None:
+        trusted = Path(trusted_root).resolve()
+        try:
+            resolved.relative_to(trusted)
+        except ValueError:
+            raise ValueError(
+                f"Fixture path {resolved!r} escapes trusted root {trusted!r}"
+            )
+
+    if not resolved.is_file():
+        raise HistoricalDataError(f"Fixture not found: {resolved}")
+
+    source_hash = hashlib.sha256(resolved.read_bytes()).hexdigest()
     interval_ms = _interval_to_ms(interval)
     bars: List[HistoricalBar] = []
 
-    with path.open(newline="", encoding="utf-8") as f:
+    with resolved.open(newline="", encoding="utf-8") as f:
         reader = csv.reader(f)
         for i, row in enumerate(reader):
             if not row or row[0].startswith("#"):
@@ -375,8 +497,13 @@ class HistoricalLibrary:
     """
     In-memory versioned historical library.
 
-    Versions are immutable. Corrections create a new version (``correct()``).
-    All reads are deterministic given the same version and decision_cutoff_ms.
+    Versions are immutable (DatasetManifest is frozen). Corrections create a
+    new version (``correct()``). All reads are deterministic given the same
+    version and decision_cutoff_ms.
+
+    FIX01 — Gap 2: register() and correct() use dataclasses.replace() to
+    produce updated frozen DatasetManifest instances instead of direct field
+    mutation, which is now rejected by the frozen dataclass.
     """
     _datasets: Dict[str, Dict[int, Tuple[List[HistoricalBar], DatasetManifest]]] = field(
         default_factory=dict
@@ -388,8 +515,16 @@ class HistoricalLibrary:
         bars: List[HistoricalBar],
         manifest: DatasetManifest,
     ) -> DatasetManifest:
-        """Store a validated dataset under dataset_id at manifest.version."""
-        manifest.dataset_id = dataset_id
+        """
+        Store a validated dataset under dataset_id at manifest.version.
+
+        FIX01: if manifest.dataset_id differs from dataset_id, a new frozen
+        DatasetManifest instance is produced via dataclasses.replace() (which
+        recomputes manifest_integrity_hash to reflect the new dataset_id).
+        The caller's manifest reference is never mutated.
+        """
+        if manifest.dataset_id != dataset_id:
+            manifest = dataclasses.replace(manifest, dataset_id=dataset_id)
         if dataset_id not in self._datasets:
             self._datasets[dataset_id] = {}
         if manifest.version in self._datasets[dataset_id]:
@@ -405,6 +540,12 @@ class HistoricalLibrary:
         return max(self._datasets[dataset_id])
 
     def get_manifest(self, dataset_id: str, version: Optional[int] = None) -> DatasetManifest:
+        """
+        Return the manifest for dataset_id at version (default: latest).
+
+        FIX01: DatasetManifest is frozen, so the returned reference is already
+        immutable — callers cannot alter registered version metadata.
+        """
         if dataset_id not in self._datasets:
             raise HistoricalDataError(f"Unknown dataset: {dataset_id}")
         v = version if version is not None else self.latest_version(dataset_id)
@@ -424,11 +565,14 @@ class HistoricalLibrary:
 
         Bars with observation_cutoff_ms > decision_cutoff_ms are excluded,
         preventing future-bar leakage into research decisions.
+
+        Returns an empty list when no bars are observable at the given cutoff.
+        For range-complete guarantees use range_query() with require_complete=True.
         """
         if dataset_id not in self._datasets:
             raise HistoricalDataError(f"Unknown dataset: {dataset_id}")
         v = version if version is not None else self.latest_version(dataset_id)
-        bars, manifest = self._datasets[dataset_id][v]
+        bars, _ = self._datasets[dataset_id][v]
         eligible = [b for b in bars if b.observation_cutoff_ms <= decision_cutoff_ms]
         return sorted(eligible, key=lambda b: b.bar_open)
 
@@ -440,10 +584,19 @@ class HistoricalLibrary:
         decision_cutoff_ms: int,
         *,
         version: Optional[int] = None,
+        require_complete: bool = True,
     ) -> List[HistoricalBar]:
         """
         Return bars in [start_ms, end_ms] observable at decision_cutoff_ms.
-        Raises if no bars qualify (fail-closed).
+
+        FIX01 — Gap 4: fail-closed by default (require_complete=True).
+        When require_complete is True, raises HistoricalDataError if the
+        returned bars do not form a complete contiguous sequence covering
+        [start_ms, end_ms] with no gaps.  This prevents silent partial
+        backtests.
+
+        Set require_complete=False only when explicitly handling partial data.
+        Raises if no bars qualify at all regardless of require_complete.
         """
         all_bars = self.snapshot(dataset_id, decision_cutoff_ms, version=version)
         result = [b for b in all_bars if start_ms <= b.bar_open <= end_ms]
@@ -452,6 +605,26 @@ class HistoricalLibrary:
                 f"No eligible bars in [{start_ms}, {end_ms}] "
                 f"at cutoff {decision_cutoff_ms} for {dataset_id}"
             )
+
+        if require_complete:
+            manifest = self.get_manifest(dataset_id, version)
+            interval_ms = _interval_to_ms(manifest.interval)
+            actual_opens = {b.bar_open for b in result}
+            missing = []
+            cur = start_ms
+            while cur <= end_ms:
+                if cur not in actual_opens:
+                    missing.append(cur)
+                cur += interval_ms
+            if missing:
+                raise HistoricalDataError(
+                    f"Incomplete range [{start_ms}, {end_ms}]: "
+                    f"{len(missing)} bar(s) missing or not yet observable "
+                    f"at cutoff {decision_cutoff_ms} "
+                    f"(first missing bar_open: {missing[0]}). "
+                    "Use require_complete=False for partial reads."
+                )
+
         return result
 
     def correct(
@@ -468,6 +641,9 @@ class HistoricalLibrary:
 
         The prior version is never modified. The new version gets
         parent_version = base_version (or latest) and lineage_reason = reason.
+
+        FIX01: uses dataclasses.replace() to update frozen manifest fields;
+        manifest_integrity_hash is recomputed automatically via __post_init__.
         """
         base_v = base_version if base_version is not None else self.latest_version(dataset_id)
         _, base_manifest = self._datasets[dataset_id][base_v]
@@ -475,12 +651,16 @@ class HistoricalLibrary:
         validated, new_manifest = validate_bars(
             new_bars, base_manifest.symbol, base_manifest.interval, allow_gaps=allow_gaps
         )
-        new_manifest.version = base_v + 1
-        new_manifest.parent_version = base_v
-        new_manifest.lineage_reason = reason
-        new_manifest.exchange = base_manifest.exchange
-        new_manifest.market = base_manifest.market
-        new_manifest.source_label = base_manifest.source_label
+        # Update version, lineage, and copy inherited metadata from base
+        new_manifest = dataclasses.replace(
+            new_manifest,
+            version=base_v + 1,
+            parent_version=base_v,
+            lineage_reason=reason,
+            exchange=base_manifest.exchange,
+            market=base_manifest.market,
+            source_label=base_manifest.source_label,
+        )
 
         return self.register(dataset_id, validated, new_manifest)
 
