@@ -1,0 +1,31 @@
+name: Research WP-R11 External Custody Contract
+
+on:
+  push:
+    branches:
+      - feat/research-wp-r11-external-custody-contract-20261022
+  pull_request:
+    paths:
+      - "research_wp_r0/**"
+      - "tests/test_research_wp_r*.py"
+      - ".github/workflows/research-wp-r11-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  research-custody-contract:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: python --version
+      - run: python -m compileall -q research_wp_r0 tests
+      - run: python -B -m unittest discover -s tests -p 'test_research_wp_r*.py' -v
