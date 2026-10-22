@@ -28,6 +28,10 @@ If direct authorized GitHub write capability is available, perform the approved 
 
 Prefer existing Issues, PRs and documents over duplicates. Include exact known files and evidence; mark unknown file paths for inspection rather than guessing. Never silently approve architecture, trading logic, promotions or gate closure. Handoff text never includes credentials, API keys or sensitive data. This is proactive behavior within an active conversation, not background automation or a guarantee that an assistant can access GitHub without a connected tool.
 
+## Mandatory continuity and completeness — G0-GOV-01
+
+Before any new Work handoff, follow [the canonical provisional rule](03_DECISIONS.md#g0-gov-01--work-handoff-continuity-and-completeness) and read [HANDOFF_REGISTER.md](HANDOFF_REGISTER.md). Establish the last owner-confirmed SUBMITTED handoff plus addenda, not merely the latest draft. Reconcile the complete since-baseline delta against verified GitHub and actually accessible chats; map every item to included / already documented with evidence / owner-deferred / unresolved. Audit before issuance, request missing references for inaccessible baseline/addenda, and label coverage gaps honestly. Record ID/date/scope/submission confirmation/addenda/resulting PR/review/merge evidence in the register. This applies across chat boundaries and does not grant access to other chats or final approval.
+
 ## END
 - Completed work must update `04_STATE.md` and append `05_WORK_LOG.md` on GitHub through the authorized PR workflow, with direct evidence links to the relevant PR, commit, Issue, or validation output. Distinguish branch/proposed results from merged main; retain prior log entries.
 - Record commit hash, tests executed, outcomes, outstanding issues and next exact task.
@@ -36,3 +40,6 @@ Prefer existing Issues, PRs and documents over duplicates. Include exact known f
 
 ## RECOVERY
 If context is missing, STOP and reread repository. Never reconstruct the project state from model memory alone.
+
+## Current-state and historical evidence — INT-06
+Apply the canonical INT-06 rule in 03_DECISIONS.md: verify each changing status with timestamp/timezone, source and PR/branch/commit; distinguish BLOCKED from UNVERIFIED. Update the current STATE snapshot through authorized work and append later events/corrections to WORK_LOG and handoff history. Never rewrite an earlier OPEN observation into MERGED. Preserve one event with multiple provenance references, not duplicate events per branch.
