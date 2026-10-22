@@ -3,6 +3,7 @@ import json
 import tempfile
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
 
 from research_wp_r0.offline_owner_handoff import (
@@ -38,6 +39,33 @@ class OwnerHandoffAcceptance(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 _write_owner_copy(path, cp)
             self.assertEqual(_load_owner_copy(path), cp)
+
+    def test_fsync_failure_never_publishes_final_checkpoint(self):
+        with tempfile.TemporaryDirectory() as base:
+            directory = Path(base)
+            path = directory / "checkpoint.json"
+            cp = OwnerCheckpoint("a" * 64, 3, "b" * 64)
+            with patch("research_wp_r0.offline_owner_handoff.os.fsync",
+                       side_effect=OSError("simulated disk sync failure")):
+                with self.assertRaises(OSError):
+                    _write_owner_copy(path, cp)
+            self.assertFalse(path.exists())
+            self.assertEqual(list(directory.iterdir()), [])
+            _write_owner_copy(path, cp)
+            self.assertEqual(_load_owner_copy(path), cp)
+
+    def test_preexisting_receipt_preserved_and_temporary_file_cleaned(self):
+        with tempfile.TemporaryDirectory() as base:
+            directory = Path(base)
+            path = directory / "checkpoint.json"
+            first = OwnerCheckpoint("a" * 64, 3, "b" * 64)
+            different = OwnerCheckpoint("a" * 64, 4, "c" * 64)
+            _write_owner_copy(path, first)
+            with self.assertRaises(FileExistsError):
+                _write_owner_copy(path, different)
+            self.assertEqual(_load_owner_copy(path), first)
+            self.assertEqual([entry.name for entry in directory.iterdir()],
+                             ["checkpoint.json"])
 
     def test_untrusted_snapshot_cannot_be_verified_as_owner_approved(self):
         with tempfile.TemporaryDirectory() as base:

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - test/research-wp-r40-offline-checkpoint-handoff-20261022
+      - fix/research-r41-checkpoint-export-sync-20261022
   pull_request:
     paths:
       - "research_wp_r0/offline_owner_handoff.py"
