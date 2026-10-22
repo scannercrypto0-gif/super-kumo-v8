@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - ci/research-unified-fast-suite-20261022
+      - ci/research-wp-r17-fast-path-20261022
   pull_request:
     paths:
       - "research_wp_r0/**"
@@ -12,6 +13,11 @@ on:
       - ".github/workflows/research-wp-r*-tests.yml"
       - ".github/workflows/research-audit-remediation.yml"
   workflow_dispatch:
+    inputs:
+      deep_smoke:
+        description: 'Run three extra synthetic E2E commands (already covered in unit acceptance tests)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -22,7 +28,7 @@ concurrency:
 
 jobs:
   research:
-    name: Full research suite + e2e (${{ matrix.os }})
+    name: Full research fast suite (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -39,8 +45,11 @@ jobs:
       - name: All research regression tests, exactly once per OS
         run: python -B -m unittest discover -s tests -p 'test_research_wp_r*.py'
       - name: End-to-end research evidence and checkpoint
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.deep_smoke == true }}
         run: python -B -m research_wp_r0.measured_pipeline
       - name: Disposable telemetry loss isolation
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.deep_smoke == true }}
         run: python -B -m research_wp_r0.isolated_telemetry
       - name: Telemetry queue backpressure and worker failure
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.deep_smoke == true }}
         run: python -B -m research_wp_r0.telemetry_pressure
