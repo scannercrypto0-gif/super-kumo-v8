@@ -88,6 +88,14 @@ class DurableTrialJournal:
     def __init__(self, path: str | Path, family: FrozenSearchFamily, *,
                  expected_head: str | None = None,
                  expected_sequence: int | None = None) -> None:
+        if (expected_head is None) != (expected_sequence is None):
+            raise ValueError("External anchors require both head and sequence")
+        if expected_sequence is not None and (type(expected_sequence) is not int or expected_sequence < 1):
+            raise ValueError("External anchor sequence must be a positive integer")
+        if expected_head is not None and (len(expected_head) != 64 or any(c not in "0123456789abcdef" for c in expected_head)):
+            raise ValueError("External anchor must be a canonical SHA-256 hex digest")
+        self._trusted_head = expected_head
+        self._trusted_sequence = expected_sequence
         self.path = Path(path)
         self.family = family
         self._lock_path = self.path.with_name(self.path.name + ".lock")
@@ -111,8 +119,8 @@ class DurableTrialJournal:
                 raise JournalIntegrityError("Missing journal cannot satisfy an external anchor")
             else:
                 self._append("FAMILY", _family_data(family), "family:" + family.digest)
-            self.verify_anchor(expected_head=expected_head,
-                               expected_sequence=expected_sequence)
+            # _restore verifies the externally anchored prefix, including
+            # when later journal records have legitimately been appended.
         except BaseException:
             self.close()
             raise
@@ -250,10 +258,14 @@ class DurableTrialJournal:
                     if record["kind"] == "FAMILY":
                         raise ValueError("Redefined trial family")
                     _replay_event(reconstructed, record["kind"], record["data"])
+                if self._trusted_sequence == idx and self._trusted_head != claim:
+                    raise ValueError("Externally anchored prefix hash mismatch")
                 seen[record["event_id"]] = _canonical(payload)
                 expected = claim
             except (ValueError, TypeError, KeyError, UnicodeError, AttributeError) as exc:
                 raise JournalIntegrityError(f"Invalid journal at record {idx}") from exc
+        if self._trusted_sequence is not None and len(parts) < self._trusted_sequence:
+            raise JournalIntegrityError("Journal rollback before externally trusted checkpoint")
         self._sequence = len(parts)
         self._head = expected
         self._events = seen
