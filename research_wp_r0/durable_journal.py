@@ -263,6 +263,13 @@ class DurableTrialJournal:
 
     def _validated_append(self, kind: str, data: dict, event_id: str) -> None:
         self._require_healthy()
+        # Before EVERY mutation, detect tampering, truncation or noncanonical
+        # events even when an attacker preserves the file's byte length.
+        try:
+            self._restore()
+        except BaseException:
+            self._poisoned = True
+            raise
         payload = _canonical({"kind": kind, "data": data, "event_id": event_id})
         if event_id in self._events:
             if self._events[event_id] == payload:
