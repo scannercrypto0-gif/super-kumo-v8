@@ -45,6 +45,13 @@ class FrozenSearchFamily:
                   self.dataset_version, self.metric_name)
         if not all(fields):
             raise ValueError("Every research scope/provenance reference is required")
+        if not isinstance(self.candidate_ids, (list, tuple)) or not all(
+            isinstance(candidate, str) and bool(candidate) for candidate in self.candidate_ids
+        ):
+            raise ValueError("Candidate identities must be nonempty strings")
+        # A frozen dataclass does not recursively freeze mutable collections.
+        # Snapshot the declared trial family BEFORE any count or digest checks.
+        object.__setattr__(self, "candidate_ids", tuple(self.candidate_ids))
         if self.metric_direction not in ("MAXIMIZE", "MINIMIZE"):
             raise ValueError("Metric direction required")
         if not self.candidate_ids or not all(self.candidate_ids):
