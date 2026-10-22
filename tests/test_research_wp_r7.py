@@ -130,10 +130,10 @@ class JournalAcceptance(unittest.TestCase):
             for r in records
         )
         self.path.write_text(encoded)
-        # Valid state transition may become TUNE and be flagged as contaminated;
-        # importantly the persisted report must reflect it after restart.
-        with DurableTrialJournal(self.path, family()) as ledger:
-            self.assertEqual(ledger.report().status, "HOLDOUT_CONTAMINATED")
+        # Even a fully recomputed *valid hash* must not bypass the replay
+        # state machine: the first holdout event can only be OPEN.
+        with self.assertRaises(JournalIntegrityError):
+            DurableTrialJournal(self.path, family())
 
     def test_existing_same_size_tampering_detected_before_append(self):
         with DurableTrialJournal(self.path, family()) as ledger:
