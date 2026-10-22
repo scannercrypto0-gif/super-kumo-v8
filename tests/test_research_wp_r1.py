@@ -78,7 +78,7 @@ class TimeSplitTests(unittest.TestCase):
             self.assertTrue(all(windows[i].label_end_at <= first_test
                                 for i in fold.train_indices))
             self.assertTrue(all(i < fold.test_indices[0] for i in fold.train_indices))
-        self.assertNotIn(2, folds[0].train_indices)
+        self.assertNotIn(folds[0].test_indices[0] - 1, folds[0].train_indices)
 
     def test_embargo_is_respected(self):
         windows = self.windows()
