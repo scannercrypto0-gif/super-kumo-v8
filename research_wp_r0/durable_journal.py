@@ -113,7 +113,7 @@ class DurableTrialJournal:
             raise FileNotFoundError("Journal parent directory must exist")
         # Lock prevents cooperating processes using this implementation from
         # racing. It is NOT an OS-enforced universal lock against other tools.
-        self._lock_fd = os.open(self._lock_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        self._lock_fd = os.open(self._lock_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o600)
         try:
             if self.path.exists():
                 self._restore()
@@ -157,16 +157,31 @@ class DurableTrialJournal:
 
     def verify_anchor(self, *, expected_head: str | None,
                       expected_sequence: int | None = None) -> None:
-        """Compare to an owner-held EXTERNAL trusted checkpoint.
+        """Pin and verify a trusted, independently held checkpoint prefix.
 
-        Without independent anchor custody, local hash-chain rewrite remains
-        undetectable. Callers must not treat the journal itself as an anchor.
+        Re-read and replay disk: a cached in-memory head is not evidence.
+        Subsequent appends are allowed; historical prefix rewrites are not.
+        This must not be mistaken for independently authenticating the anchor.
         """
         self._require_healthy()
-        if expected_head is not None and self._head != expected_head:
-            raise JournalIntegrityError("Journal head differs from trusted anchor")
-        if expected_sequence is not None and self._sequence != expected_sequence:
-            raise JournalIntegrityError("Journal sequence differs from trusted anchor")
+        if (not isinstance(expected_head, str) or len(expected_head) != 64 or
+                any(c not in "0123456789abcdef" for c in expected_head) or
+                type(expected_sequence) is not int or expected_sequence < 1):
+            raise ValueError("Trusted anchor requires canonical head and positive sequence")
+        if self._trusted_head is not None and (
+            self._trusted_head != expected_head or self._trusted_sequence != expected_sequence
+        ):
+            raise JournalIntegrityError("Cannot replace an already pinned trusted anchor")
+        self._trusted_head = expected_head
+        self._trusted_sequence = expected_sequence
+        try:
+            self._restore()
+        except BaseException:
+            # A failed verification must never let this writer continue.
+            self._poisoned = True
+            raise
+        # The accepted pin remains active for all future full replays.
+
 
     def _require_healthy(self) -> None:
         if self._closed or self._poisoned:
@@ -192,7 +207,9 @@ class DurableTrialJournal:
         # Exclusive lock acquired before inspection, no concurrent writers
         # under this contract. O_APPEND, fsync and write-all minimize torn
         # records but do not guarantee atomic multi-process appends.
-        flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+        # Windows CRT text mode silently turns LF into CRLF for os.write.
+        # Journal hashes and canonical bytes require binary mode end-to-end.
+        flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_BINARY", 0)
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
         try:
@@ -229,7 +246,7 @@ class DurableTrialJournal:
         return True
 
     def _restore(self) -> None:
-        flags = os.O_RDONLY
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
         fd = os.open(self.path, flags)
