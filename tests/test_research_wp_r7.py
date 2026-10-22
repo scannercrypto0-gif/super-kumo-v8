@@ -85,6 +85,29 @@ class JournalAcceptance(unittest.TestCase):
         with self.assertRaises(JournalIntegrityError):
             DurableTrialJournal(self.path, family())
 
+    def test_external_trusted_anchor_detects_whole_chain_rewrite(self):
+        seq, head = write_complete(self.path)
+        with DurableTrialJournal(self.path, family(),
+                                 expected_head=head, expected_sequence=seq) as ledger:
+            self.assertEqual(ledger.head, head)
+        records = [json.loads(x) for x in self.path.read_text().splitlines()]
+        # Rewrite a valid outcome and recompute every downstream SHA-256 link;
+        # internal integrity alone cannot detect this fully rewritten history.
+        from research_wp_r0.trial_holdout import fingerprint
+        records[1]["data"]["marginal_p_value"] = 0.03
+        previous = "0" * 64
+        for record in records:
+            record["prev_hash"] = previous
+            record["hash"] = fingerprint({k: v for k, v in record.items() if k != "hash"})
+            previous = record["hash"]
+        self.path.write_text("".join(
+            json.dumps(r, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\\n"
+            for r in records
+        ))
+        with self.assertRaises(JournalIntegrityError):
+            DurableTrialJournal(self.path, family(),
+                                expected_head=head, expected_sequence=seq)
+
     def test_truncated_tail_rejected_without_repair(self):
         write_complete(self.path)
         raw = self.path.read_bytes()
