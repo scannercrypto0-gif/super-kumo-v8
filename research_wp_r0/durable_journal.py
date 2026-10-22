@@ -13,6 +13,7 @@ from __future__ import annotations
 from datetime import datetime
 import json
 import os
+import stat
 from pathlib import Path
 from typing import Any
 
@@ -105,6 +106,7 @@ class DurableTrialJournal:
         self._events: dict[str, bytes] = {}
         self._sequence = 0
         self._head = self.GENESIS
+        self._journal_identity: tuple[int, int] | None = None
         self._ledger = TrialFamilyLedger(family)
 
         if not self.path.parent.is_dir():
@@ -196,7 +198,13 @@ class DurableTrialJournal:
         try:
             fd = os.open(self.path, flags, 0o600)
             try:
-                size = os.fstat(fd).st_size
+                metadata = os.fstat(fd)
+                size = metadata.st_size
+                identity = (metadata.st_dev, metadata.st_ino)
+                if not stat.S_ISREG(metadata.st_mode):
+                    raise JournalIntegrityError("Journal must be a regular file")
+                if self._journal_identity is not None and identity != self._journal_identity:
+                    raise JournalIntegrityError("Journal file replaced during writer lifetime")
                 if self._sequence and size != self._persisted_size:
                     raise JournalIntegrityError("Journal changed outside active writer")
                 if not self._sequence and size != 0:
@@ -213,6 +221,7 @@ class DurableTrialJournal:
         except BaseException:
             self._poisoned = True
             raise
+        self._journal_identity = identity
         self._persisted_size = (getattr(self, "_persisted_size", 0) + len(encoded))
         self._sequence = number
         self._head = record["hash"]
@@ -220,7 +229,23 @@ class DurableTrialJournal:
         return True
 
     def _restore(self) -> None:
-        raw = self.path.read_bytes()
+        flags = os.O_RDONLY
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        fd = os.open(self.path, flags)
+        try:
+            metadata = os.fstat(fd)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise JournalIntegrityError("Journal must be a regular file")
+            identity = (metadata.st_dev, metadata.st_ino)
+            if self._journal_identity is not None and identity != self._journal_identity:
+                raise JournalIntegrityError("Journal file replaced during writer lifetime")
+            with os.fdopen(fd, "rb") as source:
+                fd = -1
+                raw = source.read()
+        finally:
+            if fd >= 0:
+                os.close(fd)
         if not raw or not raw.endswith(b"\n"):
             raise JournalIntegrityError("Empty or truncated journal (no automatic repair)")
         parts = raw.splitlines(keepends=True)
@@ -270,6 +295,7 @@ class DurableTrialJournal:
         self._head = expected
         self._events = seen
         self._ledger = reconstructed
+        self._journal_identity = identity
         self._persisted_size = len(raw)
 
     def record_attempt(self, attempt: Attempt, *, event_id: str) -> None:
