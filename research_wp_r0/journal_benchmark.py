@@ -8,6 +8,8 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timedelta, timezone
 import json
+import os
+from unittest.mock import patch
 from pathlib import Path
 import sys
 import tempfile
@@ -46,25 +48,42 @@ def run(*, module_root: Path, sizes: tuple[int, ...], repeats: int) -> dict:
                     "net", "MAXIMIZE", tuple(f"c{i:04d}" for i in range(n)),
                     0.05, now,
                 )
+                fsync_total_seconds = 0.0
+                fsync_calls = 0
+                real_fsync = os.fsync
+
+                def measured_fsync(fd):
+                    nonlocal fsync_total_seconds, fsync_calls
+                    before_fsync = time.perf_counter()
+                    try:
+                        return real_fsync(fd)  # DO NOT weaken write durability
+                    finally:
+                        fsync_total_seconds += time.perf_counter() - before_fsync
+                        fsync_calls += 1
+
                 started = time.perf_counter()
-                with DurableTrialJournal(path, family) as journal:
-                    for i in range(n):
-                        journal.record_attempt(
-                            Attempt(f"c{i:04d}", AttemptState.COMPLETE,
-                                    f"digest-{i:04d}",
-                                    now + timedelta(seconds=i + 1), 0.5),
-                            event_id=f"event-{i:04d}",
-                        )
-                    if journal.sequence != n + 1 or journal.report().complete != n:
-                        raise AssertionError("Journal failed attempt accounting")
-                    head = journal.head
+                with patch("os.fsync", side_effect=measured_fsync):
+                    with DurableTrialJournal(path, family) as journal:
+                        for i in range(n):
+                            journal.record_attempt(
+                                Attempt(f"c{i:04d}", AttemptState.COMPLETE,
+                                        f"digest-{i:04d}",
+                                        now + timedelta(seconds=i + 1), 0.5),
+                                event_id=f"event-{i:04d}",
+                            )
+                        if journal.sequence != n + 1 or journal.report().complete != n:
+                            raise AssertionError("Journal failed attempt accounting")
+                        head = journal.head
                 write_ms = (time.perf_counter() - started) * 1000
+                if fsync_calls != n + 1:
+                    raise AssertionError("Expected every append, including genesis, to fsync")
                 replay_started = time.perf_counter()
                 with DurableTrialJournal(path, family) as restored:
                     if restored.head != head or restored.report().complete != n:
                         raise AssertionError("Restored chain mismatch")
                 replay_ms = (time.perf_counter() - replay_started) * 1000
-                observed.append((write_ms, replay_ms, path.stat().st_size))
+                observed.append((write_ms, replay_ms, path.stat().st_size,
+                                 fsync_total_seconds * 1000, fsync_calls))
         data.append({
             "attempts": n,
             "repeat_count": repeats,
@@ -72,6 +91,9 @@ def run(*, module_root: Path, sizes: tuple[int, ...], repeats: int) -> dict:
             "restore_median_ms": round(_median(x[1] for x in observed), 3),
             "journal_bytes": observed[0][2],
             "append_ms_per_attempt": round(_median(x[0] for x in observed) / n, 3),
+            "fsync_total_median_ms": round(_median(x[3] for x in observed), 3),
+            "fsync_calls": observed[0][4],
+            "fsync_share_of_append_pct": round(100 * _median(x[3] for x in observed) / _median(x[0] for x in observed), 1),
         })
     return {
         "module_root": module_root.name,
