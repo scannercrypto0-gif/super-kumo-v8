@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - feat/research-wp-r10-owner-checkpoints-20261022
-  pull_request:
-    paths:
-      - "research_wp_r0/**"
-      - "tests/test_research_wp_r*.py"
-      - ".github/workflows/research-wp-r10-tests.yml"
 
 permissions:
   contents: read
