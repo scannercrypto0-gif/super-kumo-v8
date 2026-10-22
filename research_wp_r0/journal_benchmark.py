@@ -9,16 +9,25 @@ import argparse
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
-import statistics
 import sys
 import tempfile
 import time
+
+
+def _median(values):
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    return ordered[middle] if len(ordered) % 2 else (ordered[middle-1] + ordered[middle]) / 2
 
 
 def run(*, module_root: Path, sizes: tuple[int, ...], repeats: int) -> dict:
     module_root = module_root.resolve()
     if not (module_root / "research_wp_r0" / "durable_journal.py").is_file():
         raise ValueError("Need repository module root")
+    # Running a script inside research_wp_r0 puts that directory on sys.path;
+    # its statistics.py would shadow Python's standard-library statistics.
+    script_dir = str(Path(__file__).resolve().parent)
+    sys.path[:] = [p for p in sys.path if str(Path(p).resolve()) != script_dir]
     sys.path.insert(0, str(module_root))
     from research_wp_r0.durable_journal import DurableTrialJournal
     from research_wp_r0.trial_holdout import Attempt, AttemptState, FrozenSearchFamily
@@ -59,10 +68,10 @@ def run(*, module_root: Path, sizes: tuple[int, ...], repeats: int) -> dict:
         data.append({
             "attempts": n,
             "repeat_count": repeats,
-            "append_total_median_ms": round(statistics.median(x[0] for x in observed), 3),
-            "restore_median_ms": round(statistics.median(x[1] for x in observed), 3),
+            "append_total_median_ms": round(_median(x[0] for x in observed), 3),
+            "restore_median_ms": round(_median(x[1] for x in observed), 3),
             "journal_bytes": observed[0][2],
-            "append_ms_per_attempt": round(statistics.median(x[0] for x in observed) / n, 3),
+            "append_ms_per_attempt": round(_median(x[0] for x in observed) / n, 3),
         })
     return {
         "module_root": module_root.name,
