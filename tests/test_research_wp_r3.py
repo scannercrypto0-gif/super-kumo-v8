@@ -55,7 +55,7 @@ class NoFillAccountingTests(unittest.TestCase):
         result = evaluate(rows, policy=UNKNOWN_COSTS)
         self.assertEqual(result.complete_pairs, 59)
         self.assertEqual(result.status, "INCOMPLETE_COVERAGE")
-        self.assertFalse(result.nomination_eligible)
+        self.assertFalse(result.screening_positive)
 
     def test_missing_and_ambiguous_are_never_imputed(self):
         rows = [row(i) for i in range(60)]
@@ -65,7 +65,7 @@ class NoFillAccountingTests(unittest.TestCase):
         self.assertEqual(result.unknown_pairs, 1)
         self.assertEqual(result.ambiguous_pairs, 1)
         self.assertEqual(result.complete_pairs, 58)
-        self.assertFalse(result.nomination_eligible)
+        self.assertFalse(result.screening_positive)
         self.assertEqual(result.status, "INCOMPLETE_COVERAGE")
 
     def test_all_missing_is_insufficient_not_zero(self):
@@ -90,7 +90,7 @@ class GroupSensitivityTests(unittest.TestCase):
         rows = [row(i, market="btc-crash") for i in range(60)]
         result = evaluate(rows)
         self.assertEqual(result.status, "INSUFFICIENT_CLUSTER_DIVERSITY")
-        self.assertFalse(result.nomination_eligible)
+        self.assertFalse(result.screening_positive)
         self.assertIsNone(result.market_interval)
 
     def test_one_sector_blocks_claim_even_with_multiple_market_shocks(self):
@@ -109,7 +109,7 @@ class GroupSensitivityTests(unittest.TestCase):
     def test_negative_gain_screen_does_not_pass(self):
         rows = [row(i, gain=-0.008) for i in range(72)]
         result = evaluate(rows)
-        self.assertFalse(result.nomination_eligible)
+        self.assertFalse(result.screening_positive)
         self.assertLess(result.realized_policy_net_lift, 0)
 
     def test_invalid_policy_and_bootstrap_rejected(self):
