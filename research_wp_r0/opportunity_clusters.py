@@ -68,7 +68,7 @@ class OpportunityAssessment:
     sensitivity_lower: float | None
     sensitivity_upper: float | None
     status: str
-    nomination_eligible: bool
+    screening_positive: bool
     warnings: tuple[str, ...]
 
 
