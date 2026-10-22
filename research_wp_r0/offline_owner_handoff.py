@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 import time
@@ -33,9 +34,19 @@ def _family():
 def _write_owner_copy(path: Path, checkpoint: OwnerCheckpoint) -> None:
     """Create only; never replace the owner's checkpoint through this handoff."""
     # Test-only local file; it does NOT implement independently trusted custody.
-    with path.open("xb") as stream:
-        stream.write(checkpoint.to_json_bytes())
-        stream.flush()
+    # Stage full bytes and fsync before publishing a name. A failed write or
+    # fsync leaves no final receipt; os.link never overwrites an existing one.
+    # This improves *local handoff staging*, not independent owner custody.
+    import tempfile as _tempfile
+    fd, temp_name = _tempfile.mkstemp(prefix=".checkpoint-pending-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(checkpoint.to_json_bytes())
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.link(temp_name, path)
+    finally:
+        os.unlink(temp_name)
 
 
 def _load_owner_copy(path: Path) -> OwnerCheckpoint:
