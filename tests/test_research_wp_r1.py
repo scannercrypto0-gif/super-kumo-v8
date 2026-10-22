@@ -58,6 +58,12 @@ class UncertaintyTests(unittest.TestCase):
                                           [4., -1., -1., -1.],
                                           block_length=4, replicates=200, seed=2)
 
+    def test_fewer_than_three_nominal_blocks_rejected(self):
+        with self.assertRaises(ValueError):
+            paired_moving_block_interval([0., 1., 0., 1.],
+                                          [1., 0., 1., 0.],
+                                          block_length=2, replicates=200, seed=1)
+
     def test_block_size_records_dependence_assumption(self):
         baseline = [0., 0.01, 0.02, 0., -0.01] * 10
         candidate = [x + (0.01 if i % 5 < 3 else -0.005)
