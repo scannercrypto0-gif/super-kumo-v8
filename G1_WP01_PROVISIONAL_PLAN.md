@@ -71,3 +71,20 @@ All nine owner selections below are **option C, provisional**. They are not auth
 This file is a **planning addendum** for Claude's independent G0 architecture review, not a G0-approved baseline or a request to implement G1. Reviewer should challenge feasibility, boundaries, free-tier dependencies, recovery consistency and the Archive ACK vs Backup Verified distinction. Check TIME-01 policy-aware closed-candle fallback and DATA-07 trader-owned exits against original source PRs. Source PR #6–#10 assimilation was previously audited with intentional semantic refinements, but not runtime validated.
 
 Issue #1 remains OPEN. PRs #6–#15 are not presumed merged. All proposed tests are unexecuted. Any future ChatGPT Work instruction must first re-verify the last owner-actually-submitted handoff and reconcile subsequent decisions under G0-GOV-01.
+
+
+## 2026-10-22 — Owner-approved provisional B: minimal measured ingest first, full Inbox deferred
+
+**Authority and status:** Owner explicitly selected **B provisionally**, and authorized documenting the deferred step. This is a planning-scope change only, **not** final G0 sign-off, G1 implementation authorization, PR merge, or evidence that any test has run. PR #15 cumulative documentation was squash-merged into main as `e4c1f9ec5df9265405c62bab97b2ecc807ceab7b`; this PR #16 remains an independent draft planning proposal.
+
+**Immediate G1-WP01-MVP scope (subject to G0 final authorization):**
+1. Benchmark actual Binance Spot REST/WebSocket behavior and limits with a small symbol set; record event, receipt and persistence timestamps, source identity, finality, observed gaps, failures, and measured request/latency budgets.
+2. Commit received events to a **minimal restart-readable local durable journal before remote acknowledgement**; explicitly define and test its commit boundary and crash behavior. Do not call a buffered, unflushed file write durable. Replay idempotently into the operational store (Supabase only after provisioning and approval), using stable event keys.
+3. Test duplicate delivery, process kill/restart, disconnected network, remote-store failure and REST gap recovery. Distinguish received, locally committed, remotely persisted, recovered and **UNRESOLVED_DATA_GAP**; do not claim zero loss without verified evidence.
+4. Report measurable outcomes: input/committed/persisted/replayed counts, duplicate count, gap coverage, restart recovery time, failure modes, API usage and storage footprint. Tests are **NOT RUN** at this documentation checkpoint.
+
+**Explicitly deferred to a later G1 work package, not cancelled:** full multi-consumer Durable Inbox with independent Fast/Slow cursors, archive ACK and reclaim gates, bounded retention and disk-pressure handling, scheduling/priority/backpressure, versioned manifests, P0/P1/P2 backup/restore and measured RPO/RTO. The minimal journal is a narrow precursor, **not** evidence of those capabilities. Before widening ingestion or enabling dependent trading/observation workloads, implement and test the relevant full Inbox/recovery guarantees and demonstrate no silent data loss, false VALID state or fabricated historical fills.
+
+**Reopen/advance trigger:** MVP measured evidence is reviewed; any unbounded journal growth, partial-commit ambiguity, unrecoverable gap, replay mismatch or missing crash durability blocks promotion and becomes a tracked implementation defect. This deferral must be rechecked before G1 foundation acceptance; it is not a waiver of the existing architecture contract.
+
+**Governance:** G0 and Issue #1 remain OPEN until explicit owner sign-off and evidence reconciliation. Research PRs remain separate. No new implementation, CI pass, runtime benchmark, Supabase deployment or production readiness is asserted here.
