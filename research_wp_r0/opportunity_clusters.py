@@ -70,6 +70,8 @@ class OpportunityAssessment:
     status: str
     screening_positive: bool
     warnings: tuple[str, ...]
+    baseline_mean_net: float | None = None
+    candidate_mean_net: float | None = None
 
 
 def _accounted_value(outcome, policy: FrozenAccountingPolicy) -> float | None:
@@ -151,6 +153,8 @@ def evaluate_opportunity_clusters(
     baseline_nofill = candidate_nofill = base_exec = cand_exec = 0
     unknown = ambiguous = 0
     effects: list[float] = []
+    baseline_values: list[float] = []
+    candidate_values: list[float] = []
     markets: list[str] = []
     sectors: list[str] = []
     for row in rows:
@@ -166,6 +170,8 @@ def evaluate_opportunity_clusters(
         b_net = _accounted_value(b, policy)
         c_net = _accounted_value(c, policy)
         if b_net is not None and c_net is not None:
+            baseline_values.append(b_net)
+            candidate_values.append(c_net)
             effects.append(c_net - b_net)
             markets.append(row.market_shock_id)
             sectors.append(row.sector_id)
@@ -174,6 +180,9 @@ def evaluate_opportunity_clusters(
         "No-fill zero represents confirmed zero *realized exposure* under the frozen policy; missed upside and execution propensity remain unestimated.",
         "Intervals are axis-wise cluster sensitivity, not formal simultaneous/multiway coverage.",
         "Cluster identifiers require point-in-time provenance; small/uneven clusters and outcome selection may bias inference.",
+        "UNADJUSTED_FOR_SEARCH: trial-family selection and independent validation are not proven.",
+        "No positive screening flag is issued until a dependence-calibrated confirmatory protocol exists.",
+        "Relative improvement can occur even when both strategies have negative average net returns.",
         "Screening never authorizes strategy promotion or operational trader changes.",
     )
     if not effects:
@@ -194,6 +203,8 @@ def evaluate_opportunity_clusters(
             len(rows), len(effects), unknown, ambiguous, baseline_nofill,
             candidate_nofill, base_exec, cand_exec, estimate, None, None,
             None, None, "INSUFFICIENT_CLUSTER_DIVERSITY", False, warnings,
+            math.fsum(baseline_values) / len(baseline_values),
+            math.fsum(candidate_values) / len(candidate_values),
         )
     market_ci = _cluster_resample(
         effects, markets, axis="MARKET_SHOCK",
@@ -205,14 +216,15 @@ def evaluate_opportunity_clusters(
     )
     lower = min(market_ci.lower, sector_ci.lower)
     upper = max(market_ci.upper, sector_ci.upper)
-    # This is a screening threshold, not a significance or causal proof.
-    screening = (not incomplete and lower > minimum_effect
-                 and policy.confirmed_no_fill_zero_exposure
-                 and policy.no_fill_has_no_fees)
+    # Pointwise axis-wise bootstrap cannot justify a positive decision:
+    # neither cross-classified dependence nor full search selection is tested.
+    screening = False
     return OpportunityAssessment(
         len(rows), len(effects), unknown, ambiguous, baseline_nofill,
         candidate_nofill, base_exec, cand_exec, estimate,
         market_ci, sector_ci, lower, upper,
         "INCOMPLETE_COVERAGE" if incomplete else "EXPLORATORY_CLUSTER_SCREEN",
         screening, warnings,
+        math.fsum(baseline_values) / len(baseline_values),
+        math.fsum(candidate_values) / len(candidate_values),
     )

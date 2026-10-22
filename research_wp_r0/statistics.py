@@ -82,8 +82,11 @@ def paired_moving_block_interval(
     n = len(left)
     if len(right) != n:
         raise ValueError("Paired samples require identical denominators")
-    if not isinstance(block_length, int) or not 1 <= block_length <= n:
-        raise ValueError("Invalid block length")
+    if not isinstance(block_length, int) or not 1 <= block_length < n:
+        raise ValueError("Block length must be smaller than sample size; a full circular block produces a degenerate interval")
+    # Conservative safety floor, not a guarantee of valid bootstrap coverage.
+    if n < 3 * block_length:
+        raise ValueError("At least three nominal block lengths required; interval would be poorly supported")
     if not isinstance(replicates, int) or replicates < 100:
         raise ValueError("At least 100 bootstrap replicates required")
     if not 0 < confidence < 1:

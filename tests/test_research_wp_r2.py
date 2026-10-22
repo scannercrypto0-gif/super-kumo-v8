@@ -28,7 +28,8 @@ class EvaluationAcceptance(unittest.TestCase):
         self.assertEqual(r.observed_group_count, 10)
         self.assertAlmostEqual(r.paired_net_lift, 0.003)
         self.assertAlmostEqual(r.lift_interval.lower, 0.003)
-        self.assertEqual(r.decision, "HISTORICAL_CANDIDATE_ONLY")
+        self.assertEqual(r.decision, "FURTHER_INDEPENDENT_VALIDATION")
+        self.assertTrue(any("UNADJUSTED_FOR_SEARCH" in note for note in r.notes))
         self.assertEqual(r.evidence_status, "EXPLORATORY")
 
     def test_no_fill_and_missing_not_zero_pnl(self):

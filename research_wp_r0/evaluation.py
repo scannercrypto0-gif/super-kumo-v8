@@ -138,6 +138,9 @@ def evaluate_paired(
         "Paired effect conditional on both strategies having known executed outcomes.",
         "Shared market group correlations are disclosed, not modeled by circular time-block resampling.",
         "Costs and returns must be supplied on the same frozen notional/denominator.",
+        "UNADJUSTED_FOR_SEARCH: no complete trial-family ledger or independent holdout verified.",
+        "UNVERIFIED_TEMPORAL_CONTEXT: order, cutoff and matched horizons not validated by a frozen manifest.",
+        "Sample-level bootstrap is not calibrated for correlated market-shock clusters.",
     ]
     if n < minimum_paired:
         return EvaluationReport(
@@ -162,8 +165,11 @@ def evaluate_paired(
     decision = "FURTHER_INDEPENDENT_VALIDATION"
     if interval.upper <= minimum_effect:
         decision = "DO_NOT_NOMINATE"
-    elif interval.lower > minimum_effect and not outstanding and not one_group:
-        decision = "HISTORICAL_CANDIDATE_ONLY"
+    # This sample-level bootstrap ignores cross-asset shared shocks, and the
+    # protocol does not prove holdout custody or full trial-family accounting.
+    # A positive CI must NEVER become a candidate-selection decision here.
+    elif interval.lower > minimum_effect:
+        decision = "FURTHER_INDEPENDENT_VALIDATION"
     if one_group:
         notes.append("One correlated-event group cannot establish robust independent support.")
     if outstanding:
