@@ -149,6 +149,16 @@ class JournalAcceptance(unittest.TestCase):
             with self.assertRaises(JournalIntegrityError):
                 j.report()
 
+    def test_replaced_journal_inode_rejected_during_writer(self):
+        import os
+        with DurableTrialJournal(self.path, family()) as j:
+            j.record_attempt(attempt("a"), event_id="trial-a")
+            replacement = self.path.with_name("replacement.jsonl")
+            replacement.write_bytes(self.path.read_bytes())
+            os.replace(replacement, self.path)
+            with self.assertRaises(JournalIntegrityError):
+                j.record_attempt(attempt("b"), event_id="trial-b")
+
     def test_trusted_anchor_requires_complete_pair(self):
         with self.assertRaises(ValueError):
             DurableTrialJournal(self.path, family(), expected_head="0" * 64)
