@@ -5,11 +5,13 @@ on:
     branches:
       - ci/research-unified-fast-suite-20261022
       - ci/research-wp-r17-fast-path-20261022
+      - ci/research-r18-targeted-performance-20261022
   pull_request:
     paths:
       - "research_wp_r0/**"
       - "tests/test_research_wp_r*.py"
       - ".github/workflows/research-unified-fast.yml"
+      - ".github/workflows/research-targeted-performance.yml"
       - ".github/workflows/research-wp-r*-tests.yml"
       - ".github/workflows/research-audit-remediation.yml"
   workflow_dispatch:
