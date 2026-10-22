@@ -64,6 +64,9 @@ class TemporalFact:
             raise ValueError("Verified receipt requires available_at")
         if self.is_final_bar and self.final_at is None:
             raise ValueError("Final bars must provide final_at")
+        if self.is_final_bar and self.final_at is not None and self.available_at is not None:
+            if utc(self.available_at) < utc(self.final_at):
+                raise ValueError("A finalized bar cannot be available before finalization")
 
 
 @dataclass(frozen=True)
