@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 
 from .collector.binance_collector import BinanceCollector
+from .health import take_snapshot
 from .journal.durable_journal import DurableJournal
 from .recovery.gap_recovery import recover_gap
 from .storage.operational_store import OperationalStore
@@ -216,6 +217,22 @@ def run_pipeline(
     store_count = store.count(symbol, interval)
     min_open, max_open = store.get_range(symbol, interval)
 
+    # --- Health snapshot (read-only; does not affect acquisition or trading) ---
+    # Use the last available recovery report for mandatory-recovery-failed detection.
+    _last_recovery_report = None
+    if ws_recovery_result is not None:
+        _last_recovery_report = ws_recovery_result["gap_report"]
+    elif startup_recovery_results:
+        _last_recovery_report = startup_recovery_results[-1]["gap_report"]
+    health = take_snapshot(
+        journal=journal,
+        store=store,
+        symbol=symbol,
+        interval=interval,
+        recovery_report=_last_recovery_report,
+        replay_errors=startup_replay_errors,
+    )
+
     def _report_from(recovery_result: dict | None) -> dict | None:
         if recovery_result is None:
             return None
@@ -264,6 +281,7 @@ def run_pipeline(
         },
         "ws_gap_recovery": _report_from(ws_recovery_result),
         "supabase_status": OperationalStore.SUPABASE_STATUS,
+        "health_snapshot": health.to_dict(),
     }
 
     logger.info("Pipeline complete: %s", result)
