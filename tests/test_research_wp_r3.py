@@ -106,6 +106,29 @@ class GroupSensitivityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ClusteredPair(rows[0].pair, "wrong-shock", "sector-A")
 
+    def test_both_strategies_losing_relative_lift_is_not_profit(self):
+        rows = []
+        for i in range(72):
+            market = f"market-{i // 4}"
+            b = OpportunityOutcome(str(i), market, Resolution.KNOWN,
+                                   gross_return=-0.02, execution_cost=0.0)
+            c = OpportunityOutcome(str(i), market, Resolution.KNOWN,
+                                   gross_return=-0.01, execution_cost=0.0)
+            rows.append(ClusteredPair(OpportunityPair(b, c), market,
+                                      f"sector-{i % 6}"))
+        result = evaluate(rows)
+        self.assertAlmostEqual(result.baseline_mean_net, -0.02)
+        self.assertAlmostEqual(result.candidate_mean_net, -0.01)
+        self.assertGreater(result.realized_policy_net_lift, 0)
+        self.assertFalse(result.screening_positive)
+        self.assertTrue(any("UNADJUSTED_FOR_SEARCH" in w for w in result.warnings))
+
+    def test_positive_relative_lift_cannot_bypass_search_controls(self):
+        rows = [row(i, gain=0.02) for i in range(120)]
+        result = evaluate(rows)
+        self.assertGreater(result.realized_policy_net_lift, 0)
+        self.assertFalse(result.screening_positive)
+
     def test_negative_gain_screen_does_not_pass(self):
         rows = [row(i, gain=-0.008) for i in range(72)]
         result = evaluate(rows)
