@@ -100,6 +100,7 @@ def evaluate_paired(
     seed: int,
     minimum_paired: int,
     minimum_effect: float = 0.0,
+    temporal_manifest=None,
 ) -> EvaluationReport:
     """Assess research improvement only on fully resolved executed PnL pairs.
 
@@ -108,6 +109,9 @@ def evaluate_paired(
     This does *not* estimate intent-to-trade opportunity-level return when
     no-fill exists; it explicitly reports conditional-on-both-known lift only.
     """
+    if temporal_manifest is not None:
+        from research_wp_r0.temporal_contract import validate_temporal_pairs
+        validate_temporal_pairs(pairs, temporal_manifest)
     if not pairs or minimum_paired < 2 or not math.isfinite(minimum_effect):
         raise ValueError("Invalid evaluation design")
     ids = [p.baseline.opportunity_id for p in pairs]
@@ -139,7 +143,8 @@ def evaluate_paired(
         "Shared market group correlations are disclosed, not modeled by circular time-block resampling.",
         "Costs and returns must be supplied on the same frozen notional/denominator.",
         "UNADJUSTED_FOR_SEARCH: no complete trial-family ledger or independent holdout verified.",
-        "UNVERIFIED_TEMPORAL_CONTEXT: order, cutoff and matched horizons not validated by a frozen manifest.",
+        ("UNVERIFIED_TEMPORAL_CONTEXT: no frozen manifest supplied." if temporal_manifest is None
+         else "STRUCTURALLY_VALIDATED_TEMPORAL_CONTEXT: supplied manifest checked; receipt provenance not independently audited."),
         "Sample-level bootstrap is not calibrated for correlated market-shock clusters.",
     ]
     if n < minimum_paired:
