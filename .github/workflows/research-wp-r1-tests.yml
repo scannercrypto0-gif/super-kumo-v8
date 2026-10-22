@@ -1,0 +1,27 @@
+name: Research WP-R1 Statistical Tests
+
+on:
+  push:
+    branches:
+      - feat/research-wp-r1-statistics-20261022
+  pull_request:
+    paths:
+      - "research_wp_r0/**"
+      - "tests/test_research_wp_r*.py"
+      - ".github/workflows/research-wp-r1-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  research-statistics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record Python
+        run: python3 --version
+      - name: Compile
+        run: python3 -m compileall -q research_wp_r0 tests
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests -p 'test_research_wp_r*.py' -v
