@@ -69,6 +69,11 @@ class FrozenTemporalManifest:
     def __post_init__(self) -> None:
         if not self.protocol_digest or not self.source_version or not self.horizon_name:
             raise ValueError("Frozen protocol, source version and horizon required")
+        if not isinstance(self.ordered, (list, tuple)) or not all(
+            isinstance(item, TemporalOpportunity) for item in self.ordered
+        ):
+            raise ValueError("Frozen temporal universe must contain TemporalOpportunity objects")
+        object.__setattr__(self, "ordered", tuple(self.ordered))
         if not self.ordered:
             raise ValueError("Empty opportunity universe")
         if not isinstance(self.horizon_seconds, int) or self.horizon_seconds <= 0:
