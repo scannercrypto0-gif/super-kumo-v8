@@ -1,3 +1,12 @@
+# ATLAS Quant Lab — current isolated research execution snapshot
+Project ID: AQL-CRYPTO-RESEARCH-001. Verified `2026-10-22T12:14:00.627993+00:00` UTC (Asia/Riyadh UTC+03:00).
+Main observed: `e4c1f9ec5df9265405c62bab97b2ecc807ceab7b`. G0 **APPROVED**, Issue #1 **CLOSED**, verified Issue body/final owner sign-off and #15 merge. R09 **NOT RESOLVED**: mandatory before any legacy code/key reuse; no such reuse in this synthetic offline task.
+Active research: WP-R19 read-boundary integrity fixes on `fix/research-r19-read-boundaries-20261022`, parent Draft PR #38 `51b7d8c82ea05fb9438aeb25d9053eb481c0d9c0`. Existing research PRs unmerged; no main or operational code modified. Last owner-submitted baseline: AQL-HO-20261021-002 / #14; current execution handoff AQL-HO-20261022-001. Other originating chats inaccessible.
+Done: three defect categories fixed, 16 new regression methods, unified 169 PASS on local Linux/Python 3.12.14, five probes 0/5 -> 5/5 rejected; append evidence bytes/head/fsync unchanged. Windows/current CI and physical failure testing not claimed. [Results, source chain and measured read cost](research_wp_r0/READ_BOUNDARY_REVIEW.md).
+Next: review the new Draft fix and source-stack integration; owner approval required before any merge or preservation-policy change. New PR number/publication not guessed in this pre-publication snapshot; actual PR body/tool result supplies later evidence. Existing historical snapshots below remain historical.
+
+## Earlier source-branch snapshot retained verbatim
+
 # ATLAS Quant Lab — CURRENT STATE
 Project ID: `AQL-CRYPTO-RESEARCH-001`
 Former name: SUPER KUMO V8

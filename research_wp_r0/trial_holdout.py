@@ -43,8 +43,8 @@ class FrozenSearchFamily:
     def __post_init__(self) -> None:
         fields = (self.family_id, self.protocol_digest, self.temporal_manifest_digest,
                   self.dataset_version, self.metric_name)
-        if not all(fields):
-            raise ValueError("Every research scope/provenance reference is required")
+        if not all(type(value) is str and bool(value) for value in fields):
+            raise ValueError("Research scope/provenance references must be nonempty strings")
         if not isinstance(self.candidate_ids, (list, tuple)) or not all(
             isinstance(candidate, str) and bool(candidate) for candidate in self.candidate_ids
         ):
@@ -217,3 +217,4 @@ class TrialFamilyLedger:
                 "No result grants statistical confirmation, candidate promotion or G0/G1 operational authority.",
             ),
         )
+

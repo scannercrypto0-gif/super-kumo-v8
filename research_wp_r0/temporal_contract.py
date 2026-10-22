@@ -34,8 +34,9 @@ class TemporalOpportunity:
     opportunity_group_id: str
 
     def __post_init__(self) -> None:
-        if not self.opportunity_id or not self.opportunity_group_id:
-            raise ValueError("Opportunity and group identity required")
+        if not all(type(value) is str and bool(value)
+                   for value in (self.opportunity_id, self.opportunity_group_id)):
+            raise ValueError("Opportunity and group identities must be nonempty strings")
         decision = _utc(self.decision_at)
         for value in (self.baseline_feature_available_at, self.candidate_feature_available_at,
                       self.baseline_horizon_end_at, self.candidate_horizon_end_at,
@@ -67,8 +68,9 @@ class FrozenTemporalManifest:
     horizon_seconds: int = 3600
 
     def __post_init__(self) -> None:
-        if not self.protocol_digest or not self.source_version or not self.horizon_name:
-            raise ValueError("Frozen protocol, source version and horizon required")
+        if not all(type(value) is str and bool(value)
+                   for value in (self.protocol_digest, self.source_version, self.horizon_name)):
+            raise ValueError("Frozen protocol, source version and horizon must be nonempty strings")
         if not isinstance(self.ordered, (list, tuple)) or not all(
             isinstance(item, TemporalOpportunity) for item in self.ordered
         ):
@@ -138,3 +140,4 @@ def validate_temporal_pairs(
         if row.baseline.group_id != frozen.opportunity_group_id:
             raise ValueError("Market group differs from frozen manifest")
     return manifest.digest
+

@@ -1,0 +1,399 @@
+{
+  "after": {
+    "label": "after-r19",
+    "limitation": "Local Linux samples only; not Windows, real holdout custody or hardware power-loss proof.",
+    "negative_probes": {
+      "malformed_report": true,
+      "mutable_frozen_family_reference": true,
+      "mutable_frozen_manifest_reference": true,
+      "string_false_trust": true,
+      "torn_report": true
+    },
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+    "python": "3.12.14",
+    "repeats": 3,
+    "reports_per_sample": 12,
+    "results": [
+      {
+        "attempts": 8,
+        "median_append_ms": 6.1028310000210695,
+        "median_report_ms": 3.7100209999607614,
+        "samples": [
+          {
+            "append_ms": 6.523390999973344,
+            "attempts": 8,
+            "bytes": 3902,
+            "confirmatory_eligible": false,
+            "events": 11,
+            "fsync_calls": 11,
+            "head": "500fdc706b97febd0911c163c73522ad107257189bf6fd2b51575cb20f9fe992",
+            "report_ms": 4.061219000050187,
+            "report_mutated_evidence": false,
+            "report_replays": 12,
+            "reports": 12,
+            "restart_verified": true
+          },
+          {
+            "append_ms": 5.322116000002097,
+            "attempts": 8,
+            "bytes": 3902,
+            "confirmatory_eligible": false,
+            "events": 11,
+            "fsync_calls": 11,
+            "head": "500fdc706b97febd0911c163c73522ad107257189bf6fd2b51575cb20f9fe992",
+            "report_ms": 3.5018170000284954,
+            "report_mutated_evidence": false,
+            "report_replays": 12,
+            "reports": 12,
+            "restart_verified": true
+          },
+          {
+            "append_ms": 6.1028310000210695,
+            "attempts": 8,
+            "bytes": 3902,
+            "confirmatory_eligible": false,
+            "events": 11,
+            "fsync_calls": 11,
+            "head": "500fdc706b97febd0911c163c73522ad107257189bf6fd2b51575cb20f9fe992",
+            "report_ms": 3.7100209999607614,
+            "report_mutated_evidence": false,
+            "report_replays": 12,
+            "reports": 12,
+            "restart_verified": true
+          }
+        ]
+      },
+      {
+        "attempts": 32,
+        "median_append_ms": 35.50281499997254,
+        "median_report_ms": 11.432988000024125,
+        "samples": [
+          {
+            "append_ms": 35.50281499997254,
+            "attempts": 32,
+            "bytes": 12438,
+            "confirmatory_eligible": false,
+            "events": 35,
+            "fsync_calls": 35,
+            "head": "5e9ea6801aba4d8fa01a3372d937106c989f1deea5c02a34cde0071547535ff3",
+            "report_ms": 11.432988000024125,
+            "report_mutated_evidence": false,
+            "report_replays": 12,
+            "reports": 12,
+            "restart_verified": true
+          },
+          {
+            "append_ms": 35.43230900004346,
+            "attempts": 32,
+            "bytes": 12438,
+            "confirmatory_eligible": false,
+            "events": 35,
+            "fsync_calls": 35,
+            "head": "5e9ea6801aba4d8fa01a3372d937106c989f1deea5c02a34cde0071547535ff3",
+            "report_ms": 11.650233999944248,
+            "report_mutated_evidence": false,
+            "report_replays": 12,
+            "reports": 12,
+            "restart_verified": true
+          },
+          {
+            "append_ms": 42.438005999997586,
+            "attempts": 32,
+            "bytes": 12438,
+            "confirmatory_eligible": false,
+            "events": 35,
+            "fsync_calls": 35,
+            "head": "5e9ea6801aba4d8fa01a3372d937106c989f1deea5c02a34cde0071547535ff3",
+            "report_ms": 11.265495999964514,
+            "report_mutated_evidence": false,
+            "report_replays": 12,
+            "reports": 12,
+            "restart_verified": true
+          }
+        ]
+      },
+      {
+        "attempts": 128,
+        "median_append_ms": 324.77530100004515,
+        "median_report_ms": 39.48082800002339,
+        "samples": [
+          {
+            "append_ms": 340.1791169999342,
+            "attempts": 128,
+            "bytes": 46758,
+            "confirmatory_eligible": false,
+            "events": 131,
+            "fsync_calls": 131,
+            "head": "156218d4c68add70d3bee993ede1d2fdfdd283ce37ed43cab4d5fdac2487a9a9",
+            "report_ms": 37.03229400002783,
+            "report_mutated_evidence": false,
+            "report_replays": 12,
+            "reports": 12,
+            "restart_verified": true
+          },
+          {
+            "append_ms": 320.2910810000503,
+            "attempts": 128,
+            "bytes": 46758,
+            "confirmatory_eligible": false,
+            "events": 131,
+            "fsync_calls": 131,
+            "head": "156218d4c68add70d3bee993ede1d2fdfdd283ce37ed43cab4d5fdac2487a9a9",
+            "report_ms": 39.48082800002339,
+            "report_mutated_evidence": false,
+            "report_replays": 12,
+            "reports": 12,
+            "restart_verified": true
+          },
+          {
+            "append_ms": 324.77530100004515,
+            "attempts": 128,
+            "bytes": 46758,
+            "confirmatory_eligible": false,
+            "events": 131,
+            "fsync_calls": 131,
+            "head": "156218d4c68add70d3bee993ede1d2fdfdd283ce37ed43cab4d5fdac2487a9a9",
+            "report_ms": 42.93460299993512,
+            "report_mutated_evidence": false,
+            "report_replays": 12,
+            "reports": 12,
+            "restart_verified": true
+          }
+        ]
+      }
+    ],
+    "source_sha256": {
+      "durable_journal.py": "4dbe48495f7d650258e7362366bc2ae5976e0fa06e92819cfddf495a404c0298",
+      "owner_checkpoints.py": "959a07a8524aba7aa61973bca249ebb24343949632649df9895c53b74aec755b",
+      "temporal_contract.py": "e2763e03900723abd9f8ad97414d2297825bccf46c08ae09bedf8a51aaab513e",
+      "trial_holdout.py": "129bd087bfac55603153bba29c02198174165e15fdb122ed1bde1bc26e394a57"
+    },
+    "synthetic_only": true
+  },
+  "base": "51b7d8c82ea05fb9438aeb25d9053eb481c0d9c0",
+  "baseline_copy_normalization": {
+    "research_wp_r0/durable_journal.py": {
+      "ast_unchanged": true,
+      "executed_before_sha256": "efbb4a1b34ef1803698dd29f0fe85fed12e58316c101d15548791a03d5966efe",
+      "one_extra_eof_lf_only": true,
+      "parent_sha256": "d90f1ca4a85889b2f2a74602e69ebf5dce0507e6ff0df7f4c1d1db3b219bb2b9"
+    },
+    "research_wp_r0/owner_checkpoints.py": {
+      "ast_unchanged": true,
+      "executed_before_sha256": "c4778e732cd29ae873d6664db67e05cddd5ca0177d31344446f3ff867e22141e",
+      "one_extra_eof_lf_only": true,
+      "parent_sha256": "3ffcc971333f48bbfb65e68944f1eac9f278174862733d94d85c870594226ed0"
+    },
+    "research_wp_r0/temporal_contract.py": {
+      "ast_unchanged": true,
+      "executed_before_sha256": "448cba60a9f5240d64bf2c1f8d7130c0050d9c96cc337b164bf937eec42bc8ce",
+      "one_extra_eof_lf_only": true,
+      "parent_sha256": "9e5af05068e8f84f2d6714acbe2a18816363872503572631750488127f4d05f9"
+    },
+    "research_wp_r0/trial_holdout.py": {
+      "ast_unchanged": true,
+      "executed_before_sha256": "bc4520daba97acfb038a2bafbc2d15888f161af6500527f62835d783a2e75c43",
+      "one_extra_eof_lf_only": true,
+      "parent_sha256": "a911f6865e04078b1e05b54fe74a266592a0b14c4e337fe141719a8c190c8a62"
+    }
+  },
+  "baseline_suite": {
+    "command": "python -B -m unittest discover -s tests -p test_research_wp_r*.py",
+    "elapsed_seconds": 0.7658252689999472,
+    "exit_code": 0,
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+    "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+    "source": "51b7d8c82ea05fb9438aeb25d9053eb481c0d9c0"
+  },
+  "before": {
+    "label": "before-51b7d8c",
+    "limitation": "Local Linux samples only; not Windows, real holdout custody or hardware power-loss proof.",
+    "negative_probes": {
+      "malformed_report": false,
+      "mutable_frozen_family_reference": false,
+      "mutable_frozen_manifest_reference": false,
+      "string_false_trust": false,
+      "torn_report": false
+    },
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+    "python": "3.12.14",
+    "repeats": 3,
+    "reports_per_sample": 12,
+    "results": [
+      {
+        "attempts": 8,
+        "median_append_ms": 5.518821999999091,
+        "median_report_ms": 0.21387200001754536,
+        "samples": [
+          {
+            "append_ms": 5.518821999999091,
+            "attempts": 8,
+            "bytes": 3902,
+            "confirmatory_eligible": false,
+            "events": 11,
+            "fsync_calls": 11,
+            "head": "500fdc706b97febd0911c163c73522ad107257189bf6fd2b51575cb20f9fe992",
+            "report_ms": 0.21387200001754536,
+            "report_mutated_evidence": false,
+            "report_replays": 0,
+            "reports": 12,
+            "restart_verified": true
+          },
+          {
+            "append_ms": 5.130569000016294,
+            "attempts": 8,
+            "bytes": 3902,
+            "confirmatory_eligible": false,
+            "events": 11,
+            "fsync_calls": 11,
+            "head": "500fdc706b97febd0911c163c73522ad107257189bf6fd2b51575cb20f9fe992",
+            "report_ms": 0.195953999991616,
+            "report_mutated_evidence": false,
+            "report_replays": 0,
+            "reports": 12,
+            "restart_verified": true
+          },
+          {
+            "append_ms": 9.204773000078603,
+            "attempts": 8,
+            "bytes": 3902,
+            "confirmatory_eligible": false,
+            "events": 11,
+            "fsync_calls": 11,
+            "head": "500fdc706b97febd0911c163c73522ad107257189bf6fd2b51575cb20f9fe992",
+            "report_ms": 0.40352700000312325,
+            "report_mutated_evidence": false,
+            "report_replays": 0,
+            "reports": 12,
+            "restart_verified": true
+          }
+        ]
+      },
+      {
+        "attempts": 32,
+        "median_append_ms": 42.71232799999325,
+        "median_report_ms": 0.4772679999405227,
+        "samples": [
+          {
+            "append_ms": 48.24408999991192,
+            "attempts": 32,
+            "bytes": 12438,
+            "confirmatory_eligible": false,
+            "events": 35,
+            "fsync_calls": 35,
+            "head": "5e9ea6801aba4d8fa01a3372d937106c989f1deea5c02a34cde0071547535ff3",
+            "report_ms": 0.38203500002964574,
+            "report_mutated_evidence": false,
+            "report_replays": 0,
+            "reports": 12,
+            "restart_verified": true
+          },
+          {
+            "append_ms": 42.48206599993409,
+            "attempts": 32,
+            "bytes": 12438,
+            "confirmatory_eligible": false,
+            "events": 35,
+            "fsync_calls": 35,
+            "head": "5e9ea6801aba4d8fa01a3372d937106c989f1deea5c02a34cde0071547535ff3",
+            "report_ms": 0.4772679999405227,
+            "report_mutated_evidence": false,
+            "report_replays": 0,
+            "reports": 12,
+            "restart_verified": true
+          },
+          {
+            "append_ms": 42.71232799999325,
+            "attempts": 32,
+            "bytes": 12438,
+            "confirmatory_eligible": false,
+            "events": 35,
+            "fsync_calls": 35,
+            "head": "5e9ea6801aba4d8fa01a3372d937106c989f1deea5c02a34cde0071547535ff3",
+            "report_ms": 0.5324710000422783,
+            "report_mutated_evidence": false,
+            "report_replays": 0,
+            "reports": 12,
+            "restart_verified": true
+          }
+        ]
+      },
+      {
+        "attempts": 128,
+        "median_append_ms": 338.31152699997347,
+        "median_report_ms": 1.2911730000269017,
+        "samples": [
+          {
+            "append_ms": 336.30940399996234,
+            "attempts": 128,
+            "bytes": 46758,
+            "confirmatory_eligible": false,
+            "events": 131,
+            "fsync_calls": 131,
+            "head": "156218d4c68add70d3bee993ede1d2fdfdd283ce37ed43cab4d5fdac2487a9a9",
+            "report_ms": 1.3670170000068538,
+            "report_mutated_evidence": false,
+            "report_replays": 0,
+            "reports": 12,
+            "restart_verified": true
+          },
+          {
+            "append_ms": 407.8609590000042,
+            "attempts": 128,
+            "bytes": 46758,
+            "confirmatory_eligible": false,
+            "events": 131,
+            "fsync_calls": 131,
+            "head": "156218d4c68add70d3bee993ede1d2fdfdd283ce37ed43cab4d5fdac2487a9a9",
+            "report_ms": 1.2911730000269017,
+            "report_mutated_evidence": false,
+            "report_replays": 0,
+            "reports": 12,
+            "restart_verified": true
+          },
+          {
+            "append_ms": 338.31152699997347,
+            "attempts": 128,
+            "bytes": 46758,
+            "confirmatory_eligible": false,
+            "events": 131,
+            "fsync_calls": 131,
+            "head": "156218d4c68add70d3bee993ede1d2fdfdd283ce37ed43cab4d5fdac2487a9a9",
+            "report_ms": 1.1939559999518679,
+            "report_mutated_evidence": false,
+            "report_replays": 0,
+            "reports": 12,
+            "restart_verified": true
+          }
+        ]
+      }
+    ],
+    "source_sha256": {
+      "durable_journal.py": "efbb4a1b34ef1803698dd29f0fe85fed12e58316c101d15548791a03d5966efe",
+      "owner_checkpoints.py": "c4778e732cd29ae873d6664db67e05cddd5ca0177d31344446f3ff867e22141e",
+      "temporal_contract.py": "448cba60a9f5240d64bf2c1f8d7130c0050d9c96cc337b164bf937eec42bc8ce",
+      "trial_holdout.py": "bc4520daba97acfb038a2bafbc2d15888f161af6500527f62835d783a2e75c43"
+    },
+    "synthetic_only": true
+  },
+  "ci_for_new_patch": "NOT_YET_OBSERVED",
+  "final_suite": {
+    "command": "python -B -m unittest discover -s tests -p test_research_wp_r*.py",
+    "elapsed_seconds": 0.6656768169999623,
+    "exit_code": 0,
+    "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]"
+  },
+  "hardware_power_loss": "NOT_TESTED",
+  "legacy_credentials": "NOT_ACCESSED_OR_USED",
+  "logs": {
+    "baseline": ".........................................................................................................................................................\n----------------------------------------------------------------------\nRan 153 tests in 0.575s\n\nOK\n",
+    "final": ".........................................................................................................................................................................\n----------------------------------------------------------------------\nRan 169 tests in 0.476s\n\nOK\n",
+    "regression_after": "test_false_none_and_zero_remain_untrusted (test_research_wp_r19.CheckpointTrustTypeTests.test_false_none_and_zero_remain_untrusted) ... ok\ntest_truthy_non_boolean_cannot_assert_independent_custody (test_research_wp_r19.CheckpointTrustTypeTests.test_truthy_non_boolean_cannot_assert_independent_custody) ... ok\ntest_family_metadata_rejects_mutable_non_string_references (test_research_wp_r19.FrozenReferenceTypeTests.test_family_metadata_rejects_mutable_non_string_references) ... ok\ntest_manifest_metadata_rejects_mutable_non_string_references (test_research_wp_r19.FrozenReferenceTypeTests.test_manifest_metadata_rejects_mutable_non_string_references) ... ok\ntest_temporal_event_rejects_mutable_identities (test_research_wp_r19.FrozenReferenceTypeTests.test_temporal_event_rejects_mutable_identities) ... ok\ntest_failed_report_poisoning_cannot_be_repaired_silently (test_research_wp_r19.ReportReadIntegrityTests.test_failed_report_poisoning_cannot_be_repaired_silently) ... ok\ntest_healthy_report_does_not_write_or_change_committed_head (test_research_wp_r19.ReportReadIntegrityTests.test_healthy_report_does_not_write_or_change_committed_head) ... ok\ntest_holdout_contamination_and_counts_survive_anchored_restart (test_research_wp_r19.ReportReadIntegrityTests.test_holdout_contamination_and_counts_survive_anchored_restart) ... ok\ntest_rehashed_unanchored_history_is_still_not_authenticated (test_research_wp_r19.ReportReadIntegrityTests.test_rehashed_unanchored_history_is_still_not_authenticated) ... ok\ntest_report_rejects_corruption_without_a_subsequent_write (test_research_wp_r19.ReportReadIntegrityTests.test_report_rejects_corruption_without_a_subsequent_write) ... ok\ntest_report_rejects_file_replacement_even_with_identical_bytes (test_research_wp_r19.ReportReadIntegrityTests.test_report_rejects_file_replacement_even_with_identical_bytes) ... ok\ntest_report_rejects_missing_file (test_research_wp_r19.ReportReadIntegrityTests.test_report_rejects_missing_file) ... ok\ntest_report_rejects_rehashed_history_against_pinned_checkpoint (test_research_wp_r19.ReportReadIntegrityTests.test_report_rejects_rehashed_history_against_pinned_checkpoint) ... ok\ntest_report_rejects_rollback_against_pinned_checkpoint (test_research_wp_r19.ReportReadIntegrityTests.test_report_rejects_rollback_against_pinned_checkpoint) ... ok\ntest_report_rejects_same_length_hash_tamper (test_research_wp_r19.ReportReadIntegrityTests.test_report_rejects_same_length_hash_tamper) ... ok\ntest_report_rejects_torn_tail (test_research_wp_r19.ReportReadIntegrityTests.test_report_rejects_torn_tail) ... ok\n\n----------------------------------------------------------------------\nRan 16 tests in 0.031s\n\nOK\n",
+    "regression_before": ".FFFFFFFFFFFFFFFF...FFFFFFF\n======================================================================\nFAIL: test_truthy_non_boolean_cannot_assert_independent_custody (test_research_wp_r19.CheckpointTrustTypeTests.test_truthy_non_boolean_cannot_assert_independent_custody) (flag='false')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 151, in test_truthy_non_boolean_cannot_assert_independent_custody\n    with self.subTest(flag=flag), self.assertRaises(JournalIntegrityError):\n                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: JournalIntegrityError not raised\n\n======================================================================\nFAIL: test_truthy_non_boolean_cannot_assert_independent_custody (test_research_wp_r19.CheckpointTrustTypeTests.test_truthy_non_boolean_cannot_assert_independent_custody) (flag='true')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 151, in test_truthy_non_boolean_cannot_assert_independent_custody\n    with self.subTest(flag=flag), self.assertRaises(JournalIntegrityError):\n                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: JournalIntegrityError not raised\n\n======================================================================\nFAIL: test_truthy_non_boolean_cannot_assert_independent_custody (test_research_wp_r19.CheckpointTrustTypeTests.test_truthy_non_boolean_cannot_assert_independent_custody) (flag=1)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 151, in test_truthy_non_boolean_cannot_assert_independent_custody\n    with self.subTest(flag=flag), self.assertRaises(JournalIntegrityError):\n                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: JournalIntegrityError not raised\n\n======================================================================\nFAIL: test_truthy_non_boolean_cannot_assert_independent_custody (test_research_wp_r19.CheckpointTrustTypeTests.test_truthy_non_boolean_cannot_assert_independent_custody) (flag=[True])\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 151, in test_truthy_non_boolean_cannot_assert_independent_custody\n    with self.subTest(flag=flag), self.assertRaises(JournalIntegrityError):\n                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: JournalIntegrityError not raised\n\n======================================================================\nFAIL: test_truthy_non_boolean_cannot_assert_independent_custody (test_research_wp_r19.CheckpointTrustTypeTests.test_truthy_non_boolean_cannot_assert_independent_custody) (flag={'trusted': True})\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 151, in test_truthy_non_boolean_cannot_assert_independent_custody\n    with self.subTest(flag=flag), self.assertRaises(JournalIntegrityError):\n                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: JournalIntegrityError not raised\n\n======================================================================\nFAIL: test_family_metadata_rejects_mutable_non_string_references (test_research_wp_r19.FrozenReferenceTypeTests.test_family_metadata_rejects_mutable_non_string_references) (field='family_id')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 168, in test_family_metadata_rejects_mutable_non_string_references\n    with self.subTest(field=field), self.assertRaises(ValueError):\n                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: ValueError not raised\n\n======================================================================\nFAIL: test_family_metadata_rejects_mutable_non_string_references (test_research_wp_r19.FrozenReferenceTypeTests.test_family_metadata_rejects_mutable_non_string_references) (field='protocol_digest')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 168, in test_family_metadata_rejects_mutable_non_string_references\n    with self.subTest(field=field), self.assertRaises(ValueError):\n                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: ValueError not raised\n\n======================================================================\nFAIL: test_family_metadata_rejects_mutable_non_string_references (test_research_wp_r19.FrozenReferenceTypeTests.test_family_metadata_rejects_mutable_non_string_references) (field='temporal_manifest_digest')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 168, in test_family_metadata_rejects_mutable_non_string_references\n    with self.subTest(field=field), self.assertRaises(ValueError):\n                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: ValueError not raised\n\n======================================================================\nFAIL: test_family_metadata_rejects_mutable_non_string_references (test_research_wp_r19.FrozenReferenceTypeTests.test_family_metadata_rejects_mutable_non_string_references) (field='dataset_version')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 168, in test_family_metadata_rejects_mutable_non_string_references\n    with self.subTest(field=field), self.assertRaises(ValueError):\n                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: ValueError not raised\n\n======================================================================\nFAIL: test_family_metadata_rejects_mutable_non_string_references (test_research_wp_r19.FrozenReferenceTypeTests.test_family_metadata_rejects_mutable_non_string_references) (field='metric_name')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 168, in test_family_metadata_rejects_mutable_non_string_references\n    with self.subTest(field=field), self.assertRaises(ValueError):\n                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: ValueError not raised\n\n======================================================================\nFAIL: test_manifest_metadata_rejects_mutable_non_string_references (test_research_wp_r19.FrozenReferenceTypeTests.test_manifest_metadata_rejects_mutable_non_string_references) (field='protocol_digest')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 174, in test_manifest_metadata_rejects_mutable_non_string_references\n    with self.subTest(field=field), self.assertRaises(ValueError):\n                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: ValueError not raised\n\n======================================================================\nFAIL: test_manifest_metadata_rejects_mutable_non_string_references (test_research_wp_r19.FrozenReferenceTypeTests.test_manifest_metadata_rejects_mutable_non_string_references) (field='source_version')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 174, in test_manifest_metadata_rejects_mutable_non_string_references\n    with self.subTest(field=field), self.assertRaises(ValueError):\n                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: ValueError not raised\n\n======================================================================\nFAIL: test_manifest_metadata_rejects_mutable_non_string_references (test_research_wp_r19.FrozenReferenceTypeTests.test_manifest_metadata_rejects_mutable_non_string_references) (field='horizon_name')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 174, in test_manifest_metadata_rejects_mutable_non_string_references\n    with self.subTest(field=field), self.assertRaises(ValueError):\n                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: ValueError not raised\n\n======================================================================\nFAIL: test_temporal_event_rejects_mutable_identities (test_research_wp_r19.FrozenReferenceTypeTests.test_temporal_event_rejects_mutable_identities) (field='opportunity_id')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 179, in test_temporal_event_rejects_mutable_identities\n    with self.subTest(field=field), self.assertRaises(ValueError):\n                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: ValueError not raised\n\n======================================================================\nFAIL: test_temporal_event_rejects_mutable_identities (test_research_wp_r19.FrozenReferenceTypeTests.test_temporal_event_rejects_mutable_identities) (field='opportunity_group_id')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 179, in test_temporal_event_rejects_mutable_identities\n    with self.subTest(field=field), self.assertRaises(ValueError):\n                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: ValueError not raised\n\n======================================================================\nFAIL: test_failed_report_poisoning_cannot_be_repaired_silently (test_research_wp_r19.ReportReadIntegrityTests.test_failed_report_poisoning_cannot_be_repaired_silently)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 106, in test_failed_report_poisoning_cannot_be_repaired_silently\n    with self.assertRaises(JournalIntegrityError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: JournalIntegrityError not raised\n\n======================================================================\nFAIL: test_report_rejects_corruption_without_a_subsequent_write (test_research_wp_r19.ReportReadIntegrityTests.test_report_rejects_corruption_without_a_subsequent_write)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 60, in test_report_rejects_corruption_without_a_subsequent_write\n    with self.assertRaises(JournalIntegrityError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: JournalIntegrityError not raised\n\n======================================================================\nFAIL: test_report_rejects_file_replacement_even_with_identical_bytes (test_research_wp_r19.ReportReadIntegrityTests.test_report_rejects_file_replacement_even_with_identical_bytes)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 86, in test_report_rejects_file_replacement_even_with_identical_bytes\n    with self.assertRaises(JournalIntegrityError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: JournalIntegrityError not raised\n\n======================================================================\nFAIL: test_report_rejects_missing_file (test_research_wp_r19.ReportReadIntegrityTests.test_report_rejects_missing_file)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 79, in test_report_rejects_missing_file\n    with self.assertRaises((JournalIntegrityError, OSError)):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: (<class 'research_wp_r0.durable_journal.JournalIntegrityError'>, <class 'OSError'>) not raised\n\n======================================================================\nFAIL: test_report_rejects_rehashed_history_against_pinned_checkpoint (test_research_wp_r19.ReportReadIntegrityTests.test_report_rejects_rehashed_history_against_pinned_checkpoint)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 93, in test_report_rejects_rehashed_history_against_pinned_checkpoint\n    with self.assertRaises(JournalIntegrityError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: JournalIntegrityError not raised\n\n======================================================================\nFAIL: test_report_rejects_rollback_against_pinned_checkpoint (test_research_wp_r19.ReportReadIntegrityTests.test_report_rejects_rollback_against_pinned_checkpoint)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 100, in test_report_rejects_rollback_against_pinned_checkpoint\n    with self.assertRaises(JournalIntegrityError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: JournalIntegrityError not raised\n\n======================================================================\nFAIL: test_report_rejects_same_length_hash_tamper (test_research_wp_r19.ReportReadIntegrityTests.test_report_rejects_same_length_hash_tamper)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 69, in test_report_rejects_same_length_hash_tamper\n    with self.assertRaises(JournalIntegrityError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: JournalIntegrityError not raised\n\n======================================================================\nFAIL: test_report_rejects_torn_tail (test_research_wp_r19.ReportReadIntegrityTests.test_report_rejects_torn_tail)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<workspace>/research_run/tests/test_research_wp_r19.py\", line 74, in test_report_rejects_torn_tail\n    with self.assertRaises(JournalIntegrityError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: JournalIntegrityError not raised\n\n----------------------------------------------------------------------\nRan 16 tests in 0.032s\n\nFAILED (failures=23)\n"
+  },
+  "main_observed": "e4c1f9ec5df9265405c62bab97b2ecc807ceab7b",
+  "real_checkpoint_custody": "NOT_VERIFIED",
+  "recorded_at_utc": "2026-10-22T12:14:00.627993+00:00",
+  "scope": "offline synthetic research only",
+  "windows_for_new_patch": "NOT_TESTED_LOCALLY"
+}
