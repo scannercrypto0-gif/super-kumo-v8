@@ -85,7 +85,9 @@ class DurableTrialJournal:
     GENESIS = "0" * 64
     MAX_LINE = 1_000_000
 
-    def __init__(self, path: str | Path, family: FrozenSearchFamily) -> None:
+    def __init__(self, path: str | Path, family: FrozenSearchFamily, *,
+                 expected_head: str | None = None,
+                 expected_sequence: int | None = None) -> None:
         self.path = Path(path)
         self.family = family
         self._lock_path = self.path.with_name(self.path.name + ".lock")
@@ -105,8 +107,12 @@ class DurableTrialJournal:
         try:
             if self.path.exists():
                 self._restore()
+            elif expected_head is not None or expected_sequence is not None:
+                raise JournalIntegrityError("Missing journal cannot satisfy an external anchor")
             else:
                 self._append("FAMILY", _family_data(family), "family:" + family.digest)
+            self.verify_anchor(expected_head=expected_head,
+                               expected_sequence=expected_sequence)
         except BaseException:
             self.close()
             raise
@@ -138,6 +144,19 @@ class DurableTrialJournal:
     def report(self):
         self._require_healthy()
         return self._ledger.report()
+
+    def verify_anchor(self, *, expected_head: str | None,
+                      expected_sequence: int | None = None) -> None:
+        """Compare to an owner-held EXTERNAL trusted checkpoint.
+
+        Without independent anchor custody, local hash-chain rewrite remains
+        undetectable. Callers must not treat the journal itself as an anchor.
+        """
+        self._require_healthy()
+        if expected_head is not None and self._head != expected_head:
+            raise JournalIntegrityError("Journal head differs from trusted anchor")
+        if expected_sequence is not None and self._sequence != expected_sequence:
+            raise JournalIntegrityError("Journal sequence differs from trusted anchor")
 
     def _require_healthy(self) -> None:
         if self._closed or self._poisoned:
