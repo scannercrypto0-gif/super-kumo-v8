@@ -1,0 +1,43 @@
+name: Research WP-R13 Measured Journal Performance
+
+on:
+  push:
+    branches:
+      - perf/research-wp-r13-journal-replay-20261022
+  pull_request:
+    paths:
+      - "research_wp_r0/**"
+      - "tests/test_research_wp_r*.py"
+      - ".github/workflows/research-wp-r13-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: optimized
+      - uses: actions/checkout@v4
+        with:
+          ref: c69965945b50403557d2b18f1e26f955513500f4
+          path: baseline
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Python
+        run: python --version
+      - name: Regression tests, including crash and tamper failures
+        working-directory: optimized
+        run: python -B -m unittest discover -s tests -p 'test_research_wp_r*.py' -v
+      - name: Baseline (same runner, journal before optimization)
+        run: python -B optimized/research_wp_r0/journal_benchmark.py --module-root baseline --sizes 16,32,64 --repeats 3
+      - name: Optimized (same runner, same workload)
+        run: python -B optimized/research_wp_r0/journal_benchmark.py --module-root optimized --sizes 16,32,64 --repeats 3

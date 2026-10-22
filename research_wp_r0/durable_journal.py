@@ -10,6 +10,7 @@ live-trader access. stdlib Python 3.10+.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import datetime
 import json
 import os
@@ -351,10 +352,11 @@ class DurableTrialJournal:
             raise JournalIntegrityError("Conflicting duplicate event id")
         # Validate on a fresh state-machine reconstruction before writing. A
         # durable append is the commit point; never update in-memory state first.
-        shadow = TrialFamilyLedger(self.family)
-        for earlier in self.path.read_bytes().splitlines()[1:]:
-            r = json.loads(earlier)
-            _replay_event(shadow, r["kind"], r["data"])
+        # _restore above already verified the complete on-disk hash chain,
+        # external anchor prefix and every state transition. Replay a copy
+        # of that validated state rather than parsing/replaying disk twice.
+        # Never mutate the committed in-memory ledger before fsync succeeds.
+        shadow = deepcopy(self._ledger)
         _replay_event(shadow, kind, data)
         changed = self._append(kind, data, event_id)
         if changed:
