@@ -60,3 +60,8 @@ Counterfactual paper TP/SL semantics and genuine adversarial statistical validit
 3. Review this branch only; separately approve any merge or new work. Existing PRs and operational contracts remain unmodified.
 
 **No deployment, live trading, merge or G0 approval is authorized.**
+
+
+## Strategy Factory Batch 01
+
+See [BATCH01_REPORT.md](BATCH01_REPORT.md) for the frozen three-family synthetic experiment, 12 grouped checks, candidate tables, reproduction command and evidence limits. All candidates remain INSUFFICIENT_EVIDENCE; no real historical/forward result or final holdout access.

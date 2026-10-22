@@ -92,3 +92,14 @@ Claude reads `07_CLAUDE_HANDOFF.md` and independently challenges the architectur
 - Obtain Claude independent architecture review, resolve or explicitly defer critical questions with rationale, and obtain final owner approval. G0 and G0-001 remain OPEN; no architecture approval is complete.
 
 SESSION END: changes/commit | tests/evidence | decisions | blockers | active WP | next exact task | reviewer.
+
+
+## 2026-10-22 — Strategy Factory Batch 01 current snapshot
+
+Verified `2026-10-22T13:22:37.459341+00:00` UTC against GitHub: main `e4c1f9ec5df9265405c62bab97b2ecc807ceab7b`; Issue #1 CLOSED, final G0 owner sign-off in its current description. Historical OPEN observations above remain unchanged. R09 still required before legacy/key reuse; no such use here.
+
+Research head #43 `0a3d900d5d85a6d987f1e26eac8f99660f05b2e5` is Draft/unmerged, parent #41 `06d1c2c218aeb3553b0c761c659fd0a8a143d93c`. Isolated Batch 01 targets #43, not main. Separate ingest chain #32/#40/#42 is not imported; owner review on #42 reports health/recovery blockers, resolution not verified here.
+
+Completed locally: three frozen synthetic families / 12 candidates, 29 new tests in 12 groups, 204 unified tests PASS, reproducible evidence, conditional/full-opportunity baselines and journal-bound result checks. All candidates INSUFFICIENT_EVIDENCE; real historical/OOS and prospective validation NOT TESTED, final holdout NOT OPENED. [Batch report](research_wp_r0/BATCH01_REPORT.md) contains counts, metrics, limits and estimated six remaining work checkpoints. CI exact-head outcome and actual Draft PR publication are subsequent evidence in the PR body.
+
+Next action: review the isolated Batch 01 Draft PR and research ancestry; separately authorize integration and trustworthy historical/independent-holdout inputs. No merge, strategy admission, live/paid action or main change authorized. Other chats inaccessible; coverage limited to visible instructions and inspected GitHub records.

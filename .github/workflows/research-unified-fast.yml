@@ -46,6 +46,14 @@ jobs:
         run: python --version
       - name: All research regression tests, exactly once per OS
         run: python -B -m unittest discover -s tests -p 'test_research_wp_r*.py'
+      - name: Reproducible synthetic Strategy Factory Batch 01
+        run: python -B -m research_wp_r0.strategy_factory --output strategy-factory-batch01-artifacts
+      - name: Preserve Batch 01 results and replay evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: strategy-factory-batch01-${{ matrix.os }}
+          path: strategy-factory-batch01-artifacts/
+          if-no-files-found: error
       - name: End-to-end research evidence and checkpoint
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.deep_smoke == true }}
         run: python -B -m research_wp_r0.measured_pipeline
