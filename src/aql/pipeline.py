@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import time
 from pathlib import Path
 
@@ -25,6 +24,94 @@ logging.basicConfig(
     datefmt="%Y-%m-%dT%H:%M:%SZ",
 )
 logger = logging.getLogger("aql.pipeline")
+
+
+def _run_gap_recovery(
+    journal: DurableJournal,
+    store: OperationalStore,
+    symbol: str,
+    interval: str,
+    gap_start_ms: int,
+    gap_end_ms: int,
+) -> dict:
+    """
+    Recover bars for a gap window.
+
+    Sequence (mandatory, per G1-WP01 fix order):
+      1. journal.commit(bar)        — durable local record first
+      2. store.upsert(bar)          — write to operational store
+      3. journal.mark_persisted()   — ONLY if upsert confirmed insertion/presence
+
+    mark_persisted is never called if upsert raises or returns False due to
+    an unconfirmed row.  (Note: upsert returns False for duplicates, which
+    are already in the store; we still mark those persisted since the data
+    IS durably stored — we just didn't add a new row.)
+    """
+    logger.info(
+        "Running gap recovery: %s %s gap=[%d, %d] duration_s=%.0f",
+        symbol, interval, gap_start_ms, gap_end_ms,
+        (gap_end_ms - gap_start_ms) / 1000,
+    )
+    existing_keys = store.get_stored_keys(symbol, interval)
+    recovered_bars, gap_report = recover_gap(
+        symbol=symbol,
+        interval=interval,
+        gap_start_ms=gap_start_ms,
+        gap_end_ms=gap_end_ms,
+        existing_keys=existing_keys,
+    )
+
+    inserted = 0
+    skipped_dup = 0
+    errors = 0
+
+    for bar in recovered_bars:
+        # Step 1: Journal commit (durable local record)
+        try:
+            journal.commit(bar)
+        except Exception as exc:
+            logger.error(
+                "Journal commit failed for recovered bar %s: %s",
+                bar.stable_key(), exc,
+            )
+            errors += 1
+            continue
+
+        # Step 2: Operational store upsert
+        upserted = False
+        try:
+            upserted = store.upsert(bar)
+        except Exception as exc:
+            logger.error(
+                "Store upsert failed for recovered bar %s: %s",
+                bar.stable_key(), exc,
+            )
+            errors += 1
+            # Do NOT call mark_persisted — store write unconfirmed
+            continue
+
+        # Step 3: Mark persisted — only when store write is confirmed.
+        # upsert() returns True for new rows, False for duplicates (already present).
+        # In both cases the data IS in the store, so mark as PERSISTED.
+        try:
+            journal.mark_persisted(bar.stable_key())
+        except Exception as exc:
+            logger.warning(
+                "mark_persisted failed for %s (non-fatal): %s",
+                bar.stable_key(), exc,
+            )
+
+        if upserted:
+            inserted += 1
+        else:
+            skipped_dup += 1
+
+    return {
+        "gap_report": gap_report,
+        "recovery_inserted": inserted,
+        "recovery_skipped_dup": skipped_dup,
+        "recovery_errors": errors,
+    }
 
 
 def run_pipeline(
@@ -54,6 +141,35 @@ def run_pipeline(
     logger.info("Store: %s", store_path)
     logger.info("Supabase: NOT_TESTED (SQLite fallback active)")
 
+    # --- Startup reconciliation (handles clean restarts AND SIGKILL recovery) ---
+    # This runs before WebSocket connection so any gap from the previous process
+    # is detected and recovered, even if _on_close was never called.
+    startup_recovery_result = None
+    try:
+        bars_replayed, startup_gap_start, startup_gap_end = journal.startup_reconcile(
+            store=store,
+            symbol=symbol,
+            interval=interval,
+        )
+        logger.info(
+            "Startup reconciliation complete: bars_replayed=%d gap=[%s, %s]",
+            bars_replayed,
+            startup_gap_start,
+            startup_gap_end,
+        )
+        if startup_gap_start is not None and startup_gap_end is not None:
+            startup_recovery_result = _run_gap_recovery(
+                journal=journal,
+                store=store,
+                symbol=symbol,
+                interval=interval,
+                gap_start_ms=startup_gap_start,
+                gap_end_ms=startup_gap_end,
+            )
+    except Exception as exc:
+        logger.error("Startup reconciliation failed (non-fatal): %s", exc)
+
+    # --- WebSocket collection ---
     collector = BinanceCollector(
         symbol=symbol,
         interval=interval,
@@ -65,29 +181,38 @@ def run_pipeline(
     metrics = collector.run(timeout_s=duration_s)
     elapsed = time.time() - t_start
 
-    # --- Gap Recovery ---
-    gap_report = None
+    # --- Post-collection gap recovery (handles WS disconnects during run) ---
+    ws_recovery_result = None
     if collector.gap_start_ms is not None and collector.gap_end_ms is not None:
-        logger.info("Running gap recovery...")
-        existing_keys = store.get_stored_keys(symbol, interval)
-        recovered_bars, gap_report = recover_gap(
+        ws_recovery_result = _run_gap_recovery(
+            journal=journal,
+            store=store,
             symbol=symbol,
             interval=interval,
             gap_start_ms=collector.gap_start_ms,
             gap_end_ms=collector.gap_end_ms,
-            existing_keys={b for b in existing_keys},
         )
-        if recovered_bars:
-            bulk_result = store.bulk_upsert(recovered_bars)
-            for bar in recovered_bars:
-                journal.commit(bar)
-                journal.mark_persisted(bar.stable_key())
-            logger.info("Gap recovery upsert: %s", bulk_result)
 
     # --- Final counts ---
     journal_counts = journal.count_by_state()
     store_count = store.count(symbol, interval)
     min_open, max_open = store.get_range(symbol, interval)
+
+    def _report_from(recovery_result: dict | None) -> dict | None:
+        if recovery_result is None:
+            return None
+        gr = recovery_result["gap_report"]
+        return {
+            "status": gr.status,
+            "expected": gr.expected_bars,
+            "recovered": gr.recovered_bars,
+            "unresolved": gr.unresolved,
+            "weight_cost": gr.weight_cost,
+            "last_seen_window_weight": gr.last_seen_window_weight,
+            "inserted": recovery_result["recovery_inserted"],
+            "skipped_dup": recovery_result["recovery_skipped_dup"],
+            "errors": recovery_result["recovery_errors"],
+        }
 
     result = {
         "symbol": symbol,
@@ -108,16 +233,8 @@ def run_pipeline(
             "min_open_ms": min_open,
             "max_open_ms": max_open,
         },
-        "gap_recovery": (
-            {
-                "status": gap_report.status,
-                "expected": gap_report.expected_bars,
-                "recovered": gap_report.recovered_bars,
-                "unresolved": gap_report.unresolved,
-                "weight_used": gap_report.weight_used,
-            }
-            if gap_report else None
-        ),
+        "startup_gap_recovery": _report_from(startup_recovery_result),
+        "ws_gap_recovery": _report_from(ws_recovery_result),
         "supabase_status": OperationalStore.SUPABASE_STATUS,
     }
 

@@ -11,6 +11,13 @@ Rules (execution order §D):
   system at an earlier time (TIME-01 / no retroactive backdating).
 - UNRESOLVED_DATA_GAP: a gap that cannot be filled (e.g. gap pre-dates
   available REST history, or REST returns fewer bars than expected).
+
+Weight accounting:
+  X-MBX-USED-WEIGHT-1M is the CUMULATIVE rolling 1-minute window weight
+  across ALL requests from this IP — it is NOT the cost of a single request.
+  Per Binance docs, GET /api/v3/klines costs KLINES_WEIGHT_PER_REQUEST=2 per
+  call.  We track cost as (requests_made * KLINES_WEIGHT_PER_REQUEST) and
+  separately record last_seen_window_weight for observability.
 """
 from __future__ import annotations
 
@@ -30,11 +37,15 @@ logger = logging.getLogger(__name__)
 # Binance REST base (public, no API key required for market data)
 BINANCE_REST_BASE = "https://api.binance.com"
 
-# REST weight limits per Binance docs (2024):
-# GET /api/v3/klines  weight=2 per request (IP weight)
-# IP rate limit: 6000 weight/min (X-MBX-USED-WEIGHT-1M header)
+# REST weight per Binance docs (2024-12):
+# GET /api/v3/klines  weight = 2 per request (IP weight)
+# IP rate limit:      6000 weight/min (X-MBX-USED-WEIGHT-1M header shows cumulative)
 KLINES_WEIGHT_PER_REQUEST = 2
 MAX_KLINES_PER_REQUEST = 1000
+
+# Headroom: stop fetching if we calculate we'd exceed this threshold.
+# This is per-session cost, not the window total shown in the header.
+MAX_SESSION_WEIGHT = 1200  # 20% of 6000 limit; conservative
 
 
 @dataclass
@@ -48,7 +59,8 @@ class RecoveryReport:
     already_stored: int
     unresolved: int
     status: str  # "FULL" | "PARTIAL" | "UNRESOLVED_DATA_GAP"
-    weight_used: int
+    weight_cost: int           # cost = requests_made * KLINES_WEIGHT_PER_REQUEST
+    last_seen_window_weight: int  # last X-MBX-USED-WEIGHT-1M value (cumulative, for observation)
 
 
 def _binance_interval_ms(interval: str) -> int:
@@ -62,19 +74,33 @@ def _binance_interval_ms(interval: str) -> int:
         raise ValueError(f"Unsupported interval: {interval}")
 
 
+def _align_to_grid(ts_ms: int, interval_ms: int, direction: str = "ceil") -> int:
+    """
+    Align a timestamp to the nearest Binance bar boundary.
+
+    direction="ceil"  → next boundary >= ts_ms (used for gap start)
+    direction="floor" → last boundary <= ts_ms (used for gap end)
+    """
+    if direction == "ceil":
+        return ((ts_ms + interval_ms - 1) // interval_ms) * interval_ms
+    else:  # floor
+        return (ts_ms // interval_ms) * interval_ms
+
+
 def _fetch_klines(
     symbol: str,
     interval: str,
     start_ms: int,
     end_ms: int,
     limit: int = MAX_KLINES_PER_REQUEST,
-    proxies: Optional[dict] = None,
 ) -> tuple[list, int]:
     """
     Fetch klines from Binance REST.
-    Returns (rows, weight_used).
-    weight_used is read from X-MBX-USED-WEIGHT-1M header if available,
-    else estimated as KLINES_WEIGHT_PER_REQUEST.
+
+    Returns (rows, window_weight) where:
+      rows          — raw Binance kline rows
+      window_weight — value of X-MBX-USED-WEIGHT-1M header (cumulative window,
+                      NOT the cost of this individual request)
     """
     params = {
         "symbol": symbol,
@@ -88,10 +114,11 @@ def _fetch_klines(
 
     req = urllib.request.Request(url, headers={"User-Agent": "AQL-G1-MVP/0.1"})
     with urllib.request.urlopen(req, timeout=30) as resp:
-        weight = int(resp.headers.get("X-MBX-USED-WEIGHT-1M", KLINES_WEIGHT_PER_REQUEST))
+        # This is the CUMULATIVE rolling-window weight, not the request cost.
+        window_weight = int(resp.headers.get("X-MBX-USED-WEIGHT-1M", 0))
         data = json.loads(resp.read())
 
-    return data, weight
+    return data, window_weight
 
 
 def recover_gap(
@@ -103,32 +130,70 @@ def recover_gap(
 ) -> tuple[List[MarketBar], RecoveryReport]:
     """
     Fetch all final bars in [gap_start_ms, gap_end_ms] from Binance REST.
+
     existing_keys: set of bar_open timestamps already in the journal/store
-                   (used to count already_stored, not to skip fetch).
+                   (used to count already_stored; not used to skip fetch,
+                   because we still need to verify the full set).
+
     Returns (bars_to_insert, report).
     bars_to_insert excludes bars already in existing_keys (idempotent).
+
+    Weight accounting: cost tracked as requests_made * KLINES_WEIGHT_PER_REQUEST.
+    The header X-MBX-USED-WEIGHT-1M (cumulative window weight) is recorded
+    separately for observability only.
     """
     interval_ms = _binance_interval_ms(interval)
-    expected = max(0, (gap_end_ms - gap_start_ms) // interval_ms)
+
+    # Align gap boundaries to bar grid for accurate expected-count calculation.
+    # Gap start: first bar boundary at or after gap_start_ms
+    # Gap end:   last fully-closed bar boundary at or before gap_end_ms
+    aligned_start = _align_to_grid(gap_start_ms, interval_ms, "ceil")
+    aligned_end = _align_to_grid(gap_end_ms, interval_ms, "floor")
+
+    # Expected number of bars on the aligned grid.
+    # A bar at boundary T is fully closed if T + interval_ms <= gap_end_ms.
+    expected = max(0, (aligned_end - aligned_start) // interval_ms)
+    if aligned_end <= aligned_start:
+        expected = 0
 
     all_bars: List[MarketBar] = []
-    total_weight = 0
-    cursor = gap_start_ms
+    requests_made = 0
+    last_seen_window_weight = 0
+    cursor = aligned_start
 
-    while cursor <= gap_end_ms:
+    while cursor <= aligned_end and expected > 0:
+        # Safety: stop if we've used too much of our self-imposed budget.
+        session_cost = requests_made * KLINES_WEIGHT_PER_REQUEST
+        if session_cost >= MAX_SESSION_WEIGHT:
+            logger.warning(
+                "Gap recovery: reached session weight budget (%d >= %d), stopping.",
+                session_cost, MAX_SESSION_WEIGHT,
+            )
+            break
+
         try:
-            rows, weight = _fetch_klines(symbol, interval, cursor, gap_end_ms)
+            rows, window_weight = _fetch_klines(
+                symbol, interval, cursor, aligned_end
+            )
+            requests_made += 1
+            last_seen_window_weight = window_weight
         except Exception as exc:
             logger.warning("REST fetch failed: %s", exc)
             break
-
-        total_weight += weight
 
         if not rows:
             break
 
         for row in rows:
             bar = MarketBar.from_binance_rest_kline(row, symbol, interval)
+            # Filter: only include bars whose open time is within the aligned gap.
+            # Binance may return bars starting before startTime in rare edge cases.
+            if bar.bar_open < aligned_start or bar.bar_open > aligned_end:
+                logger.debug(
+                    "Skipping out-of-range bar: bar_open=%d not in [%d, %d]",
+                    bar.bar_open, aligned_start, aligned_end,
+                )
+                continue
             all_bars.append(bar)
 
         last_open = int(rows[-1][0])
@@ -137,6 +202,16 @@ def recover_gap(
         if len(rows) < MAX_KLINES_PER_REQUEST:
             break
 
+    # Deduplicate by bar_open (safety against any edge cases returning same bar twice)
+    seen_opens: set = set()
+    unique_bars: List[MarketBar] = []
+    for bar in all_bars:
+        if bar.bar_open not in seen_opens:
+            seen_opens.add(bar.bar_open)
+            unique_bars.append(bar)
+    all_bars = unique_bars
+
+    # Separate new bars from already-stored ones
     recovered_new = [b for b in all_bars if b.bar_open not in existing_keys]
     already_stored = len(all_bars) - len(recovered_new)
     unresolved = max(0, expected - len(all_bars))
@@ -148,6 +223,8 @@ def recover_gap(
     else:
         status = "PARTIAL"
 
+    weight_cost = requests_made * KLINES_WEIGHT_PER_REQUEST
+
     report = RecoveryReport(
         symbol=symbol,
         interval=interval,
@@ -158,14 +235,17 @@ def recover_gap(
         already_stored=already_stored,
         unresolved=unresolved,
         status=status,
-        weight_used=total_weight,
+        weight_cost=weight_cost,
+        last_seen_window_weight=last_seen_window_weight,
     )
 
     logger.info(
         "Gap recovery: symbol=%s interval=%s expected=%d recovered=%d "
-        "already_stored=%d unresolved=%d status=%s weight=%d",
+        "already_stored=%d unresolved=%d status=%s "
+        "weight_cost=%d window_weight=%d",
         symbol, interval, expected, len(all_bars),
-        already_stored, unresolved, status, total_weight,
+        already_stored, unresolved, status,
+        weight_cost, last_seen_window_weight,
     )
 
     return recovered_new, report

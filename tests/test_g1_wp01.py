@@ -318,8 +318,9 @@ class TestT6_RestGapRecovery(unittest.TestCase):
 
     def test_recovery_idempotent_with_existing_keys(self):
         """Recovery skips bars already in existing_keys (idempotent)."""
-        # 5 bars at 1m spacing
-        base = 1_700_000_000_000
+        # Use a base timestamp that IS aligned to 60-second bar boundaries.
+        # 1_700_000_040_000 % 60_000 == 0 (verified).
+        base = 1_700_000_040_000  # aligned to 60s grid
         interval_ms = 60_000
 
         rest_rows = [
@@ -345,14 +346,20 @@ class TestT6_RestGapRecovery(unittest.TestCase):
         self.assertEqual(report.status, "FULL")
 
     def test_recovery_marks_bars_as_recovered(self):
-        base = 1_700_000_000_000
+        # Use aligned base (divisible by 60_000).
+        # gap_end must cover the full bar: base + interval_ms so aligned_end = base + interval_ms
+        # and expected = 1.
+        base = 1_700_000_040_000  # aligned to 60s grid
+        interval_ms = 60_000
         rest_rows = [
             [base, "41900", "42100", "41800", "42000", "10.0",
              base + 59_999, "0", "0", "0", "0", "0"]
         ]
         with patch("aql.recovery.gap_recovery._fetch_klines") as mock_fetch:
             mock_fetch.return_value = (rest_rows, 2)
-            bars, report = recover_gap("BTCUSDT", "1m", base, base + 59_999, set())
+            # gap_end = base + interval_ms so aligned_end = base + interval_ms,
+            # expected = 1 bar
+            bars, report = recover_gap("BTCUSDT", "1m", base, base + interval_ms, set())
 
         self.assertEqual(len(bars), 1)
         self.assertEqual(bars[0].state, BarState.RECOVERED)
@@ -513,6 +520,521 @@ class TestModelIntegrity(unittest.TestCase):
         bar.close = 43000.0
         new_cs = bar.compute_checksum()
         self.assertNotEqual(original, new_cs)
+
+
+class TestT9_SIGKILLSubprocess(unittest.TestCase):
+    """
+    T9: Real SIGKILL durability test.
+
+    Spawns a child process that:
+      1. Opens the journal
+      2. Commits bars with synchronous=FULL
+      3. Receives SIGKILL (os.kill SIGKILL) before it can call _on_close
+
+    Then the parent verifies the journal still has the committed bars.
+    This tests that SQLite WAL + synchronous=FULL survives abrupt termination
+    without any manual fsync.
+    """
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    @unittest.skipIf(sys.platform == "win32", "SIGKILL not available on Windows")
+    def test_sigkill_after_commit_journal_survives(self):
+        """
+        Child commits N bars then is SIGKILL'd. Parent reads same journal
+        and verifies all bars are present.
+        """
+        import signal
+        import subprocess
+
+        jpath = os.path.join(self.tmpdir, "kill_test_journal.sqlite")
+        n_bars = 5
+
+        # Script to run in child process
+        child_script = os.path.join(self.tmpdir, "child_commit.py")
+        src_path = os.path.join(os.path.dirname(__file__), "..", "src")
+        child_code = f"""
+import sys, time
+sys.path.insert(0, {repr(src_path)})
+from aql.journal.durable_journal import DurableJournal
+from aql.models.bar import BarState, MarketBar
+
+j = DurableJournal({repr(jpath)})
+for i in range({n_bars}):
+    bar_open = 1_700_000_000_000 + i * 60_000
+    bar = MarketBar(
+        symbol="BTCUSDT", interval="1m",
+        bar_open=bar_open, bar_close=bar_open + 59_999,
+        open=41900.0, high=42100.0, low=41800.0, close=42000.0,
+        volume=10.0, is_final=True, source="test",
+        ingested_at=int(time.time() * 1000),
+        state=BarState.RECEIVED,
+    )
+    bar = bar.with_checksum()
+    j.commit(bar)
+
+# Signal parent that commits are done, then hang
+import signal, os
+os.kill(os.getpid(), signal.SIGUSR1)  # notify done
+time.sleep(60)  # wait for SIGKILL
+"""
+        with open(child_script, "w") as f:
+            f.write(child_code)
+
+        proc = subprocess.Popen(
+            [sys.executable, child_script],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        # Wait up to 10s for child to commit all bars (SIGUSR1 will be sent but
+        # we can't easily receive it in the parent; just wait a short time)
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            time.sleep(0.2)
+            # Check if journal file exists and has rows
+            if os.path.exists(jpath):
+                try:
+                    import sqlite3 as _sqlite3
+                    conn = _sqlite3.connect(jpath)
+                    count = conn.execute(
+                        "SELECT COUNT(*) FROM journal_entries"
+                    ).fetchone()[0]
+                    conn.close()
+                    if count >= n_bars:
+                        break
+                except Exception:
+                    pass
+
+        # SIGKILL the child — no _on_close, no graceful shutdown
+        try:
+            proc.send_signal(signal.SIGKILL)
+        except ProcessLookupError:
+            pass  # Already dead
+        proc.wait(timeout=5)
+
+        # Now verify journal is readable and has all bars
+        j2 = DurableJournal(jpath)
+        bars = j2.replay(symbol="BTCUSDT", interval="1m")
+
+        self.assertEqual(
+            len(bars), n_bars,
+            f"Expected {n_bars} bars after SIGKILL, got {len(bars)}"
+        )
+        # Verify all bar opens are accounted for
+        opens = {b.bar_open for b in bars}
+        expected_opens = {1_700_000_000_000 + i * 60_000 for i in range(n_bars)}
+        self.assertEqual(opens, expected_opens)
+        # All should be LOCAL_COMMITTED (not PERSISTED — _on_close never called)
+        for bar in bars:
+            self.assertEqual(bar.state, BarState.LOCAL_COMMITTED)
+
+
+class TestT10_InternalGapDetection(unittest.TestCase):
+    """
+    T10: Internal gap detection — gaps that don't appear from simple row counting.
+
+    If bars A, B, D, E are stored (C is missing), row count = 4 but there is
+    a gap at C.  Gap accounting must detect the missing bar by checking bar
+    open timestamps, not just counting rows.
+    """
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_internal_gap_not_visible_from_count_alone(self):
+        """Store 4 bars with a hole at position 3. Count=4 but gap exists."""
+        base = 1_700_000_000_000
+        interval_ms = 60_000
+
+        sdb = os.path.join(self.tmpdir, "store.sqlite")
+        s = OperationalStore(sdb)
+
+        # Store bars 0,1,2,4 — skip bar 3 (internal gap)
+        stored_opens = [0, 1, 2, 4]
+        for i in stored_opens:
+            bar = _make_bar(bar_open=base + i * interval_ms)
+            s.upsert(bar)
+
+        self.assertEqual(s.count("BTCUSDT", "1m"), 4)  # count looks fine
+
+        # Detect gap: compute expected bars in range, compare to stored
+        min_open, max_open = s.get_range("BTCUSDT", "1m")
+        stored_keys = s.get_stored_keys("BTCUSDT", "1m")
+
+        # Generate expected opens between min and max
+        expected_opens = set()
+        t = min_open
+        while t <= max_open:
+            expected_opens.add(t)
+            t += interval_ms
+
+        missing = expected_opens - stored_keys
+        self.assertEqual(
+            missing, {base + 3 * interval_ms},
+            "Internal gap at bar 3 must be detected"
+        )
+        self.assertEqual(len(missing), 1)
+        self.assertEqual(len(stored_keys), 4)
+
+    def test_recovery_fills_internal_gap(self):
+        """Recovery fetched from REST fills the internal gap (bar 3 missing)."""
+        # Use aligned base so bar boundaries line up with Binance grid.
+        base = 1_700_000_040_000  # aligned to 60s grid
+        interval_ms = 60_000
+
+        sdb = os.path.join(self.tmpdir, "store2.sqlite")
+        s = OperationalStore(sdb)
+
+        # Store bars 0,1,2 then 4 (internal gap at 3)
+        for i in [0, 1, 2, 4]:
+            bar = _make_bar(bar_open=base + i * interval_ms)
+            s.upsert(bar)
+
+        existing_keys = s.get_stored_keys("BTCUSDT", "1m")
+
+        # REST returns bar 3 (the missing one)
+        missing_open = base + 3 * interval_ms
+        rest_rows = [
+            [missing_open, "41900", "42100", "41800", "42000", "10.0",
+             missing_open + 59_999, "0", "0", "0", "0", "0"]
+        ]
+
+        with patch("aql.recovery.gap_recovery._fetch_klines") as mock_fetch:
+            mock_fetch.return_value = (rest_rows, 2)
+            # gap_end must cover the full bar (+ interval_ms) for aligned_end to include it
+            bars, report = recover_gap(
+                "BTCUSDT", "1m",
+                gap_start_ms=missing_open,
+                gap_end_ms=missing_open + interval_ms,
+                existing_keys=existing_keys,
+            )
+
+        self.assertEqual(len(bars), 1)
+        self.assertEqual(bars[0].bar_open, missing_open)
+
+        # Insert recovered bar
+        for bar in bars:
+            s.upsert(bar)
+
+        # Now all 5 bars present, no gap
+        self.assertEqual(s.count("BTCUSDT", "1m"), 5)
+        final_keys = s.get_stored_keys("BTCUSDT", "1m")
+        self.assertEqual(final_keys, {base + i * interval_ms for i in range(5)})
+
+
+class TestT11_PerBarStorageFailure(unittest.TestCase):
+    """
+    T11: Per-bar storage failure injection.
+
+    When individual upsert calls fail for some bars (e.g. intermittent DB
+    write errors), the journal must still have ALL bars, and mark_persisted
+    must NOT be called for the failed bars.
+    """
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_partial_store_failure_journal_retains_all(self):
+        """
+        5 bars committed to journal. Bars 1 and 3 fail to upsert.
+        Journal still has 5 bars. Store has 3.
+        mark_persisted called only for successful bars.
+        """
+        jpath = os.path.join(self.tmpdir, "j.sqlite")
+        spath = os.path.join(self.tmpdir, "s.sqlite")
+        j = DurableJournal(jpath)
+        s = OperationalStore(spath)
+
+        base = 1_700_000_000_000
+        bars = [_make_bar(bar_open=base + i * 60_000) for i in range(5)]
+
+        fail_indices = {1, 3}
+        persisted_keys = []
+        failed_keys = []
+
+        call_count = [0]
+
+        original_upsert = s.upsert
+
+        def failing_upsert(bar):
+            idx = call_count[0]
+            call_count[0] += 1
+            if idx in fail_indices:
+                raise Exception(f"Injected storage failure for bar index {idx}")
+            return original_upsert(bar)
+
+        for bar in bars:
+            j.commit(bar)
+            try:
+                with patch.object(s, "upsert", side_effect=failing_upsert):
+                    upserted = s.upsert(bar)
+                # mark_persisted only on confirmed write
+                if upserted:
+                    j.mark_persisted(bar.stable_key())
+                    persisted_keys.append(bar.stable_key())
+                else:
+                    # Duplicate (not expected here)
+                    j.mark_persisted(bar.stable_key())
+                    persisted_keys.append(bar.stable_key())
+            except Exception:
+                failed_keys.append(bar.stable_key())
+                # Do NOT mark_persisted
+
+        # All 5 in journal
+        replayed = j.replay()
+        self.assertEqual(len(replayed), 5)
+
+        # 3 succeeded, 2 failed
+        self.assertEqual(len(failed_keys), 2)
+        self.assertEqual(len(persisted_keys), 3)
+
+        # Journal state: 3 PERSISTED, 2 LOCAL_COMMITTED
+        counts = j.count_by_state()
+        self.assertEqual(counts.get("PERSISTED", 0), 3)
+        self.assertEqual(counts.get("LOCAL_COMMITTED", 0), 2)
+
+        # Store has 3 bars
+        self.assertEqual(s.count("BTCUSDT", "1m"), 3)
+
+    def test_failed_bars_recoverable_on_retry(self):
+        """After partial failure, re-replaying journal fills the store gap."""
+        jpath = os.path.join(self.tmpdir, "j2.sqlite")
+        spath = os.path.join(self.tmpdir, "s2.sqlite")
+        j = DurableJournal(jpath)
+        s = OperationalStore(spath)
+
+        base = 1_700_000_000_000
+        bars = [_make_bar(bar_open=base + i * 60_000) for i in range(3)]
+
+        # Commit all to journal; simulate store failure on first pass
+        for bar in bars:
+            j.commit(bar)
+
+        # First pass: all store writes "fail"
+        # (journal has all bars, store has 0)
+
+        # Retry pass: replay journal and try store again
+        for bar in j.replay():
+            s.upsert(bar)
+
+        self.assertEqual(s.count("BTCUSDT", "1m"), 3)
+
+
+class TestT12_WeightAccounting(unittest.TestCase):
+    """
+    T12: Verify that weight_cost is tracked as requests * KLINES_WEIGHT_PER_REQUEST,
+    not as accumulated X-MBX-USED-WEIGHT-1M header values.
+    """
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_weight_cost_is_request_count_times_per_request_weight(self):
+        """
+        Mock fetch returns window_weight=500 (cumulative) for each call.
+        With 2 requests made, weight_cost must be 2*2=4 (not 500+500=1000).
+        """
+        from aql.recovery.gap_recovery import KLINES_WEIGHT_PER_REQUEST, MAX_KLINES_PER_REQUEST
+
+        base = 1_700_000_000_000
+        interval_ms = 60_000
+
+        # First page: MAX_KLINES_PER_REQUEST bars (triggers pagination)
+        page1 = [
+            [base + i * interval_ms, "41900", "42100", "41800", "42000", "10",
+             base + i * interval_ms + 59_999, "0", "0", "0", "0", "0"]
+            for i in range(MAX_KLINES_PER_REQUEST)
+        ]
+        # Second page: 3 bars (ends pagination)
+        page2_start = base + MAX_KLINES_PER_REQUEST * interval_ms
+        page2 = [
+            [page2_start + i * interval_ms, "41900", "42100", "41800", "42000", "10",
+             page2_start + i * interval_ms + 59_999, "0", "0", "0", "0", "0"]
+            for i in range(3)
+        ]
+
+        call_num = [0]
+
+        def mock_fetch(symbol, interval, start_ms, end_ms, limit=1000):
+            n = call_num[0]
+            call_num[0] += 1
+            # Simulate cumulative header growing (e.g. 250, 252 for two calls)
+            window_weight = 250 + n * 2
+            if n == 0:
+                return page1, window_weight
+            else:
+                return page2, window_weight
+
+        gap_end = page2_start + 2 * interval_ms
+        with patch("aql.recovery.gap_recovery._fetch_klines", side_effect=mock_fetch):
+            bars, report = recover_gap(
+                "BTCUSDT", "1m",
+                gap_start_ms=base,
+                gap_end_ms=gap_end,
+                existing_keys=set(),
+            )
+
+        # 2 requests made
+        self.assertEqual(call_num[0], 2)
+        # weight_cost = requests_made * KLINES_WEIGHT_PER_REQUEST = 2 * 2 = 4
+        self.assertEqual(report.weight_cost, 2 * KLINES_WEIGHT_PER_REQUEST)
+        # last_seen_window_weight is the cumulative header value (not the sum)
+        self.assertNotEqual(report.last_seen_window_weight, report.weight_cost)
+
+    def test_single_request_weight(self):
+        """Single request: weight_cost == KLINES_WEIGHT_PER_REQUEST."""
+        from aql.recovery.gap_recovery import KLINES_WEIGHT_PER_REQUEST
+
+        # Use aligned base. gap_end = base + interval_ms so 1 bar is expected
+        # and exactly 1 fetch request fires.
+        base = 1_700_000_040_000  # aligned to 60s grid
+        interval_ms = 60_000
+        rest_rows = [
+            [base, "41900", "42100", "41800", "42000", "10",
+             base + 59_999, "0", "0", "0", "0", "0"]
+        ]
+
+        with patch("aql.recovery.gap_recovery._fetch_klines") as mock_fetch:
+            # Window weight = 42 (cumulative, whatever the server says)
+            mock_fetch.return_value = (rest_rows, 42)
+            bars, report = recover_gap("BTCUSDT", "1m", base, base + interval_ms, set())
+
+        self.assertEqual(report.weight_cost, KLINES_WEIGHT_PER_REQUEST)
+        self.assertEqual(report.last_seen_window_weight, 42)
+        self.assertNotEqual(report.weight_cost, 42)
+
+
+class TestT13_StartupReconcile(unittest.TestCase):
+    """
+    T13: startup_reconcile correctly detects gap from last stored bar to now,
+    even after an abrupt shutdown where _on_close was never called.
+    """
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_no_data_returns_no_gap(self):
+        """With empty journal and store, no gap is returned."""
+        j = DurableJournal(os.path.join(self.tmpdir, "j.sqlite"))
+        s = OperationalStore(os.path.join(self.tmpdir, "s.sqlite"))
+
+        bars_replayed, gap_start, gap_end = j.startup_reconcile(
+            store=s, symbol="BTCUSDT", interval="1m"
+        )
+        self.assertEqual(bars_replayed, 0)
+        self.assertIsNone(gap_start)
+        self.assertIsNone(gap_end)
+
+    def test_gap_computed_from_last_stored_bar(self):
+        """
+        With last stored bar at T, gap_start = T + interval_ms, gap_end ~= now.
+        """
+        j = DurableJournal(os.path.join(self.tmpdir, "j.sqlite"))
+        s = OperationalStore(os.path.join(self.tmpdir, "s.sqlite"))
+
+        interval_ms = 60_000
+        # Store some bars (simulate bars from previous process run)
+        base = 1_700_000_000_000
+        for i in range(3):
+            bar = _make_bar(bar_open=base + i * interval_ms)
+            j.commit(bar)
+            s.upsert(bar)
+            j.mark_persisted(bar.stable_key())
+
+        t_before = int(time.time() * 1000)
+        bars_replayed, gap_start, gap_end = j.startup_reconcile(
+            store=s, symbol="BTCUSDT", interval="1m"
+        )
+        t_after = int(time.time() * 1000)
+
+        # All bars already in store, none need replaying
+        self.assertEqual(bars_replayed, 0)
+
+        # Gap starts at last bar + interval
+        last_bar_open = base + 2 * interval_ms
+        expected_gap_start = last_bar_open + interval_ms
+        self.assertEqual(gap_start, expected_gap_start)
+
+        # Gap end is approximately now
+        self.assertGreaterEqual(gap_end, t_before)
+        self.assertLessEqual(gap_end, t_after + 1000)
+
+    def test_unsynced_bars_counted_in_bars_replayed(self):
+        """
+        Bars in journal but NOT in store (simulating kill before upsert)
+        are counted in bars_replayed.
+        """
+        j = DurableJournal(os.path.join(self.tmpdir, "j.sqlite"))
+        s = OperationalStore(os.path.join(self.tmpdir, "s.sqlite"))
+
+        base = 1_700_000_000_000
+        interval_ms = 60_000
+        bars = [_make_bar(bar_open=base + i * interval_ms) for i in range(4)]
+
+        # Commit all to journal; only first 2 to store (simulating kill mid-write)
+        for bar in bars:
+            j.commit(bar)
+        for bar in bars[:2]:
+            s.upsert(bar)
+            j.mark_persisted(bar.stable_key())
+        # bars[2] and bars[3] are in journal but NOT in store
+
+        bars_replayed, gap_start, gap_end = j.startup_reconcile(
+            store=s, symbol="BTCUSDT", interval="1m"
+        )
+        # 2 bars need to be upserted to store
+        self.assertEqual(bars_replayed, 2)
+        # Gap starts after the last known bar (bars[3])
+        self.assertEqual(gap_start, base + 3 * interval_ms + interval_ms)
+
+    def test_gap_start_in_future_returns_none(self):
+        """
+        If last bar open is very recent (within current interval),
+        gap_start >= now → no gap returned.
+        """
+        j = DurableJournal(os.path.join(self.tmpdir, "j.sqlite"))
+        s = OperationalStore(os.path.join(self.tmpdir, "s.sqlite"))
+
+        # Bar open = now (just closed)
+        now_ms = int(time.time() * 1000)
+        interval_ms = 60_000
+        # Set bar_open to future-ish so gap_start > now
+        bar_open = now_ms + interval_ms  # definitely in future
+        bar = MarketBar(
+            symbol="BTCUSDT", interval="1m",
+            bar_open=bar_open, bar_close=bar_open + 59_999,
+            open=1.0, high=1.0, low=1.0, close=1.0,
+            volume=1.0, is_final=True, source="test",
+            ingested_at=now_ms, state=BarState.RECEIVED,
+        )
+        bar = bar.with_checksum()
+        j.commit(bar)
+        s.upsert(bar)
+        j.mark_persisted(bar.stable_key())
+
+        bars_replayed, gap_start, gap_end = j.startup_reconcile(
+            store=s, symbol="BTCUSDT", interval="1m"
+        )
+        # gap_start > now → no gap
+        self.assertIsNone(gap_start)
+        self.assertIsNone(gap_end)
 
 
 if __name__ == "__main__":
