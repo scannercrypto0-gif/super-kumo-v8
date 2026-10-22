@@ -108,6 +108,57 @@ class JournalAcceptance(unittest.TestCase):
             DurableTrialJournal(self.path, family(),
                                 expected_head=head, expected_sequence=seq)
 
+    def test_anchored_prefix_survives_legitimate_later_records(self):
+        with DurableTrialJournal(self.path, family()) as j:
+            j.record_attempt(attempt("a"), event_id="trial-a")
+            anchored_head, anchored_sequence = j.head, j.sequence
+        with DurableTrialJournal(self.path, family(),
+                                 expected_head=anchored_head,
+                                 expected_sequence=anchored_sequence) as j:
+            j.record_attempt(attempt("b", 0.2), event_id="trial-b")
+            self.assertEqual(j.sequence, anchored_sequence + 1)
+        with DurableTrialJournal(self.path, family(),
+                                 expected_head=anchored_head,
+                                 expected_sequence=anchored_sequence) as j:
+            self.assertEqual(j.report().complete, 2)
+
+    def test_anchored_prefix_rewrite_during_writer_lifetime_is_rejected(self):
+        with DurableTrialJournal(self.path, family()) as j:
+            j.record_attempt(attempt("a"), event_id="trial-a")
+            head, sequence = j.head, j.sequence
+        with DurableTrialJournal(self.path, family(),
+                                 expected_head=head,
+                                 expected_sequence=sequence) as j:
+            records = [json.loads(line) for line in self.path.read_text().splitlines()]
+            records[1]["data"]["marginal_p_value"] = 0.9
+            from research_wp_r0.trial_holdout import fingerprint
+            previous = "0" * 64
+            for record in records:
+                record["prev_hash"] = previous
+                record["hash"] = fingerprint({
+                    key: value for key, value in record.items() if key != "hash"
+                })
+                previous = record["hash"]
+            self.path.write_text("".join(
+                json.dumps(record, sort_keys=True, separators=(",", ":"),
+                           ensure_ascii=True) + "\n"
+                for record in records
+            ))
+            with self.assertRaises(JournalIntegrityError):
+                j.record_attempt(attempt("b"), event_id="trial-b")
+            with self.assertRaises(JournalIntegrityError):
+                j.report()
+
+    def test_trusted_anchor_requires_complete_pair(self):
+        with self.assertRaises(ValueError):
+            DurableTrialJournal(self.path, family(), expected_head="0" * 64)
+        with self.assertRaises(ValueError):
+            DurableTrialJournal(self.path, family(), expected_sequence=1)
+        with self.assertRaises(ValueError):
+            DurableTrialJournal(self.path, family(),
+                                expected_head="not-a-hash", expected_sequence=1)
+        self.assertFalse(self.path.exists())
+
     def test_truncated_tail_rejected_without_repair(self):
         write_complete(self.path)
         raw = self.path.read_bytes()
