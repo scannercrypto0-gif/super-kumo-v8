@@ -1,0 +1,36 @@
+name: Research WP-R40 Offline Owner Handoff
+
+on:
+  push:
+    branches:
+      - test/research-wp-r40-offline-checkpoint-handoff-20261022
+  pull_request:
+    paths:
+      - "research_wp_r0/offline_owner_handoff.py"
+      - "tests/test_research_wp_r40.py"
+      - ".github/workflows/research-wp-r40-tests.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-r40-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checkpoint-rehearsal:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Full unified research suite
+        run: python -B -m unittest discover -s tests -p 'test_research_wp_r*.py'
+      - name: Run independent owner-custody REHEARSAL ONLY
+        run: python -B -m research_wp_r0.offline_owner_handoff
