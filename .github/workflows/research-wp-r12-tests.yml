@@ -1,0 +1,34 @@
+name: Research WP-R12 Measured End-to-End
+
+on:
+  push:
+    branches:
+      - feat/research-wp-r12-measured-e2e-20261022
+  pull_request:
+    paths:
+      - "research_wp_r0/**"
+      - "tests/test_research_wp_r*.py"
+      - ".github/workflows/research-wp-r12-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  measured-e2e:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Python version
+        run: python --version
+      - name: Full research regression suite
+        run: python -B -m unittest discover -s tests -p 'test_research_wp_r*.py' -v
+      - name: Measured end-to-end run (JSON result)
+        run: python -B -m research_wp_r0.measured_pipeline
