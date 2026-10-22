@@ -8,13 +8,15 @@ time.
 
 Status levels
 -------------
-HEALTHY    — journal and store are fully consistent; no unresolved gaps.
+HEALTHY    — journal and store are fully consistent; no unresolved gaps;
+             at least one bar exists and data is recent.
 DEGRADED   — at least one journal bar is absent from the store (backlog exists)
              OR data lag exceeds the configured threshold; but no mandatory
              recovery has failed.
-UNHEALTHY  — mandatory recovery failed, a storage exception was swallowed, OR
-             the integrity check detects a key-set divergence that cannot be
-             explained by a normal backlog.
+UNHEALTHY  — mandatory recovery failed (across ALL startup + WS reports),
+             a storage exception was swallowed, reconciliation error occurred,
+             no bars exist yet (empty store), the integrity check detects a
+             key-set divergence, or lag exceeds the critical threshold.
 
 Key design decisions
 --------------------
@@ -24,6 +26,11 @@ Key design decisions
 * Exceptions during snapshot production are caught and surfaced in the report
   (``storage_errors`` list), never silently swallowed.
 * The snapshot is read-only: it never writes to the journal or store.
+* ALL recovery reports (startup + WS) are aggregated; a single mandatory
+  failure in any report prevents HEALTHY even if later reports succeeded.
+* startup_reconcile_error is surfaced — reconciliation failures never disappear.
+* An empty store (no candles received yet) always maps to UNHEALTHY, not
+  HEALTHY, because the system has not demonstrated data integrity yet.
 """
 from __future__ import annotations
 
@@ -66,13 +73,18 @@ class HealthSnapshot:
     unresolved_backlog: bool           # True when ≥1 journal bar missing from store
     missing_bar_opens: List[int]       # sorted list of bar_open values absent from store
 
-    # Recovery
-    recovery_status: str               # last recovery status string or "NONE"
+    # Recovery — aggregated across ALL reports (startup + WS)
+    recovery_status: str               # worst recovery status across all reports, or "NONE"
+    any_mandatory_recovery_failed: bool  # True if ANY report had HTTP_ERROR + unresolved>0
     replay_errors: int                 # bars that failed to replay into store
+
+    # Reconciliation
+    reconcile_error: Optional[str]     # startup_reconcile_error if set, else None
 
     # Temporal
     last_final_bar_open: Optional[int] # most recent bar_open in store (ms) or None
     data_lag_seconds: Optional[float]  # now - (last_bar_close_ms) in seconds, or None
+    no_bars_yet: bool                  # True when store is empty (no candles at all)
 
     # Integrity
     integrity_ok: bool                 # key-set comparison passed
@@ -95,9 +107,12 @@ class HealthSnapshot:
             "unresolved_backlog": self.unresolved_backlog,
             "missing_bar_opens": self.missing_bar_opens,
             "recovery_status": self.recovery_status,
+            "any_mandatory_recovery_failed": self.any_mandatory_recovery_failed,
             "replay_errors": self.replay_errors,
+            "reconcile_error": self.reconcile_error,
             "last_final_bar_open": self.last_final_bar_open,
             "data_lag_seconds": self.data_lag_seconds,
+            "no_bars_yet": self.no_bars_yet,
             "integrity_ok": self.integrity_ok,
             "journal_keys_not_in_store": self.journal_keys_not_in_store,
             "store_keys_not_in_journal": self.store_keys_not_in_journal,
@@ -122,8 +137,10 @@ def take_snapshot(
     symbol: str,
     interval: str,
     *,
-    recovery_report=None,
+    recovery_reports=None,       # List[RecoveryReport] — ALL startup + WS reports
+    recovery_report=None,        # DEPRECATED: single report (still accepted for compat)
     replay_errors: int = 0,
+    reconcile_error: Optional[str] = None,
     now_ms_fn: Optional[Callable[[], int]] = None,
     lag_warn_s: float = DEFAULT_LAG_WARN_S,
     lag_crit_s: float = DEFAULT_LAG_CRIT_S,
@@ -133,15 +150,22 @@ def take_snapshot(
 
     Parameters
     ----------
-    journal      : DurableJournal instance
-    store        : OperationalStore instance
-    symbol       : trading pair, e.g. "BTCUSDT"
-    interval     : Binance kline interval, e.g. "1m"
-    recovery_report : most recent RecoveryReport (or None)
-    replay_errors   : bar count that failed replay into store during reconcile
-    now_ms_fn    : callable returning current epoch-ms; defaults to wall clock
-    lag_warn_s   : seconds of data lag that triggers DEGRADED
-    lag_crit_s   : seconds of data lag that triggers UNHEALTHY
+    journal           : DurableJournal instance
+    store             : OperationalStore instance
+    symbol            : trading pair, e.g. "BTCUSDT"
+    interval          : Binance kline interval, e.g. "1m"
+    recovery_reports  : ALL RecoveryReport objects (startup + WS) as a list.
+                        Aggregated: any HTTP_ERROR+unresolved>0 → UNHEALTHY.
+    recovery_report   : (deprecated) single RecoveryReport; merged into list.
+    replay_errors     : bar count that failed replay into store during reconcile
+    reconcile_error   : startup_reconcile_error string if set, else None
+    now_ms_fn         : callable returning current epoch-ms; defaults to wall clock
+    lag_warn_s        : seconds of data lag that triggers DEGRADED
+    lag_crit_s        : seconds of data lag that triggers UNHEALTHY
+
+    Fix-1: ALL recovery reports aggregated — any mandatory failure → UNHEALTHY.
+    Fix-2: reconcile_error is surfaced and triggers UNHEALTHY.
+    Fix-3: empty store (no_bars_yet) → UNHEALTHY (not HEALTHY).
     """
     if now_ms_fn is None:
         now_ms_fn = lambda: int(time.time() * 1_000)
@@ -192,6 +216,9 @@ def take_snapshot(
     # -----------------------------------------------------------------------
     last_final_bar_open: Optional[int] = None
     data_lag_seconds: Optional[float] = None
+    # Fix-3: no bars at all → UNHEALTHY (system has not demonstrated data integrity)
+    no_bars_yet: bool = (store_final_count == 0 and journal_final_count == 0
+                         and not storage_errors)
     try:
         _, max_open = store.get_range(symbol, interval)
         if max_open is not None:
@@ -203,17 +230,33 @@ def take_snapshot(
         storage_errors.append(f"store.get_range: {exc}")
 
     # -----------------------------------------------------------------------
-    # 4. Recovery status
+    # 4. Recovery status — Fix-1: aggregate ALL reports
     # -----------------------------------------------------------------------
-    recovery_status = "NONE"
-    mandatory_recovery_failed = False
-    if recovery_report is not None:
+    # Build combined list from both parameters (support deprecated single-report)
+    all_reports: List = []
+    if recovery_reports:
+        all_reports.extend(recovery_reports)
+    if recovery_report is not None and recovery_report not in all_reports:
+        all_reports.append(recovery_report)
+
+    worst_status = "NONE"
+    any_mandatory_recovery_failed = False
+    _status_priority = {"NONE": 0, "FULL": 1, "PARTIAL": 2,
+                        "UNRESOLVED_DATA_GAP": 3, "HTTP_ERROR": 4}
+
+    for rpt in all_reports:
         try:
-            recovery_status = str(recovery_report.status)
-            if recovery_report.status == "HTTP_ERROR" and recovery_report.unresolved > 0:
-                mandatory_recovery_failed = True
+            rpt_status = str(rpt.status)
+            # Track worst status across all reports
+            if _status_priority.get(rpt_status, 0) > _status_priority.get(worst_status, 0):
+                worst_status = rpt_status
+            # Fix-1: any HTTP_ERROR with unresolved bars in ANY report → UNHEALTHY
+            if rpt.status == "HTTP_ERROR" and rpt.unresolved > 0:
+                any_mandatory_recovery_failed = True
         except Exception as exc:
             storage_errors.append(f"recovery_report read: {exc}")
+
+    recovery_status = worst_status
 
     # -----------------------------------------------------------------------
     # 5. Determine overall status
@@ -221,13 +264,15 @@ def take_snapshot(
     status = _compute_status(
         unresolved_backlog=unresolved_backlog,
         integrity_ok=integrity_ok,
-        mandatory_recovery_failed=mandatory_recovery_failed,
+        any_mandatory_recovery_failed=any_mandatory_recovery_failed,
         replay_errors=replay_errors,
+        reconcile_error=reconcile_error,
         storage_errors=storage_errors,
         data_lag_seconds=data_lag_seconds,
         lag_warn_s=lag_warn_s,
         lag_crit_s=lag_crit_s,
         journal_keys_not_in_store=len(journal_not_in_store),
+        no_bars_yet=no_bars_yet,
     )
 
     return HealthSnapshot(
@@ -241,9 +286,12 @@ def take_snapshot(
         unresolved_backlog=unresolved_backlog,
         missing_bar_opens=missing_bar_opens,
         recovery_status=recovery_status,
+        any_mandatory_recovery_failed=any_mandatory_recovery_failed,
         replay_errors=replay_errors,
+        reconcile_error=reconcile_error,
         last_final_bar_open=last_final_bar_open,
         data_lag_seconds=data_lag_seconds,
+        no_bars_yet=no_bars_yet,
         integrity_ok=integrity_ok,
         journal_keys_not_in_store=len(journal_not_in_store),
         store_keys_not_in_journal=len(store_not_in_journal),
@@ -255,24 +303,33 @@ def _compute_status(
     *,
     unresolved_backlog: bool,
     integrity_ok: bool,
-    mandatory_recovery_failed: bool,
+    any_mandatory_recovery_failed: bool,
     replay_errors: int,
+    reconcile_error: Optional[str],
     storage_errors: List[str],
     data_lag_seconds: Optional[float],
     lag_warn_s: float,
     lag_crit_s: float,
     journal_keys_not_in_store: int,
+    no_bars_yet: bool,
 ) -> str:
     # UNHEALTHY conditions (any one is sufficient)
-    if mandatory_recovery_failed:
+    # Fix-1: aggregated across ALL recovery reports
+    if any_mandatory_recovery_failed:
         return "UNHEALTHY"
     if not integrity_ok:
         return "UNHEALTHY"
     if replay_errors > 0:
         return "UNHEALTHY"
+    # Fix-2: reconcile error surfaces as UNHEALTHY
+    if reconcile_error:
+        return "UNHEALTHY"
     if storage_errors:
         return "UNHEALTHY"
     if data_lag_seconds is not None and data_lag_seconds > lag_crit_s:
+        return "UNHEALTHY"
+    # Fix-3: empty store — not yet trustworthy
+    if no_bars_yet:
         return "UNHEALTHY"
 
     # DEGRADED conditions

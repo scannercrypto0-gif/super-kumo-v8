@@ -238,8 +238,9 @@ class TestT_WP03_03_Unhealthy:
         for key in ("symbol", "interval", "timestamp_ms", "timestamp_iso",
                     "journal_final_count", "store_final_count",
                     "unresolved_backlog", "missing_bar_opens",
-                    "recovery_status", "replay_errors",
-                    "last_final_bar_open", "data_lag_seconds",
+                    "recovery_status", "any_mandatory_recovery_failed",
+                    "replay_errors", "reconcile_error",
+                    "last_final_bar_open", "data_lag_seconds", "no_bars_yet",
                     "integrity_ok", "journal_keys_not_in_store",
                     "store_keys_not_in_journal", "storage_errors"):
             assert key in d, f"Missing field: {key}"
@@ -486,13 +487,15 @@ class TestT_WP03_10_ComputeStatus:
         return dict(
             unresolved_backlog=False,
             integrity_ok=True,
-            mandatory_recovery_failed=False,
+            any_mandatory_recovery_failed=False,
             replay_errors=0,
+            reconcile_error=None,
             storage_errors=[],
             data_lag_seconds=30.0,
             lag_warn_s=90.0,
             lag_crit_s=300.0,
             journal_keys_not_in_store=0,
+            no_bars_yet=False,
         )
 
     def test_healthy_baseline(self):
@@ -510,7 +513,17 @@ class TestT_WP03_10_ComputeStatus:
 
     def test_unhealthy_recovery_failed(self):
         kw = self._base()
-        kw["mandatory_recovery_failed"] = True
+        kw["any_mandatory_recovery_failed"] = True
+        assert _compute_status(**kw) == "UNHEALTHY"
+
+    def test_unhealthy_reconcile_error(self):
+        kw = self._base()
+        kw["reconcile_error"] = "database is locked"
+        assert _compute_status(**kw) == "UNHEALTHY"
+
+    def test_unhealthy_no_bars_yet(self):
+        kw = self._base()
+        kw["no_bars_yet"] = True
         assert _compute_status(**kw) == "UNHEALTHY"
 
     def test_unhealthy_integrity(self):
@@ -537,6 +550,240 @@ class TestT_WP03_10_ComputeStatus:
         kw = self._base()
         kw["data_lag_seconds"] = None
         assert _compute_status(**kw) == "HEALTHY"
+
+
+# ============================================================================
+# T-WP03-R  — Regression tests for Review #5614480596 fixes
+# ============================================================================
+
+class TestT_WP03_R01_AggregateAllRecoveryReports:
+    """
+    Fix-1 regression: ALL recovery reports aggregated.
+    A failed startup report + successful WS report → still UNHEALTHY.
+    """
+
+    def test_failed_startup_then_successful_ws_still_unhealthy(self, tmp_path):
+        """
+        Scenario: startup recovery had HTTP_ERROR+unresolved, WS recovery succeeded.
+        Previously: only the last (WS) report was checked → falsely HEALTHY.
+        Now: aggregated list → UNHEALTHY.
+        """
+        from aql.recovery.gap_recovery import RecoveryReport
+
+        j, s = _fresh_pair(str(tmp_path))
+        bar = _make_bar(_BASE_OPEN_MS)
+        _ingest(j, s, bar)
+
+        failed_startup_report = RecoveryReport(
+            symbol=_SYMBOL, interval=_INTERVAL,
+            gap_start_ms=0, gap_end_ms=60_000,
+            expected_bars=1, recovered_bars=0, already_stored=0,
+            unresolved=1, missing_opens=[0],
+            status="HTTP_ERROR", weight_cost=0,
+            last_seen_window_weight=0, http_error="timeout",
+        )
+        successful_ws_report = RecoveryReport(
+            symbol=_SYMBOL, interval=_INTERVAL,
+            gap_start_ms=60_000, gap_end_ms=120_000,
+            expected_bars=1, recovered_bars=1, already_stored=0,
+            unresolved=0, missing_opens=[],
+            status="FULL", weight_cost=5,
+            last_seen_window_weight=0, http_error=None,
+        )
+
+        now_ms = _fresh_clock(_BASE_OPEN_MS, offset_s=30.0)
+        snap = take_snapshot(
+            j, s, _SYMBOL, _INTERVAL,
+            recovery_reports=[failed_startup_report, successful_ws_report],
+            now_ms_fn=lambda: now_ms,
+        )
+
+        assert snap.status == "UNHEALTHY", (
+            "A failed startup recovery report must make status UNHEALTHY "
+            f"even if later WS report succeeded; got {snap.status!r}"
+        )
+        assert snap.any_mandatory_recovery_failed is True
+        assert snap.recovery_status == "HTTP_ERROR"  # worst across all reports
+
+    def test_all_reports_successful_allows_healthy(self, tmp_path):
+        """
+        When ALL reports succeeded, UNHEALTHY is NOT forced by Fix-1.
+        """
+        from aql.recovery.gap_recovery import RecoveryReport
+
+        j, s = _fresh_pair(str(tmp_path))
+        bar = _make_bar(_BASE_OPEN_MS)
+        _ingest(j, s, bar)
+
+        report1 = RecoveryReport(
+            symbol=_SYMBOL, interval=_INTERVAL,
+            gap_start_ms=0, gap_end_ms=60_000,
+            expected_bars=1, recovered_bars=1, already_stored=0,
+            unresolved=0, missing_opens=[],
+            status="FULL", weight_cost=5,
+            last_seen_window_weight=0, http_error=None,
+        )
+        report2 = RecoveryReport(
+            symbol=_SYMBOL, interval=_INTERVAL,
+            gap_start_ms=60_000, gap_end_ms=120_000,
+            expected_bars=1, recovered_bars=1, already_stored=0,
+            unresolved=0, missing_opens=[],
+            status="FULL", weight_cost=5,
+            last_seen_window_weight=0, http_error=None,
+        )
+
+        now_ms = _fresh_clock(_BASE_OPEN_MS, offset_s=30.0)
+        snap = take_snapshot(
+            j, s, _SYMBOL, _INTERVAL,
+            recovery_reports=[report1, report2],
+            now_ms_fn=lambda: now_ms,
+        )
+
+        assert snap.any_mandatory_recovery_failed is False
+        assert snap.status == "HEALTHY"
+
+
+class TestT_WP03_R02_ReconcileErrorSurfaces:
+    """
+    Fix-2 regression: startup_reconcile_error passed → UNHEALTHY.
+    Previously: reconcile_error was ignored by take_snapshot.
+    """
+
+    def test_reconcile_error_causes_unhealthy(self, tmp_path):
+        j, s = _fresh_pair(str(tmp_path))
+        bar = _make_bar(_BASE_OPEN_MS)
+        _ingest(j, s, bar)
+
+        now_ms = _fresh_clock(_BASE_OPEN_MS, offset_s=30.0)
+        snap = take_snapshot(
+            j, s, _SYMBOL, _INTERVAL,
+            reconcile_error="database is locked",
+            now_ms_fn=lambda: now_ms,
+        )
+
+        assert snap.status == "UNHEALTHY", (
+            f"reconcile_error must force UNHEALTHY; got {snap.status!r}"
+        )
+        assert snap.reconcile_error == "database is locked"
+
+    def test_no_reconcile_error_does_not_force_unhealthy(self, tmp_path):
+        j, s = _fresh_pair(str(tmp_path))
+        bar = _make_bar(_BASE_OPEN_MS)
+        _ingest(j, s, bar)
+
+        now_ms = _fresh_clock(_BASE_OPEN_MS, offset_s=30.0)
+        snap = take_snapshot(
+            j, s, _SYMBOL, _INTERVAL,
+            reconcile_error=None,
+            now_ms_fn=lambda: now_ms,
+        )
+
+        assert snap.reconcile_error is None
+        assert snap.status == "HEALTHY"
+
+
+class TestT_WP03_R03_NoBarsYetUnhealthy:
+    """
+    Fix-3 regression: empty store (no candles received) → UNHEALTHY.
+    Previously: returned HEALTHY because all integrity checks passed trivially.
+    """
+
+    def test_empty_store_is_unhealthy(self, tmp_path):
+        j, s = _fresh_pair(str(tmp_path))
+
+        now_ms = int(time.time() * 1000)
+        snap = take_snapshot(
+            j, s, _SYMBOL, _INTERVAL,
+            now_ms_fn=lambda: now_ms,
+        )
+
+        assert snap.no_bars_yet is True
+        assert snap.status == "UNHEALTHY", (
+            f"Empty store must be UNHEALTHY, not {snap.status!r}"
+        )
+
+    def test_after_first_bar_ingested_no_longer_no_bars_yet(self, tmp_path):
+        j, s = _fresh_pair(str(tmp_path))
+        bar = _make_bar(_BASE_OPEN_MS)
+        _ingest(j, s, bar)
+
+        now_ms = _fresh_clock(_BASE_OPEN_MS, offset_s=30.0)
+        snap = take_snapshot(
+            j, s, _SYMBOL, _INTERVAL,
+            now_ms_fn=lambda: now_ms,
+        )
+
+        assert snap.no_bars_yet is False
+        assert snap.status == "HEALTHY"
+
+
+class TestT_WP03_R04_ReturnToHealthyAfterAllFixed:
+    """
+    Fix-5: after resolving all issues, status returns to HEALTHY.
+    Validates that the fixes don't permanently block HEALTHY.
+    """
+
+    def test_healthy_after_reconcile_error_cleared(self, tmp_path):
+        """System was unhealthy (reconcile_error set), now clear → HEALTHY."""
+        j, s = _fresh_pair(str(tmp_path))
+        bar = _make_bar(_BASE_OPEN_MS)
+        _ingest(j, s, bar)
+
+        now_ms = _fresh_clock(_BASE_OPEN_MS, offset_s=30.0)
+
+        # Phase 1: reconcile error present → UNHEALTHY
+        snap_bad = take_snapshot(
+            j, s, _SYMBOL, _INTERVAL,
+            reconcile_error="transient lock error",
+            now_ms_fn=lambda: now_ms,
+        )
+        assert snap_bad.status == "UNHEALTHY"
+
+        # Phase 2: reconcile error cleared → HEALTHY
+        snap_good = take_snapshot(
+            j, s, _SYMBOL, _INTERVAL,
+            reconcile_error=None,
+            now_ms_fn=lambda: now_ms,
+        )
+        assert snap_good.status == "HEALTHY", (
+            f"After clearing reconcile_error, expected HEALTHY; got {snap_good.status!r}"
+        )
+
+    def test_healthy_after_all_bars_ingested_and_recovery_ok(self, tmp_path):
+        """All bars ingested; all recovery reports FULL → HEALTHY."""
+        from aql.recovery.gap_recovery import RecoveryReport
+
+        j, s = _fresh_pair(str(tmp_path))
+        for i in range(5):
+            _ingest(j, s, _make_bar(_BASE_OPEN_MS + i * _INTERVAL_MS))
+
+        last_open = _BASE_OPEN_MS + 4 * _INTERVAL_MS
+        now_ms = _fresh_clock(last_open, offset_s=30.0)
+
+        full_report = RecoveryReport(
+            symbol=_SYMBOL, interval=_INTERVAL,
+            gap_start_ms=0, gap_end_ms=60_000,
+            expected_bars=5, recovered_bars=5, already_stored=0,
+            unresolved=0, missing_opens=[],
+            status="FULL", weight_cost=10,
+            last_seen_window_weight=0, http_error=None,
+        )
+
+        snap = take_snapshot(
+            j, s, _SYMBOL, _INTERVAL,
+            recovery_reports=[full_report],
+            reconcile_error=None,
+            replay_errors=0,
+            now_ms_fn=lambda: now_ms,
+        )
+
+        assert snap.status == "HEALTHY", (
+            f"All conditions met; expected HEALTHY, got {snap.status!r}\n"
+            f"  any_mandatory_recovery_failed={snap.any_mandatory_recovery_failed}\n"
+            f"  reconcile_error={snap.reconcile_error}\n"
+            f"  no_bars_yet={snap.no_bars_yet}\n"
+            f"  storage_errors={snap.storage_errors}"
+        )
 
 
 # ============================================================================
@@ -597,7 +844,7 @@ class TestZZ_WP03_SuiteSummary:
             )
             snap_un = take_snapshot(
                 j3, s3, _SYMBOL, _INTERVAL,
-                recovery_report=mock_rep,
+                recovery_reports=[mock_rep],
                 now_ms_fn=lambda: int(time.time() * 1000),
             )
         unhealthy_json = json.dumps(snap_un.to_dict(), indent=2)

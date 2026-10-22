@@ -218,19 +218,20 @@ def run_pipeline(
     min_open, max_open = store.get_range(symbol, interval)
 
     # --- Health snapshot (read-only; does not affect acquisition or trading) ---
-    # Use the last available recovery report for mandatory-recovery-failed detection.
-    _last_recovery_report = None
+    # Fix-1: aggregate ALL recovery reports (startup + WS) so that any mandatory
+    # failure in any report is detected, even if a later report succeeded.
+    # Fix-3: pass startup_reconcile_error so it surfaces as UNHEALTHY.
+    _all_recovery_reports = [r["gap_report"] for r in startup_recovery_results]
     if ws_recovery_result is not None:
-        _last_recovery_report = ws_recovery_result["gap_report"]
-    elif startup_recovery_results:
-        _last_recovery_report = startup_recovery_results[-1]["gap_report"]
+        _all_recovery_reports.append(ws_recovery_result["gap_report"])
     health = take_snapshot(
         journal=journal,
         store=store,
         symbol=symbol,
         interval=interval,
-        recovery_report=_last_recovery_report,
+        recovery_reports=_all_recovery_reports,
         replay_errors=startup_replay_errors,
+        reconcile_error=startup_reconcile_error,
     )
 
     def _report_from(recovery_result: dict | None) -> dict | None:
