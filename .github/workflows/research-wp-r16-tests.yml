@@ -1,0 +1,32 @@
+name: Research WP-R16 Telemetry Backpressure and Evidence Isolation
+
+on:
+  push:
+    branches:
+      - test/research-wp-r16-telemetry-backpressure-20261022
+  pull_request:
+    paths:
+      - "research_wp_r0/**"
+      - "tests/test_research_wp_r*.py"
+      - ".github/workflows/research-wp-r16-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  pressure:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Research regression suite
+        run: python -B -m unittest discover -s tests -p 'test_research_wp_r*.py' -v
+      - name: Execute measured telemetry pressure and worker failure
+        run: python -B -m research_wp_r0.telemetry_pressure
