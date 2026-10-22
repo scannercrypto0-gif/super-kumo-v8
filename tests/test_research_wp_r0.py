@@ -53,6 +53,11 @@ class TemporalAcceptance(unittest.TestCase):
                            final_at=t(12), is_final_bar=True)
         self.assertTrue(classify_visibility(bar, t(12, 2)).allowed_for_live_equivalent)
 
+    def test_final_bar_cannot_be_available_before_finalization(self):
+        with self.assertRaises(ValueError):
+            TemporalFact("bar", t(12), t(12, 1), True, "v1",
+                         final_at=t(12, 5), is_final_bar=True)
+
     def test_bad_timestamps_fail_closed(self):
         with self.assertRaises(ValueError):
             TemporalFact("bar", datetime(2026, 1, 1), t(12), True, "v1")
