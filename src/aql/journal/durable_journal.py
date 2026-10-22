@@ -245,7 +245,7 @@ class DurableJournal:
         store,
         symbol: str,
         interval: str,
-    ) -> Tuple[int, int, int, Optional[int], Optional[int]]:
+    ) -> Tuple[int, int, int, List[Tuple[int, int]]]:
         """
         On process restart (including after SIGKILL):
 
@@ -255,23 +255,28 @@ class DurableJournal:
            real journal-to-store replay that guarantees no bar is permanently
            lost between a durable journal commit and a store write.
 
-        2. Compute the gap from the last durably known bar to now for the
-           subsequent REST recovery pass.
+        2. Detect ALL gaps in the known bar sequence:
+           a. Internal gaps — holes between consecutive known bar_opens
+              (e.g. bars A,B,D,E present → C is an internal gap).
+           b. Trailing gap — from last known bar to now.
+
+           Internal gaps are returned first, trailing gap last, all as a
+           flat list of (gap_start_ms, gap_end_ms) tuples.  The caller
+           (pipeline) iterates the list and calls recover_gap() per gap.
 
         Returns:
-          (bars_replayed, replay_inserted, replay_errors, gap_start_ms, gap_end_ms)
+          (bars_replayed, replay_inserted, replay_errors, gaps)
 
           bars_replayed:   number of journal bars found missing from the store
           replay_inserted: number successfully upserted into the store this call
           replay_errors:   number that failed to upsert (store write error)
-          gap_start_ms:    open_time of first potentially-missing bar
-                           (last_known_bar_open + interval_ms), or None
-          gap_end_ms:      current time in ms, or None
+          gaps:            List[(gap_start_ms, gap_end_ms)] — all detected gaps,
+                           internal first then trailing; empty when no gaps.
 
-        If there is no stored data at all, returns (0, 0, 0, None, None).
+        If there is no stored data at all, returns (0, 0, 0, []).
 
         Design note: REST gap recovery is NOT called from here.  The caller
-        (pipeline) uses the returned gap bounds to invoke recover_gap().
+        (pipeline) uses the returned gap list to invoke recover_gap().
         """
         from ..recovery.gap_recovery import _binance_interval_ms
 
@@ -315,34 +320,45 @@ class DurableJournal:
                         bar.stable_key(), exc,
                     )
 
-        # Step 2: compute REST recovery gap from last known bar to now
-        # Re-read stored_keys to include bars just replayed
-        _, last_store_open = store.get_range(symbol, interval)
-        last_journal_open: Optional[int] = (
-            max(b.bar_open for b in journal_bars) if journal_bars else None
-        )
+        # Step 2: detect ALL gaps (internal + trailing) in the known bar sequence.
+        # Re-read store keys to include any bars just upserted in the replay above.
+        store_opens_after: set = store.get_stored_keys(symbol, interval)
+        journal_opens: set = {b.bar_open for b in journal_bars}
 
-        candidates = [x for x in [last_journal_open, last_store_open] if x is not None]
-        if not candidates:
-            return bars_replayed, replay_inserted, replay_errors, None, None
+        all_known_opens: List[int] = sorted(journal_opens | store_opens_after)
+        gaps: List[Tuple[int, int]] = []
 
-        last_known_open = max(candidates)
-        gap_start_ms = last_known_open + interval_ms
-        gap_end_ms = int(time.time() * 1000)
+        if not all_known_opens:
+            return bars_replayed, replay_inserted, replay_errors, gaps
 
-        if gap_start_ms >= gap_end_ms:
-            return bars_replayed, replay_inserted, replay_errors, None, None
+        # 2a. Internal gaps: consecutive known opens separated by > interval_ms
+        for i in range(len(all_known_opens) - 1):
+            expected_next = all_known_opens[i] + interval_ms
+            actual_next = all_known_opens[i + 1]
+            if actual_next > expected_next:
+                # One or more bars missing between all_known_opens[i] and all_known_opens[i+1].
+                # gap_start = first missing bar_open; gap_end = first present bar after gap
+                # (recover_gap will align internally and expect bars in [expected_next, actual_next)).
+                gaps.append((expected_next, actual_next))
 
-        logger.info(
-            "startup_reconcile: symbol=%s interval=%s "
-            "bars_replayed=%d replay_inserted=%d replay_errors=%d "
-            "gap_start=%d gap_end=%d gap_duration_s=%.0f",
-            symbol, interval,
-            bars_replayed, replay_inserted, replay_errors,
-            gap_start_ms, gap_end_ms,
-            (gap_end_ms - gap_start_ms) / 1000,
-        )
-        return bars_replayed, replay_inserted, replay_errors, gap_start_ms, gap_end_ms
+        # 2b. Trailing gap: from last known bar to now
+        last_known_open = all_known_opens[-1]
+        trailing_start = last_known_open + interval_ms
+        trailing_end = int(time.time() * 1000)
+        if trailing_start < trailing_end:
+            gaps.append((trailing_start, trailing_end))
+
+        if gaps:
+            logger.info(
+                "startup_reconcile: symbol=%s interval=%s "
+                "bars_replayed=%d replay_inserted=%d replay_errors=%d "
+                "gaps_detected=%d: %s",
+                symbol, interval,
+                bars_replayed, replay_inserted, replay_errors,
+                len(gaps), gaps,
+            )
+
+        return bars_replayed, replay_inserted, replay_errors, gaps
 
     def count_by_state(self) -> dict:
         conn = self._connect()

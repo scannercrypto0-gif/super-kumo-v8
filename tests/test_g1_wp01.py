@@ -938,14 +938,13 @@ class TestT13_StartupReconcile(unittest.TestCase):
         j = DurableJournal(os.path.join(self.tmpdir, "j.sqlite"))
         s = OperationalStore(os.path.join(self.tmpdir, "s.sqlite"))
 
-        bars_replayed, replay_inserted, replay_errors, gap_start, gap_end = j.startup_reconcile(
+        bars_replayed, replay_inserted, replay_errors, gaps = j.startup_reconcile(
             store=s, symbol="BTCUSDT", interval="1m"
         )
         self.assertEqual(bars_replayed, 0)
         self.assertEqual(replay_inserted, 0)
         self.assertEqual(replay_errors, 0)
-        self.assertIsNone(gap_start)
-        self.assertIsNone(gap_end)
+        self.assertEqual(gaps, [])
 
     def test_gap_computed_from_last_stored_bar(self):
         """
@@ -964,7 +963,7 @@ class TestT13_StartupReconcile(unittest.TestCase):
             j.mark_persisted(bar.stable_key())
 
         t_before = int(time.time() * 1000)
-        bars_replayed, replay_inserted, replay_errors, gap_start, gap_end = j.startup_reconcile(
+        bars_replayed, replay_inserted, replay_errors, gaps = j.startup_reconcile(
             store=s, symbol="BTCUSDT", interval="1m"
         )
         t_after = int(time.time() * 1000)
@@ -973,6 +972,10 @@ class TestT13_StartupReconcile(unittest.TestCase):
         self.assertEqual(bars_replayed, 0)
         self.assertEqual(replay_inserted, 0)
         self.assertEqual(replay_errors, 0)
+
+        # Trailing gap is last element (no internal gaps — bars are consecutive)
+        self.assertGreaterEqual(len(gaps), 1)
+        gap_start, gap_end = gaps[-1]
 
         # Gap starts at last bar + interval
         last_bar_open = base + 2 * interval_ms
@@ -1003,7 +1006,7 @@ class TestT13_StartupReconcile(unittest.TestCase):
             j.mark_persisted(bar.stable_key())
         # bars[2] and bars[3] are in journal but NOT in store
 
-        bars_replayed, replay_inserted, replay_errors, gap_start, gap_end = j.startup_reconcile(
+        bars_replayed, replay_inserted, replay_errors, gaps = j.startup_reconcile(
             store=s, symbol="BTCUSDT", interval="1m"
         )
         # 2 bars need to be upserted to store
@@ -1015,8 +1018,9 @@ class TestT13_StartupReconcile(unittest.TestCase):
         stored_keys = s.get_stored_keys("BTCUSDT", "1m")
         self.assertIn(bars[2].bar_open, stored_keys)
         self.assertIn(bars[3].bar_open, stored_keys)
-        # Gap starts after the last known bar (bars[3])
-        self.assertEqual(gap_start, base + 3 * interval_ms + interval_ms)
+        # Trailing gap starts after the last known bar (bars[3])
+        trailing_gap = gaps[-1]
+        self.assertEqual(trailing_gap[0], base + 3 * interval_ms + interval_ms)
 
     def test_gap_start_in_future_returns_none(self):
         """
@@ -1043,12 +1047,11 @@ class TestT13_StartupReconcile(unittest.TestCase):
         s.upsert(bar)
         j.mark_persisted(bar.stable_key())
 
-        bars_replayed, replay_inserted, replay_errors, gap_start, gap_end = j.startup_reconcile(
+        bars_replayed, replay_inserted, replay_errors, gaps = j.startup_reconcile(
             store=s, symbol="BTCUSDT", interval="1m"
         )
-        # gap_start > now → no gap
-        self.assertIsNone(gap_start)
-        self.assertIsNone(gap_end)
+        # gap_start > now → no gap (trailing_start >= trailing_end)
+        self.assertEqual(gaps, [])
 
 
 # ---------------------------------------------------------------------------
@@ -1078,7 +1081,7 @@ class TestT14_RealJournalReplay(unittest.TestCase):
         j.commit(bar)
         # Do NOT upsert to store — simulate kill between commit and upsert
 
-        bars_replayed, replay_inserted, replay_errors, _, _ = j.startup_reconcile(
+        bars_replayed, replay_inserted, replay_errors, gaps = j.startup_reconcile(
             store=s, symbol="BTCUSDT", interval="1m"
         )
 
@@ -1105,7 +1108,7 @@ class TestT14_RealJournalReplay(unittest.TestCase):
             raise RuntimeError("injected storage failure")
         s.upsert = _failing_upsert
 
-        bars_replayed, replay_inserted, replay_errors, _, _ = j.startup_reconcile(
+        bars_replayed, replay_inserted, replay_errors, gaps = j.startup_reconcile(
             store=s, symbol="BTCUSDT", interval="1m"
         )
 
@@ -1126,7 +1129,7 @@ class TestT14_RealJournalReplay(unittest.TestCase):
         s.upsert(bar)
         j.mark_persisted(bar.stable_key())
 
-        bars_replayed, replay_inserted, replay_errors, _, _ = j.startup_reconcile(
+        bars_replayed, replay_inserted, replay_errors, gaps = j.startup_reconcile(
             store=s, symbol="BTCUSDT", interval="1m"
         )
 
@@ -1400,7 +1403,7 @@ class TestT17_ReconcileFailureObservability(unittest.TestCase):
             raise RuntimeError("forced failure")
         s.upsert = _fail
 
-        bars_replayed, replay_inserted, replay_errors, gap_start, gap_end = \
+        bars_replayed, replay_inserted, replay_errors, gaps = \
             j.startup_reconcile(store=s, symbol="BTCUSDT", interval="1m")
 
         s.upsert = original_upsert
@@ -1471,6 +1474,90 @@ class TestT17_ReconcileFailureObservability(unittest.TestCase):
 
         self.assertIsNone(report.http_error)
         self.assertEqual(report.status, "FULL")
+
+
+# ---------------------------------------------------------------------------
+# T18 — Interior Gap on Restart
+# ---------------------------------------------------------------------------
+class TestT18_InteriorGapOnRestart(unittest.TestCase):
+    """
+    Regression: startup_reconcile must detect internal gaps within the
+    known bar sequence (A,B,D,E present → C missing → C detected in gaps list).
+    """
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_internal_gap_detected_in_gaps_list(self):
+        """Bars A,B,D,E in journal+store; C missing. gaps must include (base+2m, base+3m)."""
+        j = DurableJournal(os.path.join(self.tmpdir, "j.sqlite"))
+        s = OperationalStore(os.path.join(self.tmpdir, "s.sqlite"))
+
+        base = 1_700_000_040_000
+        interval_ms = 60_000
+
+        # A=base, B=base+1m, D=base+3m, E=base+4m; C=base+2m intentionally absent
+        for offset in [0, 1, 3, 4]:
+            bar = _make_bar(bar_open=base + offset * interval_ms)
+            j.commit(bar)
+            s.upsert(bar)
+            j.mark_persisted(bar.stable_key())
+
+        bars_replayed, replay_inserted, replay_errors, gaps = j.startup_reconcile(
+            store=s, symbol="BTCUSDT", interval="1m"
+        )
+
+        self.assertEqual(bars_replayed, 0)  # all already in store
+        # Internal gaps: gap_end <= base+4m (trailing gap_end >> base+4m)
+        internal_gaps = [(gs, ge) for gs, ge in gaps if ge <= base + 4 * interval_ms]
+        self.assertGreaterEqual(
+            len(internal_gaps), 1,
+            "Must report at least one internal gap covering C",
+        )
+        gap_starts = [gs for gs, ge in internal_gaps]
+        self.assertIn(
+            base + 2 * interval_ms,
+            gap_starts,
+            "Internal gap must start at C's bar_open (base+2m)",
+        )
+
+    def test_rest_failure_leaves_c_as_unresolved(self):
+        """REST fetch fails for C's internal gap → HTTP_ERROR, C in missing_opens."""
+        from unittest.mock import patch
+        from aql.recovery.gap_recovery import recover_gap
+
+        base = 1_700_000_040_000
+        interval_ms = 60_000
+        c_open = base + 2 * interval_ms
+
+        # Internal gap: expected_next=base+2m, actual_next=base+3m
+        # gap_end = base+3m (the first present bar after C); bar at c_open closes at c_open+interval_ms
+        # For recover_gap to expect exactly 1 bar, gap_end must be >= c_open + interval_ms
+        gap_start_ms = c_open
+        gap_end_ms = c_open + interval_ms  # gap_end = close of C's candle
+
+        with patch("aql.recovery.gap_recovery._fetch_klines") as mock_fetch:
+            mock_fetch.side_effect = OSError("connection refused")
+            bars, report = recover_gap(
+                symbol="BTCUSDT",
+                interval="1m",
+                gap_start_ms=gap_start_ms,
+                gap_end_ms=gap_end_ms,
+                existing_keys=set(),
+            )
+
+        self.assertEqual(
+            report.status, "HTTP_ERROR",
+            "REST failure on internal gap must produce HTTP_ERROR, not FULL",
+        )
+        self.assertEqual(report.unresolved, 1)
+        self.assertIn(c_open, report.missing_opens)
+        self.assertIsNotNone(report.http_error)
+        self.assertIn("connection refused", report.http_error)
+        self.assertEqual(len(bars), 0)
 
 
 if __name__ == "__main__":

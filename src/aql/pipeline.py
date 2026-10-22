@@ -144,7 +144,7 @@ def run_pipeline(
     # --- Startup reconciliation (handles clean restarts AND SIGKILL recovery) ---
     # This runs before WebSocket connection so any gap from the previous process
     # is detected and recovered, even if _on_close was never called.
-    startup_recovery_result = None
+    startup_recovery_results: list = []
     startup_reconcile_error: str | None = None
     startup_replay_inserted: int = 0
     startup_replay_errors: int = 0
@@ -153,17 +153,16 @@ def run_pipeline(
         (startup_bars_replayed,
          startup_replay_inserted,
          startup_replay_errors,
-         startup_gap_start,
-         startup_gap_end) = journal.startup_reconcile(
+         startup_gaps) = journal.startup_reconcile(
             store=store,
             symbol=symbol,
             interval=interval,
         )
         logger.info(
             "Startup reconciliation complete: bars_replayed=%d "
-            "replay_inserted=%d replay_errors=%d gap=[%s, %s]",
+            "replay_inserted=%d replay_errors=%d gaps_detected=%d",
             startup_bars_replayed, startup_replay_inserted, startup_replay_errors,
-            startup_gap_start, startup_gap_end,
+            len(startup_gaps),
         )
         if startup_replay_errors > 0:
             logger.error(
@@ -171,15 +170,19 @@ def run_pipeline(
                 "unresolved backlog exists",
                 startup_replay_errors,
             )
-        if startup_gap_start is not None and startup_gap_end is not None:
-            startup_recovery_result = _run_gap_recovery(
+        # Run REST recovery for every detected gap (internal + trailing).
+        # A failed REST fetch is captured in the RecoveryReport (status=HTTP_ERROR)
+        # and carried in startup_recovery_results — never silently swallowed.
+        for gap_start, gap_end in startup_gaps:
+            gr = _run_gap_recovery(
                 journal=journal,
                 store=store,
                 symbol=symbol,
                 interval=interval,
-                gap_start_ms=startup_gap_start,
-                gap_end_ms=startup_gap_end,
+                gap_start_ms=gap_start,
+                gap_end_ms=gap_end,
             )
+            startup_recovery_results.append(gr)
     except Exception as exc:
         startup_reconcile_error = str(exc)
         logger.error("Startup reconciliation FAILED: %s", startup_reconcile_error)
@@ -250,7 +253,7 @@ def run_pipeline(
             "min_open_ms": min_open,
             "max_open_ms": max_open,
         },
-        "startup_gap_recovery": _report_from(startup_recovery_result),
+        "startup_gap_recovery": [_report_from(r) for r in startup_recovery_results] if startup_recovery_results else None,
         "startup_reconcile": {
             "bars_replayed": startup_bars_replayed,
             "replay_inserted": startup_replay_inserted,
