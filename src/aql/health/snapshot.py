@@ -250,8 +250,9 @@ def take_snapshot(
             # Track worst status across all reports
             if _status_priority.get(rpt_status, 0) > _status_priority.get(worst_status, 0):
                 worst_status = rpt_status
-            # Fix-1: any HTTP_ERROR with unresolved bars in ANY report → UNHEALTHY
-            if rpt.status == "HTTP_ERROR" and rpt.unresolved > 0:
+            # Any report with unresolved > 0 → UNHEALTHY regardless of status string
+            # (HTTP_ERROR, PARTIAL, UNRESOLVED_DATA_GAP, or any future status)
+            if rpt.unresolved > 0:
                 any_mandatory_recovery_failed = True
         except Exception as exc:
             storage_errors.append(f"recovery_report read: {exc}")

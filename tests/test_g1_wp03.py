@@ -643,6 +643,109 @@ class TestT_WP03_R01_AggregateAllRecoveryReports:
         assert snap.status == "HEALTHY"
 
 
+class TestT_WP03_R01b_UnresolvedAnyStatus:
+    """
+    Fix correctness: unresolved > 0 blocks HEALTHY for ALL status strings,
+    not only HTTP_ERROR. PARTIAL and UNRESOLVED_DATA_GAP with missing bars
+    must also produce UNHEALTHY.
+    """
+
+    def _make_report(self, status: str, unresolved: int, tmp_path):
+        from aql.recovery.gap_recovery import RecoveryReport
+        return RecoveryReport(
+            symbol=_SYMBOL, interval=_INTERVAL,
+            gap_start_ms=_BASE_OPEN_MS,
+            gap_end_ms=_BASE_OPEN_MS + _INTERVAL_MS,
+            expected_bars=1,
+            recovered_bars=max(0, 1 - unresolved),
+            already_stored=0,
+            unresolved=unresolved,
+            missing_opens=[_BASE_OPEN_MS] if unresolved > 0 else [],
+            status=status,
+            weight_cost=5,
+            last_seen_window_weight=0,
+            http_error=None,
+        )
+
+    def _snap(self, tmp_path, report, now_ms):
+        j, s = _fresh_pair(str(tmp_path))
+        _ingest(j, s, _make_bar(_BASE_OPEN_MS))
+        return take_snapshot(
+            j, s, _SYMBOL, _INTERVAL,
+            recovery_reports=[report],
+            now_ms_fn=lambda: now_ms,
+        )
+
+    def test_unresolved_data_gap_with_missing_bars_is_unhealthy(self, tmp_path):
+        report = self._make_report("UNRESOLVED_DATA_GAP", unresolved=1, tmp_path=tmp_path)
+        now_ms = _fresh_clock(_BASE_OPEN_MS, offset_s=30.0)
+        snap = self._snap(tmp_path, report, now_ms)
+        assert snap.any_mandatory_recovery_failed is True
+        assert snap.status == "UNHEALTHY", (
+            f"UNRESOLVED_DATA_GAP+unresolved=1 must be UNHEALTHY; got {snap.status!r}"
+        )
+
+    def test_partial_with_missing_bars_is_unhealthy(self, tmp_path):
+        report = self._make_report("PARTIAL", unresolved=1, tmp_path=tmp_path)
+        now_ms = _fresh_clock(_BASE_OPEN_MS, offset_s=30.0)
+        snap = self._snap(tmp_path, report, now_ms)
+        assert snap.any_mandatory_recovery_failed is True
+        assert snap.status == "UNHEALTHY", (
+            f"PARTIAL+unresolved=1 must be UNHEALTHY; got {snap.status!r}"
+        )
+
+    def test_http_error_with_missing_bars_is_unhealthy(self, tmp_path):
+        """Original HTTP_ERROR case still works after generalisation."""
+        report = self._make_report("HTTP_ERROR", unresolved=1, tmp_path=tmp_path)
+        now_ms = _fresh_clock(_BASE_OPEN_MS, offset_s=30.0)
+        snap = self._snap(tmp_path, report, now_ms)
+        assert snap.any_mandatory_recovery_failed is True
+        assert snap.status == "UNHEALTHY"
+
+    def test_partial_zero_unresolved_allows_healthy(self, tmp_path):
+        """PARTIAL with unresolved=0 does NOT block HEALTHY."""
+        report = self._make_report("PARTIAL", unresolved=0, tmp_path=tmp_path)
+        now_ms = _fresh_clock(_BASE_OPEN_MS, offset_s=30.0)
+        snap = self._snap(tmp_path, report, now_ms)
+        assert snap.any_mandatory_recovery_failed is False
+        assert snap.status == "HEALTHY", (
+            f"PARTIAL+unresolved=0 should be HEALTHY; got {snap.status!r}"
+        )
+
+    def test_failed_report_followed_by_successful_still_unhealthy(self, tmp_path):
+        """Fix-1 + generalised: failed startup UNRESOLVED_DATA_GAP, then successful WS."""
+        from aql.recovery.gap_recovery import RecoveryReport
+        j, s = _fresh_pair(str(tmp_path))
+        _ingest(j, s, _make_bar(_BASE_OPEN_MS))
+
+        failed = RecoveryReport(
+            symbol=_SYMBOL, interval=_INTERVAL,
+            gap_start_ms=_BASE_OPEN_MS, gap_end_ms=_BASE_OPEN_MS + _INTERVAL_MS,
+            expected_bars=1, recovered_bars=0, already_stored=0,
+            unresolved=1, missing_opens=[_BASE_OPEN_MS],
+            status="UNRESOLVED_DATA_GAP", weight_cost=0,
+            last_seen_window_weight=0, http_error=None,
+        )
+        succeeded = RecoveryReport(
+            symbol=_SYMBOL, interval=_INTERVAL,
+            gap_start_ms=_BASE_OPEN_MS + _INTERVAL_MS,
+            gap_end_ms=_BASE_OPEN_MS + 2 * _INTERVAL_MS,
+            expected_bars=1, recovered_bars=1, already_stored=0,
+            unresolved=0, missing_opens=[],
+            status="FULL", weight_cost=5,
+            last_seen_window_weight=0, http_error=None,
+        )
+
+        now_ms = _fresh_clock(_BASE_OPEN_MS, offset_s=30.0)
+        snap = take_snapshot(
+            j, s, _SYMBOL, _INTERVAL,
+            recovery_reports=[failed, succeeded],
+            now_ms_fn=lambda: now_ms,
+        )
+        assert snap.any_mandatory_recovery_failed is True
+        assert snap.status == "UNHEALTHY"
+
+
 class TestT_WP03_R02_ReconcileErrorSurfaces:
     """
     Fix-2 regression: startup_reconcile_error passed → UNHEALTHY.
