@@ -66,6 +66,19 @@ class TemporalContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             replace(e, baseline_label_available_at=e.baseline_horizon_end_at - timedelta(seconds=1))
 
+    def test_cross_opportunity_horizon_mismatch_rejected(self):
+        m = manifest()
+        e = m.ordered[3]
+        changed = replace(e,
+            baseline_horizon_end_at=e.baseline_horizon_end_at + timedelta(minutes=1),
+            candidate_horizon_end_at=e.candidate_horizon_end_at + timedelta(minutes=1),
+            baseline_label_available_at=e.baseline_label_available_at + timedelta(minutes=1),
+            candidate_label_available_at=e.candidate_label_available_at + timedelta(minutes=1))
+        with self.assertRaises(ValueError):
+            replace(m, ordered=m.ordered[:3] + (changed,) + m.ordered[4:])
+        with self.assertRaises(ValueError):
+            replace(m, horizon_seconds=0)
+
     def test_backwards_or_equal_decision_time_rejected(self):
         events = list(manifest().ordered)
         events[1], events[2] = events[2], events[1]
