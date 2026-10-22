@@ -153,12 +153,19 @@ def evaluate_paired(
     # A pointwise CI on selectively observed executions does not prove
     # whole-opportunity benefit, particularly when fills/unknowns differ.
     outstanding = n != len(pairs)
-    evidence_status = "INCOMPLETE_COVERAGE" if outstanding else "EXPLORATORY"
+    # Even complete paired outcomes can all originate from one common shock.
+    # Group count alone does not establish independence; one group is an
+    # explicit hard stop for any favorable candidate classification.
+    one_group = len(groups) < 2
+    evidence_status = ("INSUFFICIENT_GROUP_DIVERSITY" if one_group else
+                       "INCOMPLETE_COVERAGE" if outstanding else "EXPLORATORY")
     decision = "FURTHER_INDEPENDENT_VALIDATION"
     if interval.upper <= minimum_effect:
         decision = "DO_NOT_NOMINATE"
-    elif interval.lower > minimum_effect and not outstanding:
+    elif interval.lower > minimum_effect and not outstanding and not one_group:
         decision = "HISTORICAL_CANDIDATE_ONLY"
+    if one_group:
+        notes.append("One correlated-event group cannot establish robust independent support.")
     if outstanding:
         notes.append("Unresolved/no-fill opportunities prevent unconditional improvement claims.")
     return EvaluationReport(
