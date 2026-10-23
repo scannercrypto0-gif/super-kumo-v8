@@ -274,6 +274,12 @@ class DatasetManifest:
     source_hash: Optional[str] = None
     # FIX01: manifest-level integrity hash (auto-computed in __post_init__)
     manifest_integrity_hash: str = field(default="", compare=False)
+    # FIX03-B: provenance sentinel — True ONLY when from_dict() found and validated
+    # a stored manifest_integrity_hash. Never included in the integrity hash itself
+    # or in serialisation (to_dict). Legacy manifests reconstructed without a stored
+    # hash have this flag set to False and are rejected at the verified registration
+    # boundary (register()).
+    provenance_verified: bool = field(default=True, compare=False)
 
     def __post_init__(self):
         """
@@ -347,7 +353,12 @@ class DatasetManifest:
         return self.manifest_hash == expected
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        # FIX03-B: exclude provenance_verified — it is a runtime custody marker,
+        # not a persisted field. Legacy round-trips must not inherit a False flag
+        # that was not present in the original serialised record.
+        d = asdict(self)
+        d.pop("provenance_verified", None)
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "DatasetManifest":
@@ -371,6 +382,9 @@ class DatasetManifest:
         """
         d = dict(d)
         stored_ih = d.pop("manifest_integrity_hash", None)
+        # FIX03-B: provenance_verified must not be passed through from serialised
+        # data — it is a runtime custody marker computed here.
+        d.pop("provenance_verified", None)
         # Normalise gap_bar_opens: JSON arrays deserialise as lists; we need tuples
         if "gap_bar_opens" in d and isinstance(d["gap_bar_opens"], list):
             d["gap_bar_opens"] = tuple(d["gap_bar_opens"])
@@ -381,6 +395,11 @@ class DatasetManifest:
                 "manifest_integrity_hash mismatch on from_dict: "
                 "stored hash does not match recomputed value — record may have been tampered"
             )
+        # FIX03-B: if no stored hash was present (legacy record), the fresh hash
+        # computed in __post_init__ is unverified provenance.  Mark the manifest
+        # so the verified registration boundary (register()) can reject it.
+        if stored_ih is None:
+            obj = dataclasses.replace(obj, provenance_verified=False)
         return obj
 
 
@@ -694,6 +713,18 @@ class HistoricalLibrary:
         2. manifest.verify_hash(bars) must hold (detect bar-set tamper).
         3. manifest.verify_integrity() must hold (detect metadata tamper).
         """
+        # FIX03-B: reject manifests that were reconstructed from legacy serialised
+        # records (no stored manifest_integrity_hash).  Such manifests have a
+        # freshly-recomputed hash that cannot prove the original stored state —
+        # they are not custody-grade and must not be registered as verified datasets.
+        if not manifest.provenance_verified:
+            raise HistoricalDataError(
+                f"manifest for {dataset_id} v{manifest.version} lacks verified "
+                "provenance: it was reconstructed from a legacy record with no "
+                "stored manifest_integrity_hash and cannot be registered as a "
+                "custody-grade dataset.  Re-import from the original source with "
+                "a full integrity chain to produce a verifiable manifest."
+            )
         # FIX02 — Blocker 3: bar-level checksum validation
         bad_keys = [b.stable_key() for b in bars if not b.verify_checksum()]
         if bad_keys:
@@ -1039,6 +1070,78 @@ def make_test_bar(
         ingest_time_ms=ingest_time_ms,
         availability_kind=availability_kind,
     )
+
+
+# ---------------------------------------------------------------------------
+# FIX03-A — Custody-grade access adapter
+# ---------------------------------------------------------------------------
+
+class CustodyAccessor:
+    """
+    Custody-grade access adapter for HistoricalLibrary.
+
+    Research callers that require confirmed-evidence guarantees MUST obtain
+    data through this adapter rather than calling HistoricalLibrary.snapshot()
+    or HistoricalLibrary.range_query() directly.
+
+    ``require_confirmed_availability=True`` is ALWAYS enforced, unconditionally.
+    Callers cannot accidentally bypass the gate through argument defaults:
+    the parameter is not exposed on CustodyAccessor's public API.
+
+    For exploratory research where RETROSPECTIVE bars are acceptable, use the
+    underlying HistoricalLibrary methods directly and document the choice.
+
+    FIX03-A: this adapter is the required answer to the architectural gap in
+    which callers could forget to pass require_confirmed_availability=True and
+    silently receive RETROSPECTIVE bars in confirmed-evidence research workflows.
+    """
+
+    def __init__(self, library: "HistoricalLibrary") -> None:
+        self._library = library
+
+    def snapshot(
+        self,
+        dataset_id: str,
+        decision_cutoff_ms: int,
+        *,
+        version: Optional[int] = None,
+    ) -> "List[HistoricalBar]":
+        """
+        Return bars observable at ``decision_cutoff_ms`` with confirmed
+        availability.  RETROSPECTIVE bars are always excluded.
+        Cannot be bypassed by caller defaults.
+        """
+        return self._library.snapshot(
+            dataset_id,
+            decision_cutoff_ms,
+            version=version,
+            require_confirmed_availability=True,  # non-negotiable custody contract
+        )
+
+    def range_query(
+        self,
+        dataset_id: str,
+        start_ms: int,
+        end_ms: int,
+        decision_cutoff_ms: int,
+        *,
+        version: Optional[int] = None,
+        require_complete: bool = True,
+    ) -> "List[HistoricalBar]":
+        """
+        Return bars in [start_ms, end_ms] with confirmed availability.
+        RETROSPECTIVE bars are always excluded before the completeness check.
+        Cannot be bypassed by caller defaults.
+        """
+        return self._library.range_query(
+            dataset_id,
+            start_ms,
+            end_ms,
+            decision_cutoff_ms,
+            version=version,
+            require_complete=require_complete,
+            require_confirmed_availability=True,  # non-negotiable custody contract
+        )
 
 
 def make_fixture_csv(bars: List[HistoricalBar]) -> str:

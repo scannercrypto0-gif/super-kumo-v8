@@ -50,6 +50,7 @@ import os
 from research_wp_r0.historical_library import (
     ArchiveCopyInterface,
     BarQuality,
+    CustodyAccessor,
     DataAvailabilityKind,
     DatasetManifest,
     HistoricalBar,
@@ -2023,11 +2024,22 @@ class TestConsolidatedFinalAcceptanceBatch:
 
     def test_a4_integration_path_fail_closed_gate_on_retrospective(self):
         """
-        Research integration path must enforce confirmed availability.
-        Calling range_query / snapshot without the confirmed flag on a
-        RETROSPECTIVE-only dataset succeeds (exploratory backtest), but
-        the flag must make it fail-closed (custody-grade gate).
-        This verifies the gate is accessible and honoured on both call sites.
+        FIX03-A: CustodyAccessor must fail-closed on RETROSPECTIVE data and cannot
+        be bypassed by omitting the flag.
+
+        OLD behaviour (pre-FIX03-A): no custody-grade entrypoint existed — a
+        caller could call lib.snapshot() / lib.range_query() without the flag
+        and silently receive RETROSPECTIVE bars, contaminating confirmed-evidence
+        research.  THIS TEST WOULD HAVE BEEN IMPOSSIBLE TO WRITE without the
+        CustodyAccessor class.
+
+        NEW behaviour: CustodyAccessor.snapshot() always excludes RETROSPECTIVE
+        bars; CustodyAccessor.range_query() raises HistoricalDataError on a
+        RETROSPECTIVE-only dataset.  The caller has no parameter to bypass the
+        confirmed-availability contract.
+
+        This test would FAIL if CustodyAccessor did not exist or if it exposed
+        a require_confirmed_availability parameter (a caller could pass False).
         """
         lib = HistoricalLibrary()
         retro = [
@@ -2039,31 +2051,40 @@ class TestConsolidatedFinalAcceptanceBatch:
         lib.register("a4_integration", retro, m)
         cutoff = retro[-1].observation_cutoff_ms + 1
 
-        # Exploratory backtest path (no flag) — allowed, must succeed
+        # Exploratory path on raw library still succeeds (documented opt-out)
         snap_ok = lib.snapshot("a4_integration", cutoff)
         assert len(snap_ok) == 3
 
-        rq_ok = lib.range_query(
-            "a4_integration", retro[0].bar_open, retro[-1].bar_open, cutoff
-        )
-        assert len(rq_ok) == 3
+        # CustodyAccessor must fail-closed — no flag, no way to bypass
+        custody = CustodyAccessor(lib)
 
-        # Custody-grade gate — must fail-closed on retrospective data
-        snap_gate = lib.snapshot(
-            "a4_integration", cutoff, require_confirmed_availability=True
+        # Confirm CustodyAccessor does NOT expose require_confirmed_availability
+        import inspect
+        snap_params = inspect.signature(custody.snapshot).parameters
+        rq_params = inspect.signature(custody.range_query).parameters
+        assert "require_confirmed_availability" not in snap_params, (
+            "CustodyAccessor.snapshot() must not expose require_confirmed_availability "
+            "— callers must not be able to bypass the custody contract"
         )
-        assert len(snap_gate) == 0, (
-            "Custody gate on snapshot() must exclude all RETROSPECTIVE bars"
+        assert "require_confirmed_availability" not in rq_params, (
+            "CustodyAccessor.range_query() must not expose require_confirmed_availability"
         )
 
+        # Custody snapshot returns empty (RETROSPECTIVE excluded, cannot bypass)
+        snap_custody = custody.snapshot("a4_integration", cutoff)
+        assert len(snap_custody) == 0, (
+            "CustodyAccessor.snapshot() must exclude all RETROSPECTIVE bars "
+            "unconditionally — no opt-out exists"
+        )
+
+        # Custody range_query raises (no bars survive after retrospective exclusion)
         with pytest.raises(HistoricalDataError):
-            lib.range_query(
-                "a4_integration", retro[0].bar_open, retro[-1].bar_open, cutoff,
-                require_confirmed_availability=True,
+            custody.range_query(
+                "a4_integration", retro[0].bar_open, retro[-1].bar_open, cutoff
             )
 
     def test_a4_confirmed_bars_pass_through_custody_gate(self):
-        """CONFIRMED bars must pass through the custody gate without error."""
+        """FIX03-A: CONFIRMED bars must pass through CustodyAccessor without error."""
         lib = HistoricalLibrary()
         confirmed = [
             make_test_bar(i, availability_kind=DataAvailabilityKind.CONFIRMED)
@@ -2074,15 +2095,19 @@ class TestConsolidatedFinalAcceptanceBatch:
         lib.register("a4_confirmed", confirmed, m)
         cutoff = confirmed[-1].observation_cutoff_ms + 1
 
-        # Custody gate must pass for CONFIRMED data
-        snap = lib.snapshot("a4_confirmed", cutoff, require_confirmed_availability=True)
-        assert len(snap) == 3
-
-        rq = lib.range_query(
-            "a4_confirmed", confirmed[0].bar_open, confirmed[-1].bar_open, cutoff,
-            require_confirmed_availability=True,
+        # CustodyAccessor must pass CONFIRMED data through unchanged
+        custody = CustodyAccessor(lib)
+        snap = custody.snapshot("a4_confirmed", cutoff)
+        assert len(snap) == 3, (
+            "CustodyAccessor.snapshot() must pass CONFIRMED bars through"
         )
-        assert len(rq) == 3
+
+        rq = custody.range_query(
+            "a4_confirmed", confirmed[0].bar_open, confirmed[-1].bar_open, cutoff
+        )
+        assert len(rq) == 3, (
+            "CustodyAccessor.range_query() must pass CONFIRMED bars through"
+        )
 
     # ------------------------------------------------------------------
     # B1 — Legacy manifest without manifest_integrity_hash
@@ -2090,28 +2115,56 @@ class TestConsolidatedFinalAcceptanceBatch:
 
     def test_b1_legacy_manifest_without_hash_is_not_custody_grade(self):
         """
-        A legacy serialized manifest that has no manifest_integrity_hash must not
-        be silently promoted to custody-grade via from_dict().
-        It should be accepted for exploratory compatibility but verify_integrity()
-        must be the gate: a manifest reconstructed without a stored hash can be
-        tested against its own recomputed hash.
+        FIX03-B: A manifest reconstructed from a legacy record (no stored
+        manifest_integrity_hash) must be rejected at the verified registration
+        boundary (register()).
+
+        OLD behaviour (pre-FIX03-B): from_dict() would reconstruct the manifest
+        with a freshly-computed hash via __post_init__, making it INDISTINGUISHABLE
+        from a fully-verified manifest.  register() would accept it without
+        question.  verify_integrity() would return True because it only checks
+        internal self-consistency of the freshly-computed hash — it cannot
+        prove the original stored state was intact.
+
+        NEW behaviour (FIX03-B):
+        1. from_dict() sets provenance_verified=False when no stored hash is
+           present.
+        2. register() rejects any manifest where provenance_verified=False.
+        3. The rejection message is specific and actionable.
+        4. A fully-verified round-trip (to_dict() → from_dict() with stored
+           hash) sets provenance_verified=True and can be registered.
         """
         bars = _bars(3)
         _, m = validate_bars(bars, SYMBOL, INTERVAL)
+        m = dataclasses.replace(m, dataset_id="b1_legacy")
+
+        # Simulate legacy serialised record: remove the integrity hash
         d = m.to_dict()
-        # Simulate legacy record: remove the integrity hash
         d.pop("manifest_integrity_hash", None)
-        # from_dict must not raise (legacy compatibility)
+
+        # from_dict must still load (legacy compatibility for read-only use)
         legacy_m = DatasetManifest.from_dict(d)
-        # But the manifest must self-report its integrity is intact
-        # (the recomputed hash matches itself — it is internally consistent)
-        assert legacy_m.verify_integrity(), (
-            "Legacy manifest (no stored hash) must be internally consistent"
+
+        # FIX03-B: legacy manifest must carry provenance_verified=False
+        assert legacy_m.provenance_verified is False, (
+            "from_dict() must set provenance_verified=False when no stored "
+            "manifest_integrity_hash was present — old code silently promoted "
+            "unverified legacy manifests to custody-grade"
         )
-        # The key custody gate: verify_hash against the bars must work
-        assert legacy_m.verify_hash(bars), (
-            "Legacy manifest must still correctly verify bar hashes"
+
+        # FIX03-B: register() must reject the legacy manifest with a clear error
+        lib = HistoricalLibrary()
+        with pytest.raises(HistoricalDataError, match="lacks verified provenance"):
+            lib.register("b1_legacy", bars, legacy_m)
+
+        # FIX03-B: a fully-verified round-trip must still succeed
+        full_d = m.to_dict()          # includes manifest_integrity_hash
+        verified_m = DatasetManifest.from_dict(full_d)
+        assert verified_m.provenance_verified is True, (
+            "from_dict() with stored hash must set provenance_verified=True"
         )
+        lib2 = HistoricalLibrary()
+        lib2.register("b1_legacy", bars, verified_m)   # must NOT raise
 
     def test_b1_legacy_manifest_tampered_field_detected_by_verify_integrity(self):
         """
