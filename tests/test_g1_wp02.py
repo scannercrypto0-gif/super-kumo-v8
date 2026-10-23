@@ -252,8 +252,9 @@ def _worker_ingest(db_dir: str, n_before: int, n_total: int, ready_path: str):
 
 
 @unittest.skipIf(sys.platform == "win32",
-                 "signal.SIGKILL is not available on Windows — "
-                 "cannot generate real SIGKILL evidence.")
+                 "signal.SIGKILL is not available on Windows — subprocess "
+                 "termination cannot generate real SIGKILL evidence. "
+                 "Not PASS-without-kill.")
 class TestT_WP02_03_SIGKILLReplay(unittest.TestCase):
     """
     Spawn a child process that ingests 200 bars durably (journal+store), then
