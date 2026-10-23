@@ -244,6 +244,7 @@ def _worker_ingest(db_dir: str, n_before: int, n_total: int, ready_path: str):
         time.sleep(0.001)
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="SIGKILL not available on Windows")
 class TestT_WP02_03_SIGKILLReplay(unittest.TestCase):
     """
     Spawn a child process that ingests 200 bars durably (journal+store), then
