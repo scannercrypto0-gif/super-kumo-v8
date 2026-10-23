@@ -1,0 +1,4 @@
+# AQL G1-WP01-MVP runtime dependencies
+# All public packages — no API keys required for Binance market data
+
+websocket-client>=1.7.0
