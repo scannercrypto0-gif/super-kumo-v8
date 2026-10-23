@@ -162,3 +162,30 @@ Created local Git repository baseline, README, .gitignore, session/handoff proto
 ## 2026-10-21 — G0-REV-01/C documentation remediation of draft PR #15
 
 Owner explicitly approved C: improve documentary acceptance scenarios, notification/recovery invariants and performance measurement criteria, without code, merge, technology selection or fabricated numerical SLA. Same draft PR #15 branch updated. New test cases T29–T44 are SPECIFIED / NOT EXECUTED; conceptual evidence fields added. No independent runtime, concurrency, recovery, notification, CI or performance test performed. G0 OPEN; all earlier PRs preserved; owner review required.
+
+## 2026-10-22 — G0 approved; G1 WP01–WP04 implemented and CI-fixed (Issues #52, #53)
+
+- **G0 approved:** Owner closed Issue #1 on 2026-10-22 with explicit sign-off. R09 mandatory credential revocation/rotation before V7 reuse remains binding.
+- **G1 WP01 (PR #32):** Binance Spot USDT shared SQLite journal collector — merged to main as `9609711d6ff9c1ca446519b1347e46ebb74db06a`. Pre-merge CI run 40011286037: Ubuntu ✅ Windows ✅.
+- **G1 WP02 (PR #40):** Durable SQLite WAL journal stress tests — merged to main as `fd6f8cfc999e94204ecabd732028a621abc50346`. Pre-merge CI run 40017268781: Ubuntu ✅ Windows ✅.
+- **G1 WP03 (PR #42):** Health snapshot monitoring — merged to main as `c6392150cd9c7e49fe98f5076dce5017ece89df4`. Pre-merge CI run 40018212783: Ubuntu ✅ Windows ✅.
+- **G1 WP04 (PR #45):** Operational readiness + SIGKILL recovery (Issue #44) — merged to main as `0af0dce5b3d5e16f5e44935fef76f77b4b8cdb87`. Pre-merge CI run 40018228077: Ubuntu ✅ Windows ✅.
+- **CI fixes (Issue #52):** `setuptools.build_meta` backend fix, Windows SIGKILL/throughput skips, platform-aware throughput floors — included in WP02/03/04 branches before merge.
+- **Stack ancestry reconciliation (Issue #53):** Conflict on `.github/workflows/g1-tests.yml` resolved via forward-merge commit `2e2035d`; PR #45 `mergeable_state` restored to `clean` before merge.
+- **Draft state:** PRs #40, #42, #45 marked `draft=true` before final owner-authorized merge sequence.
+- **Windows test coverage gaps (pre-existing, documented):** POSIX SIGKILL (9 skips), heavy fsync throughput/10k-candle tests skipped; Windows throughput floor 5 bars/s vs Linux 50 bars/s. Accepted limitation.
+- **Live integration:** Binance REST/WS BLOCKED (proxy policy); Supabase NOT TESTED. Synthetic/mock pass ≠ live readiness.
+- Application/runtime tests executed and passed: 129 passed / 1 skipped (live Binance REST) / 0 failed — Linux Ubuntu, Python 3.11.
+
+## 2026-10-23 — Post-merge G1 verification, CI trigger fix, documentation hygiene (Issue #53)
+
+- **Verified** by Claude Sonnet 4.6 scheduled execution agent, session https://claude.ai/code/session_01H5cqvL3durEYQzY6x6P5oi.
+- **main HEAD** confirmed `0af0dce5b3d5e16f5e44935fef76f77b4b8cdb87` — all four WP merge commits present and accounted for.
+- **Local full G1 regression on main HEAD:** `PYTHONPATH=src python -m pytest tests/test_g1_wp01.py tests/test_g1_wp02.py tests/test_g1_wp03.py tests/test_g1_wp04.py tests/test_g1_wp04_fix01.py -v --tb=short` → **129 passed, 1 skipped, 0 failed in 69.98s** (Linux/Ubuntu, Python 3.11). Full-pipeline POSIX SIGKILL test `test_ag_fp01_full_pipeline_sigkill_and_restart` PASSED. This is a local Claude run, not independent GitHub Actions CI.
+- **Post-merge main CI gap:** `.github/workflows/g1-tests.yml` push trigger did not include `main`; no GitHub Actions run was triggered on the post-merge main HEAD. Fixed on feature branch `fix/g1-post-merge-ci-and-docs` — added `main` to push.branches; DRAFT PR opened for owner review.
+- **CI trigger fix** (`.github/workflows/g1-tests.yml`): added `- main` under `push.branches`. No tests, logic or runtime code changed.
+- **Documentation updates:** `04_STATE.md` updated with current-status addendum (historical content preserved); `05_WORK_LOG.md` this entry appended. PR descriptions for #32–#45 updated in earlier sessions (see Issue #53 comment trail).
+- **G1 safety audit findings (not critical defects):** All G1 core behaviors (durable journal, duplicate suppression, crash/restart replay, gap detection, SIGKILL recovery, health snapshots) are implemented and pass synthetic tests. No critical G1 bug or post-merge regression found. Live Binance/Supabase not tested (not in G1 scope per G1-PLAN-01/C).
+- **R09:** Remains mandatory; no V7 credentials accessed or present in this session.
+- **Production authorization:** NOT granted. G1 code merged ≠ G1 production authorized.
+- No merges, no main modifications, no live trading/deployment, no Strategy Factory work performed in this session.
