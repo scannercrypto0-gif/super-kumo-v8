@@ -120,10 +120,19 @@ def run_pipeline(
     interval: str = "1m",
     duration_s: float = 600,
     data_dir: str = "./data",
+    now_ms_fn=None,
 ) -> dict:
     """
     Run the full G1-WP01 MVP pipeline.
     Returns a result dict suitable for the execution report.
+
+    Parameters
+    ----------
+    now_ms_fn : callable, optional
+        ``() -> int`` returning the current epoch-millisecond timestamp.
+        Passed through to ``take_snapshot``; defaults to wall clock when
+        ``None`` (no operational behaviour change).  Intended for
+        deterministic health assertions in tests only.
     """
     data_path = Path(data_dir)
     data_path.mkdir(parents=True, exist_ok=True)
@@ -232,6 +241,7 @@ def run_pipeline(
         recovery_reports=_all_recovery_reports,
         replay_errors=startup_replay_errors,
         reconcile_error=startup_reconcile_error,
+        now_ms_fn=now_ms_fn,
     )
 
     def _report_from(recovery_result: dict | None) -> dict | None:

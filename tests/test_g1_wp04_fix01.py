@@ -1,8 +1,8 @@
 """
-AQL G1-WP04-FIX01 — Pipeline Integration and Subprocess SIGKILL Evidence
-=========================================================================
+AQL G1-WP04-FIX01/FIX02 — Pipeline Integration and Subprocess SIGKILL Evidence
+================================================================================
 
-Required by Issue #49 (G1-WP04-FIX01):
+Required by Issue #49 (G1-WP04-FIX01) and Issue #51 (G1-WP04-FIX02):
 
 1. T_WP04_FIX01_01_PipelineOrchestration
    Integration tests that drive actual src/aql/pipeline.py orchestration
@@ -10,6 +10,9 @@ Required by Issue #49 (G1-WP04-FIX01):
    with a synthetic no-op).  Exercises the complete code path:
      startup_reconcile → collect → health snapshot
    using real SQLite journal + store — not component-level stubs.
+
+   FIX02 update: now_ms_fn injected via run_pipeline() so health status is
+   deterministic; AG-F01 and AG-F02 assert exactly HEALTHY, not a loose set.
 
 2. T_WP04_FIX01_02_SubprocessSigkill
    Real OS-level subprocess SIGKILL tests using subprocess.Popen +
@@ -25,23 +28,37 @@ Required by Issue #49 (G1-WP04-FIX01):
    Skipped on Windows (SIGKILL not available on that platform); marked
    SKIP with explicit reason — never PASS-without-kill.
 
+   This is a journal-level component test (proves journal durability).
+
+3. T_WP04_FIX02_04_FullPipelineSIGKILL  (new — Issue #51)
+   Full-pipeline OS-level subprocess SIGKILL.  The child process runs the
+   actual run_pipeline() with deterministic synthetic WS/REST adapters and
+   real SQLite.  A _CrashCollector commits N bars to the journal then writes
+   a flag and sleeps (never calls store.upsert).  The parent SIGKILLs the
+   running pipeline, then restarts it via run_pipeline() with an empty
+   collector.  Verifies replay, idempotency, exact key coverage and HEALTHY.
+
 Distinction from WP04 T_WP04_02_SigkillRestart (existing approximation)
 -------------------------------------------------------------------------
 WP04 T_WP04_02 approximated SIGKILL by ``del journal; del store; reopen``.
-This module (FIX01) uses actual OS-level subprocess termination with an
-explicit journal-commit synchronisation point, satisfying AG-05's
-"true OS kill requires a subprocess fixture — PARTIAL" note.
+FIX01 T_WP04_FIX01_02 uses actual OS-level subprocess termination with an
+explicit journal-commit synchronisation point (journal-level writer only).
+FIX02 T_WP04_FIX02_04 kills a child running the full orchestrated pipeline.
 
 New acceptance gates
 --------------------
-AG-F01  Pipeline orchestration: real run_pipeline() with synthetic adapters
-        → store_total == N_PIPELINE_BARS and errors == 0
+AG-F01  Pipeline orchestration: run_pipeline() with synthetic adapters,
+        deterministic now_ms_fn → store_total==N_PIPELINE_BARS, errors==0,
+        health==HEALTHY (exact)
 AG-F02  Pipeline restart: startup_reconcile replays journal bars into store,
-        health snapshot = HEALTHY
-AG-F03  Subprocess SIGKILL: child commits N bars to journal (not store),
-        SIGKILL, fresh startup_reconcile → all N bars in store, no gaps
-AG-F04  Double startup_reconcile is idempotent → no duplicate store rows
-AG-F05  Health after subprocess SIGKILL recovery = HEALTHY
+        deterministic now_ms_fn → health==HEALTHY (exact)
+AG-F03  Subprocess SIGKILL (journal-level child): child commits N bars to
+        journal only, SIGKILL, startup_reconcile recovers all bars, no dups
+AG-F04  Double startup_reconcile is idempotent → replay_inserted_2==0
+AG-F05  Health after journal-level SIGKILL recovery == HEALTHY (now_ms_fn)
+AG-FP01 Full-pipeline SIGKILL: child runs run_pipeline() with _CrashCollector,
+        SIGKILL after flag, restart via run_pipeline() → bars_replayed==N
+AG-FP02 Exact key coverage + idempotent double-restart + health==HEALTHY
 """
 from __future__ import annotations
 
@@ -260,13 +277,22 @@ class TestT_WP04_FIX01_01_PipelineOrchestration:
     def test_ag_f01_pipeline_fresh_start_healthy(self, tmp_path):
         """
         AG-F01: run_pipeline() with N_PIPELINE_BARS synthetic bars on a
-        fresh SQLite database.  Asserts store_total == N, errors == 0,
-        startup replayed 0 bars, result dict well-formed.
+        fresh SQLite database.  Injects deterministic now_ms_fn so the
+        health snapshot clock is pinned at module-import time
+        (lag ≈ 30 s < DEFAULT_LAG_WARN_S=90 s → exactly HEALTHY).
+
+        FIX02 change: assert hs["status"] == "HEALTHY" (strict, not loose set).
         """
         from aql.pipeline import run_pipeline
 
         bars = [_make_live_bar(i) for i in range(N_PIPELINE_BARS)]
         CollectorCls = _make_synthetic_collector_class(bars)
+
+        # Deterministic clock: pinned at module import (lag ≈ 30 s → HEALTHY).
+        # _LAST_CLOSE_TARGET = _NOW_AT_IMPORT - 30_000; last bar close is at
+        # _LAST_CLOSE_TARGET - 1.  lag = _NOW_AT_IMPORT - (_LAST_CLOSE_TARGET-1)
+        # ≈ 30 001 ms ≈ 30 s < DEFAULT_LAG_WARN_S=90 s.
+        _fixed_now_ms = _NOW_AT_IMPORT
 
         with (
             patch("aql.pipeline.BinanceCollector", CollectorCls),
@@ -277,6 +303,7 @@ class TestT_WP04_FIX01_01_PipelineOrchestration:
                 interval=INTERVAL,
                 duration_s=1.0,
                 data_dir=str(tmp_path / "pipeline_fresh"),
+                now_ms_fn=lambda: _fixed_now_ms,
             )
 
         assert result["symbol"] == SYMBOL
@@ -296,8 +323,10 @@ class TestT_WP04_FIX01_01_PipelineOrchestration:
         assert sr["error"] is None
 
         hs = result["health_snapshot"]
-        assert hs["status"] in ("HEALTHY", "DEGRADED", "UNHEALTHY"), (
-            f"Unexpected health status: {hs['status']}"
+        # FIX02: exact assertion — deterministic clock guarantees HEALTHY.
+        assert hs["status"] == "HEALTHY", (
+            f"AG-F01 FAIL: expected exactly HEALTHY with deterministic clock "
+            f"(lag≈30s). Got: {hs['status']}. Full snapshot: {hs}"
         )
         # store and journal counts must be present in health snapshot
         assert hs["store_final_count"] == N_PIPELINE_BARS, hs
@@ -306,7 +335,7 @@ class TestT_WP04_FIX01_01_PipelineOrchestration:
         print(
             f"\n  AG-F01 PASS: fresh run  store={result['store_total']}  "
             f"journal={result['journal_committed']}  "
-            f"health={hs['status']}"
+            f"health={hs['status']}  (now_ms pinned, lag≈30s)"
         )
 
     def test_ag_f02_pipeline_restart_replays_journal(self, tmp_path):
@@ -314,7 +343,12 @@ class TestT_WP04_FIX01_01_PipelineOrchestration:
         AG-F02: Pre-seed journal with N bars without writing to the store
         (simulates a crash between journal.commit and store.upsert).
         run_pipeline() should detect the gap in startup_reconcile, replay
-        all bars into the store, and report HEALTHY.
+        all bars into the store, and report exactly HEALTHY.
+
+        FIX02 change: now_ms_fn injected so health status is deterministic.
+        The "live" bars have their last close ≈ 30 s before module import;
+        pinning the clock at _NOW_AT_IMPORT keeps lag ≈ 30 s < 90 s → HEALTHY.
+        Asserts hs["status"] == "HEALTHY" (strict, not loose set).
         """
         from aql.pipeline import run_pipeline
 
@@ -335,6 +369,9 @@ class TestT_WP04_FIX01_01_PipelineOrchestration:
         # Restart: empty synthetic collector; startup_reconcile must replay
         CollectorCls = _make_synthetic_collector_class([])
 
+        # Deterministic clock: pinned at module import (lag ≈ 30 s → HEALTHY).
+        _fixed_now_ms = _NOW_AT_IMPORT
+
         with (
             patch("aql.pipeline.BinanceCollector", CollectorCls),
             patch("aql.pipeline.recover_gap", _synthetic_recover_gap),
@@ -344,6 +381,7 @@ class TestT_WP04_FIX01_01_PipelineOrchestration:
                 interval=INTERVAL,
                 duration_s=1.0,
                 data_dir=data_dir,
+                now_ms_fn=lambda: _fixed_now_ms,
             )
 
         sr = result["startup_reconcile"]
@@ -356,19 +394,19 @@ class TestT_WP04_FIX01_01_PipelineOrchestration:
         )
 
         hs = result["health_snapshot"]
-        # run_pipeline() has no now_ms_fn injection point; when the full suite runs
-        # for >90s the live bar timestamps drift past the WARN threshold → DEGRADED.
-        # The core AG-F02 requirement is correct replay (bars_replayed, store_total);
-        # UNHEALTHY (lag ≥ 300s or integrity failure) would indicate a real defect.
-        assert hs["status"] in ("HEALTHY", "DEGRADED"), (
-            f"Expected HEALTHY or DEGRADED after journal-replay restart. Got: {hs}"
+        # FIX02: exact assertion — deterministic clock guarantees HEALTHY.
+        assert hs["status"] == "HEALTHY", (
+            f"AG-F02 FAIL: expected exactly HEALTHY with deterministic clock "
+            f"(lag≈30s) after journal-replay restart. Got: {hs['status']}. "
+            f"Full snapshot: {hs}"
         )
         assert hs["unresolved_backlog"] is False
         assert hs["integrity_ok"] is True
 
         print(
             f"\n  AG-F02 PASS: restart  bars_replayed={sr['bars_replayed']}  "
-            f"store={result['store_total']}  health={hs['status']}"
+            f"store={result['store_total']}  health={hs['status']}  "
+            f"(now_ms pinned, lag≈30s)"
         )
 
     def test_pipeline_result_dict_all_keys_present(self, tmp_path):
@@ -789,14 +827,15 @@ class TestT_WP04_FIX01_03_AcceptanceGateReport:
         """
         gate_map = {
             "AG-F01": (
-                "Pipeline orchestration: run_pipeline() with synthetic adapters "
-                "→ store_total==N_PIPELINE_BARS, errors==0",
+                "Pipeline orchestration: run_pipeline() with synthetic adapters, "
+                "deterministic now_ms_fn → store_total==N_PIPELINE_BARS, errors==0, "
+                "health==HEALTHY (exact, not loose set)",
                 "TestT_WP04_FIX01_01::test_ag_f01_pipeline_fresh_start_healthy",
                 "PASS (all platforms)",
             ),
             "AG-F02": (
                 "Pipeline restart: startup_reconcile replays journal bars, "
-                "health==HEALTHY",
+                "deterministic now_ms_fn → health==HEALTHY (exact, not loose set)",
                 "TestT_WP04_FIX01_01::test_ag_f02_pipeline_restart_replays_journal",
                 "PASS (all platforms)",
             ),
@@ -818,6 +857,21 @@ class TestT_WP04_FIX01_03_AcceptanceGateReport:
                 "TestT_WP04_FIX01_02::test_ag_f05_health_healthy_after_sigkill_recovery",
                 "PASS (POSIX) / SKIP (Windows)",
             ),
+            "AG-FP01": (
+                "Full-pipeline SIGKILL: child runs run_pipeline() with _CrashCollector "
+                "(journal-only, no store.upsert), SIGKILL after flag, "
+                "restart via run_pipeline() → bars_replayed==N_FP_BARS",
+                "TestT_WP04_FIX02_04_FullPipelineSIGKILL::"
+                "test_ag_fp01_full_pipeline_sigkill_and_restart",
+                "PASS (POSIX) / SKIP (Windows)",
+            ),
+            "AG-FP02": (
+                "Exact key coverage + health==HEALTHY after full-pipeline restart; "
+                "idempotent double-restart (replay_inserted_2==0)",
+                "TestT_WP04_FIX02_04_FullPipelineSIGKILL::"
+                "test_ag_fp01_full_pipeline_sigkill_and_restart",
+                "PASS (POSIX) / SKIP (Windows)",
+            ),
         }
 
         print("\n=== WP04-FIX01 Acceptance Gate Summary ===")
@@ -827,8 +881,363 @@ class TestT_WP04_FIX01_03_AcceptanceGateReport:
             print(f"    → {test_ref}")
         print("==========================================\n")
 
-        always_present_gates = ["AG-F01", "AG-F02"]
+        always_present_gates = ["AG-F01", "AG-F02", "AG-FP01", "AG-FP02"]
         for gate_id in always_present_gates:
             desc, ref, _ = gate_map[gate_id]
             assert desc, f"{gate_id} has empty description"
             assert ref, f"{gate_id} has no test reference"
+
+
+# ---------------------------------------------------------------------------
+# Full-pipeline SIGKILL child script template  (Issue #51 — FIX02)
+# ---------------------------------------------------------------------------
+#
+# The child process runs actual run_pipeline() with:
+#   - _CrashCollector: commits N bars to journal, writes flag, sleeps
+#     (never calls store.upsert — simulates crash before store write)
+#   - _noop_recover_gap: no real HTTP calls
+#
+# The parent polls for the flag file, then os.kill(SIGKILL) on the
+# child's PID (which is the pipeline process itself, not a separate
+# journal-writer).  This proves full pipeline orchestration: startup_reconcile
+# runs (0 bars, clean DB), then _CrashCollector.run() commits N bars and
+# signals the parent, then the child is killed — all through the real
+# run_pipeline() call stack.
+
+_PIPELINE_CHILD_SCRIPT = textwrap.dedent(
+    """\
+    import sys
+    import time
+    from pathlib import Path
+    from unittest.mock import patch
+
+    sys.path.insert(0, "{src_path}")
+
+    from aql.pipeline import run_pipeline
+    from aql.collector.binance_collector import CollectorMetrics
+    from aql.journal.durable_journal import DurableJournal
+    from aql.models.bar import BarState, MarketBar
+    from aql.recovery.gap_recovery import RecoveryReport
+
+    SYMBOL = "BTCUSDT"
+    INTERVAL = "1m"
+    INTERVAL_MS = 60_000
+    BASE_OPEN = {base_open}
+    N_BARS = {n_bars}
+    FLAG_PATH = "{flag_path}"
+    DATA_DIR = "{data_dir}"
+
+    def _noop_recover_gap(symbol, interval, gap_start_ms, gap_end_ms, existing_keys):
+        \"\"\"Synthetic REST gap recovery — no HTTP calls.\"\"\"
+        return [], RecoveryReport(
+            symbol=symbol,
+            interval=interval,
+            gap_start_ms=gap_start_ms,
+            gap_end_ms=gap_end_ms,
+            expected_bars=0,
+            recovered_bars=0,
+            already_stored=0,
+            unresolved=0,
+            missing_opens=[],
+            status="FULL",
+            weight_cost=0,
+            last_seen_window_weight=0,
+            http_error=None,
+        )
+
+    class _CrashCollector:
+        \"\"\"
+        Commits N bars to journal only (no store.upsert), writes a flag file
+        to signal the parent that journal commits are durable, then sleeps
+        until the parent SIGKILLs this process.
+
+        gap_start_ms / gap_end_ms left None (no WS gap).
+        \"\"\"
+        def __init__(self, symbol, interval, journal, store, **kwargs):
+            self._journal = journal
+            self.gap_start_ms = None
+            self.gap_end_ms = None
+
+        def run(self, timeout_s=None):
+            metrics = CollectorMetrics()
+            for i in range(N_BARS):
+                bar_open = BASE_OPEN + i * INTERVAL_MS
+                bar_close = bar_open + INTERVAL_MS - 1
+                bar = MarketBar(
+                    symbol=SYMBOL,
+                    interval=INTERVAL,
+                    bar_open=bar_open,
+                    bar_close=bar_close,
+                    open=300.0 + i,
+                    high=301.0 + i,
+                    low=299.0 + i,
+                    close=300.5 + i,
+                    volume=30.0 + i,
+                    is_final=True,
+                    source="synthetic_pipeline_crash",
+                    ingested_at=bar_open + 500,
+                    committed_at=bar_open + 550,
+                    state=BarState.LOCAL_COMMITTED,
+                    checksum=None,
+                )
+                bar.checksum = bar.compute_checksum()
+                # Commit to journal — durable before flag write (WAL + FULL sync)
+                self._journal.commit(bar)
+                metrics.journal_commit_count += 1
+                metrics.final_bar_count += 1
+                metrics.ws_message_count += 1
+
+            # Signal parent: all journal.commit() calls have returned.
+            # IMPORTANT: do NOT call store.upsert() — simulate crash before store.
+            Path(FLAG_PATH).write_text("ready")
+
+            # Sleep until SIGKILL — never reaches store.upsert or mark_persisted.
+            time.sleep(3600)
+            return metrics  # unreachable
+
+    with (
+        patch("aql.pipeline.BinanceCollector", _CrashCollector),
+        patch("aql.pipeline.recover_gap", _noop_recover_gap),
+    ):
+        run_pipeline(
+            symbol=SYMBOL,
+            interval=INTERVAL,
+            duration_s=3600.0,
+            data_dir=DATA_DIR,
+        )
+    """
+)
+
+
+# ---------------------------------------------------------------------------
+# T_WP04_FIX02_04 — Full-Pipeline Subprocess SIGKILL (Issue #51)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason=(
+        "signal.SIGKILL is not available on Windows — subprocess termination "
+        "semantics differ.  Run this test on a POSIX runner (Linux/macOS) to "
+        "generate real full-pipeline SIGKILL evidence.  Not PASS-without-kill."
+    ),
+)
+class TestT_WP04_FIX02_04_FullPipelineSIGKILL:
+    """
+    AG-FP01, AG-FP02: Full-pipeline OS-level subprocess SIGKILL.
+
+    The child process runs actual run_pipeline() with:
+      - _CrashCollector injected for BinanceCollector (commits to journal
+        only, writes flag, sleeps — no store.upsert)
+      - _noop_recover_gap injected for recover_gap (no HTTP)
+
+    Distinction from T_WP04_FIX01_02 (journal-level component test)
+    -----------------------------------------------------------------
+    FIX01 child is a standalone journal writer (never calls run_pipeline).
+    FIX02 child executes ``run_pipeline()`` through its real entry point,
+    exercising startup_reconcile → _CrashCollector.run() → flag → sleep.
+    The kill target is the pipeline orchestration process itself.
+
+    Not PARTIAL — uses subprocess.Popen + os.kill(pid, signal.SIGKILL).
+    Skipped on Windows with explicit reason (never PASS-without-kill).
+    """
+
+    N_FP_BARS = 8  # bars committed to journal before SIGKILL
+
+    def _spawn_pipeline_child_and_sync(
+        self,
+        tmp_path: Path,
+        n_bars: int,
+        suffix: str = "",
+    ):
+        """
+        Write pipeline child script to disk, start it, wait for flag.
+
+        The child runs run_pipeline() via _CrashCollector; the flag file
+        is written after all N_BARS journal.commit() calls return,
+        confirming durable writes before the parent sends SIGKILL.
+
+        Returns (proc, data_dir_str, expected_opens).
+        Raises pytest.fail if child exits early or times out.
+        """
+        data_dir = str(tmp_path / f"fp_data{suffix}")
+        Path(data_dir).mkdir(parents=True, exist_ok=True)
+        flag_path = str(tmp_path / f"fp_ready{suffix}.flag")
+        script_path = str(tmp_path / f"fp_child{suffix}.py")
+
+        script = _PIPELINE_CHILD_SCRIPT.format(
+            src_path=_SRC_PATH,
+            base_open=BASE_OPEN_STATIC,
+            n_bars=n_bars,
+            flag_path=flag_path,
+            data_dir=data_dir,
+        )
+        Path(script_path).write_text(script)
+
+        # -I: isolated mode so child uses sys.path.insert(0, src_path) from script
+        proc = subprocess.Popen(
+            [sys.executable, "-I", script_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        deadline = time.monotonic() + _SYNC_TIMEOUT_S
+        while time.monotonic() < deadline:
+            if Path(flag_path).exists():
+                break
+            if proc.poll() is not None:
+                _, stderr = proc.communicate(timeout=3)
+                pytest.fail(
+                    f"Pipeline child process exited prematurely "
+                    f"(code={proc.returncode}). "
+                    f"stderr: {stderr.decode(errors='replace')[:1200]}"
+                )
+            time.sleep(0.05)
+        else:
+            proc.kill()
+            proc.wait(timeout=5)
+            pytest.fail(
+                f"Pipeline child did not write ready flag within {_SYNC_TIMEOUT_S}s"
+            )
+
+        expected_opens = {
+            BASE_OPEN_STATIC + i * INTERVAL_MS for i in range(n_bars)
+        }
+        return proc, data_dir, expected_opens
+
+    def test_ag_fp01_full_pipeline_sigkill_and_restart(self, tmp_path):
+        """
+        AG-FP01, AG-FP02: Full-pipeline SIGKILL and restart verification.
+
+        Phase 1 — Spawn pipeline child
+          - Child runs run_pipeline() with _CrashCollector + _noop_recover_gap
+          - startup_reconcile: 0 bars on clean DB (no-op)
+          - _CrashCollector.run(): commits N_FP_BARS to journal, writes flag
+          - Parent waits for flag (durable journal commit confirmed)
+
+        Phase 2 — SIGKILL pipeline process
+          - os.kill(child.pid, signal.SIGKILL) — kills the run_pipeline() process
+          - Assert returncode < 0 (signal kill, not graceful exit)
+
+        Phase 3 — Restart via actual pipeline entry point (AG-FP01)
+          - run_pipeline() called with empty _SyntheticCollector
+          - startup_reconcile detects N_FP_BARS orphaned journal entries
+            (journal.commit done, store never written)
+          - Replays all N_FP_BARS into store
+          - Assert bars_replayed == N_FP_BARS, store_total == N_FP_BARS
+
+        Phase 4 — Exact key coverage + health (AG-FP02)
+          - store.get_stored_keys() == expected_opens (no missing, no extras)
+          - deterministic now_ms_fn → health == "HEALTHY" (exact)
+          - unresolved_backlog == False, integrity_ok == True
+
+        Phase 5 — Idempotent double-restart (AG-FP02)
+          - Second run_pipeline() with empty collector
+          - startup_reconcile finds all bars already in store → replay_inserted==0
+          - store_total unchanged at N_FP_BARS
+        """
+        from aql.pipeline import run_pipeline
+
+        # Phase 1: spawn pipeline child and wait for durable journal commits
+        proc, data_dir, expected_opens = self._spawn_pipeline_child_and_sync(
+            tmp_path, n_bars=self.N_FP_BARS
+        )
+
+        # Phase 2: SIGKILL the pipeline process
+        os.kill(proc.pid, signal.SIGKILL)
+        rc = proc.wait(timeout=5)
+        # On Linux: returncode == -(signal_number) for SIGKILL
+        assert rc < 0, (
+            f"AG-FP01: pipeline process not killed by signal "
+            f"(returncode={rc}); expected < 0"
+        )
+
+        # Phase 3: Restart via actual pipeline entry point
+        # Empty collector — startup_reconcile handles all bars
+        EmptyCollector = _make_synthetic_collector_class([])
+
+        # Deterministic clock: 30 s after last bar's close (BASE_OPEN_STATIC epoch)
+        last_close_fp = BASE_OPEN_STATIC + self.N_FP_BARS * INTERVAL_MS - 1
+        restart_now_ms = last_close_fp + 30_000  # 30 s lag → HEALTHY
+
+        with (
+            patch("aql.pipeline.BinanceCollector", EmptyCollector),
+            patch("aql.pipeline.recover_gap", _synthetic_recover_gap),
+        ):
+            result = run_pipeline(
+                symbol=SYMBOL,
+                interval=INTERVAL,
+                duration_s=1.0,
+                data_dir=data_dir,
+                now_ms_fn=lambda: restart_now_ms,
+            )
+
+        # AG-FP01: bars_replayed and store_total
+        sr = result["startup_reconcile"]
+        assert sr["bars_replayed"] == self.N_FP_BARS, (
+            f"AG-FP01 FAIL: expected {self.N_FP_BARS} bars replayed by "
+            f"startup_reconcile after SIGKILL, got {sr['bars_replayed']}"
+        )
+        assert sr["replay_errors"] == 0, (
+            f"AG-FP01 FAIL: replay_errors={sr['replay_errors']} (expected 0)"
+        )
+        assert result["store_total"] == self.N_FP_BARS, (
+            f"AG-FP01 FAIL: expected {self.N_FP_BARS} bars in store after restart, "
+            f"got {result['store_total']}"
+        )
+
+        # Phase 4: exact key coverage and health (AG-FP02)
+        store_verify = OperationalStore(
+            str(Path(data_dir) / "operational.sqlite")
+        )
+        actual_keys = store_verify.get_stored_keys(SYMBOL, INTERVAL)
+        assert actual_keys == expected_opens, (
+            f"AG-FP02 FAIL: key coverage mismatch after full-pipeline SIGKILL restart:\n"
+            f"  missing={expected_opens - actual_keys}\n"
+            f"  extra={actual_keys - expected_opens}"
+        )
+
+        hs = result["health_snapshot"]
+        assert hs["status"] == "HEALTHY", (
+            f"AG-FP02 FAIL: expected exactly HEALTHY after full-pipeline restart "
+            f"(deterministic clock, lag=30s). Got: {hs['status']}. "
+            f"Full snapshot: {hs}"
+        )
+        assert hs["unresolved_backlog"] is False, (
+            f"AG-FP02 FAIL: unresolved_backlog=True after full replay: {hs}"
+        )
+        assert hs["integrity_ok"] is True, (
+            f"AG-FP02 FAIL: integrity_ok=False after recovery: {hs}"
+        )
+
+        # Phase 5: idempotent double-restart (AG-FP02)
+        with (
+            patch("aql.pipeline.BinanceCollector", EmptyCollector),
+            patch("aql.pipeline.recover_gap", _synthetic_recover_gap),
+        ):
+            result2 = run_pipeline(
+                symbol=SYMBOL,
+                interval=INTERVAL,
+                duration_s=1.0,
+                data_dir=data_dir,
+                now_ms_fn=lambda: restart_now_ms,
+            )
+
+        sr2 = result2["startup_reconcile"]
+        assert sr2["replay_inserted"] == 0, (
+            f"AG-FP02 FAIL: second restart inserted {sr2['replay_inserted']} "
+            f"rows — not idempotent"
+        )
+        assert result2["store_total"] == self.N_FP_BARS, (
+            f"AG-FP02 FAIL: after second restart: expected {self.N_FP_BARS}, "
+            f"got {result2['store_total']}"
+        )
+
+        print(
+            f"\n  AG-FP01 PASS  SIGKILL rc={rc}  "
+            f"bars_replayed={sr['bars_replayed']}  "
+            f"store={result['store_total']}  "
+            f"health={hs['status']}\n"
+            f"  AG-FP02 PASS  "
+            f"exact_key_coverage=True  "
+            f"idempotent=(replay_inserted_2=={sr2['replay_inserted']})"
+        )
