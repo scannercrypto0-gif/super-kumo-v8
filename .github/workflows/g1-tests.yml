@@ -1,0 +1,47 @@
+name: G1 WP01–WP04 Tests
+
+on:
+  push:
+    branches:
+      - feat/g1-wp01-minimal-ingest
+      - feat/g1-wp02-stress-test
+      - feat/g1-wp03-health-snapshot
+      - feat/g1-wp04-operational-readiness
+  pull_request:
+    branches:
+      - feat/g1-wp01-minimal-ingest
+      - feat/g1-wp02-stress-test
+      - feat/g1-wp03-health-snapshot
+      - feat/g1-wp04-operational-readiness
+      - main
+
+jobs:
+  test:
+    name: G1 Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run G1 WP01–WP04 tests
+        run: >
+          python -m pytest
+          tests/test_g1_wp01.py
+          tests/test_g1_wp02.py
+          tests/test_g1_wp03.py
+          tests/test_g1_wp04.py
+          tests/test_g1_wp04_fix01.py
+          -v --tb=short
+        env:
+          BINANCE_LIVE_TEST: "0"
