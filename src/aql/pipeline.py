@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 
 from .collector.binance_collector import BinanceCollector
+from .health import take_snapshot
 from .journal.durable_journal import DurableJournal
 from .recovery.gap_recovery import recover_gap
 from .storage.operational_store import OperationalStore
@@ -216,6 +217,23 @@ def run_pipeline(
     store_count = store.count(symbol, interval)
     min_open, max_open = store.get_range(symbol, interval)
 
+    # --- Health snapshot (read-only; does not affect acquisition or trading) ---
+    # Fix-1: aggregate ALL recovery reports (startup + WS) so that any mandatory
+    # failure in any report is detected, even if a later report succeeded.
+    # Fix-3: pass startup_reconcile_error so it surfaces as UNHEALTHY.
+    _all_recovery_reports = [r["gap_report"] for r in startup_recovery_results]
+    if ws_recovery_result is not None:
+        _all_recovery_reports.append(ws_recovery_result["gap_report"])
+    health = take_snapshot(
+        journal=journal,
+        store=store,
+        symbol=symbol,
+        interval=interval,
+        recovery_reports=_all_recovery_reports,
+        replay_errors=startup_replay_errors,
+        reconcile_error=startup_reconcile_error,
+    )
+
     def _report_from(recovery_result: dict | None) -> dict | None:
         if recovery_result is None:
             return None
@@ -264,6 +282,7 @@ def run_pipeline(
         },
         "ws_gap_recovery": _report_from(ws_recovery_result),
         "supabase_status": OperationalStore.SUPABASE_STATUS,
+        "health_snapshot": health.to_dict(),
     }
 
     logger.info("Pipeline complete: %s", result)
