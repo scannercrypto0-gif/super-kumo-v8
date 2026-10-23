@@ -10,6 +10,8 @@ on:
     paths:
       - "research_wp_r0/**"
       - "tests/test_research_wp_r*.py"
+      # FIX02-Blocker1: SF-DATA-01 test file must trigger this workflow
+      - "tests/test_sf_data_01.py"
       - ".github/workflows/research-unified-fast.yml"
       - ".github/workflows/research-targeted-performance.yml"
       - ".github/workflows/research-wp-r*-tests.yml"
@@ -44,8 +46,14 @@ jobs:
           python-version: "3.14"
       - name: Python
         run: python --version
+      - name: Install pytest for SF-DATA test suite
+        # FIX02-Blocker1: pytest needed for test_sf_data_01.py (not discovered by unittest -p 'test_research_wp_r*.py')
+        run: pip install pytest -q
       - name: All research regression tests, exactly once per OS
         run: python -B -m unittest discover -s tests -p 'test_research_wp_r*.py'
+      - name: SF-DATA-01 Historical Library tests (FIX02 coverage)
+        # FIX02-Blocker1: test_sf_data_01.py was excluded by the glob 'test_research_wp_r*.py'
+        run: python -B -m pytest tests/test_sf_data_01.py -v
       - name: Reproducible synthetic Strategy Factory Batch 01
         run: python -B -m research_wp_r0.strategy_factory --output strategy-factory-batch01-artifacts
       - name: Preserve Batch 01 results and replay evidence

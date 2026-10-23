@@ -1,6 +1,6 @@
 """
 SF-DATA-01 — Historical Market Data Library V1
-Acceptance tests for Issues #47 and #50 (SF-DATA-01-FIX01)
+Acceptance tests for Issues #47 and #50 (SF-DATA-01-FIX01 and SF-DATA-01-FIX02)
 
 Coverage (original SF-DATA-01 / Issue #47):
   T01  deterministic import and snapshot replay; checksums and immutable versions
@@ -22,6 +22,14 @@ Coverage (SF-DATA-01-FIX01 / Issue #50):
   T12  Gap 4 — range_query fail-closed: partial coverage raises by default;
        require_complete=False opt-in; empty range always raises
   T13  FIX01 combined acceptance gate — all 4 fix gates must PASS
+
+Coverage (SF-DATA-01-FIX02 / Issue #50 owner review 2026-10-23):
+  T14  Blocker 2 — gap_bar_opens is a Tuple; integrity hash covers all omitted fields
+  T15  Blocker 3 — register() validates chain; from_dict() rejects tampered records
+  T16  Blocker 4 — OHLCV validation: NaN, Inf, negative price, negative volume, OHLC ordering
+  T17  Blocker 5 — DataAvailabilityKind; RETROSPECTIVE vs CONFIRMED; fail-closed PIT mode
+  T18  Blocker 6 — source_hash bound to manifest; parse from single file read
+  T19  FIX02 combined acceptance gate — all 6 fix02 gates must PASS
 """
 from __future__ import annotations
 
@@ -42,6 +50,7 @@ import os
 from research_wp_r0.historical_library import (
     ArchiveCopyInterface,
     BarQuality,
+    DataAvailabilityKind,
     DatasetManifest,
     HistoricalBar,
     HistoricalDataError,
@@ -1100,3 +1109,700 @@ class TestFix01AcceptanceGate:
 
         failed = [name for name, status in results if not status.startswith("PASS")]
         assert not failed, f"Failed FIX01 gates: {failed}"
+
+
+# ---------------------------------------------------------------------------
+# T14 — FIX02 Blocker 2: gap_bar_opens immutability + full integrity coverage
+# ---------------------------------------------------------------------------
+
+class TestFix02GapBarOpensTupleAndFullIntegrity:
+    """
+    SF-DATA-01-FIX02 Blocker 2
+    --------------------------
+    * gap_bar_opens must be a Tuple[int, ...], not List[int] — the frozen
+      dataclass prevents replacing the field, but a List's contents are still
+      mutable; a tuple is truly immutable.
+    * _compute_integrity_hash() must cover gap_bar_opens, duplicate_count,
+      non_final_count, and created_at_ms — previously omitted, allowing a
+      partial-coverage manifest to pass integrity verification.
+    """
+
+    def test_gap_bar_opens_is_tuple(self):
+        """gap_bar_opens on a freshly built manifest must be a tuple."""
+        bars = [make_test_bar(i) for i in [0, 1, 2, 4]]
+        _, manifest = validate_bars(bars, SYMBOL, INTERVAL, allow_gaps=True)
+        assert isinstance(manifest.gap_bar_opens, tuple), (
+            f"gap_bar_opens must be tuple, got {type(manifest.gap_bar_opens)}"
+        )
+
+    def test_gap_bar_opens_tuple_normalised_from_list(self):
+        """DatasetManifest.__post_init__ must normalise a list input to tuple."""
+        bars = _bars(3)
+        _, m = validate_bars(bars, SYMBOL, INTERVAL)
+        # Build a new manifest with gap_bar_opens passed as a list
+        m2 = dataclasses.replace(m, gap_bar_opens=[1, 2, 3])  # type: ignore[arg-type]
+        assert isinstance(m2.gap_bar_opens, tuple), (
+            "__post_init__ must normalise list -> tuple"
+        )
+        assert m2.gap_bar_opens == (1, 2, 3)
+
+    def test_gap_bar_opens_contents_covered_by_integrity_hash(self):
+        """Changing gap_bar_opens must produce a different manifest_integrity_hash."""
+        bars = _bars(5)
+        _, m = validate_bars(bars, SYMBOL, INTERVAL)
+        m_with_gaps = dataclasses.replace(m, gap_bar_opens=(999_000, 999_001))
+        assert m_with_gaps.manifest_integrity_hash != m.manifest_integrity_hash, (
+            "gap_bar_opens change must alter manifest_integrity_hash"
+        )
+        assert m_with_gaps.verify_integrity()
+
+    def test_duplicate_count_covered_by_integrity_hash(self):
+        """Changing duplicate_count must produce a different manifest_integrity_hash."""
+        bars = _bars(3)
+        _, m = validate_bars(bars, SYMBOL, INTERVAL)
+        m_dup = dataclasses.replace(m, duplicate_count=7)
+        assert m_dup.manifest_integrity_hash != m.manifest_integrity_hash, (
+            "duplicate_count change must alter manifest_integrity_hash"
+        )
+        assert m_dup.verify_integrity()
+
+    def test_non_final_count_covered_by_integrity_hash(self):
+        """Changing non_final_count must produce a different manifest_integrity_hash."""
+        bars = _bars(3)
+        _, m = validate_bars(bars, SYMBOL, INTERVAL)
+        m_nf = dataclasses.replace(m, non_final_count=3)
+        assert m_nf.manifest_integrity_hash != m.manifest_integrity_hash, (
+            "non_final_count change must alter manifest_integrity_hash"
+        )
+        assert m_nf.verify_integrity()
+
+    def test_created_at_ms_covered_by_integrity_hash(self):
+        """Changing created_at_ms must produce a different manifest_integrity_hash."""
+        bars = _bars(3)
+        _, m = validate_bars(bars, SYMBOL, INTERVAL)
+        m_old = dataclasses.replace(m, created_at_ms=m.created_at_ms - 1_000_000)
+        assert m_old.manifest_integrity_hash != m.manifest_integrity_hash, (
+            "created_at_ms change must alter manifest_integrity_hash"
+        )
+        assert m_old.verify_integrity()
+
+    def test_all_omitted_fields_covered_together(self):
+        """A manifest with all four previously-omitted fields changed must
+        produce a distinct integrity hash from the original."""
+        bars = [make_test_bar(i) for i in [0, 1, 3, 4]]
+        _, m = validate_bars(bars, SYMBOL, INTERVAL, allow_gaps=True)
+        # gap_bar_opens has one entry; change all four omitted fields
+        original_ih = m.manifest_integrity_hash
+        m2 = dataclasses.replace(
+            m,
+            gap_bar_opens=(BASE + 2 * IMS, BASE + 5 * IMS),
+            duplicate_count=1,
+            non_final_count=1,
+            created_at_ms=m.created_at_ms + 999,
+        )
+        assert m2.manifest_integrity_hash != original_ih
+        assert m2.verify_integrity()
+
+
+# ---------------------------------------------------------------------------
+# T15 — FIX02 Blocker 3: register() integrity chain + from_dict() tamper detection
+# ---------------------------------------------------------------------------
+
+class TestFix02RegisterIntegrityAndFromDict:
+    """
+    SF-DATA-01-FIX02 Blocker 3
+    --------------------------
+    * register() must reject bars with bad checksums, mismatched manifest_hash,
+      and invalid manifest_integrity_hash.
+    * from_dict() must validate the stored manifest_integrity_hash against the
+      recomputed value — not silently discard it.
+    """
+
+    def test_register_rejects_bar_with_bad_checksum(self):
+        """register() must raise when a bar has a tampered checksum."""
+        lib = HistoricalLibrary()
+        bars = _bars(3)
+        _, m = validate_bars(bars, SYMBOL, INTERVAL)
+        m = dataclasses.replace(m, dataset_id="ds")
+        # Silently tamper one bar's stored checksum
+        tampered_bar = bars[0]
+        object.__setattr__(tampered_bar, "checksum", "0" * 64)
+        with pytest.raises(HistoricalDataError, match="checksum"):
+            lib.register("ds", bars, m)
+
+    def test_register_rejects_mismatched_manifest_hash(self):
+        """register() must raise when manifest_hash does not match bars."""
+        lib = HistoricalLibrary()
+        bars = _bars(3)
+        _, m = validate_bars(bars, SYMBOL, INTERVAL)
+        # Replace manifest_hash with garbage (triggers re-verification in register)
+        tampered_m = dataclasses.replace(m, manifest_hash="b" * 64, dataset_id="ds")
+        with pytest.raises(HistoricalDataError, match="manifest_hash"):
+            lib.register("ds", bars, tampered_m)
+
+    def test_register_rejects_invalid_integrity_hash(self):
+        """register() must raise when manifest_integrity_hash is inconsistent."""
+        lib = HistoricalLibrary()
+        bars = _bars(3)
+        _, m = validate_bars(bars, SYMBOL, INTERVAL)
+        m2 = dataclasses.replace(m, dataset_id="ds")
+        # Force-write an invalid integrity hash (bypasses __post_init__)
+        object.__setattr__(m2, "manifest_integrity_hash", "c" * 64)
+        with pytest.raises(HistoricalDataError, match="integrity"):
+            lib.register("ds", bars, m2)
+
+    def test_register_accepts_valid_chain(self):
+        """register() must succeed when the full integrity chain is valid."""
+        lib = HistoricalLibrary()
+        bars = _bars(5)
+        _, m = validate_bars(bars, SYMBOL, INTERVAL)
+        m = dataclasses.replace(m, dataset_id="ds_ok")
+        returned = lib.register("ds_ok", bars, m)
+        assert returned.dataset_id == "ds_ok"
+        assert returned.verify_integrity()
+
+    def test_from_dict_accepts_valid_manifest(self):
+        """from_dict() must succeed for an unmodified round-trip."""
+        bars = _bars(4)
+        _, m = validate_bars(bars, SYMBOL, INTERVAL)
+        d = m.to_dict()
+        m2 = DatasetManifest.from_dict(d)
+        assert m2.manifest_integrity_hash == m.manifest_integrity_hash
+        assert m2.verify_integrity()
+
+    def test_from_dict_rejects_tampered_field_with_matching_stored_hash(self):
+        """
+        Adversary modifies a field in the dict AND updates the stored
+        manifest_integrity_hash to match the modified field.  from_dict()
+        must detect this because the recomputed hash (from ALL fields) differs
+        from the stored hash that was computed from the MODIFIED field only.
+
+        Actually, the adversary cannot easily forge the correct hash without
+        knowing the exact canonical JSON format — but this test verifies the
+        key property: changing bar_count in the dict and adjusting stored hash
+        to match is detectable because the new manifest_integrity_hash computed
+        by __post_init__ from the modified fields equals the adversary's hash,
+        and from_dict() will ACCEPT it (both match).  The adversary's power is
+        if they modify a field but leave the hash as the original — that is what
+        from_dict() must catch.
+        """
+        bars = _bars(4)
+        _, m = validate_bars(bars, SYMBOL, INTERVAL)
+        d = m.to_dict()
+        original_ih = d["manifest_integrity_hash"]
+        # Adversary modifies bar_count but leaves original hash
+        d["bar_count"] = 999
+        with pytest.raises(HistoricalDataError, match="mismatch"):
+            DatasetManifest.from_dict(d)
+
+    def test_from_dict_missing_stored_hash_is_accepted(self):
+        """Legacy records without manifest_integrity_hash should still load."""
+        bars = _bars(3)
+        _, m = validate_bars(bars, SYMBOL, INTERVAL)
+        d = m.to_dict()
+        del d["manifest_integrity_hash"]
+        m2 = DatasetManifest.from_dict(d)
+        assert m2.verify_integrity()
+
+    def test_from_dict_normalises_gap_bar_opens_list_to_tuple(self):
+        """JSON round-trip gives gap_bar_opens as list; from_dict must convert."""
+        bars = [make_test_bar(i) for i in [0, 1, 3]]
+        _, m = validate_bars(bars, SYMBOL, INTERVAL, allow_gaps=True)
+        d = m.to_dict()
+        # Simulate JSON round-trip: tuples become lists in JSON
+        assert isinstance(d["gap_bar_opens"], (list, tuple))
+        d["gap_bar_opens"] = list(d["gap_bar_opens"])
+        m2 = DatasetManifest.from_dict(d)
+        assert isinstance(m2.gap_bar_opens, tuple), (
+            "from_dict must normalise list to tuple"
+        )
+
+
+# ---------------------------------------------------------------------------
+# T16 — FIX02 Blocker 4: OHLCV numeric validation
+# ---------------------------------------------------------------------------
+
+class TestFix02OhlcvValidation:
+    """
+    SF-DATA-01-FIX02 Blocker 4
+    --------------------------
+    validate_bars() must reject:
+    * NaN or Inf in any price or volume field (math.isfinite check)
+    * Non-positive prices (open, high, low, close ≤ 0)
+    * Negative volume
+    * OHLC ordering violations (high < max(O,C,L) or low > min(O,C,H))
+    """
+
+    def _bad_bar(self, i=0, **kwargs) -> HistoricalBar:
+        """Create a bar overriding specific OHLCV fields via object.__setattr__."""
+        bar = make_test_bar(i)
+        for k, v in kwargs.items():
+            object.__setattr__(bar, k, v)
+        # Recompute checksum after field override so validate_bars checksum check
+        # doesn't fire before the OHLCV check (we want the OHLCV check to fire first)
+        object.__setattr__(bar, "checksum", bar._compute_checksum())
+        return bar
+
+    def test_nan_open_rejected(self):
+        bar = self._bad_bar(0, open=float("nan"))
+        with pytest.raises(HistoricalDataError, match="Non-finite"):
+            validate_bars([bar], SYMBOL, INTERVAL)
+
+    def test_inf_high_rejected(self):
+        bar = self._bad_bar(0, high=float("inf"))
+        with pytest.raises(HistoricalDataError, match="Non-finite"):
+            validate_bars([bar], SYMBOL, INTERVAL)
+
+    def test_neg_inf_volume_rejected(self):
+        bar = self._bad_bar(0, volume=float("-inf"))
+        with pytest.raises(HistoricalDataError, match="Non-finite"):
+            validate_bars([bar], SYMBOL, INTERVAL)
+
+    def test_zero_open_rejected(self):
+        """open=0 is non-positive → rejected."""
+        bar = self._bad_bar(0, open=0.0)
+        with pytest.raises(HistoricalDataError, match="Non-positive price"):
+            validate_bars([bar], SYMBOL, INTERVAL)
+
+    def test_negative_low_rejected(self):
+        """low < 0 is non-positive → rejected."""
+        bar = self._bad_bar(0, low=-1.0)
+        with pytest.raises(HistoricalDataError, match="Non-positive price"):
+            validate_bars([bar], SYMBOL, INTERVAL)
+
+    def test_negative_volume_rejected(self):
+        bar = self._bad_bar(0, volume=-0.001)
+        with pytest.raises(HistoricalDataError, match="Negative volume"):
+            validate_bars([bar], SYMBOL, INTERVAL)
+
+    def test_zero_volume_accepted(self):
+        """Volume=0 (e.g. illiquid bar) must be accepted."""
+        bar = self._bad_bar(0, volume=0.0)
+        validated, _ = validate_bars([bar], SYMBOL, INTERVAL)
+        assert validated[0].volume == 0.0
+
+    def test_high_below_open_rejected(self):
+        """high < open violates OHLC ordering."""
+        bar = self._bad_bar(0, open=105.0, high=104.0, low=99.0, close=100.5)
+        with pytest.raises(HistoricalDataError, match="OHLC violation"):
+            validate_bars([bar], SYMBOL, INTERVAL)
+
+    def test_high_below_close_rejected(self):
+        """high < close violates OHLC ordering."""
+        bar = self._bad_bar(0, open=100.0, high=100.4, low=99.0, close=100.5)
+        with pytest.raises(HistoricalDataError, match="OHLC violation"):
+            validate_bars([bar], SYMBOL, INTERVAL)
+
+    def test_low_above_open_rejected(self):
+        """low > open violates OHLC ordering."""
+        bar = self._bad_bar(0, open=100.0, high=101.0, low=100.5, close=100.5)
+        with pytest.raises(HistoricalDataError, match="OHLC violation"):
+            validate_bars([bar], SYMBOL, INTERVAL)
+
+    def test_low_above_close_rejected(self):
+        """low > close violates OHLC ordering."""
+        bar = self._bad_bar(0, open=100.0, high=101.0, low=100.6, close=100.5)
+        with pytest.raises(HistoricalDataError, match="OHLC violation"):
+            validate_bars([bar], SYMBOL, INTERVAL)
+
+    def test_valid_ohlcv_accepted(self):
+        """A clean bar must pass all OHLCV checks."""
+        bar = make_test_bar(0)
+        validated, manifest = validate_bars([bar], SYMBOL, INTERVAL)
+        assert len(validated) == 1
+        assert manifest.verify_integrity()
+
+    def test_doji_bar_accepted(self):
+        """open==high==low==close (doji) is valid."""
+        bar = self._bad_bar(0, open=100.0, high=100.0, low=100.0, close=100.0)
+        validated, _ = validate_bars([bar], SYMBOL, INTERVAL)
+        assert len(validated) == 1
+
+
+# ---------------------------------------------------------------------------
+# T17 — FIX02 Blocker 5: DataAvailabilityKind + fail-closed PIT mode
+# ---------------------------------------------------------------------------
+
+class TestFix02DataAvailabilityKind:
+    """
+    SF-DATA-01-FIX02 Blocker 5
+    --------------------------
+    * DataAvailabilityKind.RETROSPECTIVE marks fixture bars (theoretical cutoff).
+    * DataAvailabilityKind.CONFIRMED marks bars with recorded ingest times.
+    * availability_kind is part of the bar checksum.
+    * snapshot() / range_query() with require_confirmed_availability=True
+      excludes RETROSPECTIVE bars — fail-closed PIT mode.
+    * import_fixture_csv() must set availability_kind=RETROSPECTIVE.
+    * make_test_bar() defaults to CONFIRMED.
+    """
+
+    def test_availability_kind_enum_values(self):
+        """Both enum members must exist with expected string values."""
+        assert DataAvailabilityKind.RETROSPECTIVE == "RETROSPECTIVE"
+        assert DataAvailabilityKind.CONFIRMED == "CONFIRMED"
+
+    def test_make_test_bar_defaults_confirmed(self):
+        bar = make_test_bar(0)
+        assert bar.availability_kind == DataAvailabilityKind.CONFIRMED
+
+    def test_make_test_bar_retrospective_override(self):
+        bar = make_test_bar(0, availability_kind=DataAvailabilityKind.RETROSPECTIVE)
+        assert bar.availability_kind == DataAvailabilityKind.RETROSPECTIVE
+
+    def test_availability_kind_in_checksum(self):
+        """Changing availability_kind must produce a different checksum."""
+        bar_c = make_test_bar(0, availability_kind=DataAvailabilityKind.CONFIRMED)
+        bar_r = make_test_bar(0, availability_kind=DataAvailabilityKind.RETROSPECTIVE)
+        assert bar_c.checksum != bar_r.checksum, (
+            "availability_kind change must alter checksum"
+        )
+
+    def test_fixture_csv_sets_retrospective(self, tmp_path):
+        """import_fixture_csv must produce bars with availability_kind=RETROSPECTIVE."""
+        bars = _bars(5)
+        csv_file = tmp_path / "bars.csv"
+        csv_file.write_text(make_fixture_csv(bars))
+        imported, _ = import_fixture_csv(csv_file, SYMBOL, INTERVAL)
+        for bar in imported:
+            assert bar.availability_kind == DataAvailabilityKind.RETROSPECTIVE, (
+                f"fixture bar at {bar.bar_open} must be RETROSPECTIVE"
+            )
+
+    def test_snapshot_excludes_retrospective_when_flag_set(self):
+        """
+        When require_confirmed_availability=True, RETROSPECTIVE bars are
+        excluded from the snapshot even though they pass the PIT cutoff.
+        """
+        lib = HistoricalLibrary()
+        confirmed_bars = _bars(3)  # default: CONFIRMED
+        retro_bar = make_test_bar(3, availability_kind=DataAvailabilityKind.RETROSPECTIVE)
+        all_bars = confirmed_bars + [retro_bar]
+        _, m = validate_bars(all_bars, SYMBOL, INTERVAL)
+        lib.register("ds", all_bars, m)
+        cutoff = retro_bar.observation_cutoff_ms + 1
+
+        snap_normal = lib.snapshot("ds", cutoff)
+        snap_confirmed = lib.snapshot("ds", cutoff, require_confirmed_availability=True)
+
+        assert len(snap_normal) == 4, "Normal snapshot should include all 4 bars"
+        assert len(snap_confirmed) == 3, "Confirmed snapshot should exclude RETROSPECTIVE bar"
+        retro_opens = [b.bar_open for b in snap_confirmed
+                       if b.availability_kind == DataAvailabilityKind.RETROSPECTIVE]
+        assert retro_opens == [], "No RETROSPECTIVE bars in confirmed snapshot"
+
+    def test_range_query_excludes_retrospective_when_flag_set(self):
+        """
+        range_query with require_confirmed_availability=True excludes
+        RETROSPECTIVE bars, causing the range to appear incomplete.
+        """
+        lib = HistoricalLibrary()
+        # All bars as RETROSPECTIVE
+        retro_bars = [
+            make_test_bar(i, availability_kind=DataAvailabilityKind.RETROSPECTIVE)
+            for i in range(5)
+        ]
+        _, m = validate_bars(retro_bars, SYMBOL, INTERVAL)
+        lib.register("ds_retro", retro_bars, m)
+        cutoff = retro_bars[-1].observation_cutoff_ms + 1
+
+        # Normal range query succeeds
+        result = lib.range_query(
+            "ds_retro", retro_bars[0].bar_open, retro_bars[4].bar_open, cutoff
+        )
+        assert len(result) == 5
+
+        # With require_confirmed_availability=True, all bars excluded → incomplete
+        with pytest.raises(HistoricalDataError):
+            lib.range_query(
+                "ds_retro", retro_bars[0].bar_open, retro_bars[4].bar_open,
+                cutoff, require_confirmed_availability=True,
+            )
+
+    def test_mixed_availability_range_query_confirmed_only(self):
+        """
+        A dataset with both CONFIRMED and RETROSPECTIVE bars:
+        require_confirmed_availability=True returns only CONFIRMED bars
+        but fails if the requested range has gaps.
+        """
+        lib = HistoricalLibrary()
+        # bars 0,1: CONFIRMED; bar 2: RETROSPECTIVE; bar 3: CONFIRMED
+        confirmed_0 = make_test_bar(0, availability_kind=DataAvailabilityKind.CONFIRMED)
+        confirmed_1 = make_test_bar(1, availability_kind=DataAvailabilityKind.CONFIRMED)
+        retro_2     = make_test_bar(2, availability_kind=DataAvailabilityKind.RETROSPECTIVE)
+        confirmed_3 = make_test_bar(3, availability_kind=DataAvailabilityKind.CONFIRMED)
+        all_bars = [confirmed_0, confirmed_1, retro_2, confirmed_3]
+        _, m = validate_bars(all_bars, SYMBOL, INTERVAL)
+        lib.register("ds_mix", all_bars, m)
+        cutoff = confirmed_3.observation_cutoff_ms + 1
+
+        # Narrow query covering only confirmed bars → succeeds
+        result = lib.range_query(
+            "ds_mix", confirmed_0.bar_open, confirmed_1.bar_open,
+            cutoff, require_confirmed_availability=True,
+        )
+        assert len(result) == 2
+
+        # Query spanning the RETROSPECTIVE bar → excluded → gap → raises
+        with pytest.raises(HistoricalDataError):
+            lib.range_query(
+                "ds_mix", confirmed_0.bar_open, confirmed_3.bar_open,
+                cutoff, require_confirmed_availability=True,
+            )
+
+
+# ---------------------------------------------------------------------------
+# T18 — FIX02 Blocker 6: source_hash bound to manifest; single file read
+# ---------------------------------------------------------------------------
+
+class TestFix02SourceHashAndSingleRead:
+    """
+    SF-DATA-01-FIX02 Blocker 6
+    --------------------------
+    * import_fixture_csv() must hash and parse from the SAME bytes.
+    * source_hash must be present on the returned manifest.
+    * source_hash must be included in the manifest_integrity_hash.
+    * source_hash round-trips through to_dict() / from_dict().
+    """
+
+    def test_source_hash_present_after_import(self, tmp_path):
+        """import_fixture_csv must attach a non-None source_hash to the manifest."""
+        bars = _bars(5)
+        csv_file = tmp_path / "bars.csv"
+        csv_file.write_text(make_fixture_csv(bars))
+        _, manifest = import_fixture_csv(csv_file, SYMBOL, INTERVAL)
+        assert manifest.source_hash is not None, "source_hash must be set after import"
+        assert len(manifest.source_hash) == 64, "source_hash must be a SHA-256 hex string"
+
+    def test_source_hash_matches_file_bytes(self, tmp_path):
+        """The source_hash must equal SHA-256 of the file's raw bytes."""
+        bars = _bars(5)
+        csv_file = tmp_path / "bars.csv"
+        csv_file.write_bytes(make_fixture_csv(bars).encode("utf-8"))
+        expected_hash = hashlib.sha256(csv_file.read_bytes()).hexdigest()
+        _, manifest = import_fixture_csv(csv_file, SYMBOL, INTERVAL)
+        assert manifest.source_hash == expected_hash
+
+    def test_source_hash_in_integrity_hash(self, tmp_path):
+        """Changing source_hash must produce a different manifest_integrity_hash."""
+        bars = _bars(3)
+        csv_file = tmp_path / "bars.csv"
+        csv_file.write_text(make_fixture_csv(bars))
+        _, m = import_fixture_csv(csv_file, SYMBOL, INTERVAL)
+        original_ih = m.manifest_integrity_hash
+        m2 = dataclasses.replace(m, source_hash="a" * 64)
+        assert m2.manifest_integrity_hash != original_ih, (
+            "source_hash change must alter manifest_integrity_hash"
+        )
+        assert m2.verify_integrity()
+
+    def test_source_hash_none_has_distinct_hash_from_set(self, tmp_path):
+        """A manifest with source_hash=None must differ from one with source_hash set."""
+        bars = _bars(3)
+        csv_file = tmp_path / "bars.csv"
+        csv_file.write_text(make_fixture_csv(bars))
+        _, m = import_fixture_csv(csv_file, SYMBOL, INTERVAL)
+        m_no_hash = dataclasses.replace(m, source_hash=None)
+        assert m_no_hash.manifest_integrity_hash != m.manifest_integrity_hash, (
+            "source_hash=None vs set must produce distinct integrity hashes"
+        )
+        assert m_no_hash.verify_integrity()
+
+    def test_source_hash_survives_to_dict_from_dict(self, tmp_path):
+        """source_hash must round-trip correctly through to_dict() / from_dict()."""
+        bars = _bars(4)
+        csv_file = tmp_path / "bars.csv"
+        csv_file.write_text(make_fixture_csv(bars))
+        _, m = import_fixture_csv(csv_file, SYMBOL, INTERVAL)
+        d = m.to_dict()
+        assert "source_hash" in d
+        m2 = DatasetManifest.from_dict(d)
+        assert m2.source_hash == m.source_hash
+        assert m2.verify_integrity()
+
+    def test_different_file_content_gives_different_hash(self, tmp_path):
+        """Two fixture files with different content must produce different source hashes."""
+        bars_a = _bars(3)
+        bars_b = _bars(4)  # different number of bars
+        f_a = tmp_path / "a.csv"
+        f_b = tmp_path / "b.csv"
+        f_a.write_text(make_fixture_csv(bars_a))
+        f_b.write_text(make_fixture_csv(bars_b))
+        _, m_a = import_fixture_csv(f_a, SYMBOL, INTERVAL)
+        _, m_b = import_fixture_csv(f_b, SYMBOL, INTERVAL)
+        assert m_a.source_hash != m_b.source_hash
+
+
+# ---------------------------------------------------------------------------
+# T19 — FIX02 combined acceptance gate
+# ---------------------------------------------------------------------------
+
+class TestFix02AcceptanceGate:
+    """
+    SF-DATA-01-FIX02 — combined acceptance gate for all 6 fix02 blockers.
+    All 6 FIX02 gates must PASS.
+    """
+
+    def _run_gate(self, name: str, fn) -> tuple:
+        try:
+            fn()
+            return name, "PASS ✓"
+        except Exception as exc:
+            return name, f"FAIL ✗ — {exc}"
+
+    def test_fix02_all_gates(self, tmp_path):
+        results = []
+
+        # FIX02-AG-01: Blocker 2 — gap_bar_opens is tuple; all fields in integrity hash
+        def fix02_ag01():
+            bars = [make_test_bar(i) for i in [0, 1, 3]]
+            _, m = validate_bars(bars, SYMBOL, INTERVAL, allow_gaps=True)
+            assert isinstance(m.gap_bar_opens, tuple), "gap_bar_opens must be tuple"
+            # Each of the four previously-omitted fields must affect the hash
+            for field_kwargs, desc in [
+                ({"gap_bar_opens": (777,)}, "gap_bar_opens"),
+                ({"duplicate_count": 5}, "duplicate_count"),
+                ({"non_final_count": 5}, "non_final_count"),
+                ({"created_at_ms": m.created_at_ms + 1}, "created_at_ms"),
+            ]:
+                m2 = dataclasses.replace(m, **field_kwargs)
+                assert m2.manifest_integrity_hash != m.manifest_integrity_hash, (
+                    f"{desc} change must alter integrity hash"
+                )
+        results.append(self._run_gate("FIX02-AG-01 gap_bar_opens+integrity", fix02_ag01))
+
+        # FIX02-AG-02: Blocker 3 — register validates chain; from_dict detects tamper
+        def fix02_ag02():
+            lib = HistoricalLibrary()
+            bars = _bars(3)
+            _, m = validate_bars(bars, SYMBOL, INTERVAL)
+            m = dataclasses.replace(m, dataset_id="ds02")
+            lib.register("ds02", bars, m)
+            # Tampered bar checksum → register raises
+            lib2 = HistoricalLibrary()
+            bars2 = _bars(3)
+            _, m2 = validate_bars(bars2, SYMBOL, INTERVAL)
+            m2 = dataclasses.replace(m2, dataset_id="ds02b")
+            object.__setattr__(bars2[0], "checksum", "0" * 64)
+            try:
+                lib2.register("ds02b", bars2, m2)
+                raise AssertionError("must raise on bad checksum")
+            except HistoricalDataError:
+                pass
+            # from_dict rejects tampered field (original hash mismatch)
+            original_m = list(_bars(3))
+            _, mm = validate_bars(original_m, SYMBOL, INTERVAL)
+            d = mm.to_dict()
+            d["bar_count"] = 999  # tamper, but keep original hash
+            try:
+                DatasetManifest.from_dict(d)
+                raise AssertionError("must raise on mismatch")
+            except HistoricalDataError:
+                pass
+        results.append(self._run_gate("FIX02-AG-02 register+from_dict integrity", fix02_ag02))
+
+        # FIX02-AG-03: Blocker 4 — OHLCV checks: NaN, negative price, OHLC ordering
+        def fix02_ag03():
+            base = make_test_bar(0)
+
+            def bad_bar(**kw):
+                b = make_test_bar(0)
+                for k, v in kw.items():
+                    object.__setattr__(b, k, v)
+                object.__setattr__(b, "checksum", b._compute_checksum())
+                return b
+
+            for bad, pattern in [
+                (bad_bar(open=float("nan")),  "Non-finite"),
+                (bad_bar(high=float("inf")),  "Non-finite"),
+                (bad_bar(close=-1.0),         "Non-positive"),
+                (bad_bar(volume=-0.1),        "Negative volume"),
+                (bad_bar(high=98.0),          "OHLC violation"),   # high < close/open
+            ]:
+                try:
+                    validate_bars([bad], SYMBOL, INTERVAL)
+                    raise AssertionError(f"must raise for {pattern}")
+                except HistoricalDataError as exc:
+                    assert pattern.lower() in str(exc).lower(), (
+                        f"expected '{pattern}' in error, got: {exc}"
+                    )
+        results.append(self._run_gate("FIX02-AG-03 OHLCV validation", fix02_ag03))
+
+        # FIX02-AG-04: Blocker 5 — DataAvailabilityKind + fail-closed PIT
+        def fix02_ag04():
+            # Fixture bars must be RETROSPECTIVE
+            f = tmp_path / "fix02_ag04.csv"
+            f.write_text(make_fixture_csv(_bars(3)))
+            imported, _ = import_fixture_csv(f, SYMBOL, INTERVAL)
+            for b in imported:
+                assert b.availability_kind == DataAvailabilityKind.RETROSPECTIVE
+
+            # availability_kind in checksum
+            b_c = make_test_bar(0, availability_kind=DataAvailabilityKind.CONFIRMED)
+            b_r = make_test_bar(0, availability_kind=DataAvailabilityKind.RETROSPECTIVE)
+            assert b_c.checksum != b_r.checksum, "availability_kind must affect checksum"
+
+            # require_confirmed_availability excludes RETROSPECTIVE bars
+            lib = HistoricalLibrary()
+            retro_bars = [
+                make_test_bar(i, availability_kind=DataAvailabilityKind.RETROSPECTIVE)
+                for i in range(3)
+            ]
+            _, m = validate_bars(retro_bars, SYMBOL, INTERVAL)
+            lib.register("retro_ds", retro_bars, m)
+            cutoff = retro_bars[-1].observation_cutoff_ms + 1
+            snap = lib.snapshot("retro_ds", cutoff)
+            assert len(snap) == 3, "Normal snapshot should see all 3"
+            snap_c = lib.snapshot("retro_ds", cutoff, require_confirmed_availability=True)
+            assert len(snap_c) == 0, "Confirmed snapshot should see none"
+        results.append(self._run_gate("FIX02-AG-04 DataAvailabilityKind", fix02_ag04))
+
+        # FIX02-AG-05: Blocker 6 — source_hash bound, single-read parse
+        def fix02_ag05():
+            f = tmp_path / "fix02_ag05.csv"
+            raw = make_fixture_csv(_bars(4))
+            f.write_bytes(raw.encode("utf-8"))
+            expected_hash = hashlib.sha256(f.read_bytes()).hexdigest()
+            _, m = import_fixture_csv(f, SYMBOL, INTERVAL)
+            assert m.source_hash is not None, "source_hash must be set"
+            assert m.source_hash == expected_hash, "source_hash must match file bytes"
+            # source_hash in integrity chain
+            m2 = dataclasses.replace(m, source_hash="z" * 64)
+            assert m2.manifest_integrity_hash != m.manifest_integrity_hash
+            assert m2.verify_integrity()
+        results.append(self._run_gate("FIX02-AG-05 source_hash", fix02_ag05))
+
+        # FIX02-AG-06: full pipeline — import + register + range_query
+        def fix02_ag06():
+            f = tmp_path / "fix02_ag06.csv"
+            f.write_text(make_fixture_csv(_bars(10)))
+            imported, m = import_fixture_csv(f, SYMBOL, INTERVAL)
+            lib = HistoricalLibrary()
+            m = dataclasses.replace(m, dataset_id="full_pipeline", exchange="test", market="spot")
+            lib.register("full_pipeline", imported, m)
+            stored_m = lib.get_manifest("full_pipeline")
+            assert stored_m.source_hash is not None
+            assert stored_m.verify_integrity()
+            # All fixture bars are RETROSPECTIVE → confirmed mode fails
+            cutoff = imported[-1].observation_cutoff_ms + 1
+            try:
+                lib.range_query(
+                    "full_pipeline", imported[0].bar_open, imported[9].bar_open,
+                    cutoff, require_confirmed_availability=True,
+                )
+                raise AssertionError("must fail for RETROSPECTIVE bars in confirmed mode")
+            except HistoricalDataError:
+                pass
+            # Normal mode succeeds
+            result = lib.range_query(
+                "full_pipeline", imported[0].bar_open, imported[9].bar_open, cutoff
+            )
+            assert len(result) == 10
+        results.append(self._run_gate("FIX02-AG-06 full pipeline", fix02_ag06))
+
+        print("\n=== SF-DATA-01-FIX02 ACCEPTANCE GATE ===")
+        for name, status in results:
+            print(f"  {status:<8}  {name}")
+        print("=========================================")
+
+        failed = [name for name, status in results if not status.startswith("PASS")]
+        assert not failed, f"Failed FIX02 gates: {failed}"

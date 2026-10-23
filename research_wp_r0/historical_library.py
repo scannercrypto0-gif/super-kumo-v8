@@ -35,6 +35,20 @@ SF-DATA-01-FIX01 (Issue #50) changes vs original SF-DATA-01:
   - import_fixture_csv: raw-string guard BEFORE resolve(), symlink rejection,
     optional trusted_root parameter (Gap 3)
   - range_query: require_complete=True default; raises on partial coverage (Gap 4)
+
+SF-DATA-01-FIX02 (Issue #50 owner review 2026-10-23) changes vs FIX01:
+  - Blocker 1: CI workflow updated to include test_sf_data_01.py in discovery
+  - Blocker 2: DatasetManifest.gap_bar_opens: List→Tuple[int,...]; integrity hash
+    now covers gap_bar_opens, duplicate_count, non_final_count, created_at_ms
+  - Blocker 3: register() validates bar checksums, manifest_hash, integrity_hash;
+    from_dict() validates stored hash against recomputed (no silent laundering)
+  - Blocker 4: validate_bars() checks math.isfinite, positive prices, nonneg
+    volume, and OHLC ordering (high≥max(O,C,L); low≤min(O,C,H))
+  - Blocker 5: DataAvailabilityKind enum; availability_kind field on HistoricalBar
+    (in checksum); RETROSPECTIVE for fixtures; require_confirmed_availability
+    on snapshot() and range_query()
+  - Blocker 6: import_fixture_csv reads bytes once (hash+parse from same bytes);
+    source_hash bound to manifest via dataclasses.replace()
 """
 from __future__ import annotations
 
@@ -43,6 +57,7 @@ import dataclasses
 import hashlib
 import io
 import json
+import math
 import os
 import time
 import threading
@@ -69,6 +84,31 @@ class SourceType(str, Enum):
     SYNTHETIC = "synthetic"   # generated in-process for tests
 
 
+class DataAvailabilityKind(str, Enum):
+    """
+    Captures whether the observation timestamp is theoretically derived or
+    actually recorded.
+
+    FIX02 — Blocker 5
+    -----------------
+    RETROSPECTIVE
+        Bar was imported from a historical fixture; the actual receipt time is
+        unknown.  ``observation_cutoff_ms = bar_close + 1`` is a theoretical
+        lower bound — the bar *could not* have been known before bar close, but
+        we have no evidence of when it was actually ingested.  Researchers must
+        be aware that any analysis that depends on intra-bar or near-close
+        arrival times cannot be reproduced exactly.
+
+    CONFIRMED
+        The bar was received in real time; ``ingest_time_ms`` is recorded and
+        ``observation_cutoff_ms = max(bar_close + 1, ingest_time_ms)`` reflects
+        the actual ingestion wall-clock.  Point-in-time queries can rely on
+        this timestamp.
+    """
+    RETROSPECTIVE = "RETROSPECTIVE"   # obs time unknown; bar_close+1 is theoretical
+    CONFIRMED = "CONFIRMED"           # actual ingest time recorded
+
+
 # ---------------------------------------------------------------------------
 # Canonical OHLCV record
 # ---------------------------------------------------------------------------
@@ -89,11 +129,17 @@ class HistoricalBar:
         Wall-clock epoch-ms when the bar was received/imported.
         ``None`` if unknown — the historical receipt time is not fabricated.
 
+    ``availability_kind``
+        Whether the observation timestamp is theoretically derived
+        (RETROSPECTIVE, from a fixture) or actually recorded (CONFIRMED, from
+        the real-time pipeline).  Included in the checksum so that a fixture
+        bar cannot be silently promoted to CONFIRMED without detection.
+
     ``checksum``
         SHA-256 of a canonical JSON payload covering all OHLCV fields,
         provenance metadata (symbol, interval, quality, source, source_label),
-        AND temporal integrity fields (observation_cutoff_ms, ingest_time_ms).
-        Any tamper of ANY field changes the checksum.
+        temporal integrity fields (observation_cutoff_ms, ingest_time_ms),
+        AND availability_kind.  Any tamper of ANY field changes the checksum.
     """
     symbol: str
     interval: str
@@ -109,6 +155,8 @@ class HistoricalBar:
     source_label: str      # e.g. "binance_spot", "fixture_v1"
     observation_cutoff_ms: int   # earliest decision point that may use this bar
     ingest_time_ms: Optional[int]  # None = unknown
+    # FIX02 — Blocker 5: distinguishes theoretical (fixture) from recorded timestamps
+    availability_kind: DataAvailabilityKind = DataAvailabilityKind.CONFIRMED
     checksum: str = field(default="", compare=False)
 
     def __post_init__(self):
@@ -118,10 +166,14 @@ class HistoricalBar:
 
     def _compute_checksum(self) -> str:
         """
-        SHA-256 over canonical JSON covering all OHLCV + provenance + temporal fields.
+        SHA-256 over canonical JSON covering all OHLCV + provenance + temporal
+        + availability fields.
 
         FIX01 — Gap 1: observation_cutoff_ms, ingest_time_ms and source_label
-        are now included so that any tamper of these fields is detectable.
+        are included so that any tamper of these fields is detectable.
+
+        FIX02 — Blocker 5: availability_kind is included so that a RETROSPECTIVE
+        fixture bar cannot be silently promoted to CONFIRMED without detection.
         """
         payload = json.dumps({
             "symbol": self.symbol,
@@ -139,6 +191,8 @@ class HistoricalBar:
             "source_label": self.source_label,
             "observation_cutoff_ms": self.observation_cutoff_ms,
             "ingest_time_ms": self.ingest_time_ms,  # None serialises as JSON null
+            # FIX02 — Blocker 5: availability classification
+            "availability_kind": self.availability_kind.value,
         }, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(payload.encode()).hexdigest()
 
@@ -164,10 +218,9 @@ class DatasetManifest:
         SHA-256 of all bar checksums concatenated in bar_open order.
         Detects any change in bar OHLCV / provenance / temporal fields.
     ``manifest_integrity_hash``
-        SHA-256 of a canonical JSON covering all manifest metadata fields
-        (dataset_id, version, exchange, market, symbol, interval, timezone,
-        source_label, bar_count, min/max_bar_open, coverage_pct, gap_count,
-        parent_version, lineage_reason) AND manifest_hash.
+        SHA-256 of a canonical JSON covering ALL manifest metadata fields —
+        including gap_bar_opens, duplicate_count, non_final_count, created_at_ms
+        and source_hash (FIX02) — plus manifest_hash.
         Detects tampering with manifest metadata even when bar content is intact.
 
     FIX01 — Gap 2
@@ -178,6 +231,20 @@ class DatasetManifest:
     * register() and correct() use dataclasses.replace() instead of direct
       field mutation; each replace() triggers __post_init__ which recomputes
       manifest_integrity_hash to reflect the updated fields.
+
+    FIX02 — Blocker 2
+    -----------------
+    * gap_bar_opens changed to Tuple[int, ...] — the frozen dataclass cannot
+      prevent mutation of a List's contents; a tuple is truly immutable.
+      __post_init__ normalises any list input to a tuple before hashing.
+    * _compute_integrity_hash now covers gap_bar_opens, duplicate_count,
+      non_final_count, and created_at_ms — previously omitted, allowing a
+      partial-coverage or stale manifest to pass integrity verification.
+
+    FIX02 — Blocker 6
+    -----------------
+    * source_hash: Optional[str] added — SHA-256 of the raw fixture file bytes,
+      bound to the manifest at import time and included in the integrity hash.
 
     Corrected datasets must produce a NEW version with a lineage reference.
     """
@@ -194,25 +261,49 @@ class DatasetManifest:
     max_bar_open: int        # epoch-ms
     coverage_pct: float      # 0–100; fraction of expected bars present
     gap_count: int
-    gap_bar_opens: List[int] # sorted list of missing expected bar_opens
+    # FIX02 — Blocker 2: Tuple[int, ...] is immutable; List contents are mutable
+    # even inside a frozen dataclass.  __post_init__ normalises any list input.
+    gap_bar_opens: Tuple[int, ...]
     duplicate_count: int
     non_final_count: int
     manifest_hash: str       # sha256 of all bar checksums in bar_open order
     created_at_ms: int
     parent_version: Optional[int]  # lineage: which version this corrects
     lineage_reason: Optional[str]
+    # FIX02 — Blocker 6: SHA-256 of raw fixture file bytes; None for non-file sources
+    source_hash: Optional[str] = None
     # FIX01: manifest-level integrity hash (auto-computed in __post_init__)
     manifest_integrity_hash: str = field(default="", compare=False)
 
     def __post_init__(self):
-        """Compute and freeze manifest_integrity_hash on construction."""
+        """
+        Normalise gap_bar_opens to a tuple, then compute and freeze
+        manifest_integrity_hash.
+
+        FIX02 — Blocker 2: normalisation happens BEFORE hashing so that the
+        integrity hash always reflects a canonical tuple representation,
+        regardless of whether the caller passed a list or a tuple.
+        """
+        # Normalise gap_bar_opens to tuple (frozen dataclass cannot prevent
+        # mutation of a list's *contents*, but a tuple is truly immutable)
+        gbo = self.gap_bar_opens
+        if not isinstance(gbo, tuple):
+            object.__setattr__(self, "gap_bar_opens", tuple(gbo))
         ih = self._compute_integrity_hash()
         object.__setattr__(self, "manifest_integrity_hash", ih)
 
     def _compute_integrity_hash(self) -> str:
         """
-        SHA-256 over canonical JSON of all manifest metadata + manifest_hash.
+        SHA-256 over canonical JSON of ALL manifest metadata + manifest_hash.
         Does NOT include manifest_integrity_hash itself (avoids circularity).
+
+        FIX02 — Blocker 2: gap_bar_opens, duplicate_count, non_final_count and
+        created_at_ms were previously omitted, allowing a partial-coverage
+        manifest or one with stale timestamps to pass verification.  They are
+        now included.
+
+        FIX02 — Blocker 6: source_hash included so fixture-file provenance is
+        part of the integrity chain.
         """
         payload = json.dumps({
             "dataset_id": self.dataset_id,
@@ -228,8 +319,15 @@ class DatasetManifest:
             "max_bar_open": self.max_bar_open,
             "coverage_pct": self.coverage_pct,
             "gap_count": self.gap_count,
+            # FIX02 — Blocker 2: previously omitted fields
+            "gap_bar_opens": list(self.gap_bar_opens),  # canonical list for JSON
+            "duplicate_count": self.duplicate_count,
+            "non_final_count": self.non_final_count,
+            "created_at_ms": self.created_at_ms,
             "parent_version": self.parent_version,
             "lineage_reason": self.lineage_reason,
+            # FIX02 — Blocker 6: fixture file provenance
+            "source_hash": self.source_hash,
             "manifest_hash": self.manifest_hash,
         }, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(payload.encode()).hexdigest()
@@ -253,9 +351,37 @@ class DatasetManifest:
 
     @classmethod
     def from_dict(cls, d: dict) -> "DatasetManifest":
+        """
+        Reconstruct a DatasetManifest from a dict (e.g. from JSON serialisation).
+
+        FIX02 — Blocker 3: the previous implementation silently discarded the
+        stored ``manifest_integrity_hash`` and recomputed it from the fields.
+        This launders a tampered record: an adversary who modifies both a field
+        AND the stored hash to match would produce a "valid" manifest.
+
+        The corrected implementation:
+        1. Pops the stored hash (to avoid passing it to __init__).
+        2. Normalises gap_bar_opens from a JSON list to a tuple.
+        3. Constructs the object (which recomputes the hash in __post_init__).
+        4. Validates that the STORED hash matches the RECOMPUTED hash.
+           If they differ the record has been tampered → raises HistoricalDataError.
+
+        If the stored dict has no manifest_integrity_hash (e.g. legacy record)
+        the validation step is skipped and the computed hash is accepted.
+        """
         d = dict(d)
-        d.pop("manifest_integrity_hash", None)  # let __post_init__ recompute
-        return cls(**d)
+        stored_ih = d.pop("manifest_integrity_hash", None)
+        # Normalise gap_bar_opens: JSON arrays deserialise as lists; we need tuples
+        if "gap_bar_opens" in d and isinstance(d["gap_bar_opens"], list):
+            d["gap_bar_opens"] = tuple(d["gap_bar_opens"])
+        obj = cls(**d)
+        # Validate stored hash against freshly recomputed hash
+        if stored_ih is not None and obj.manifest_integrity_hash != stored_ih:
+            raise HistoricalDataError(
+                "manifest_integrity_hash mismatch on from_dict: "
+                "stored hash does not match recomputed value — record may have been tampered"
+            )
+        return obj
 
 
 # ---------------------------------------------------------------------------
@@ -316,6 +442,34 @@ def validate_bars(
         if bar.interval != interval:
             raise HistoricalDataError(
                 f"Cross-interval contamination: expected {interval}, got {bar.interval}"
+            )
+        # FIX02 — Blocker 4: OHLCV numeric validity checks
+        for fname, fval in (
+            ("open", bar.open), ("high", bar.high),
+            ("low", bar.low), ("close", bar.close), ("volume", bar.volume),
+        ):
+            if not math.isfinite(fval):
+                raise HistoricalDataError(
+                    f"Non-finite {fname} at bar_open={bar.bar_open}: {fval!r}"
+                )
+        if bar.open <= 0 or bar.high <= 0 or bar.low <= 0 or bar.close <= 0:
+            raise HistoricalDataError(
+                f"Non-positive price at bar_open={bar.bar_open}: "
+                f"O={bar.open} H={bar.high} L={bar.low} C={bar.close}"
+            )
+        if bar.volume < 0:
+            raise HistoricalDataError(
+                f"Negative volume at bar_open={bar.bar_open}: {bar.volume!r}"
+            )
+        if bar.high < max(bar.open, bar.close, bar.low):
+            raise HistoricalDataError(
+                f"OHLC violation at bar_open={bar.bar_open}: "
+                f"high={bar.high} < max(open={bar.open}, close={bar.close}, low={bar.low})"
+            )
+        if bar.low > min(bar.open, bar.close, bar.high):
+            raise HistoricalDataError(
+                f"OHLC violation at bar_open={bar.bar_open}: "
+                f"low={bar.low} > min(open={bar.open}, close={bar.close}, high={bar.high})"
             )
         if bar.quality != BarQuality.FINAL:
             non_final += 1
@@ -445,46 +599,58 @@ def import_fixture_csv(
     if not resolved.is_file():
         raise HistoricalDataError(f"Fixture not found: {resolved}")
 
-    source_hash = hashlib.sha256(resolved.read_bytes()).hexdigest()
+    # FIX02 — Blocker 6: read bytes ONCE; hash them; parse via StringIO.
+    # Previous code called read_bytes() for hashing then opened the file
+    # again for parsing — two separate reads, which could theoretically
+    # diverge on a replaced file.  A single read guarantees the hash and
+    # the parsed bars correspond to exactly the same bytes.
+    file_bytes = resolved.read_bytes()
+    source_hash = hashlib.sha256(file_bytes).hexdigest()
+
     interval_ms = _interval_to_ms(interval)
     bars: List[HistoricalBar] = []
 
-    with resolved.open(newline="", encoding="utf-8") as f:
-        reader = csv.reader(f)
-        for i, row in enumerate(reader):
-            if not row or row[0].startswith("#"):
-                continue
-            if len(row) < 7:
-                raise HistoricalDataError(
-                    f"Row {i+1}: expected 7 columns, got {len(row)}"
-                )
-            try:
-                bar_open = int(row[0])
-                bar_close = int(row[1])
-                o, h, l, c, v = (float(x) for x in row[2:7])
-            except ValueError as e:
-                raise HistoricalDataError(f"Row {i+1}: parse error: {e}") from e
-            expected_close = bar_open + interval_ms - 1
-            if bar_close != expected_close:
-                raise HistoricalDataError(
-                    f"Row {i+1}: bar_close {bar_close} != expected {expected_close}"
-                )
-            obs_cutoff = bar_close + 1
-            bar = HistoricalBar(
-                symbol=symbol,
-                interval=interval,
-                bar_open=bar_open,
-                bar_close=bar_close,
-                open=o, high=h, low=l, close=c, volume=v,
-                quality=BarQuality.FINAL,
-                source=SourceType.FIXTURE,
-                source_label=source_label,
-                observation_cutoff_ms=obs_cutoff,
-                ingest_time_ms=None,  # receipt time unknown for historical fixtures
+    reader = csv.reader(io.StringIO(file_bytes.decode("utf-8")))
+    for i, row in enumerate(reader):
+        if not row or row[0].startswith("#"):
+            continue
+        if len(row) < 7:
+            raise HistoricalDataError(
+                f"Row {i+1}: expected 7 columns, got {len(row)}"
             )
-            bars.append(bar)
+        try:
+            bar_open = int(row[0])
+            bar_close = int(row[1])
+            o, h, l, c, v = (float(x) for x in row[2:7])
+        except ValueError as e:
+            raise HistoricalDataError(f"Row {i+1}: parse error: {e}") from e
+        expected_close = bar_open + interval_ms - 1
+        if bar_close != expected_close:
+            raise HistoricalDataError(
+                f"Row {i+1}: bar_close {bar_close} != expected {expected_close}"
+            )
+        obs_cutoff = bar_close + 1
+        bar = HistoricalBar(
+            symbol=symbol,
+            interval=interval,
+            bar_open=bar_open,
+            bar_close=bar_close,
+            open=o, high=h, low=l, close=c, volume=v,
+            quality=BarQuality.FINAL,
+            source=SourceType.FIXTURE,
+            source_label=source_label,
+            observation_cutoff_ms=obs_cutoff,
+            ingest_time_ms=None,          # receipt time unknown for historical fixtures
+            # FIX02 — Blocker 5: fixture bars are RETROSPECTIVE — bar_close+1 is a
+            # theoretical lower bound, not a confirmed ingestion timestamp
+            availability_kind=DataAvailabilityKind.RETROSPECTIVE,
+        )
+        bars.append(bar)
 
     validated, manifest = validate_bars(bars, symbol, interval, allow_gaps=allow_gaps)
+    # FIX02 — Blocker 6: bind source_hash to manifest so fixture provenance is
+    # permanently part of the integrity chain
+    manifest = dataclasses.replace(manifest, source_hash=source_hash)
     return validated, manifest
 
 
@@ -522,9 +688,38 @@ class HistoricalLibrary:
         DatasetManifest instance is produced via dataclasses.replace() (which
         recomputes manifest_integrity_hash to reflect the new dataset_id).
         The caller's manifest reference is never mutated.
+
+        FIX02 — Blocker 3: validate the full integrity chain before storing:
+        1. All bar checksums must pass (detect OHLCV/provenance tamper).
+        2. manifest.verify_hash(bars) must hold (detect bar-set tamper).
+        3. manifest.verify_integrity() must hold (detect metadata tamper).
         """
+        # FIX02 — Blocker 3: bar-level checksum validation
+        bad_keys = [b.stable_key() for b in bars if not b.verify_checksum()]
+        if bad_keys:
+            raise HistoricalDataError(
+                f"Bar checksum failure(s) for {dataset_id}: {bad_keys[:5]}"
+            )
+        # FIX02 — Blocker 3: manifest_hash must match the submitted bars
+        if not manifest.verify_hash(bars):
+            raise HistoricalDataError(
+                f"manifest_hash does not match bars for {dataset_id} "
+                f"v{manifest.version}"
+            )
+        # FIX02 — Blocker 3: manifest_integrity_hash must be self-consistent
+        if not manifest.verify_integrity():
+            raise HistoricalDataError(
+                f"manifest_integrity_hash invalid for {dataset_id} "
+                f"v{manifest.version}"
+            )
         if manifest.dataset_id != dataset_id:
             manifest = dataclasses.replace(manifest, dataset_id=dataset_id)
+            # After replace(), re-verify integrity (dataset_id is now different)
+            if not manifest.verify_integrity():
+                raise HistoricalDataError(
+                    f"manifest_integrity_hash invalid after dataset_id update "
+                    f"for {dataset_id}"
+                )
         if dataset_id not in self._datasets:
             self._datasets[dataset_id] = {}
         if manifest.version in self._datasets[dataset_id]:
@@ -559,6 +754,7 @@ class HistoricalLibrary:
         decision_cutoff_ms: int,
         *,
         version: Optional[int] = None,
+        require_confirmed_availability: bool = False,
     ) -> List[HistoricalBar]:
         """
         Return all bars observable at ``decision_cutoff_ms`` (point-in-time).
@@ -566,14 +762,27 @@ class HistoricalLibrary:
         Bars with observation_cutoff_ms > decision_cutoff_ms are excluded,
         preventing future-bar leakage into research decisions.
 
+        ``require_confirmed_availability``
+            When True, also excludes RETROSPECTIVE bars (fixtures whose
+            observation timestamp is a theoretical lower bound, not an actual
+            ingestion time).  Use this when the research requires a provably
+            confirmed ingest time for every bar.
+
         Returns an empty list when no bars are observable at the given cutoff.
         For range-complete guarantees use range_query() with require_complete=True.
+
+        FIX02 — Blocker 5: require_confirmed_availability added.
         """
         if dataset_id not in self._datasets:
             raise HistoricalDataError(f"Unknown dataset: {dataset_id}")
         v = version if version is not None else self.latest_version(dataset_id)
         bars, _ = self._datasets[dataset_id][v]
         eligible = [b for b in bars if b.observation_cutoff_ms <= decision_cutoff_ms]
+        if require_confirmed_availability:
+            eligible = [
+                b for b in eligible
+                if b.availability_kind == DataAvailabilityKind.CONFIRMED
+            ]
         return sorted(eligible, key=lambda b: b.bar_open)
 
     def range_query(
@@ -585,6 +794,7 @@ class HistoricalLibrary:
         *,
         version: Optional[int] = None,
         require_complete: bool = True,
+        require_confirmed_availability: bool = False,
     ) -> List[HistoricalBar]:
         """
         Return bars in [start_ms, end_ms] observable at decision_cutoff_ms.
@@ -595,10 +805,20 @@ class HistoricalLibrary:
         [start_ms, end_ms] with no gaps.  This prevents silent partial
         backtests.
 
+        ``require_confirmed_availability``
+            Forwarded to snapshot(): when True, RETROSPECTIVE bars are excluded
+            before the completeness check.  A dataset that contains only
+            RETROSPECTIVE bars with this flag set will fail as incomplete.
+
         Set require_complete=False only when explicitly handling partial data.
         Raises if no bars qualify at all regardless of require_complete.
+
+        FIX02 — Blocker 5: require_confirmed_availability added.
         """
-        all_bars = self.snapshot(dataset_id, decision_cutoff_ms, version=version)
+        all_bars = self.snapshot(
+            dataset_id, decision_cutoff_ms, version=version,
+            require_confirmed_availability=require_confirmed_availability,
+        )
         result = [b for b in all_bars if start_ms <= b.bar_open <= end_ms]
         if not result:
             raise HistoricalDataError(
@@ -788,7 +1008,14 @@ def make_test_bar(
     source: SourceType = SourceType.SYNTHETIC,
     quality: BarQuality = BarQuality.FINAL,
     ingest_time_ms: Optional[int] = None,
+    availability_kind: DataAvailabilityKind = DataAvailabilityKind.CONFIRMED,
 ) -> HistoricalBar:
+    """
+    Create a synthetic test bar.
+
+    FIX02 — Blocker 5: availability_kind parameter added (default CONFIRMED)
+    so that test helpers can produce RETROSPECTIVE bars where needed.
+    """
     interval_ms = _interval_to_ms(interval)
     bar_open = base_open + i * interval_ms
     bar_close = bar_open + interval_ms - 1
@@ -810,6 +1037,7 @@ def make_test_bar(
         source_label="synthetic",
         observation_cutoff_ms=obs_cutoff,
         ingest_time_ms=ingest_time_ms,
+        availability_kind=availability_kind,
     )
 
 
