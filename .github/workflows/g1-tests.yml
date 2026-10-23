@@ -31,17 +31,23 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Upgrade pip and setuptools
+        run: pip install --upgrade pip setuptools wheel
+
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
       - name: Run G1 WP01–WP04 tests
         run: >
-          python -m pytest
-          tests/test_g1_wp01.py
-          tests/test_g1_wp02.py
-          tests/test_g1_wp03.py
-          tests/test_g1_wp04.py
-          tests/test_g1_wp04_fix01.py
-          -v --tb=short
+          python -m pytest tests/
+          -v --tb=long
+          --junit-xml=test-results-${{ matrix.os }}.xml
         env:
           BINANCE_LIVE_TEST: "0"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: test-results-${{ matrix.os }}.xml
