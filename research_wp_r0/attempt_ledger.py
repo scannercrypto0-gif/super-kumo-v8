@@ -59,9 +59,9 @@ class AttemptLedger:
     No UPDATE/DELETE API. Entire bounded chain/state replay checked each append.
     A supplied external checkpoint must match a retained prefix, including on open.
     """
-    def __init__(self, path, *, expected_checkpoint=None):
+    def __init__(self, path, *, expected_checkpoint=None, require_admission=False):
         self.path = _checked_path(path)
-        self.expected_checkpoint = expected_checkpoint
+        self.expected_checkpoint = expected_checkpoint\n        self.require_admission = require_admission
         existed = self.path.exists()
         if not existed and expected_checkpoint is not None:
             raise ValueError("Anchored ledger missing; refusing recreation")
