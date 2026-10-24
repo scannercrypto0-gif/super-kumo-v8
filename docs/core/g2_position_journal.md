@@ -14,3 +14,7 @@ This experimental single-writer JSONL journal fsyncs each event, verifies a SHA-
 ## In-process serialization
 
 A module-wide Python threading mutex now serializes `append` calls made by journal instances **within the same interpreter process**. Together with the pre-append disk verification, this rejects stale second instances rather than allowing sequential interleaving. This is **not** a cross-process file lock and does not prevent another executable from changing the file. Do not interpret it as production multi-process safety.
+
+## Cross-process writer lock (experimental)
+
+Appends now acquire an atomic `O_CREAT | O_EXCL` sidecar `.writer.lock` before checking/replaying/writing the journal. Cooperating processes on a local filesystem cannot simultaneously enter the write critical section. A crash may leave the lock behind: fail closed; **never delete a lock without confirming the owning process is dead and inspecting the journal**. This is not a distributed lock and must not be assumed safe on all network filesystems. There is no automatic orphan-lock recovery, lock ownership fencing, or crash-atomic directory durability guarantee. These are required for production readiness.
