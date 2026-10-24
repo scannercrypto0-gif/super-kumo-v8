@@ -59,9 +59,10 @@ class AttemptLedger:
     No UPDATE/DELETE API. Entire bounded chain/state replay checked each append.
     A supplied external checkpoint must match a retained prefix, including on open.
     """
-    def __init__(self, path, *, expected_checkpoint=None):
+    def __init__(self, path, *, expected_checkpoint=None, require_admission=False):
         self.path = _checked_path(path)
         self.expected_checkpoint = expected_checkpoint
+        self.require_admission = require_admission
         existed = self.path.exists()
         if not existed and expected_checkpoint is not None:
             raise ValueError("Anchored ledger missing; refusing recreation")
@@ -70,6 +71,18 @@ class AttemptLedger:
             if not existed:
                 db.execute("CREATE TABLE receipts(seq INTEGER PRIMARY KEY, event_id TEXT UNIQUE NOT NULL, payload BLOB NOT NULL, chain_hash TEXT NOT NULL)")
                 db.execute("PRAGMA user_version=1")
+            db.execute("CREATE TABLE IF NOT EXISTS ledger_policy (id INTEGER PRIMARY KEY CHECK(id=1), require_admission INTEGER NOT NULL CHECK(require_admission IN (0,1)))")
+            stored = db.execute("SELECT require_admission FROM ledger_policy WHERE id=1").fetchone()
+            if stored is None:
+                db.execute("INSERT INTO ledger_policy(id, require_admission) VALUES(1, ?)",
+                           (int(bool(require_admission)),))
+                self.require_admission = bool(require_admission)
+            else:
+                self.require_admission = bool(stored[0])
+                if require_admission and not self.require_admission:
+                    db.execute("UPDATE ledger_policy SET require_admission=1 WHERE id=1")
+                    self.require_admission = True
+            db.execute("CREATE TABLE IF NOT EXISTS frozen_plan_policy (id INTEGER PRIMARY KEY CHECK(id=1), plan_digest TEXT NOT NULL, plan_bytes BLOB NOT NULL)")
             self._read(db)
         finally:
             db.close()
@@ -171,7 +184,40 @@ class AttemptLedger:
         identity = {k: event.get(k) for k in ("family_id", "candidate_id", "input_digest", "state")}
         return _hash(b"AQL:ATTEMPT-ID:1\0" + canonical(identity))
 
-    def record_attempt(self, event):
+    def bind_frozen_plan(self, raw_plan, expected_digest):
+        """Enroll an empty ledger into a durable plan policy (one-time only).
+
+        Plan identity is checked inside each subsequent append transaction.
+        Custody of the initial digest must be verified independently.
+        """
+        from .frozen_research_plan import verify_research_plan
+        verify_research_plan(raw_plan, expected_digest)
+        db = self._connect()
+        try:
+            db.execute("BEGIN IMMEDIATE")
+            events, _ = self._read(db)
+            stored = db.execute("SELECT plan_digest,plan_bytes FROM frozen_plan_policy WHERE id=1").fetchone()
+            if stored is not None:
+                if stored[0] != expected_digest or bytes(stored[1]) != raw_plan:
+                    raise ValueError("Frozen plan policy cannot be replaced")
+            else:
+                if events:
+                    raise ValueError("Frozen plan enrollment requires empty ledger")
+                db.execute("INSERT INTO frozen_plan_policy VALUES(1,?,?)",
+                           (expected_digest, raw_plan))
+                db.execute("UPDATE ledger_policy SET require_admission=1 WHERE id=1")
+            db.execute("COMMIT")
+        finally:
+            if db.in_transaction: db.execute("ROLLBACK")
+            db.close()
+
+    def record_attempt(self, event, *, admission=None):
+        """Append receipt; optional admission is checked under BEGIN IMMEDIATE.
+
+        An admission callback must be trusted, deterministic and side-effect
+        free. Existing callers remain supported, so this alone does not
+        prohibit unguarded writes through the original API.
+        """
         raw = canonical(event)
         if len(raw) > 2_000_000:
             raise ValueError("Receipt exceeds bounded size")
@@ -181,6 +227,28 @@ class AttemptLedger:
         try:
             db.execute("BEGIN IMMEDIATE")
             events, checkpoint = self._read(db)
+            policy = db.execute("SELECT require_admission FROM ledger_policy WHERE id=1").fetchone()
+            if policy is None:
+                raise ValueError("Missing durable admission policy")
+            sealed = db.execute("SELECT plan_digest,plan_bytes FROM frozen_plan_policy WHERE id=1").fetchone()
+            if sealed is not None:
+                from .frozen_research_plan import verify_research_plan
+                plan = verify_research_plan(bytes(sealed[1]), sealed[0])
+                if event.get("family_id") != plan["family_id"] or not any(
+                    item["candidate_id"] == event.get("candidate_id") and
+                    item["strategy_digest"] == event.get("strategy_digest")
+                    for item in plan["candidates"]
+                ):
+                    raise ValueError("Event violates sealed frozen plan")
+                for prior in events:
+                    if prior["family_id"] != plan["family_id"] or not any(
+                        item["candidate_id"] == prior.get("candidate_id") and
+                        item["strategy_digest"] == prior.get("strategy_digest")
+                        for item in plan["candidates"]
+                    ):
+                        raise ValueError("Prior event violates sealed frozen plan")
+            elif bool(policy[0]) and admission is None:
+                raise ValueError("Durable admission policy requires callback")
             existing = db.execute("SELECT payload FROM receipts WHERE event_id=?", (eid,)).fetchone()
             if existing:
                 if bytes(existing[0]) != raw:
@@ -194,6 +262,8 @@ class AttemptLedger:
             states = {}; identities = {}
             for prior in events: self._validate(prior, states, identities)
             self._validate(event, states, identities)
+            if admission is not None:
+                admission(event, tuple(events), checkpoint)
             chain = _hash(bytes.fromhex(checkpoint[1]) + raw)
             db.execute("INSERT INTO receipts VALUES(?,?,?,?)", (checkpoint[0]+1, eid, raw, chain))
             db.execute("COMMIT")  # ACK only after successful real SQLite commit.
@@ -213,7 +283,21 @@ class AttemptLedger:
 
 
 def prepare_durable_candidate(ledger, *args, **kwargs):
-    """Existing bridge + durable immutable INPUTS receipt; no evaluation result."""
+    """Legacy bridge, disabled for frozen-plan protected ledgers.
+
+    A frozen research run must use a plan-aware recorder/adapter; never
+    allow this legacy bridge to silently write through a sealed policy.
+    """
+    if not isinstance(ledger, AttemptLedger):
+        raise ValueError("Real Factory AttemptLedger required")
+    db = ledger._connect()
+    try:
+        sealed = db.execute("SELECT 1 FROM frozen_plan_policy WHERE id=1").fetchone()
+        policy = db.execute("SELECT require_admission FROM ledger_policy WHERE id=1").fetchone()
+        if sealed is not None or policy is None or bool(policy[0]):
+            raise ValueError("Legacy preparation prohibited on protected ledger")
+    finally:
+        db.close()
     from .historical_evaluation_bridge import prepare_candidate
     prepared, inputs = prepare_candidate(AttemptRecorder(ledger), *args, **kwargs)
     ledger.record_attempt({**prepared.__dict__, "state": "INPUTS",
