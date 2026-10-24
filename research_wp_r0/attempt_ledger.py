@@ -171,7 +171,13 @@ class AttemptLedger:
         identity = {k: event.get(k) for k in ("family_id", "candidate_id", "input_digest", "state")}
         return _hash(b"AQL:ATTEMPT-ID:1\0" + canonical(identity))
 
-    def record_attempt(self, event):
+    def record_attempt(self, event, *, admission=None):
+        """Append receipt; optional admission is checked under BEGIN IMMEDIATE.
+
+        An admission callback must be trusted, deterministic and side-effect
+        free. Existing callers remain supported, so this alone does not
+        prohibit unguarded writes through the original API.
+        """
         raw = canonical(event)
         if len(raw) > 2_000_000:
             raise ValueError("Receipt exceeds bounded size")
@@ -194,6 +200,8 @@ class AttemptLedger:
             states = {}; identities = {}
             for prior in events: self._validate(prior, states, identities)
             self._validate(event, states, identities)
+            if admission is not None:
+                admission(event, tuple(events), checkpoint)
             chain = _hash(bytes.fromhex(checkpoint[1]) + raw)
             db.execute("INSERT INTO receipts VALUES(?,?,?,?)", (checkpoint[0]+1, eid, raw, chain))
             db.execute("COMMIT")  # ACK only after successful real SQLite commit.
