@@ -159,4 +159,20 @@ class JournalTests(unittest.TestCase):
             fresh=DurablePositionJournal(p)
             self.assertEqual(fresh.append(self.e('close','closed',10,'exit')),'inserted')
             self.assertEqual(DurablePositionJournal(p).ledger.status('p1',11),'closed')
+    def test_deleted_journal_rejected_by_existing_writer(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/'journal.jsonl'
+            j=DurablePositionJournal(p)
+            j.append(self.e('start','opened',0))
+            p.unlink()
+            with self.assertRaises(JournalIntegrityError):
+                j.append(self.e('exit','closed',10,'exit'))
+            self.assertFalse(p.exists())
+    def test_empty_journal_first_event(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/'journal.jsonl'
+            p.touch()
+            j=DurablePositionJournal(p)
+            self.assertEqual(j.append(self.e('start','opened',0)),'inserted')
+            self.assertEqual(DurablePositionJournal(p).ledger.status('p1',1),'open')
 if __name__=='__main__':unittest.main()
