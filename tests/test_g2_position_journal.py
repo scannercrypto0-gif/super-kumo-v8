@@ -33,4 +33,13 @@ class JournalTests(unittest.TestCase):
             p=Path(d)/'journal.jsonl';j=DurablePositionJournal(p);j.append(self.e('start','opened',0))
             with p.open('ab') as f:f.write(b'{"partial":')
             with self.assertRaises(JournalIntegrityError): DurablePositionJournal(p)
+    def test_stale_writer_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/'journal.jsonl'
+            first=DurablePositionJournal(p)
+            second=DurablePositionJournal(p)
+            first.append(self.e('start','opened',0))
+            with self.assertRaises(JournalIntegrityError):
+                second.append(self.e('other','opened',1))
+            self.assertEqual(DurablePositionJournal(p).ledger.status('p1',10),'open')
 if __name__=='__main__':unittest.main()
