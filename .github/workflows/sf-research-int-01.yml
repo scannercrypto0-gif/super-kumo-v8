@@ -1,7 +1,5 @@
 name: SF-RESEARCH-INT-01 Contracts
 on:
-  push:
-    branches: [feat/sf-research-int-01]
   pull_request:
     branches: [main]
     paths: ["research_wp_r0/**", "tests/test_sf_*.py", "integration_tests/test_sf_strat_ind02.py", ".github/workflows/sf-research-int-01.yml"]
@@ -33,11 +31,11 @@ jobs:
           python -m pip freeze | tee -a sf-research-source.txt
           python -B -c "import pathlib,research_wp_r0.historical_evaluation_bridge as b; p=pathlib.Path(b.__file__).resolve(); print(p); assert p==pathlib.Path('research_wp_r0/historical_evaluation_bridge.py').resolve()" | tee -a sf-research-source.txt
       - name: Dependency isolation
-        run: python -B research_wp_r0/_dep_guard.py research_wp_r0/indicator_library.py research_wp_r0/indicator_library_v2.py research_wp_r0/strategy_definition.py research_wp_r0/historical_evaluation_bridge.py research_wp_r0/content_identity.py
+        run: python -B research_wp_r0/_dep_guard.py research_wp_r0/indicator_library.py research_wp_r0/indicator_library_v2.py research_wp_r0/strategy_definition.py research_wp_r0/historical_evaluation_bridge.py research_wp_r0/content_identity.py research_wp_r0/attempt_ledger.py
       - name: Combined accepted-main and new contract regressions
-        run: python -B -m pytest -p no:cacheprovider tests/test_sf_data_01.py tests/test_sf_ind_01.py tests/test_sf_dep_guard.py tests/test_sf_ind_02.py tests/test_sf_strat_01.py integration_tests/test_sf_strat_ind02.py tests/test_sf_research_int_01.py tests/test_sf_content_identity.py -v --tb=short --junitxml=sf-research-int-01.xml
+        run: python -B -m pytest -p no:cacheprovider tests/test_sf_data_01.py tests/test_sf_ind_01.py tests/test_sf_dep_guard.py tests/test_sf_ind_02.py tests/test_sf_strat_01.py integration_tests/test_sf_strat_ind02.py tests/test_sf_research_int_01.py tests/test_sf_content_identity.py tests/test_sf_attempt_ledger.py -v --tb=short --junitxml=sf-research-int-01.xml
       - name: Require all collected tests without skips
-        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('sf-research-int-01.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==429; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
+        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('sf-research-int-01.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==461; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -101,21 +101,17 @@ unreconciled PR46 ancestry. Full-population paired comparisons, regimes, sample
 thresholds, bootstrap dependence, multiplicity and purged/embargoed OOS require
 real admissible data and frozen split provenance first. No final holdout opens.
 
-## Attempt accounting and failure contract
+## Attempt accounting and failure contract — durable receipt slice
 
-`prepare_candidate` reuses main's AttemptRecorder: malformed definitions record
-INVALID; input/binding errors record FAILED after PENDING; sink errors propagate.
-Successful preparation remains PENDING, never COMPLETE. Caller must explicitly
-mark ABANDONED if it stops. Fatal process interruption can leave PENDING and
-requires future ledger reconciliation, never inferred success.
-
-The memory test sink deliberately permits duplicate attempts. The tests expose
-this limitation rather than invent exactly-once persistence. Immutable input
-receipts and persist-or-raise port behavior are tested; durable crash recovery,
-checkpoint replay, uniqueness, trial-family reconciliation, journal fsync and
-Windows power-loss safety are **NOT IMPLEMENTED/NOT VERIFIED** here. Actual
-process-crash/restart journal testing is gated on that separately reconciled
-durable implementation. No in-memory sink is offered as fsync evidence.
+Main AttemptRecorder remains unchanged. Factory-owned AttemptLedger now implements
+its dictionary persist-or-raise sink using local SQLite, no operational imports.
+Malformed definitions persist INVALID; prepare errors persist FAILED after PENDING;
+success stays PENDING. prepare_durable_candidate adds an immutable full INPUTS
+receipt before returning, retaining dataset/version/manifest/cutoff and bundle digest.
+It delegates all input/PIT validation to the existing bridge unchanged. INPUTS is
+not evaluation or COMPLETE. A failed INPUTS append raises with PENDING unresolved.
+Explicit ABANDONED is supported; no startup silently changes lifecycle state.
+COMPLETE is rejected until an actual evaluator/result contract is reconciled.
 
 ## Local/CI validation
 
@@ -175,39 +171,83 @@ The function computes on demand once per dataset adoption; no per-bar runtime or
 automatic recomputation/caching/migration is introduced. Existing input-1 schema,
 strategy bindings, legacy hash algorithms and stored records remain unchanged.
 
-## Concrete staged Research Ledger reconciliation (BLOCKED durable acceptance)
+## Factory-owned receipt adapter v1 — consolidated order6384985545
 
-Read-only comparison: main AttemptRecorder sends dictionaries with family_id,
-candidate_id, input_digest/strategy_digest, PENDING/INVALID/FAILED/ABANDONED/COMPLETE;
-unmerged PR46 a4c106a's DurableResearchJournal accepts typed Attempt plus keyword
-event_id, and replays FrozenSearchFamily/TrialFamilyLedger with protocol_digest,
-temporal_manifest_digest, dataset_version, metric/direction, alpha, declared_at.
-That journal imports unmerged trial_holdout. Its on-disk family/attempt schema is
-not main's port. A dictionary cast would lose family/temporal/error semantics.
-No safe durable adapter or new journal is claimed by this PR.
+### Typed compatibility and absent semantics
 
-Executable next stage, before empirical work:
-1. Inventory and freeze legacy family/attempt/checkpoint formats at PR46 SHA;
-   use golden retained journals in disposable directories only, never old records.
-2. Reconcile a versioned research-only family declaration (complete candidate
-   universe, metric, alpha, protocol/split/data commitments) with accepted main.
-   Review schema/reader dependencies before selecting the smallest legacy modules.
-3. Map deterministic event ID = domain + family + candidate + input commitment +
-   lifecycle transition + result/error commitment. Same ID+same bytes is replay;
-   same ID+different bytes is corruption. Require unique family/candidate attempt
-   identity, legal PENDING→terminal transitions; rejected definitions still count.
-4. Persist or raise before acknowledgement; preserve INVALID and failure details.
-   COMPLETE requires actual evaluated result and binding, not prepared inputs.
-   Restart leaves PENDING unresolved until explicit ABANDONED/reconciliation;
-   never infer COMPLETE or silently lose the trial-family denominator.
-5. Test process kill at each write/fsync/ACK/checkpoint boundary, torn-tail reject,
-   full-chain/state replay, family mismatch, duplicate/conflicting IDs and restored
-   checkpoints relative to a separately retained trusted commitment. Real Windows
-   locking/path-replacement tests are required; file fsync is not power-loss or
-   independently trusted external-anchor certification.
+STATE_MAPPING is an in-code frozen dataclass mapping, inspected against PR46
+a4c106a02c55ee012eedf4c55c1488d71d850203 trial_holdout.py. Actual legacy enum is
+COMPLETE/FAILED/INELIGIBLE (not INVALID/ABANDONED/PENDING). Main INVALID has only
+a non-lossless analogy to INELIGIBLE; PENDING/ABANDONED are absent there. Main
+dictionary input/strategy/error payload versus typed Attempt+event_id, and frozen
+family/metric/alpha/temporal-manifest fields remain explicit incompatibilities.
+No legacy backend is imported or old record rewritten. Earlier reports that
+described the whole journal integration as blocked are superseded ONLY for this
+new narrow local receipt slice, not the full statistical TrialFamilyLedger.
 
-Historical engine remains BLOCKED on that reconciliation plus credible real
-source/receipt/coverage and frozen splits. No compatible accepted-main simulator
-exists; implementing another independent engine here would duplicate unmerged46.
-The explicit execution contract above remains the safe boundary. Final Holdout
-stays CLOSED, shadow future-only, no cloud or operational data path is touched.
+### Commit, replay and input binding
+
+AttemptLedger(existing_private_parent / filename) creates version1 SQLite receipts
+table (seq,event_id,payload,chain_hash). WAL + synchronous=FULL + BEGIN IMMEDIATE
+serialize appends; ACK returns (sequence,chain hash) only after COMMIT succeeds.
+No UPDATE/DELETE API; this is logically append-only, NOT physically immutable
+SQLite or an access-control/security boundary. No runtime operational storage import.
+sqlite3 is the sole new stdlib allowance in the research static dependency guard;
+all operational/third-party import bans remain. No package installation.
+
+Event ID = SHA256(domain AQL:ATTEMPT-ID:1 + NUL + canonical family/candidate/input/
+state identity). Same-ID identical bytes replay without adding rows, even after a
+terminal event; changed payload rejects. One input+strategy identity per family/
+candidate. Legal initial PENDING/INVALID/FAILED; PENDING can transition to FAILED
+or ABANDONED, or acquire INPUTS without completing. Conflicting terminal events
+reject. Existing accepted definition is PENDING, not an invented separate success.
+Full canonical input bundle/digest is saved, including immutable original manifest
+and instance hashes; no content_hash_v1/legacy hash contract changes or fabricated
+receipt times. Identical durable prepare replays idempotently.
+
+Chain hash = SHA256(previous digest bytes + canonical payload); first predecessor
+is32zero bytes. Full chain/schema/state replay on open and each append, contiguous
+sequence, bounded10000receipts/16MB payload total/2MB each,1sSQLite lock timeout.
+No unbounded job loop; reaching capacity raises, does not ACK/drop/auto-prune.
+Bounds are application inventory limits, not file/WAL/host resource quotas or SLAs.
+Use dedicated local private directories; SQLite transactions handle cooperating
+concurrent writers, no shared operational queue. New ledger file/parent symlink/
+Windows reparse components rejected; observed file identity replacement rejected.
+
+### Checkpoints and crash evidence
+
+snapshot returns detached events plus checkpoint; caller may retain checkpoint
+separately and supply expected_checkpoint on open. It must match a complete prefix;
+extensions are accepted, truncation/rewrite of that prefix rejected. Missing anchored
+file is rejected without recreation. SQLite quick_check, canonical payload, chain
+and state verification fail closed; no torn-tail repair or automatic truncation.
+Real temporary-file tests exercise committed child os._exit and uncommitted child
+write os._exit, reopen/replay, physical DB truncation, corrupted payload/hash/sequence,
+rollback relative to separately saved digest, duplicate/conflict, concurrent writers,
+failed SQLite INSERT and input-receipt failure propagation.
+
+The saved-checkpoint test uses a separate local fixture file: it is an independent
+verification path, NOT a trusted off-device anchor service. An attacker controlling
+both database and retained checkpoint can rewrite both. SQL FULL requests durability
+from actual filesystem/OS; tests prove process-crash recovery on tested environments,
+not hardware power-loss/directory-fsync/offsite certification. SQLite corruption may
+raise DatabaseError/OSError rather than a normalized custom exception; caller must
+treat every exception as no ACK. No credential/error-value dump is persisted, only
+bounded error_type where main supplies it. Exact OS path replacement races against
+same-account attackers, private-directory ACL provisioning, network filesystems,
+hardware caches and independently authenticated anchors remain unproven/out of scope.
+
+### Remaining honest blockers
+
+Received-attempt receipts now have durable local replay; complete preregistered
+family accounting (including candidates never submitted), metric/alpha/selection
+policy and legacy checkpoint interchange are NOT delivered by this narrow adapter.
+No compatible evaluated-result/backend is installed, so COMPLETE remains disabled.
+Historical evaluator/real source receipt/coverage and frozen splits remain blocked;
+no duplicate engine, empirical result, profit, OOS or shadow-runtime claim. Final
+Holdout remains CLOSED; no G1/Scanner/cloud/production or main change.
+
+Final evidence/counts/head/CI and local invocation details are recorded on Issue77
+and existing Draft78. Prior393+36identity+32receipt tests =461 distinct final CI
+cases. One final PR-triggered Factory matrix; remove duplicate push trigger to avoid
+running that same matrix twice on one submitted change. No manual repeated dispatch.
