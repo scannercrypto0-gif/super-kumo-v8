@@ -1,4 +1,4 @@
-import sys,unittest,tempfile
+import sys,unittest,tempfile,subprocess
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from aql.observation.positions import PositionEvent
@@ -67,5 +67,30 @@ class JournalTests(unittest.TestCase):
             p=Path(d)/'journal.jsonl'
             DurablePositionJournal(p).append(self.e('start','opened',0))
             self.assertFalse(p.with_name(p.name+'.writer.lock').exists())
+            self.assertEqual(DurablePositionJournal(p).ledger.status('p1',1),'open')
+    def test_independent_process_respects_lock(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/'journal.jsonl'
+            lock=p.with_name(p.name+'.writer.lock')
+            lock.write_text('owner-process')
+            child_code = (
+                "import sys; from pathlib import Path; "
+                "sys.path.insert(0,sys.argv[2]); "
+                "from aql.observation.positions import PositionEvent; "
+                "from aql.observation.position_journal import DurablePositionJournal,JournalIntegrityError; "
+                "p=Path(sys.argv[1]); "
+                "j=DurablePositionJournal(p); "
+                "e=PositionEvent('p1','open','opened',0,0,'offline'); "
+                "j.append(e)"
+            )
+            result=subprocess.run(
+                [sys.executable,'-c',child_code,str(p),
+                 str(Path(__file__).resolve().parents[1]/'src')],
+                capture_output=True,text=True,timeout=15)
+            self.assertNotEqual(result.returncode,0)
+            self.assertIn('writer lock held',result.stderr)
+            self.assertFalse(p.exists())
+            lock.unlink()
+            DurablePositionJournal(p).append(self.e('start','opened',0))
             self.assertEqual(DurablePositionJournal(p).ledger.status('p1',1),'open')
 if __name__=='__main__':unittest.main()
