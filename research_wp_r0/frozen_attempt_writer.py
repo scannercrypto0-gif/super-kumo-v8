@@ -47,7 +47,9 @@ class FrozenAttemptWriter:
                 cid = prior["candidate_id"]
                 if cid not in self.allowed or prior.get("strategy_digest") != self.allowed[cid]:
                     raise ValueError("Existing attempt violates frozen plan")
-            if candidate_event["candidate_id"] not in self.allowed or (\n                candidate_event.get("strategy_digest") != self.allowed[candidate_event["candidate_id"]]\n            ):
+            if candidate_event["candidate_id"] not in self.allowed or (
+                candidate_event.get("strategy_digest") != self.allowed[candidate_event["candidate_id"]]
+            ):
                 raise ValueError("Attempt violates frozen plan")
         checkpoint = self.ledger.record_attempt(event, admission=admission)
         reconcile_full_research_plan(self.raw_plan, self.expected_digest, self.ledger)
