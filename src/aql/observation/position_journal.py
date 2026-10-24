@@ -22,7 +22,7 @@ class DurablePositionJournal:
         if not self.path.exists(): return
         with self.path.open('rb') as f:
             for number,raw in enumerate(f,1):
-                if not raw.endswith(b'\\n'): raise JournalIntegrityError(f'torn record at line {number}')
+                if not raw.endswith(b'\n'): raise JournalIntegrityError(f'torn record at line {number}')
                 try:
                     row=json.loads(raw)
                     if set(row)!= {'previous','event','digest'} or row['previous']!=self._tail:
@@ -45,7 +45,7 @@ class DurablePositionJournal:
         row={'previous':self._tail,'event':asdict(event)}
         material=json.dumps(row,sort_keys=True,separators=(',',':')).encode()
         row['digest']=hashlib.sha256(material).hexdigest()
-        encoded=(json.dumps(row,sort_keys=True,separators=(',',':'))+'\\n').encode()
+        encoded=(json.dumps(row,sort_keys=True,separators=(',',':'))+'\n').encode()
         self.path.parent.mkdir(parents=True,exist_ok=True)
         with self.path.open('ab') as f:
             f.write(encoded)
