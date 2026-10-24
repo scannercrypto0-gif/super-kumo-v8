@@ -1,0 +1,26 @@
+name: G2 Position Journal Offline Tests
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/aql/observation/position_journal.py'
+      - 'src/aql/observation/positions.py'
+      - 'tests/test_g2_position_journal.py'
+      - '.github/workflows/g2-position-journal.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  journal-tests:
+    name: Offline journal (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m unittest discover -s tests -p test_g2_position_journal.py -v
