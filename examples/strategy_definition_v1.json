@@ -1,0 +1,66 @@
+{
+  "definition": {
+    "entry": {
+      "left": {
+        "field": "value",
+        "lag": 0,
+        "name": "trend",
+        "op": "indicator"
+      },
+      "op": "gt",
+      "right": {
+        "op": "constant",
+        "value": 100
+      }
+    },
+    "exit": {
+      "left": {
+        "field": "value",
+        "lag": 1,
+        "name": "trend",
+        "op": "indicator"
+      },
+      "op": "lt",
+      "right": {
+        "op": "constant",
+        "value": 99
+      }
+    },
+    "indicators": [
+      {
+        "constraints": {
+          "period": {
+            "max": 20,
+            "min": 2,
+            "type": "int"
+          }
+        },
+        "indicator_id": "SMA_v1",
+        "name": "trend",
+        "parameters": {
+          "period": 3
+        },
+        "version": "1"
+      }
+    ],
+    "risk": {
+      "entry_ttl_bars": 2,
+      "holding_bars": 10,
+      "max_exposure": 1,
+      "max_leverage": 1,
+      "stop_fraction": 0.02,
+      "target_fraction": 0.04,
+      "unit": "ENTRY_NOTIONAL"
+    },
+    "schema_version": "1",
+    "scope": "RESEARCH_ONLY",
+    "strategy_id": "example",
+    "strategy_version": "v1",
+    "timing": {
+      "ambiguity": "REJECT",
+      "decision": "CONFIRMED_CLOSE",
+      "entry_execution": "NEXT_ELIGIBLE_OPEN"
+    }
+  },
+  "digest": "024283f5e191a49199cf2e65aada9f87113c076d6190653a57fbb1b5c739ef86"
+}
