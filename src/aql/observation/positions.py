@@ -37,6 +37,7 @@ class PositionEvent:
         if self.kind == 'closed' and not self.reason:
             raise PositionContractError('explicit close requires reason')
         if self.price is not None:
+            if not isinstance(self.price,str): raise PositionContractError('price must be a decimal string')
             from decimal import Decimal, InvalidOperation
             try:
                 p=Decimal(self.price)
@@ -77,10 +78,12 @@ class PositionLedger:
         state=self.positions.get(position_id)
         if not state: return None
         first=state[0]
+        if type(as_of_ms) is not int or as_of_ms < 0: raise PositionContractError('invalid assessment time')
         if as_of_ms < first.received_ms: return None
         end=next((e.event_ms for e in state if e.kind=='closed' and e.received_ms <= as_of_ms),as_of_ms)
         return max(0,end-first.event_ms)
     def checkpoint_state(self,position_id,policy,offset_ms,as_of_ms):
+        if not isinstance(policy,HorizonPolicy) or type(offset_ms) is not int or type(as_of_ms) is not int or as_of_ms < 0: return 'invalid'
         if offset_ms not in policy.horizons_ms: return 'invalid'
         state=self.positions.get(position_id)
         if not state or as_of_ms < state[0].received_ms: return 'invalid'
