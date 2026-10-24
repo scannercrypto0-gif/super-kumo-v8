@@ -4,68 +4,69 @@ on:
   push:
     branches:
       - feat/research-sf-ind-01
+      - fix/research-sf-ind-01-ci-guard-20261024
   pull_request:
     branches:
       - main
     paths:
       - "research_wp_r0/indicator_library.py"
+      - "research_wp_r0/_dep_guard.py"
       - "tests/test_sf_ind_01.py"
+      - "tests/test_sf_dep_guard.py"
       - ".github/workflows/sf-ind-01-fast.yml"
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Manual trigger reason (e.g. post-merge CI validation)"
+        required: false
+        default: "manual"
 
 jobs:
   test:
-    name: SF-IND-01 Unit Tests (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    name: SF-IND-01 (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12"]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Verify no external dependencies
+      - name: Install test runner
         run: |
-          python -c "
-          import ast, sys, pathlib
-          src = pathlib.Path('research_wp_r0/indicator_library.py').read_text()
-          tree = ast.parse(src)
-          # stdlib modules allowed in library code
-          stdlib = {'__future__','abc','collections','dataclasses','datetime',
-                    'enum','functools','hashlib','itertools','json','math',
-                    'operator','os','pathlib','re','struct','time','typing',
-                    'uuid','warnings'}
-          # project-internal packages (same repo, not third-party)
-          project_internal = {'research_wp_r0'}
-          bad = []
-          for node in ast.walk(tree):
-              if isinstance(node, (ast.Import, ast.ImportFrom)):
-                  name = node.names[0].name if isinstance(node, ast.Import) \
-                         else (node.module or '')
-                  root = name.split('.')[0]
-                  if root and root not in stdlib and root not in project_internal:
-                      bad.append(root)
-          if bad:
-              print('External deps found:', bad, file=sys.stderr)
-              sys.exit(1)
-          print('No external (third-party) dependencies — OK')
-          "
+          python -m pip install --upgrade pip
+          pip install pytest
 
-      - name: Run SF-IND-01 tests
-        run: |
-          python -m pytest tests/test_sf_ind_01.py -v \
-            --tb=short \
-            --junit-xml=test-results-sf-ind-01.xml
+      - name: Verify no external dependencies in indicator library
+        # Calls the extracted, testable guard module — same code as the tests.
+        # Previously: inline python -c with names[0]-only bug (caught research_wp_r0
+        # as a false positive AND missed multi-alias imports like 'import os, numpy').
+        run: python research_wp_r0/_dep_guard.py research_wp_r0/indicator_library.py
+
+      - name: Run SF-IND-01 indicator tests
+        # Single-line: backslash continuation is bash-only; PowerShell (Windows) rejects it.
+        run: python -m pytest tests/test_sf_ind_01.py -v --tb=short --junit-xml=test-results-sf-ind-01.xml
+
+      - name: Run SF-IND-01 dependency-guard regression tests
+        # Single-line: same Windows/PowerShell compatibility reason.
+        run: python -m pytest tests/test_sf_dep_guard.py -v --tb=short --junit-xml=test-results-sf-dep-guard.xml
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sf-ind-01-results-py${{ matrix.python-version }}
-          path: test-results-sf-ind-01.xml
+          name: sf-ind-01-results-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: |
+            test-results-sf-ind-01.xml
+            test-results-sf-dep-guard.xml
           retention-days: 7
