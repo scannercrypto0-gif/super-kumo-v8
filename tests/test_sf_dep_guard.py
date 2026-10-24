@@ -93,26 +93,26 @@ class TestAllowed(unittest.TestCase):
         self.assertTrue(_ok('import research_wp_r0'))
 
     def test_project_internal_dotted(self):
-        self.assertTrue(_ok('import research_wp_r0.foo'))
+        self.assertTrue(_ok('import research_wp_r0.historical_library'))
 
     def test_from_project_internal(self):
-        self.assertTrue(_ok('from research_wp_r0 import bar'))
+        self.assertTrue(_ok('from research_wp_r0 import historical_library'))
 
     def test_from_project_internal_dotted(self):
         self.assertTrue(_ok('from research_wp_r0.historical_library import CustodyAccessor'))
 
-    # --- relative imports (all internal by definition) ---
+    # --- verified relative imports; escapes rejected ---
     def test_relative_single_dot(self):
-        self.assertTrue(_ok('from . import something'))
+        self.assertTrue(_ok('from . import historical_library'))
 
     def test_relative_single_dot_module(self):
-        self.assertTrue(_ok('from .foo import bar'))
+        self.assertTrue(_ok('from .historical_library import CustodyAccessor'))
 
     def test_relative_double_dot(self):
-        self.assertTrue(_ok('from .. import baz'))
+        self.assertTrue(_bad('from .. import baz'))
 
     def test_relative_double_dot_module(self):
-        self.assertTrue(_ok('from ..util import helper'))
+        self.assertTrue(_bad('from ..util import helper'))
 
 
 # ===========================================================================
@@ -234,6 +234,43 @@ class TestGoldenFiles(unittest.TestCase):
 # ===========================================================================
 # Entry point
 # ===========================================================================
+
+class TestVerifiedFirstParty(unittest.TestCase):
+    def test_unknown_dotted_module(self):
+        self.assertTrue(_bad('import research_wp_r0.not_a_real_module'))
+
+    def test_unknown_from_module(self):
+        self.assertTrue(_bad('from research_wp_r0.not_a_real_module import x'))
+
+    def test_unknown_relative_module(self):
+        self.assertTrue(_bad('from .not_a_real_module import x'))
+
+    def test_unknown_relative_alias(self):
+        self.assertTrue(_bad('from . import historical_library, not_a_real_module'))
+
+    def test_relative_escape(self):
+        self.assertTrue(_bad('from ..numpy import array'))
+
+    def test_nested_context(self):
+        self.assertEqual(check_source('from ..historical_library import CustodyAccessor',
+                                     package='research_wp_r0.subpackage'), [])
+
+    def test_no_package_relative(self):
+        self.assertTrue(check_source('from .historical_library import x', package=''))
+
+    def test_cli_rejects_actual_file(self):
+        import subprocess
+        import tempfile
+        root = pathlib.Path(__file__).resolve().parent.parent
+        with tempfile.TemporaryDirectory() as directory:
+            target = pathlib.Path(directory) / 'bad.py'
+            target.write_text('import os, numpy', encoding='utf-8')
+            result = subprocess.run([sys.executable, '-B',
+                                     str(root / 'research_wp_r0' / '_dep_guard.py'),
+                                     str(target)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn('numpy', result.stderr)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

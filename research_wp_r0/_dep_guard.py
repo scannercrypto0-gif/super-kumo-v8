@@ -12,19 +12,10 @@ Exits 0 if no unauthorised imports found; non-zero otherwise.
 
 Guard rules
 -----------
-* ``import a``                 → checks root of 'a'
-* ``import a, b``              → checks root of 'a' AND root of 'b'
-                                 (the old guard only checked 'a' — this is the
-                                 bug that allowed ``import os, numpy`` through)
-* ``import a.b``               → checks root 'a'
-* ``from a import b``          → checks root 'a'
-* ``from a.b import c``        → checks root 'a'
-* ``from . import b``          → relative → allowed (internal to package)
-* ``from .a import b``         → relative → allowed (internal to package)
-* ``from ..a import b``        → relative → allowed (internal to package)
-
-All names in ``STDLIB`` and ``PROJECT_INTERNAL`` are allowed; everything
-else is rejected.
+Checks every import alias. Relative imports are resolved against the source
+package and must remain inside a verified first-party package. Dotted
+first-party modules must exist on disk; nothing is imported or executed.
+This is a static dependency policy, not a sandbox for dynamic Python code.
 
 Issue: #59 (SF-IND-01 CI fix)
 """
@@ -57,61 +48,60 @@ PROJECT_INTERNAL: frozenset = frozenset({'research_wp_r0'})
 # Core check functions
 # ---------------------------------------------------------------------------
 
-def check_source(src: str) -> List[str]:
-    """
-    Parse *src* as Python source and return a list of unauthorised import
-    root names.  An empty return list means the source is clean.
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
-    Parameters
-    ----------
-    src : str
-        Raw Python source code to analyse.
 
-    Returns
-    -------
-    list[str]
-        Unauthorised import names (the full dotted name, not just the root),
-        in encounter order.  May contain duplicates if the same name appears
-        in multiple import statements.
+def _internal_module(name: str) -> bool:
+    parts = name.split('.')
+    if parts[0] not in PROJECT_INTERNAL:
+        return False
+    path = REPO_ROOT.joinpath(*parts)
+    return path.with_suffix('.py').is_file() or (path / '__init__.py').is_file()
+
+
+def _allowed(name: str) -> bool:
+    root = name.split('.')[0]
+    return root in STDLIB or _internal_module(name)
+
+
+def check_source(src: str, *, package: str = 'research_wp_r0') -> List[str]:
+    """Check import dependencies without importing inspected modules.
+
+    Synthetic snippets default to the indicator package; check_file derives the
+    real context from its path. Relative imports cannot escape that package.
+    Imported attributes are not a runtime symbol/type check.
     """
-    tree = ast.parse(src)
     bad: List[str] = []
-
-    for node in ast.walk(tree):
+    for node in ast.walk(ast.parse(src)):
         if isinstance(node, ast.Import):
-            # --- FIX: iterate ALL aliases, not just names[0] ---
-            # Old code: ``node.names[0].name`` missed everything after the
-            # first name in ``import os, numpy`` (only 'os' was checked).
-            for alias in node.names:
-                root = alias.name.split('.')[0]
-                if root and root not in STDLIB and root not in PROJECT_INTERNAL:
-                    bad.append(alias.name)
-
+            bad.extend(alias.name for alias in node.names if not _allowed(alias.name))
         elif isinstance(node, ast.ImportFrom):
-            # Relative imports (level > 0) are always internal to the package.
-            # ``from . import foo``, ``from .bar import baz``,
-            # ``from ..util import x`` — all fine.
-            if node.level and node.level > 0:
-                continue
             module = node.module or ''
-            root = module.split('.')[0]
-            if root and root not in STDLIB and root not in PROJECT_INTERNAL:
+            if node.level:
+                parts = package.split('.') if package else []
+                if node.level > len(parts):
+                    bad.append('.' * node.level + module)
+                    continue
+                module = '.'.join(parts[:len(parts) - node.level + 1] +
+                                  ([module] if module else []))
+            if not _allowed(module):
                 bad.append(module)
-
+            elif module in PROJECT_INTERNAL:
+                # "from . import X" must resolve an actual local module.
+                bad.extend(module + '.' + alias.name for alias in node.names
+                           if not _internal_module(module + '.' + alias.name))
     return bad
 
 
 def check_file(path: "str | pathlib.Path") -> List[str]:
-    """
-    Read *path* and return unauthorised import root names (empty = clean).
-
-    Parameters
-    ----------
-    path : str or pathlib.Path
-        File to check (must be valid Python source).
-    """
-    src = pathlib.Path(path).read_text(encoding='utf-8')
-    return check_source(src)
+    path = pathlib.Path(path).resolve()
+    try:
+        relative = path.relative_to(REPO_ROOT)
+        parts = relative.with_suffix('').parts
+        package = '.'.join(parts[:-1])
+    except ValueError:
+        package = ''
+    return check_source(path.read_text(encoding='utf-8'), package=package)
 
 
 # ---------------------------------------------------------------------------
