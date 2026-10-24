@@ -58,3 +58,20 @@ def reconcile_plan(raw_plan, expected_digest, ledger):
     return {"checkpoint": checkpoint, "missing": sorted(set(allowed) - set(states)),
             "pending": sorted(cid for cid in states if states[cid] == "PENDING"),
             "evaluation_status": "NOT_EVALUATED"}
+
+
+def reconcile_full_research_plan(raw_plan, expected_digest, ledger):
+    """Check full frozen research plan against real attempt receipts.
+
+    The plan is validated by its dedicated full-manifest verifier. The
+    compatibility adapter reuses the existing ledger replay/identity rules.
+    This is inventory only; it never asserts a completed evaluation.
+    """
+    from .frozen_research_plan import verify_research_plan
+    plan = verify_research_plan(raw_plan, expected_digest)
+    candidate_plan = {
+        "schema_version": "1",
+        "family_id": plan["family_id"],
+        "candidates": plan["candidates"],
+    }
+    return reconcile_plan(canonical(candidate_plan), digest(candidate_plan), ledger)
