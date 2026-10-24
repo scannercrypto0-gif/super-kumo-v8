@@ -45,7 +45,7 @@ jobs:
       - name: Install test runner
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          pip install pytest pytest-timeout
 
       - name: Verify no external dependencies in indicator library
         # Calls the extracted, testable guard module — same code as the tests.
