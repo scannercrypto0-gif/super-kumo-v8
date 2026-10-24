@@ -35,22 +35,25 @@ jobs:
           import ast, sys, pathlib
           src = pathlib.Path('research_wp_r0/indicator_library.py').read_text()
           tree = ast.parse(src)
+          # stdlib modules allowed in library code
           stdlib = {'__future__','abc','collections','dataclasses','datetime',
                     'enum','functools','hashlib','itertools','json','math',
                     'operator','os','pathlib','re','struct','time','typing',
                     'uuid','warnings'}
+          # project-internal packages (same repo, not third-party)
+          project_internal = {'research_wp_r0'}
           bad = []
           for node in ast.walk(tree):
               if isinstance(node, (ast.Import, ast.ImportFrom)):
                   name = node.names[0].name if isinstance(node, ast.Import) \
                          else (node.module or '')
                   root = name.split('.')[0]
-                  if root and root not in stdlib:
+                  if root and root not in stdlib and root not in project_internal:
                       bad.append(root)
           if bad:
               print('External deps found:', bad, file=sys.stderr)
               sys.exit(1)
-          print('No external dependencies — OK')
+          print('No external (third-party) dependencies — OK')
           "
 
       - name: Run SF-IND-01 tests
