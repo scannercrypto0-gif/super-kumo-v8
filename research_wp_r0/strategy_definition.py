@@ -73,7 +73,7 @@ def integer(value, minimum=1, maximum=100000):
 
 
 def number(value, minimum=None, maximum=None):
-    if type(value) not in (int, float) or not math.isfinite(value):
+    if type(value) not in (int, float) or (type(value) is int and abs(value) > 2**53-1) or not math.isfinite(value):
         raise ValueError("Invalid finite number")
     if minimum is not None and value < minimum or maximum is not None and value > maximum:
         raise ValueError("Number outside bounds")

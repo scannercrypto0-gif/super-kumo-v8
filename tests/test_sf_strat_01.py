@@ -207,3 +207,11 @@ def test_ema_explicit_parameters_and_boolean_nodes():
     assert binding(d)
     v["entry"]["args"][0]["left"]["name"]=[]
     with pytest.raises(ValueError):StrategyDefinition(v)
+
+def test_extreme_numeric_invalid_attempt_is_retained():
+    value=spec();value["risk"]["stop_fraction"]=10**500
+    sink=Mock()
+    raw=json.dumps({"definition":value,"digest":"0"*64})
+    with pytest.raises(ValueError):
+        AttemptRecorder(sink).prepare(raw,"family","huge")
+    assert sink.record_attempt.call_args.args[0]["state"]=="INVALID"
