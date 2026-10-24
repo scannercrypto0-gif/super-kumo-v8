@@ -195,3 +195,32 @@ def test_cross_platform_golden_commitments(name):
 def test_custody_adapter_is_mandatory():
     with pytest.raises(ValueError,match="CustodyAccessor"):
         IndicatorRegistryV2().get("OBV_v2").compute(object(),"x",0,0,1)
+
+
+@pytest.mark.parametrize("version", [True, 1.0, 0, -1])
+def test_dataset_version_is_strict(version):
+    bars=input_bars();_,accessor=_lib_with(bars)
+    with pytest.raises(ValueError,match="version"):
+        IndicatorRegistryV2().get("OBV_v2").compute(accessor,"BTC1M",BASE_MS,bars[-1].bar_open,bars[-1].bar_close+1,version=version)
+
+
+def test_corrupt_dataset_manifest_is_rejected():
+    bars=input_bars();library,accessor=_lib_with(bars)
+    object.__setattr__(library.get_manifest("BTC1M",1),"source_label","corrupt")
+    with pytest.raises(ValueError,match="manifest integrity"):
+        IndicatorRegistryV2().get("OBV_v2").compute(accessor,"BTC1M",BASE_MS,bars[-1].bar_open,bars[-1].bar_close+1)
+
+
+def test_manifest_rejects_mixed_result_identity_and_binds_seed_range():
+    rows,manifest=run("OBV_v2")
+    metadata=manifest.to_dict();metadata.pop("manifest_hash")
+    metadata["dataset_id"]="OTHER"
+    mixed=VectorManifest.create(metadata,rows)
+    assert not mixed.verify(rows)
+    metadata=manifest.to_dict();metadata.pop("manifest_hash")
+    metadata["output_fields"]=["wrong"]
+    assert not VectorManifest.create(metadata,rows).verify(rows)
+    bars=input_bars();_,accessor=_lib_with(bars)
+    _,later=IndicatorRegistryV2().get("OBV_v2").compute(accessor,"BTC1M",BASE_MS+IMS,bars[-1].bar_open,bars[-1].bar_close+1)
+    assert manifest.start_ms==BASE_MS and later.start_ms==BASE_MS+IMS
+    assert manifest.input_bar_hash!=later.input_bar_hash

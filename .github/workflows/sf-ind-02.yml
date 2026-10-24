@@ -2,7 +2,7 @@ name: SF-IND-02 Research Tests
 on:
   pull_request:
     branches: [main]
-    paths: ["research_wp_r0/indicator_library_v2.py", "tests/test_sf_ind_02.py", "tests/fixtures/sf_ind_02_golden.json", ".github/workflows/sf-ind-02.yml"]
+    paths: ["research_wp_r0/historical_library.py", "research_wp_r0/indicator_library.py", "research_wp_r0/_dep_guard.py", "tests/test_sf_ind_01.py", "tests/test_sf_dep_guard.py", "pyproject.toml", "research_wp_r0/indicator_library_v2.py", "tests/test_sf_ind_02.py", "tests/fixtures/sf_ind_02_golden.json", ".github/workflows/sf-ind-02.yml"]
   push:
     branches: [feat/sf-ind-02-expansion]
   workflow_dispatch:

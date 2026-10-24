@@ -92,9 +92,28 @@ class VectorManifest:
         return tuple(tuple(p) for p in value) if name == "parameter_set" else value
 
     def verify(self, results):
-        fields = json.loads(self.payload)
-        return len(results) == fields["result_count"] and all(r.verify_integrity() for r in results) and (
-            [r.provenance_hash for r in results] == fields["result_hashes"])
+        try:
+            fields = json.loads(self.payload)
+            if len(results) != fields["result_count"] or [r.provenance_hash for r in results] != fields["result_hashes"]:
+                return False
+            previous = None
+            for r in results:
+                if not r.verify_integrity() or r.partial_coverage is not False:
+                    return False
+                for name in ("indicator_id", "version", "dataset_id", "dataset_version",
+                             "dataset_manifest_hash", "decision_cutoff_ms"):
+                    if getattr(r, name) != fields[name]:
+                        return False
+                if (r.parameters != tuple(tuple(p) for p in fields["parameter_set"]) or
+                    r.warmup_bars_consumed != fields["warmup_policy"] or
+                    tuple(k for k, _ in r.value) != tuple(fields["output_fields"]) or
+                    not fields["start_ms"] <= r.bar_open_ms <= fields["end_ms"] or
+                    previous is not None and r.bar_open_ms <= previous):
+                    return False
+                previous = r.bar_open_ms
+            return True
+        except (ValueError, TypeError, KeyError, AttributeError):
+            return False
 
     @classmethod
     def from_dict(cls, value, *, expected_hash):
@@ -158,7 +177,11 @@ class ExpandedIndicator:
                 raise ValueError("Explicit nonnegative integer timestamps required")
         if start_ms > end_ms or end_ms > decision_cutoff_ms:
             raise ValueError("Invalid cutoff/range")
+        if version is not None and (type(version) is not int or version < 1):
+            raise ValueError("Explicit positive integer dataset version required")
         ds_version, ds_hash = _get_ds_meta(accessor, dataset_id, version)
+        if not accessor._library.get_manifest(dataset_id, ds_version).verify_integrity():
+            raise ValueError("Dataset manifest integrity failure")
         bars = accessor.range_query(dataset_id, start_ms, end_ms, decision_cutoff_ms,
                                     version=ds_version, require_complete=True)
         for b in bars:
@@ -182,7 +205,8 @@ class ExpandedIndicator:
                         dataset_id=dataset_id, dataset_version=ds_version,
                         dataset_manifest_hash=ds_hash, decision_cutoff_ms=decision_cutoff_ms,
                         parameter_set=self._params, warmup_policy=self.min_warmup_bars,
-                        output_fields=self.output_fields)
+                        output_fields=self.output_fields, start_ms=start_ms, end_ms=end_ms,
+                        input_bar_hash=_hash([b.checksum for b in bars]))
         return results, VectorManifest.create(metadata, results)
 
     def _values(self, bars):

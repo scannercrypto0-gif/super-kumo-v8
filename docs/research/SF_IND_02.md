@@ -42,3 +42,6 @@ Actual dependency guard checks this new library; CI installs pytest and pytest-t
 VWAP: existing OHLCV lacks an approved session calendar/anchor/reset and volume-unit custody contract. OBV only uses signed raw base-volume under a fixed-start seed; it makes no notional/session claim.
 Cross-asset relative strength/volume normalization needs aligned confirmed availability and units. Funding/OI/order book/sentiment require new data contracts. None added.
 No profitability, promotion, production, paper or live execution claim. Draft only; owner merge decision separate.
+
+## Final acceptance hardening
+V2 verifies the custody manifest on every compute and rejects bool/float dataset versions. Computation manifests additionally bind exact requested start/end and ordered input-bar checksum digest, including seed history; individual result hashes alone are not a complete requested-range receipt. Manifest verification checks result identity, parameters, warmup, fields and ordering against metadata, not only the list of hashes. Original V1 bytes/commitments remain unchanged.
