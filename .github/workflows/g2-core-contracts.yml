@@ -1,0 +1,29 @@
+name: G2 Core Offline Contracts
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/aql/observation/**'
+      - 'tests/test_g2_observation_contracts.py'
+      - '.github/workflows/g2-core-contracts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  g2-contracts:
+    name: G2 offline contracts (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run offline G2 contracts tests
+        run: python -m unittest discover -s tests -p test_g2_observation_contracts.py -v
