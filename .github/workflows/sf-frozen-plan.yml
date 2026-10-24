@@ -1,0 +1,26 @@
+name: SF Frozen Plan Reconciliation
+on:
+  pull_request:
+    branches: [feat/sf-research-int-01]
+    paths:
+      - "research_wp_r0/frozen_plan_reconciliation.py"
+      - "research_wp_r0/test_frozen_plan_reconciliation.py"
+      - ".github/workflows/sf-frozen-plan.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  focused:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.10", "3.11", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install pytest pytest-timeout
+      - run: python -B -m pytest -p no:cacheprovider research_wp_r0/test_frozen_plan_reconciliation.py -v --tb=short
