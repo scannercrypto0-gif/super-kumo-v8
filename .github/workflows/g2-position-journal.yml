@@ -5,7 +5,7 @@ on:
     paths:
       - 'src/aql/observation/position_journal.py'
       - 'src/aql/observation/positions.py'
-      - 'tests/test_g2_position_journal.py'
+      - 'tests/test_g2_*journal*.py'
       - '.github/workflows/g2-position-journal.yml'
   workflow_dispatch:
 permissions:
@@ -23,4 +23,4 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: python -m unittest discover -s tests -p test_g2_position_journal.py -v
+      - run: python -m unittest discover -s tests -p "test_g2_*journal*.py" -v
