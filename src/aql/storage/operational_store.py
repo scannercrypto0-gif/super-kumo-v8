@@ -44,7 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_bars_symbol_interval_open
 
 PRAGMAS = [
     "PRAGMA journal_mode=WAL",
-    "PRAGMA synchronous=NORMAL",
+    "PRAGMA synchronous=FULL",
     "PRAGMA foreign_keys=ON",
 ]
 
@@ -65,7 +65,7 @@ class OperationalStore:
         self._init_db()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=0.25)
         conn.row_factory = sqlite3.Row
         for pragma in PRAGMAS:
             conn.execute(pragma)

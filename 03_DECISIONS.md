@@ -1113,3 +1113,19 @@ Deduplicate/escalate sustained incidents by affected positions, mandatory eviden
 | G1-ARCH-44 | C / provisional | 05;16;24;41–43 | 03_DECISIONS;02_ROADMAP;08_RISKS | Owner visible approval; documentary only |
 
 **Open implementation choices:** catalog representation/validation, dependency graph engine, physical state store, snapshot/change protocol, revision fencing, subscription transport, concurrency/single-flight mechanics, bounded retry policy, priority/hysteresis measurements, history warm-up rules by actual indicator, instrumentation clock quality, alert thresholds, provider budgets, numerical SLA. Escalate conflicts; do not silently select.
+
+## G1-OPS-20261024 - Controlled non-production completion implementation
+
+Authority: owner's 2026-10-24 Final Execution Mission, G0/G1-only feature branch.
+This records implementation choices under that scope, not production approval.
+- Keep SQLite FULL/WAL as core durable truth. Move startup recovery and operational
+  delivery out of the critical callback; bounded admission and explicit pending/error
+  evidence, cooperative core-first writes, no forced cancellation of an fsync.
+- Add optional sandbox PostgreSQL adapter and separate remote ACK cursor. Remote
+  delivery never shares or overwrites the local persistence acknowledgement.
+- Public read-only Binance connectivity is authorized once within bounded scope.
+  Transport PASS is separate from temporal acceptance; observed clock divergence
+  is fail-closed and must not be hidden by auto-backdating.
+- Retain R09 and deferred full Inbox/off-device backup requirements. PR16's MVP
+  plan is superseded; its deferred obligations remain. No PR closure is executed.
+Parameters and measured evidence/limits are in docs/operations/G1_COMPLETION_20261024.md.

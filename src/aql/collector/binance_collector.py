@@ -53,6 +53,7 @@ class CollectorMetrics:
     last_bar_open: Optional[int] = None
     last_ingested_at: Optional[int] = None
     last_committed_at: Optional[int] = None
+    source_clock_skew_ms: Optional[int] = None
     first_connect_at: Optional[int] = None
     disconnect_at: Optional[int] = None
     # Latency tracking (ms)
@@ -87,6 +88,10 @@ class BinanceCollector:
         self.journal = journal
         self.store = store
         self.max_bars = max_bars
+        self.background_persistence = False
+        self.health_state = "CONNECTING"
+        self.clock_tolerance_ms = 5000
+        self.clock_uncertain = False
         self.metrics = CollectorMetrics()
         self._stop_event = threading.Event()
         self._ws: Optional[websocket.WebSocketApp] = None
@@ -105,19 +110,40 @@ class BinanceCollector:
             if "k" not in data:
                 return
 
+            if "E" in data:
+                skew = int(data["E"]) - int(time.time() * 1000)
+                self.metrics.source_clock_skew_ms = skew
+                if skew > self.clock_tolerance_ms:
+                    self.health_state = "CLOCK_UNCERTAIN"
+                    self.clock_uncertain = True
+                    raise ValueError("Source event is ahead of local clock; temporal eligibility denied")
             k = data["k"]
+            if type(k.get("x")) is not bool:
+                raise ValueError("Invalid candle finality flag")
             bar = MarketBar.from_binance_ws_kline(k)
+            if bar.symbol != self.symbol or bar.interval != self.interval:
+                raise ValueError("Unexpected stream identity")
 
             if not bar.is_final:
                 self.metrics.non_final_bar_count += 1
                 return
 
+            if bar.bar_close >= bar.ingested_at:
+                self.clock_uncertain = True
+                raise ValueError("Closed candle claims future close time")
             self.metrics.final_bar_count += 1
-            self.metrics.last_bar_open = bar.bar_open
             self.metrics.last_ingested_at = bar.ingested_at
 
             # Commit to journal (fsync boundary)
             committed = self.journal.commit(bar)
+            previous = self.metrics.last_bar_open
+            if previous is not None:
+                from ..recovery.gap_recovery import _binance_interval_ms
+                next_open = previous + _binance_interval_ms(self.interval)
+                if bar.bar_open > next_open:
+                    self.gap_start_ms = min(self.gap_start_ms if self.gap_start_ms is not None else next_open, next_open)
+                    self.gap_end_ms = max(self.gap_end_ms or 0, bar.bar_open)
+            self.metrics.last_bar_open = max(previous if previous is not None else bar.bar_open, bar.bar_open)
             if committed:
                 self.metrics.journal_commit_count += 1
                 committed_at = bar.committed_at
@@ -134,9 +160,11 @@ class BinanceCollector:
                 self.metrics.duplicate_count += 1
 
             # Upsert to operational store (idempotent)
-            if self.store.upsert(bar):
-                self.metrics.store_insert_count += 1
+            if not self.background_persistence:
+                if self.store.upsert(bar):
+                    self.metrics.store_insert_count += 1
                 self.journal.mark_persisted(bar.stable_key())
+            self.health_state = "STREAMING"
 
             if self.max_bars and self.metrics.journal_commit_count >= self.max_bars:
                 logger.info("Reached max_bars=%d, stopping.", self.max_bars)
@@ -149,18 +177,21 @@ class BinanceCollector:
 
     def _on_error(self, ws, error) -> None:
         self.metrics.error_count += 1
+        self.health_state = "DEGRADED"
         logger.warning("WebSocket error: %s", error)
 
     def _on_close(self, ws, close_status_code, close_msg) -> None:
+        self.health_state = "DISCONNECTED"
         self.metrics.disconnect_at = int(time.time() * 1000)
-        if self.metrics.last_bar_open:
-            self.gap_start_ms = self.metrics.last_bar_open
+        if self.metrics.last_bar_open is not None:
+            self.gap_start_ms = min(self.gap_start_ms if self.gap_start_ms is not None else self.metrics.last_bar_open, self.metrics.last_bar_open)
         logger.info(
             "WebSocket closed: code=%s msg=%s gap_start=%s",
             close_status_code, close_msg, self.gap_start_ms,
         )
 
     def _on_open(self, ws) -> None:
+        self.health_state = "CONNECTED"
         if self.metrics.first_connect_at is None:
             self.metrics.first_connect_at = int(time.time() * 1000)
         # Record gap end when we reconnect (gap window now closed)
@@ -213,17 +244,17 @@ class BinanceCollector:
                 backoff = RECONNECT_BACKOFF_S[min(attempt - 1, len(RECONNECT_BACKOFF_S) - 1)]
                 logger.info("Reconnecting in %ds (attempt %d)...", backoff, attempt)
                 self.metrics.reconnect_count += 1
-                time.sleep(backoff)
+                self._stop_event.wait(backoff)
 
         t = threading.Thread(target=_run_ws, daemon=True)
         t.start()
 
-        deadline = time.time() + timeout_s if timeout_s else None
+        deadline = time.monotonic() + timeout_s if timeout_s is not None else None
         try:
             while t.is_alive():
                 if self._stop_event.is_set():
                     break
-                if deadline and time.time() >= deadline:
+                if deadline is not None and time.monotonic() >= deadline:
                     logger.info("Timeout reached, stopping collector.")
                     self._stop_event.set()
                     if self._ws:

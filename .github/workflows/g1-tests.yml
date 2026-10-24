@@ -16,6 +16,9 @@ on:
       - feat/g1-wp04-operational-readiness
       - main
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: G1 Tests (${{ matrix.os }})
@@ -46,6 +49,7 @@ jobs:
           tests/test_g1_wp03.py
           tests/test_g1_wp04.py
           tests/test_g1_wp04_fix01.py
+          tests/test_g1_completion.py
           -v --tb=long
           --junit-xml=test-results-${{ matrix.os }}.xml
         env:
@@ -57,3 +61,27 @@ jobs:
         with:
           name: test-results-${{ matrix.os }}
           path: test-results-${{ matrix.os }}.xml
+
+  postgres-sandbox:
+    name: Disposable PostgreSQL sandbox contract
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: atlas_sandbox
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d atlas_sandbox"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]" "psycopg[binary]>=3.2,<4"
+      - run: python -B -m pytest tests/test_g1_completion.py -k disposable_postgres -v
+        env:
+          AQL_DISPOSABLE_POSTGRES_TEST: "1"
