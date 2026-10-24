@@ -18,6 +18,7 @@ class DurablePositionJournal:
         self.ledger=PositionLedger()
         self._tail='0'*64
         self._replay()
+        self._expected_size=self.path.stat().st_size if self.path.exists() else 0
     def _replay(self):
         if not self.path.exists(): return
         with self.path.open('rb') as f:
@@ -36,6 +37,11 @@ class DurablePositionJournal:
                 except (ValueError,TypeError,KeyError,UnicodeError,PositionContractError) as exc:
                     raise JournalIntegrityError(f'invalid journal line {number}') from exc
     def append(self,event):
+        # Refuse stale instances and out-of-band changes before every write.
+        # This detects sequential conflicts but is NOT a cross-process lock.
+        current_size=self.path.stat().st_size if self.path.exists() else 0
+        if current_size != self._expected_size:
+            raise JournalIntegrityError('journal changed outside this writer; reopen and replay')
         if not isinstance(event,PositionEvent): raise PositionContractError('invalid event')
         # Validate against a disposable replay before touching durable bytes.
         candidate=PositionLedger()
@@ -53,4 +59,5 @@ class DurablePositionJournal:
             os.fsync(f.fileno())
         self.ledger=candidate
         self._tail=row['digest']
+        self._expected_size+=len(encoded)
         return 'inserted'
