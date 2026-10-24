@@ -93,4 +93,27 @@ class JournalTests(unittest.TestCase):
             lock.unlink()
             DurablePositionJournal(p).append(self.e('start','opened',0))
             self.assertEqual(DurablePositionJournal(p).ledger.status('p1',1),'open')
+    def test_crashed_process_orphan_lock_fails_closed(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/'journal.jsonl'
+            child_code=(
+                "import sys,os; from pathlib import Path; "
+                "sys.path.insert(0,sys.argv[2]); "
+                "from aql.observation.position_journal import _exclusive_writer; "
+                "p=Path(sys.argv[1]); "
+                "with_open='unused'; "
+                "lock=p.with_name(p.name+'.writer.lock'); "
+                "fd=os.open(lock,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600); "
+                "os.write(fd,b'crashed'); os.fsync(fd); os._exit(17)"
+            )
+            result=subprocess.run(
+                [sys.executable,'-c',child_code,str(p),
+                 str(Path(__file__).resolve().parents[1]/'src')],
+                capture_output=True,text=True,timeout=15)
+            self.assertEqual(result.returncode,17)
+            lock=p.with_name(p.name+'.writer.lock')
+            self.assertTrue(lock.exists())
+            with self.assertRaises(JournalIntegrityError):
+                DurablePositionJournal(p).append(self.e('start','opened',0))
+            self.assertFalse(p.exists())
 if __name__=='__main__':unittest.main()
