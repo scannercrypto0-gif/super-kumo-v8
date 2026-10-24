@@ -1,5 +1,6 @@
 """Security regression: sealed plan remains authoritative after policy downgrade."""
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,8 +16,9 @@ class SealedPolicyTamperTests(unittest.TestCase):
             raw, digest = frozen_plan()
             ledger = AttemptLedger(path)
             ledger.bind_frozen_plan(raw, digest)
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db:
                 db.execute("UPDATE ledger_policy SET require_admission=0 WHERE id=1")
+                db.commit()
             with self.assertRaisesRegex(ValueError, "sealed frozen plan"):
                 AttemptLedger(path).record_attempt(dict(EVENT, candidate_id="Unplanned"),
                                                    admission=lambda *_: None)
