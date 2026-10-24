@@ -1,6 +1,5 @@
 """G2 #92: isolated fail-closed recovery regression tests (offline only)."""
 import hashlib
-import json
 import subprocess
 import sys
 import tempfile
@@ -27,7 +26,7 @@ class RecoveryEvidenceTests(unittest.TestCase):
             child = (
                 "import os,sys; "
                 "f=open(sys.argv[1],'ab'); "
-                "f.write(b'{\\\"previous\\\":'); f.flush(); os.fsync(f.fileno()); "
+                "f.write(b\x27PARTIAL_RECORD\x27); f.flush(); os.fsync(f.fileno()); "
                 "os._exit(29)"
             )
             result = subprocess.run([sys.executable, "-c", child, str(path)],
