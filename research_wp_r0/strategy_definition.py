@@ -52,11 +52,19 @@ def digest(value):
     return hashlib.sha256(canonical(value)).hexdigest()
 
 
+def _json_float(text):
+    value = float(text)
+    significand = text.lower().split("e")[0]
+    if not math.isfinite(value) or (value == 0 and any(c in "123456789" for c in significand)):
+        raise ValueError("JSON number overflow/underflow")
+    return value
+
+
 def load_json(raw):
     if type(raw) is not str or len(raw.encode("utf-8")) > 100000:
         raise ValueError("Expected bounded UTF-8 JSON string")
     try:
-        return json.loads(raw, object_pairs_hook=_pairs, parse_constant=_reject)
+        return json.loads(raw, object_pairs_hook=_pairs, parse_constant=_reject, parse_float=_json_float)
     except (RecursionError, UnicodeError) as error:
         raise ValueError("Invalid JSON encoding/depth") from error
 
@@ -295,8 +303,14 @@ def bind_evaluation(definition, accessor, dataset_id, version, start_ms, end_ms,
                 r.dataset_manifest_hash != meta.manifest_integrity_hash or
                 tuple(r.parameters) != tuple(sorted(ind.params.items()))):
                 raise ValueError("Indicator result identity mismatch")
-            if type(r.value) is tuple and tuple(k for k, _ in r.value) != tuple(ind.output_fields):
-                raise ValueError("Typed output fields mismatch")
+            fields = getattr(ind, "output_fields", None)
+            if fields is not None:
+                if type(r.value) is not tuple or tuple(k for k, _ in r.value) != tuple(fields):
+                    raise ValueError("Typed output fields mismatch")
+            elif type(r.value) is tuple:
+                raise ValueError("Scalar indicator output required")
+            if r.warmup_bars_consumed != ind.min_warmup_bars:
+                raise ValueError("Result warmup mismatch")
             values = [v for _, v in r.value] if type(r.value) is tuple else [r.value]
             for value in values:
                 number(value)
@@ -349,8 +363,11 @@ class AttemptRecorder:
         raw_hash = hashlib.sha256(raw_json.encode("utf-8", errors="surrogatepass")).hexdigest()
         try:
             definition = StrategyDefinition.from_json(raw_json, registry=registry)
-        except (ValueError, TypeError, KeyError) as error:
-            self.sink.record_attempt({"state": "INVALID", "family_id": family_id,
+        except Exception as error:
+            # Registry/provider failures are attempted work too. Never swallow
+            # the failure or fabricate a completed result; persistence may raise.
+            state = "INVALID" if isinstance(error, (ValueError, TypeError, KeyError)) else "FAILED"
+            self.sink.record_attempt({"state": state, "family_id": family_id,
                                       "candidate_id": candidate_id, "input_digest": raw_hash,
                                       "error_type": type(error).__name__})
             raise

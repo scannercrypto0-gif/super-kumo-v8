@@ -215,3 +215,52 @@ def test_extreme_numeric_invalid_attempt_is_retained():
     with pytest.raises(ValueError):
         AttemptRecorder(sink).prepare(raw,"family","huge")
     assert sink.record_attempt.call_args.args[0]["state"]=="INVALID"
+
+
+@pytest.mark.parametrize("raw", ['{"x":1e9999}', '{"x":1e-9999}', '{"x":-1e-9999}'])
+def test_json_float_extremes_fail_closed(raw):
+    with pytest.raises(ValueError):load_json(raw)
+
+
+def test_unexpected_registry_failure_is_recorded_and_propagated():
+    class BrokenRegistry:
+        def get(self,*args,**kwargs):raise RuntimeError("provider unavailable")
+    sink=Mock()
+    with pytest.raises(RuntimeError,match="provider unavailable"):
+        AttemptRecorder(sink).prepare(definition().to_json(),"family","candidate",registry=BrokenRegistry())
+    event=sink.record_attempt.call_args.args[0]
+    assert event["state"]=="FAILED" and event["candidate_id"]=="candidate"
+    assert event["input_digest"] and event["error_type"]=="RuntimeError"
+    sink.record_attempt.side_effect=OSError("ledger unavailable")
+    with pytest.raises(OSError,match="ledger unavailable"):
+        AttemptRecorder(sink).prepare(definition().to_json(),"family","candidate",registry=BrokenRegistry())
+
+
+def test_wrong_result_warmup_rejected_even_with_consistent_hashes():
+    from research_wp_r0.indicator_library import IndicatorLibrary,IndicatorResult,IndicatorManifest
+    class Registry(IndicatorLibrary):
+        def get(self,*args,**kwargs):
+            ind=super().get(*args,**kwargs);compute=ind.compute
+            def bad(*a,**k):
+                rows,manifest=compute(*a,**k)
+                fields=rows[-1].to_dict();fields.pop("provenance_hash")
+                fields["warmup_bars_consumed"]+=1
+                rows[-1]=IndicatorResult.create(**fields)
+                manifest=dataclasses.replace(manifest,computation_hash=IndicatorManifest._hash_results(rows))
+                return rows,manifest
+            ind.compute=bad
+            return ind
+    with pytest.raises(ValueError,match="warmup"):
+        binding(registry=Registry())
+
+
+def test_vector_contract_cannot_accept_scalar_result():
+    from research_wp_r0.indicator_library import IndicatorLibrary
+    class Registry(IndicatorLibrary):
+        def get(self,*args,**kwargs):
+            ind=super().get(*args,**kwargs)
+            ind.output_fields=("first","second")
+            return ind
+    value=spec();value["entry"]["left"]["field"]="first";value["exit"]["left"]["field"]="second"
+    with pytest.raises(ValueError,match="Typed output"):
+        binding(StrategyDefinition(value,registry=Registry()),registry=Registry())

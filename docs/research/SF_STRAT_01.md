@@ -16,7 +16,7 @@ This is a definition/validation/provenance contract, **not a strategy execution 
 
 PR46 a4c106a02c55ee012eedf4c55c1488d71d850203 is stacked on #43 and earlier unmerged research PRs, not accepted main. Reuses the canonical-byte/frozen-protocol/candidate/commitment pattern; does not silently merge or copy its engine. A concrete adapter to DurableTrialJournal's existing Attempt API requires separate ancestry reconciliation. The port is not that journal implementation and makes no fsync, anti-rollback or independent custody guarantee. The injected sink must persist-or-raise and enforce family membership/event lifecycle; supplied in-memory mocks are test sinks only. Failure to record propagates; no successful receipt is fabricated.
 
-Indicator V2 is independently reviewable [PR68](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/68). Runtime has **no V2 import**. Its typed vector registry is tested explicitly in integration_tests/, pinned to head60cb566ef39750c33ee8a55160eee9696c7bcb3c; ordinary strategy validation works with main V1 alone. Both PRs target main; no implicit stacked merge order required. If either reviewed head changes, update the pin and rerun cross-PR integration before joint acceptance.
+Indicator V2 is independently reviewable [PR68](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/68). Runtime has **no V2 import**. Its typed vector registry is tested explicitly in integration_tests/, pinned to headf3ca2d5dde019a836fe6994b658a444c34b1cfb2; ordinary strategy validation works with main V1 alone. Both PRs target main; no implicit stacked merge order required. If either reviewed head changes, update the pin and rerun cross-PR integration before joint acceptance.
 
 ## Schema and bounded semantics
 
@@ -48,3 +48,6 @@ Six CI environments Ubuntu/Windows ×3.10/3.11/3.12 test standalone contract the
 Pinned schema/binding fixture commitments test Windows/Linux parity; future/cutoff/gap/retrospective/warmup, incorrect output/manifest, mutation/roundtrip/tamper and invalid attempts covered. Exact final CI counts/SHAs are in the PR/Issue report, not guessed here.
 
 VWAP/session anchors, cross-asset availability, new data contracts, concrete unmerged ledger chain integration, signal evaluation/optimization, Holdout, live/paper/shadow trading and G1 changes remain outside this deliverable. No profitability or production claim. Owner review/merge authorization separate; Issue66 stays open.
+
+## Final acceptance hardening
+JSON floating-point overflow and nonzero underflow-to-zero are rejected before canonicalization. Unexpected registry/provider exceptions produce a FAILED attempt event and re-raise; validation rejections remain INVALID, and sink failures always propagate. Binding rejects scalar/vector shape mismatches and per-result warmup mismatches even if a provider supplies self-consistent hashes. These checks validate adapter contracts; they do not sandbox arbitrary injected Python code.

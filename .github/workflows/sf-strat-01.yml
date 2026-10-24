@@ -2,7 +2,7 @@ name: SF-STRAT-01 Research Tests
 on:
   pull_request:
     branches: [main]
-    paths: ["research_wp_r0/strategy_definition.py", "tests/test_sf_strat_01.py", "integration_tests/test_sf_strat_ind02.py", "examples/strategy_definition_v1.json", ".github/workflows/sf-strat-01.yml"]
+    paths: ["research_wp_r0/historical_library.py", "research_wp_r0/indicator_library.py", "research_wp_r0/_dep_guard.py", "tests/test_sf_ind_01.py", "tests/test_sf_dep_guard.py", "pyproject.toml", "research_wp_r0/indicator_library_v2.py", "research_wp_r0/strategy_definition.py", "tests/test_sf_strat_01.py", "integration_tests/test_sf_strat_ind02.py", "examples/strategy_definition_v1.json", ".github/workflows/sf-strat-01.yml"]
   push:
     branches: [feat/sf-strat-01-json-v1]
   workflow_dispatch:
@@ -30,7 +30,7 @@ jobs:
       - name: Exact independent Indicator V2 review head (PR68)
         uses: actions/checkout@v4
         with:
-          ref: 60cb566ef39750c33ee8a55160eee9696c7bcb3c
+          ref: f3ca2d5dde019a836fe6994b658a444c34b1cfb2
           path: .integration-v2
       - name: Cross-PR integration without modifying tracked strategy files
         run: python -B -c "import research_wp_r0,pytest; research_wp_r0.__path__.append('.integration-v2/research_wp_r0'); raise SystemExit(pytest.main(['integration_tests/test_sf_strat_ind02.py','-v','--tb=short','--junitxml=sf-integration.xml']))"
