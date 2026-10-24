@@ -23,7 +23,9 @@ def reconcile_plan(raw_plan, expected_digest, ledger):
     plan = load_json(raw_plan.decode("utf-8"))
     if canonical(plan) != raw_plan or digest(plan) != expected_digest:
         raise ValueError("Frozen plan mismatch")
-    if type(plan) is not dict or set(plan) != {"schema_version", "family_id", "candidates"}:\n        raise ValueError("Malformed frozen plan")\n    if plan.get("schema_version") != "1":
+    if type(plan) is not dict or set(plan) != {"schema_version", "family_id", "candidates"}:
+        raise ValueError("Malformed frozen plan")
+    if plan.get("schema_version") != "1":
         raise ValueError("Unknown plan version")
     identifier(plan["family_id"])
     if not isinstance(plan.get("candidates"), list) or not 1 <= len(plan["candidates"]) <= 256:
