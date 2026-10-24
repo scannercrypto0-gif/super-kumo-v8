@@ -33,3 +33,4 @@ Default64 rows/batch amortizesfsync within8 segments in thisfixture; no per-symb
 
 Default10 GB archive reserve,8192 backup files/2 GB/60s budgets are protective implementation defaults, not tested capacity guarantees. Proposed hourlyjournal RPO/nightlyarchive RPO and4h RTO require an authorized independent destination and repeated realistic restore drills. Windows directory fsync is explicitly unsupported; no power-loss certification.
 
+Measurement source hashes identify initial PR73 commit efe1f5fe48e134858b14383ce4840868d5a51ddb. Subsequent source-only formatting removes trailing blank lines; implementation semantics and recorded measurement remain unchanged. Final-head CI separately verifies the published review tree.

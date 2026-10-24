@@ -382,4 +382,3 @@ class ArchiveService:
 
     def finish(self, timeout=1):
         return self.lane.finish(timeout)
-

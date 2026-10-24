@@ -119,4 +119,3 @@ def decision_context(*, context_id, decision_ms, outcome, strategy_version, poli
             "outcome": outcome, "strategy_version": strategy_version,
             "policy_version": policy_version, "features": features}
     return canonical({**data, "context_hash": digest(data)})
-
