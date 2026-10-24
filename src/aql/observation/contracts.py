@@ -85,6 +85,24 @@ class Observation:
             raise ContractError('require either value or missing reason')
 
 @dataclass(frozen=True)
+class LateContextEvent:
+    """Append-only information learned after the original decision; never rewrites PIT."""
+    snapshot_id: str
+    event_id: str
+    source: str
+    observed_ms: int
+    received_ms: int
+    context_key: str
+    value: str
+    def validate(self, decision_ms):
+        if not self.snapshot_id or not self.event_id or not self.source or self.context_key not in CONTEXT_KEYS or not self.value:
+            raise ContractError('invalid late context event')
+        if not all(type(t) is int for t in (self.observed_ms,self.received_ms)):
+            raise ContractError('invalid late context timestamps')
+        if not (0 <= self.observed_ms <= self.received_ms) or self.received_ms <= decision_ms:
+            raise ContractError('late context must arrive after PIT decision')
+
+@dataclass(frozen=True)
 class PaperIntent:
     snapshot_id: str
     intent_id: str
@@ -98,6 +116,7 @@ class ObservationLedger:
     def __init__(self):
         self.snapshots={}
         self.observations={}
+        self.late_context={}
         self.events=[]
     def add_snapshot(self,s):
         prior=self.snapshots.get(s.opportunity_key)
@@ -118,6 +137,18 @@ class ObservationLedger:
             return 'duplicate'
         self.observations[key]=o
         self.events.append(('observation',digest(asdict(o))))
+        return 'inserted'
+    def add_late_context(self,e):
+        snap=next((s for s in self.snapshots.values() if s.snapshot_id==e.snapshot_id),None)
+        if snap is None: raise ContractError('unknown snapshot')
+        e.validate(snap.decision_ms)
+        key=(e.snapshot_id,e.event_id)
+        prior=self.late_context.get(key)
+        if prior:
+            if prior != e: raise ContractError('late event identity conflict')
+            return 'duplicate'
+        self.late_context[key]=e
+        self.events.append(('late_context',digest(asdict(e))))
         return 'inserted'
     def horizon_state(self,snapshot_id,horizon_ms,as_of_ms):
         if horizon_ms not in HORIZONS_MS: return 'invalid'
