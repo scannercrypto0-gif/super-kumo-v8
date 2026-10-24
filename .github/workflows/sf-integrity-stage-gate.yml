@@ -23,7 +23,7 @@ jobs:
       - name: Compile all Factory Python sources
         run: python -m compileall -q research_wp_r0
       - name: Focused plan, ledger and admission tests
-        run: python -B -m pytest -p no:cacheprovider research_wp_r0/test_frozen_plan_reconciliation.py research_wp_r0/test_frozen_research_plan.py research_wp_r0/test_full_plan_ledger.py research_wp_r0/test_frozen_attempt_writer.py research_wp_r0/test_frozen_concurrency_recovery.py -v --tb=short
+        run: python -B -m pytest -p no:cacheprovider research_wp_r0/test_frozen_plan_reconciliation.py research_wp_r0/test_frozen_research_plan.py research_wp_r0/test_full_plan_ledger.py research_wp_r0/test_frozen_attempt_writer.py research_wp_r0/test_frozen_concurrency_recovery.py research_wp_r0/test_factory_custody_envelope.py -v --tb=short
 
   factory-regression:
     strategy:
