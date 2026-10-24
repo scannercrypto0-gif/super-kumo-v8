@@ -1,0 +1,68 @@
+name: SF-IND-01 Fast Tests
+
+on:
+  push:
+    branches:
+      - feat/research-sf-ind-01
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "research_wp_r0/indicator_library.py"
+      - "tests/test_sf_ind_01.py"
+      - ".github/workflows/sf-ind-01-fast.yml"
+
+jobs:
+  test:
+    name: SF-IND-01 Unit Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Verify no external dependencies
+        run: |
+          python -c "
+          import ast, sys, pathlib
+          src = pathlib.Path('research_wp_r0/indicator_library.py').read_text()
+          tree = ast.parse(src)
+          stdlib = {'__future__','abc','collections','dataclasses','datetime',
+                    'enum','functools','hashlib','itertools','json','math',
+                    'operator','os','pathlib','re','struct','time','typing',
+                    'uuid','warnings'}
+          bad = []
+          for node in ast.walk(tree):
+              if isinstance(node, (ast.Import, ast.ImportFrom)):
+                  name = node.names[0].name if isinstance(node, ast.Import) \
+                         else (node.module or '')
+                  root = name.split('.')[0]
+                  if root and root not in stdlib:
+                      bad.append(root)
+          if bad:
+              print('External deps found:', bad, file=sys.stderr)
+              sys.exit(1)
+          print('No external dependencies — OK')
+          "
+
+      - name: Run SF-IND-01 tests
+        run: |
+          python -m pytest tests/test_sf_ind_01.py -v \
+            --tb=short \
+            --junit-xml=test-results-sf-ind-01.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf-ind-01-results-py${{ matrix.python-version }}
+          path: test-results-sf-ind-01.xml
+          retention-days: 7
