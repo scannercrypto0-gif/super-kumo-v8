@@ -3,10 +3,13 @@ from dataclasses import asdict
 import hashlib
 import json
 import os
+import threading
 from pathlib import Path
 from .positions import PositionContractError, PositionEvent, PositionLedger
 
 class JournalIntegrityError(PositionContractError): pass
+
+_WRITER_MUTEX = threading.Lock()
 
 class DurablePositionJournal:
     """Single-writer append-only JSONL with fsync; torn trailing records fail closed.
@@ -37,6 +40,10 @@ class DurablePositionJournal:
                 except (ValueError,TypeError,KeyError,UnicodeError,PositionContractError) as exc:
                     raise JournalIntegrityError(f'invalid journal line {number}') from exc
     def append(self,event):
+        with _WRITER_MUTEX:
+            return self._append_locked(event)
+
+    def _append_locked(self,event):
         # Refuse stale instances and out-of-band changes before every write.
         # This detects sequential conflicts but is NOT a cross-process lock.
         current_size=self.path.stat().st_size if self.path.exists() else 0
