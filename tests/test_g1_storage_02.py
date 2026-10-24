@@ -358,3 +358,141 @@ def test_valid_legacy_optional_payload_checksum_not_invented(tmp_path):
     assert rows[0]["bar"]["checksum"] is None
     assert rows[0]["journal_content_checksum"]==item.compute_checksum()
     assert "bar_payload_checksum" in rows[0]["missing"]
+
+
+def test_corrupt_optional_hot_snapshot_cannot_be_sealed(tmp_path):
+    from aql.archive import backup as module
+    journal, archive = setup(tmp_path); archive.drain_once()
+    hot = OperationalStore(str(tmp_path/"hot.sqlite"))
+    for item in journal.replay(): hot.upsert(item)
+    original = module.sqlite_snapshot
+    def corrupt_before_inventory(source, target, **kwargs):
+        original(source, target, **kwargs)
+        if Path(target).name == "operational.sqlite":
+            Path(target).write_bytes(b"storage fault before inventory sealing")
+    with patch.object(module, "sqlite_snapshot", corrupt_before_inventory):
+        with pytest.raises((ValueError, sqlite3.DatabaseError)):
+            create_backup(archive, tmp_path/"backups", operational_path=hot.db_path)
+    assert archive.last_backup_ms is None
+    assert len(journal.replay()) == 3
+    assert all(p.name.endswith(".partial") for p in (tmp_path/"backups").iterdir())
+
+
+def test_unlisted_empty_directory_rejected_and_walk_deadline_enforced(tmp_path):
+    from aql.archive import backup as module
+    _, archive = setup(tmp_path); archive.drain_once()
+    sealed, evidence = create_backup(archive, tmp_path/"backups")
+    (sealed/"not-in-inventory").mkdir()
+    with pytest.raises(ValueError, match="directory"):
+        verify_backup(sealed, expected_digest=evidence["inventory_hash"])
+    # A separate valid backup demonstrates the deadline check during traversal,
+    # after all file hashing, rather than disguising it as a checksum failure.
+    sealed, evidence = create_backup(archive, tmp_path/"more-backups")
+    original = module.os.scandir
+    clock = [0.]
+    def expired_scan(path):
+        clock[0] = 61.
+        return original(path)
+    with patch.object(module.time, "monotonic", side_effect=lambda: clock[0]), patch.object(module.os, "scandir", expired_scan):
+        with pytest.raises(TimeoutError, match="deadline"):
+            verify_backup(sealed, expected_digest=evidence["inventory_hash"])
+
+
+@pytest.mark.parametrize("raw", ['{"value":1e400}', '{"value":-1e400}', '{"value":NaN}', '{"value":Infinity}'])
+def test_nonfinite_exponent_json_is_rejected(raw):
+    with pytest.raises(ValueError, match="Nonfinite"):
+        parse(raw)
+
+
+def test_missing_backup_segment_never_publishes_restore(tmp_path):
+    _, archive = setup(tmp_path); archive.drain_once()
+    sealed, evidence = create_backup(archive, tmp_path/"backups")
+    inventory = parse((sealed/"inventory.json").read_bytes())
+    relative = next(item["path"] for item in inventory["files"] if item["path"].endswith("records.jsonl"))
+    (sealed/relative).unlink()  # Disposable fixture only; no primary deletion.
+    with pytest.raises(FileNotFoundError):
+        restore_backup(sealed, tmp_path/"restored", expected_digest=evidence["inventory_hash"])
+    assert not (tmp_path/"restored").exists()
+
+
+def test_core_commits_while_backup_capture_is_blocked(tmp_path):
+    from aql.archive import backup as module
+    journal, archive = setup(tmp_path); archive.drain_once()
+    entered, release = threading.Event(), threading.Event()
+    original = module.sqlite_snapshot
+    results, errors = [], []
+    def blocked(source, target, **kwargs):
+        original(source, target, **kwargs)
+        if Path(target).name == "journal.sqlite":
+            entered.set(); assert release.wait(5)
+    def backup():
+        try: results.append(create_backup(archive, tmp_path/"backups"))
+        except Exception as error: errors.append(error)
+    with patch.object(module, "sqlite_snapshot", blocked):
+        worker = threading.Thread(target=backup); worker.start()
+        try:
+            assert entered.wait(3)
+            start = time.monotonic()
+            assert journal.commit(bar(5))
+            assert time.monotonic()-start < 2  # Dependency check, not an SLA.
+        finally:
+            release.set(); worker.join(10)
+    assert not worker.is_alive() and not errors
+    assert results[0][1]["journal_records"] == 3
+    assert len(journal.replay()) == 4
+    assert journal.count_by_state() == {"LOCAL_COMMITTED":4}
+
+
+@pytest.mark.parametrize("phase", ["backup", "restore"])
+def test_real_terminated_copy_can_retry_without_primary_loss(tmp_path, phase):
+    journal, archive = setup(tmp_path); archive.drain_once()
+    sealed, evidence = create_backup(archive, tmp_path/"seed-backup")
+    script = '''import os, sys
+from aql.archive.local import LocalArchive
+from aql.archive import backup as b
+original = b.copy_new
+def interrupted(*args, **kwargs):
+    original(*args, **kwargs)
+    os._exit(94)
+b.copy_new = interrupted
+if sys.argv[1] == "backup":
+    a = LocalArchive(sys.argv[2], sys.argv[3], market="spot", build="test-build", policy="phase1-v1", reserve_bytes=0)
+    b.create_backup(a, sys.argv[4])
+else:
+    b.restore_backup(sys.argv[5], sys.argv[4], expected_digest=sys.argv[6])
+'''
+    destination = tmp_path/("interrupted-backup" if phase=="backup" else "interrupted-restore")
+    result = subprocess.run([sys.executable,"-B","-c",script,phase,journal.db_path,str(archive.root),
+                             str(destination),str(sealed),evidence["inventory_hash"]],
+                            capture_output=True, timeout=20)
+    assert result.returncode == 94, result.stderr.decode(errors="replace")
+    assert len(journal.replay()) == 3 and watermark(archive) == 3
+    if phase == "backup":
+        assert all(p.name.endswith(".partial") for p in destination.iterdir())
+        retry, checked = create_backup(archive, destination)
+        assert verify_backup(retry, expected_digest=checked["inventory_hash"])["records"] == 3
+    else:
+        assert not destination.exists()
+        assert restore_backup(sealed, destination, expected_digest=evidence["inventory_hash"])["records"] == 3
+
+
+@pytest.mark.parametrize("reader", ["small", "hash"])
+def test_nonregular_backup_file_rejected_before_blocking_read(tmp_path, reader):
+    from aql.archive.backup import file_hash
+    from types import SimpleNamespace
+    import stat
+    path = tmp_path/"nonregular"
+    read = local.read_small if reader == "small" else file_hash
+    if hasattr(os, "mkfifo"):
+        os.mkfifo(path)  # Real FIFO on POSIX; must reject before open/read.
+        with pytest.raises(ValueError, match="Regular"):
+            read(path)
+    else:
+        path.write_bytes(b"fixture")
+        original = Path.stat
+        def nonregular(self, *args, **kwargs):
+            if self == path: return SimpleNamespace(st_mode=stat.S_IFIFO)
+            return original(self, *args, **kwargs)
+        with patch.object(Path, "stat", nonregular):
+            with pytest.raises(ValueError, match="Regular"):
+                read(path)

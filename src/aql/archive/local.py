@@ -79,7 +79,9 @@ def write_new(path, data):
 
 
 def read_small(path, maximum=MAX_BYTES):
-    check_path(path)
+    path = check_path(path)
+    if not stat.S_ISREG(path.stat().st_mode):
+        raise ValueError("Regular archive file required")
     with open(path, "rb") as handle:
         value = handle.read(maximum + 1)
     if len(value) > maximum:

@@ -29,10 +29,21 @@ jobs:
         run: python -m pip install -e ".[dev]"
       - name: Exact imported archive checkout
         run: python -B -c "import aql.archive.local,pathlib; p=pathlib.Path(aql.archive.local.__file__).resolve(); print(p); assert pathlib.Path.cwd() in p.parents"
+      - name: Exact source and environment evidence
+        shell: bash
+        run: |
+          git rev-parse HEAD | tee storage02-source.txt
+          git rev-parse 'HEAD^{tree}' | tee -a storage02-source.txt
+          python --version | tee -a storage02-source.txt
+          python -m pip freeze | tee -a storage02-source.txt
       - name: Local-only archive and restore acceptance
         run: python -B -m pytest tests/test_g1_storage_02.py -v --tb=short --junitxml=storage02.xml
+      - name: Require complete Phase1 acceptance without skips
+        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('storage02.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==60; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: storage02-${{ matrix.os }}-${{ matrix.python }}
-          path: storage02.xml
+          path: |
+            storage02.xml
+            storage02-source.txt

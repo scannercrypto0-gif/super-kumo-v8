@@ -60,3 +60,17 @@ No deletion is authorized. A later retention proposal requires complete declared
 Phase2: separately reviewed capped generic projection publisher/quota controller/read-only dashboard. Reuse #65 for actual named-Sandbox TLS/RLS acceptance only after separate owner authorization; this issue authorizes no cloud access, schema changes, paid service or deployment.
 
 Trust boundary: sealing is append-only through this API plus retained integrity commitments, not filesystem WORM or protection from a privileged attacker. Envelope hashes start protecting temporal fields at archival capture; they cannot retroactively authenticate earlier journal timestamp edits that the original market checksum did not cover. Real provider availability remains unknown unless separately evidenced.
+
+## Final acceptance hardening (owner execution order, PR73)
+
+Within the same Phase1 architecture, verify_backup now checks the optional hot
+SQLite as well as journal/catalog. All inventory contents, including directories,
+are verified with streaming enumeration, explicit depth bounds, deadline checks
+and nonregular-file refusal before reads. JSON numeric exponent overflow is
+rejected as nonfinite; valid canonical output/hash semantics are unchanged.
+Regression tests cover these defects, actual process termination during backup
+and restore, a missing sealed payload, and core commits while snapshot capture
+is deliberately paused. These tests do not establish physical power-loss,
+privileged-race, real disk exhaustion, offsite protection or production RPO/RTO.
+The separate final acceptance evidence document records counts/measurements and
+the recommendation; this ADR remains a proposal requiring owner approval.

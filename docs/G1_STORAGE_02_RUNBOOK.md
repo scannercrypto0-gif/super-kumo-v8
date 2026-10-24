@@ -25,6 +25,22 @@ Backup API: `create_backup(archive, destination, operational_path=optional_hot_s
 
 Restore drill: `restore_backup(backup_path, new_disposable_path, expected_digest=retained_hash)` verifies inventory, SQLite integrity, every archive/source key and full envelope hash before and after copy. Success creates the target by rename; failure leaves only an explicitly partial sibling. This is not production cutover. Rebuild a new archive root from restored journal if testing continued delivery at a new path; old index is preserved forensic, not silently rebound.
 
+Acceptance hardening: journal, catalog **and optional operational SQLite** must
+pass integrity_check against the sealed bytes. Inventory hash alone does not
+prove a SQLite file is usable. Verification streams directory entries, rejects
+unlisted directories/files and nonregular entries, checks the deadline during
+traversal and bounds inventory path depth to16 components. Hash/read helpers
+reject nonregular files before opening them (real FIFO test on POSIX; simulated
+file-type metadata on Windows). Ordinary blocking filesystem calls/fsync remain
+nonpreemptible; timeout is a cooperative work limit, not a hard I/O deadline.
+
+Interrupted backup/restore copies retain partial siblings, never a successful
+final destination. Retry uses a new unique temporary attempt and leaves the
+primary journal unchanged. No partial cleanup/pruning is automatic. A valid
+backup may predate concurrent core commits; inspect journal_max_seq and the
+independently retained inventory commitment when setting RPO. The optional hot
+store is individually coherent and rebuildable, not a global snapshot.
+
 Never copy a live .sqlite file alone. SQLite backup API handles committed WAL. Never pass immutable=1 to a live database: it is used internally only for completed sealed snapshot outputs. Optional hot snapshot is coherent individually; it can lag journal and should be reconstructed from authoritative journal if necessary.
 
 Tests (local disposable files; no external providers):

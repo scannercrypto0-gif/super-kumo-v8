@@ -26,7 +26,13 @@ def parse(raw):
         return out
     def reject(_):
         raise ValueError("Nonfinite JSON")
-    return json.loads(raw, object_pairs_hook=pairs, parse_constant=reject)
+    def finite_float(text):
+        value = float(text)
+        if not math.isfinite(value):
+            raise ValueError("Nonfinite JSON")
+        return value
+    return json.loads(raw, object_pairs_hook=pairs, parse_constant=reject,
+                      parse_float=finite_float)
 
 
 def timestamp(value):

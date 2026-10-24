@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import shutil
 import sqlite3
+import stat
 import time
 import uuid
 
@@ -41,7 +42,9 @@ def sqlite_snapshot(source, target, *, timeout=30, max_bytes=2_000_000_000):
 
 
 def file_hash(path, *, max_bytes=2_000_000_000, deadline=None):
-    check_path(path)
+    path = check_path(path)
+    if not stat.S_ISREG(path.stat().st_mode):
+        raise ValueError("Regular snapshot file required")
     total = 0; hasher = hashlib.sha256()
     with open(path, "rb") as handle:
         while True:
@@ -79,10 +82,15 @@ def verify_backup(root, *, expected_digest, max_files=8192, max_bytes=2_000_000_
     if not 2 <= len(inventory["files"]) <= max_files:
         raise ValueError("Inventory file bound")
     seen = set(); total = 0
+    allowed_dirs = set()
     for item in inventory["files"]:
+        if time.monotonic() > deadline: raise TimeoutError("Verification deadline")
         if item["path"] in seen: raise ValueError("Duplicate inventory entry")
         seen.add(item["path"])
         path = child(root, item["path"])
+        parts = item["path"].split("/")
+        if len(parts) > 16: raise ValueError("Inventory path depth bound")
+        allowed_dirs.update("/".join(parts[:i]) for i in range(1, len(parts)))
         size, actual = file_hash(path, max_bytes=max_bytes-total, deadline=deadline)
         total += size
         if size != item["bytes"] or actual != item["sha256"]:
@@ -91,12 +99,24 @@ def verify_backup(root, *, expected_digest, max_files=8192, max_bytes=2_000_000_
         if required not in seen: raise ValueError("Required snapshot missing")
     # Verify exact file inventory, excluding no hidden attacker-controlled extras.
     actual_paths = set()
-    for directory, dirs, names in os.walk(root, followlinks=False):
-        for name in dirs: check_path(Path(directory)/name)
-        for name in names:
-            path = check_path(Path(directory)/name)
-            actual_paths.add(path.relative_to(root).as_posix())
-            if len(actual_paths) > max_files+1: raise ValueError("Unexpected snapshot file count")
+    expected_files = seen | {"inventory.json"}
+    def scan(directory):
+        # Stream entries: os.walk materializes an unbounded directory before
+        # yielding. Reject even empty unlisted directories; depth is bounded16.
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                if time.monotonic() > deadline: raise TimeoutError("Verification deadline")
+                path = check_path(entry.path)
+                relative = path.relative_to(root).as_posix()
+                if entry.is_dir(follow_symlinks=False):
+                    if relative not in allowed_dirs: raise ValueError("Unexpected snapshot directory")
+                    scan(path)
+                elif entry.is_file(follow_symlinks=False):
+                    if relative not in expected_files: raise ValueError("Unexpected snapshot file")
+                    actual_paths.add(relative)
+                else:
+                    raise ValueError("Nonregular snapshot entry")
+    scan(root)
     if actual_paths != seen | {"inventory.json"}: raise ValueError("Unexpected snapshot files")
     # Only sealed SQLite backup-API outputs may use immutable=1 (never live WAL DBs).
     def sealed(path):
@@ -109,6 +129,13 @@ def verify_backup(root, *, expected_digest, max_files=8192, max_bytes=2_000_000_
         for conn in (journal, catalog):
             if conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                 raise ValueError("SQLite integrity check failed")
+        if "operational.sqlite" in seen:
+            operational = sealed(root/"operational.sqlite")
+            try:
+                if operational.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+                    raise ValueError("Operational SQLite integrity check failed")
+            finally:
+                operational.close()
         if catalog.execute("SELECT COUNT(*) FROM pending").fetchone()[0]:
             raise ValueError("Snapshot has unresolved archive intent")
         source_id = journal.execute("SELECT value FROM journal_meta WHERE key='instance_id'").fetchone()[0]
@@ -143,6 +170,7 @@ def verify_backup(root, *, expected_digest, max_files=8192, max_bytes=2_000_000_
                             build=inventory["build"], policy=inventory["policy"], cutoff_ms=253402300799999)
             journal_count += 1
             if time.monotonic() > deadline: raise TimeoutError("Journal validation deadline")
+        if time.monotonic() > deadline: raise TimeoutError("Verification deadline")
         return {"records": count, "watermark": cursor, "journal_max_seq": maximum,
                 "journal_records": journal_count,
                 "files": len(seen), "bytes": total, "inventory_hash": stored,
