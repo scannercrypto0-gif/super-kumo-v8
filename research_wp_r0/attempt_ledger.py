@@ -283,7 +283,21 @@ class AttemptLedger:
 
 
 def prepare_durable_candidate(ledger, *args, **kwargs):
-    """Existing bridge + durable immutable INPUTS receipt; no evaluation result."""
+    """Legacy bridge, disabled for frozen-plan protected ledgers.
+
+    A frozen research run must use a plan-aware recorder/adapter; never
+    allow this legacy bridge to silently write through a sealed policy.
+    """
+    if not isinstance(ledger, AttemptLedger):
+        raise ValueError("Real Factory AttemptLedger required")
+    db = ledger._connect()
+    try:
+        sealed = db.execute("SELECT 1 FROM frozen_plan_policy WHERE id=1").fetchone()
+        policy = db.execute("SELECT require_admission FROM ledger_policy WHERE id=1").fetchone()
+        if sealed is not None or policy is None or bool(policy[0]):
+            raise ValueError("Legacy preparation prohibited on protected ledger")
+    finally:
+        db.close()
     from .historical_evaluation_bridge import prepare_candidate
     prepared, inputs = prepare_candidate(AttemptRecorder(ledger), *args, **kwargs)
     ledger.record_attempt({**prepared.__dict__, "state": "INPUTS",
