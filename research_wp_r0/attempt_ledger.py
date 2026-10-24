@@ -61,7 +61,8 @@ class AttemptLedger:
     """
     def __init__(self, path, *, expected_checkpoint=None, require_admission=False):
         self.path = _checked_path(path)
-        self.expected_checkpoint = expected_checkpoint\n        self.require_admission = require_admission
+        self.expected_checkpoint = expected_checkpoint
+        self.require_admission = require_admission
         existed = self.path.exists()
         if not existed and expected_checkpoint is not None:
             raise ValueError("Anchored ledger missing; refusing recreation")
@@ -70,6 +71,17 @@ class AttemptLedger:
             if not existed:
                 db.execute("CREATE TABLE receipts(seq INTEGER PRIMARY KEY, event_id TEXT UNIQUE NOT NULL, payload BLOB NOT NULL, chain_hash TEXT NOT NULL)")
                 db.execute("PRAGMA user_version=1")
+            db.execute("CREATE TABLE IF NOT EXISTS ledger_policy (id INTEGER PRIMARY KEY CHECK(id=1), require_admission INTEGER NOT NULL CHECK(require_admission IN (0,1)))")
+            stored = db.execute("SELECT require_admission FROM ledger_policy WHERE id=1").fetchone()
+            if stored is None:
+                db.execute("INSERT INTO ledger_policy(id, require_admission) VALUES(1, ?)",
+                           (int(bool(require_admission)),))
+                self.require_admission = bool(require_admission)
+            else:
+                self.require_admission = bool(stored[0])
+                if require_admission and not self.require_admission:
+                    db.execute("UPDATE ledger_policy SET require_admission=1 WHERE id=1")
+                    self.require_admission = True
             self._read(db)
         finally:
             db.close()
@@ -187,6 +199,11 @@ class AttemptLedger:
         try:
             db.execute("BEGIN IMMEDIATE")
             events, checkpoint = self._read(db)
+            policy = db.execute("SELECT require_admission FROM ledger_policy WHERE id=1").fetchone()
+            if policy is None:
+                raise ValueError("Missing durable admission policy")
+            if bool(policy[0]) and admission is None:
+                raise ValueError("Durable admission policy requires callback")
             existing = db.execute("SELECT payload FROM receipts WHERE event_id=?", (eid,)).fetchone()
             if existing:
                 if bytes(existing[0]) != raw:
