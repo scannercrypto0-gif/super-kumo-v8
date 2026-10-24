@@ -50,6 +50,20 @@ class AdmissionTests(unittest.TestCase):
                                        "input_digest": "f" * 64, "strategy_digest": "0" * 64})
             self.assertEqual(ledger.snapshot()[0], [])
 
+    def test_protected_ledger_rejects_direct_writer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ledger = AttemptLedger(Path(tmp) / "attempts.sqlite", require_admission=True)
+            event = {"state": "PENDING", "family_id": "Family1",
+                     "candidate_id": "Candidate1", "input_digest": "f" * 64,
+                     "strategy_digest": "a" * 64}
+            with self.assertRaisesRegex(ValueError, "admission"):
+                ledger.record_attempt(event)
+            raw, commitment = plan()
+            FrozenAttemptWriter(ledger, raw, commitment).record_attempt(event)
+            self.assertEqual(len(ledger.snapshot()[0]), 1)
+            with self.assertRaisesRegex(ValueError, "admission"):
+                ledger.record_attempt(event)
+
     def test_transaction_admission_rejects_without_append(self):
         with tempfile.TemporaryDirectory() as tmp:
             ledger = AttemptLedger(Path(tmp) / "attempts.sqlite")
