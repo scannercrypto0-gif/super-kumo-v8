@@ -7,7 +7,7 @@ import json
 import math
 
 from research_wp_r0.indicator_library import IndicatorLibrary, _get_ds_meta
-from research_wp_r0.historical_library import CustodyAccessor, DataAvailabilityKind
+from research_wp_r0.historical_library import CustodyAccessor, DataAvailabilityKind, BarQuality
 
 
 def _canonical(value):
@@ -190,6 +190,12 @@ class ExpandedIndicator:
             if (b.volume < 0 or b.observation_cutoff_ms > decision_cutoff_ms or
                 b.bar_close >= decision_cutoff_ms or b.availability_kind != DataAvailabilityKind.CONFIRMED):
                 raise ValueError("Invalid volume/availability")
+        for b in bars:
+            if (b.quality != BarQuality.FINAL or type(b.observation_cutoff_ms) is not int or
+                b.observation_cutoff_ms < b.bar_close + 1 or
+                b.ingest_time_ms is not None and (type(b.ingest_time_ms) is not int or
+                                                 b.ingest_time_ms < 0 or b.ingest_time_ms > b.observation_cutoff_ms)):
+                raise ValueError("Non-final or inconsistent receipt/availability timestamps")
         vectors = self._values(bars)
         results = []
         for index, values in vectors:

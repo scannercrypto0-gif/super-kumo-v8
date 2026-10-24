@@ -224,3 +224,25 @@ def test_manifest_rejects_mixed_result_identity_and_binds_seed_range():
     _,later=IndicatorRegistryV2().get("OBV_v2").compute(accessor,"BTC1M",BASE_MS+IMS,bars[-1].bar_open,bars[-1].bar_close+1)
     assert manifest.start_ms==BASE_MS and later.start_ms==BASE_MS+IMS
     assert manifest.input_bar_hash!=later.input_bar_hash
+
+
+def test_recorded_receipt_cannot_be_later_than_declared_availability():
+    bars=input_bars()
+    bars[-1]=dataclasses.replace(bars[-1],ingest_time_ms=bars[-1].bar_close+60001)
+    with pytest.raises(ValueError,match="receipt/availability"):
+        run("OBV_v2",bars)
+
+
+def test_nonfinal_returned_by_custody_adapter_fails_closed():
+    from research_wp_r0.historical_library import BarQuality
+    bars=input_bars();_,accessor=_lib_with(bars)
+    returned=[*bars[:-1],dataclasses.replace(bars[-1],quality=BarQuality.NON_FINAL)]
+    with patch.object(accessor,"range_query",return_value=returned):
+        with pytest.raises(ValueError,match="Non-final"):
+            IndicatorRegistryV2().get("OBV_v2").compute(accessor,"BTC1M",BASE_MS,bars[-1].bar_open,bars[-1].bar_close+1)
+
+
+@pytest.mark.parametrize("value",[float("nan"),float("inf"),-float("inf")])
+def test_nonfinite_candle_rejected(value):
+    bars=input_bars();bars[-1]=dataclasses.replace(bars[-1],close=value)
+    with pytest.raises((ValueError,HistoricalDataError)):run("OBV_v2",bars)

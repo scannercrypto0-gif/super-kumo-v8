@@ -45,3 +45,5 @@ No profitability, promotion, production, paper or live execution claim. Draft on
 
 ## Final acceptance hardening
 V2 verifies the custody manifest on every compute and rejects bool/float dataset versions. Computation manifests additionally bind exact requested start/end and ordered input-bar checksum digest, including seed history; individual result hashes alone are not a complete requested-range receipt. Manifest verification checks result identity, parameters, warmup, fields and ordering against metadata, not only the list of hashes. Original V1 bytes/commitments remain unchanged.
+
+FINAL quality and internally consistent receipt/availability times are checked at the new consumer boundary. Recorded ingestion cannot be later than declared availability, even if both hashes are self-consistent. A CONFIRMED label with unknown receipt time remains only the accepted custody assertion; synthetic fixtures do not prove real-world receipt evidence. No G1 or accepted V1 code changes.
