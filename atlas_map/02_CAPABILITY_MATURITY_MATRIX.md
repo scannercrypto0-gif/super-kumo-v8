@@ -95,13 +95,13 @@
 |-----------|-------|----------|-----|--------------|
 | Requirements | L1 | Issues #17–#46, PRs #17–#43 (open) | None designed | — |
 | Architecture | L1 | PR #17 docs, WP-R0 through WP-R40 | No consensus design | — |
-| Code | L0 | Nothing merged | Everything | Issues #18–#46 |
-| Tests | L0 | Nothing | Everything | — |
-| PIT Correctness | L1 | Designed in contracts | Not implemented | — |
+| Code | L1 | Strategy Factory foundations merged in main (PRs #68, #69 @ `4e4c353`): `historical_library.py`, `indicator_library.py`, `indicator_library_v2.py`, `strategy_definition.py`, `_dep_guard.py` — isolated; no integrated Research Lab | backtest engine, holdout, trial registry, runner not implemented | Issues #18–#46 |
+| Tests | L1 | SF foundation tests pass (506 local, CI #40085463732); no Research Lab integration tests | Everything at Lab level | — |
+| PIT Correctness | L1 | Designed in contracts; `decision_cutoff_ms` in CustodyAccessor | Not live-tested in backtest pipeline | — |
 | Holdout Custody | L0 | WP-R6 designed (Issue #24) | Not implemented | — |
 | Trial Registry | L0 | WP-R7 designed (Issue #25) | Not implemented | — |
 
-**Overall: L0-L1** — Substantial design work; zero implementation. Largest implementation gap in the project.
+**Overall: L1** — Isolated Strategy Factory foundations (PRs #68, #69) merged in main; integrated Research Lab (backtest engine, holdout custody, trial registry) not implemented. Largest implementation gap in the project.
 
 ---
 
@@ -174,7 +174,7 @@ B     Live Market Data Center        L2
 C     Strategy Factory               L2-L3
 D     Strategy Explorer              L0
 E     Asset Intelligence Lab         L0
-F     Research Lab                   L0-L1
+F     Research Lab                   L1
 G     Secretariat Office             L1
 H     Opportunity Scanner            L1
 I     Virtual Traders                L1

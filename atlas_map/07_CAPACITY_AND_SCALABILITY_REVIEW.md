@@ -147,4 +147,4 @@
 | SC-12: Historical Library at scale | MEDIUM | Not designed | Deferred |
 | SC-13: Concurrent backtest | MEDIUM | Not designed | Deferred |
 
-**Bottom line:** The platform is production-ready only for SC-01. Everything from SC-02 onward requires design and/or implementation work before production authorization.
+**Bottom line:** SC-01 has a bounded tested baseline (synthetic acceptance + bounded Binance PASS for Issue #64 REST/WS/reconnect/recovery) — it is **not production-authorized**. Production authorization requires resolution of Issue #64 follow-ups (clock sync, Supabase cloud, multi-symbol), R09 credential revocation, and explicit owner sign-off. Everything from SC-02 onward requires design and/or implementation work before production authorization.

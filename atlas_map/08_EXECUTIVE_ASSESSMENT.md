@@ -105,9 +105,9 @@ G2 Secretariat → G2 Scanner → G3 Momentum Trader
 ## أولويات العمل المقترحة
 
 ### فوري (قبل أي شيء آخر)
-1. **R09** — المالك يوثق إلغاء بيانات اعتماد V7
-2. **Issue #64** — قبول التكامل المحكوم (اختبار Binance الحقيقي)
-3. **Issue #65/#67** — قرار Supabase
+1. **R09** — المالك يوثق إلغاء بيانات اعتماد V7 (إجراء مطلوب من المالك — لم يكتمل بعد)
+2. **Issue #64 متابعات** — قبول Binance المحدود اكتمل (ACCEPTED WITH FOLLOW-UPS)؛ المتبقي: clock sync، Supabase cloud، multi-symbol
+3. **Issue #65/#67** — Supabase cloud: Option B مُقرر (PR #73 Draft)؛ لم يُختبر بعد
 
 ### قصير المدى (G2 Research Foundation)
 4. **Issue #71** — أرشيف محلي، جسر البيانات

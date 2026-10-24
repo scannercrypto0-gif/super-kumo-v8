@@ -90,7 +90,7 @@
 | Ref | PR # | Title | Merged | Status |
 |-----|------|-------|--------|--------|
 | E-60 | #62 | BackgroundLane + JournalConsumer + WritePriority | Yes | `[VERIFIED MAIN]` — sha `ea9cf19a` → `4e4c353` |
-| E-61 | #63 | Pipeline integration of lanes | Yes | `[VERIFIED MAIN]` — `pipeline.py` confirmed |
+| E-61 | #63 | `fix(ci): SF-IND-01 dep-guard all-aliases fix + Ubuntu+Windows matrix` | Yes @ `72a183c4` | `[VERIFIED MAIN]` — CI dep-guard fix; NOT pipeline integration; confirmed via GitHub API |
 | E-62 | #68 | SF-IND-02 indicator_library_v2 | Yes @ `ea9cf19a` | `[VERIFIED MAIN]` — file confirmed in `research_wp_r0/` |
 | E-63 | #69 | SF-STRAT-01 strategy_definition | Yes @ `4e4c353` | `[VERIFIED MAIN]` — file confirmed in `research_wp_r0/` |
 | E-64 | #60 | (prior session merge approval) | Yes | `[OWNER STATED]` |

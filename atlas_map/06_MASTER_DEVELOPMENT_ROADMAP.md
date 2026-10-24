@@ -157,9 +157,11 @@
 ## Critical Path
 
 ```
-R09 (Owner) → Issue #64 (live integration) → Issue #71 (archive)
+R09 (Owner — REQUIRED) → Issue #64 follow-ups (clock sync, Supabase cloud, multi-symbol)
     ↓
-WP-R6 (holdout) → WP-R1 (backtest) → Strategy Batch-01
+Issue #71 (archive + PIT integrity) [PARTIAL: PR #73 Draft]
+    ↓
+WP-R6 (holdout custody) → WP-R1 (backtest engine) → Strategy Batch-01
     ↓
 G2 Secretariat → G2 Scanner
     ↓
@@ -168,4 +170,8 @@ G3 Momentum Trader → Paper Trading
 G4 OOS Validation → Strategy Promotion
 ```
 
-**Shortest path to first paper trade:** ~100–140 days (optimistic-base) from G1 authorization.
+> **Note on Issue #64:** Bounded Binance acceptance PASSED (REST + WS + reconnect + gap recovery, disposition ACCEPTED WITH FOLLOW-UPS). Issue #64 is NOT a pending gate from zero — follow-up tasks remain open (clock sync, Supabase cloud, multi-symbol). R09 credential revocation is the true blocking owner action.
+
+> **Note on parallelism:** R09 credential documentation (owner action) can proceed in parallel with Issue #71 Phase 1 archive implementation. WP-R0 research environment setup can begin in parallel with G1 follow-up tasks if dep_guard isolation is maintained. Serial estimates in the table above do not reflect potential parallel work; actual elapsed time may be 10–20% shorter with parallel execution.
+
+**Shortest path to first paper trade:** ~100–140 days (optimistic-base) from G1 authorization, assuming parallel R09+#71 execution and no major blockers.
