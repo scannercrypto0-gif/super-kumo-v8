@@ -5,7 +5,7 @@ from .strategy_definition import StrategyDefinition, canonical, digest, identifi
 def frozen_commitment(family_id, candidates):
     """Commit all candidate IDs and StrategyDefinition digests before attempts."""
     identifier(family_id)
-    if not 1 <= len(candidates) <= 256:
+    if type(candidates) not in (list, tuple) or not 1 <= len(candidates) <= 256:
         raise ValueError("Bounded candidate family required")
     seen = set()
     records = []
@@ -23,7 +23,7 @@ def reconcile_plan(raw_plan, expected_digest, ledger):
     plan = load_json(raw_plan.decode("utf-8"))
     if canonical(plan) != raw_plan or digest(plan) != expected_digest:
         raise ValueError("Frozen plan mismatch")
-    if plan.get("schema_version") != "1":
+    if type(plan) is not dict or set(plan) != {"schema_version", "family_id", "candidates"}:\n        raise ValueError("Malformed frozen plan")\n    if plan.get("schema_version") != "1":
         raise ValueError("Unknown plan version")
     identifier(plan["family_id"])
     if not isinstance(plan.get("candidates"), list) or not 1 <= len(plan["candidates"]) <= 256:
@@ -51,7 +51,7 @@ def reconcile_plan(raw_plan, expected_digest, ledger):
         cid = event["candidate_id"]
         if cid not in allowed:
             raise ValueError("Unknown candidate")
-        if event.get("strategy_digest") not in (None, allowed[cid]):
+        if event.get("strategy_digest") != allowed[cid]:
             raise ValueError("Strategy digest mismatch")
         if event["state"] != "INPUTS":
             states[cid] = event["state"]
