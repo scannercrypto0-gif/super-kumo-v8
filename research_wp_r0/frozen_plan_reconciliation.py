@@ -1,6 +1,6 @@
 """Research-only, read-only integrity checks for frozen Factory candidate families."""
 from .attempt_ledger import AttemptLedger
-from .strategy_definition import canonical, digest, identifier, load_json
+from .strategy_definition import StrategyDefinition, canonical, digest, identifier, load_json
 
 def frozen_commitment(family_id, candidates):
     """Commit all candidate IDs and StrategyDefinition digests before attempts."""
@@ -11,8 +11,8 @@ def frozen_commitment(family_id, candidates):
     records = []
     for cid, definition in candidates:
         identifier(cid)
-        if cid in seen:
-            raise ValueError("Duplicate candidate")
+        if cid in seen or not isinstance(definition, StrategyDefinition):
+            raise ValueError("Duplicate candidate or unvalidated strategy")
         seen.add(cid)
         records.append({"candidate_id": cid, "strategy_digest": definition.digest})
     plan = {"schema_version": "1", "family_id": family_id, "candidates": records}
@@ -25,7 +25,20 @@ def reconcile_plan(raw_plan, expected_digest, ledger):
         raise ValueError("Frozen plan mismatch")
     if plan.get("schema_version") != "1":
         raise ValueError("Unknown plan version")
-    allowed = {x["candidate_id"]: x["strategy_digest"] for x in plan["candidates"]}
+    identifier(plan["family_id"])
+    if not isinstance(plan.get("candidates"), list) or not 1 <= len(plan["candidates"]) <= 256:
+        raise ValueError("Invalid frozen candidate list")
+    allowed = {}
+    for item in plan["candidates"]:
+        if type(item) is not dict or set(item) != {"candidate_id", "strategy_digest"}:
+            raise ValueError("Malformed frozen candidate")
+        cid = identifier(item["candidate_id"])
+        sd = item["strategy_digest"]
+        if type(sd) is not str or len(sd) != 64 or any(ch not in "0123456789abcdef" for ch in sd):
+            raise ValueError("Malformed strategy digest")
+        if cid in allowed:
+            raise ValueError("Duplicate candidate")
+        allowed[cid] = sd
     if len(allowed) != len(plan["candidates"]):
         raise ValueError("Duplicate candidate")
     if not isinstance(ledger, AttemptLedger):
