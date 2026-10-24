@@ -1,6 +1,6 @@
 # ATLAS Quant Lab — Master System Map
-**Version:** 1.1-DRAFT | **Evidence snapshot:** 2026-10-24
-**Main source baseline:** `4e4c3537036bdf2b106c1a63ec65b2a9855972a7` | **Documentation:** PR #74, Draft/unmerged.
+**Version:** 1.2-CLOSEOUT | **Evidence snapshot:** 2026-10-24
+**Main source baseline:** `bcca2238e019b750f564d4b5568e33f2a7aaf5cf` | **Documentation:** PR #74, pre-merge closeout snapshot; ready/merge state is authoritative in GitHub metadata.
 Reviewed documentation baseline: `e4ce1c8a5d7911f52fb67e52f7e58c2e0ee5b476`; final document HEAD is in PR metadata/correction matrix, not the main-source SHA.
 Evidence IDs and scope: [09_EVIDENCE_REGISTER.md](09_EVIDENCE_REGISTER.md). No production authorization or owner decision is created by this map.
 
@@ -88,7 +88,7 @@ Evidence IDs and scope: [09_EVIDENCE_REGISTER.md](09_EVIDENCE_REGISTER.md). No p
 - Main has HistoricalLibrary/CustodyAccessor, Indicator V1/V2, StrategyDefinition, bind_evaluation, candidate_grid and AttemptRecorder port.
 - Unmerged research #18–#31/#33–#39/#41/#43 inherited by #46 includes statistics/purged folds, paired outcomes/NO_FILL clusters, synthetic backtest/candidates, ExperimentRegistry, HoldoutCustody, TrialFamilyLedger, durable journal/checkpoints and reproducibility contracts. Code and tests exist; not just designs.
 - #46's internal synthetic composition passes verified legacy CI (204 tests per OS at its own tree). It is not accepted-main integration, real historical/OOS validation, independent holdout custody or prospective Shadow operation. Authorities and custody interfaces do not prove OS-level data isolation.
-- Draft #78/#77 adds an accepted-main-compatible historical input adapter with 393 tests per CI job; no simulator or durable ledger is imported. Full empirical milestone remains blocked on reconciliation/data/identity decisions.
+- Draft #78/#77 adds an accepted-main-compatible historical input adapter with 393 tests per CI job; no simulator or durable ledger is imported. Full empirical milestone remains blocked on ledger/engine reconciliation and credible data; OD01B is approved (E-92).
 - Shadow/forward runtime and paper outcome capture are not implemented in inspected main or #46 runtime. Synthetic outcome records, access-event tracking and promotion guards are foundations, not live Shadow testing.
 See the component-level seven-axis inventory in 02 and evidence E-80/E-81.
 
@@ -180,7 +180,7 @@ See the component-level seven-axis inventory in 02 and evidence E-80/E-81.
 ### M. Shared Infrastructure & Storage
 **Status:** L2 representative foundation. Main has integrated local WAL/FULL journal, operational SQLite, bounded background work and a separately gated sandbox adapter. Main has no activated archive/backup service.
 - Option B is DECIDED CONDITIONALLY by #67: authoritative local evidence/bulk archive, independent backup, future selective rebuildable cloud projections; final ADR/operating budgets still require approval.
-- #73 head cb7829e3e3c13c6b6433b6625f2df35d1991a65d is Draft/unmerged. Phase1 JSONL sealing, PIT envelope plumbing, independent catalog ACK, backups and verified restore are IMPLEMENTED IN DRAFT PR and technically VALIDATED within disposable bounds; READY FOR OWNER MERGE APPROVAL, not merged/production-authorized.
+- #73 head cb7829e3e3c13c6b6433b6625f2df35d1991a65d is merged at bcca2238e019b750f564d4b5568e33f2a7aaf5cf. Phase1 JSONL sealing, PIT envelope plumbing, independent catalog ACK, backups and verified restore are IMPLEMENTED IN MAIN and technically VALIDATED within disposable bounds; MERGED, not production-authorized.
 - #73 CI: 60 tests per six-job matrix; existing G1 synthetic merge CI passes. Fresh4096-row restore drill succeeds; directory fsync on Windows unsupported; off-device protection NOT_VERIFIED. Runtime trader-decision capture, offsite service and retention deletion are not delivered.
 - No Supabase Cloud acceptance. Offline/disposable PostgreSQL tests are not cloud tests. No routine cloud candle archive, destructive pruning or production activation.
 
@@ -213,7 +213,7 @@ See the component-level seven-axis inventory in 02 and evidence E-80/E-81.
 | J | Market Intelligence | L1 | Documented context requirements; no runtime producer |
 | K | Monitoring & Dashboard | L2 | Health snapshot code exists; unified UI/alerts deferred |
 | L | Governance & Orchestration | L2 | Versioned documents/GitHub/CI tooling; approval is a separate authority axis |
-| M | Shared Infrastructure & Storage | L2 | Main SQLite foundation; technically reviewed archive/backup in unmerged #73 |
+| M | Shared Infrastructure & Storage | L2 | Main SQLite plus merged #73 optional archive/backup; not activated |
 
 Levels are scoped inventory judgments, not an average/project-quality score. 02 contains definitions and a separate counted capability catalogue.
 
@@ -263,3 +263,11 @@ graph TD
     HistLib --> IndLib
     IndLib --> StratDef
 ```
+
+## Closeout continuity — owner directives, 2026-10-24
+
+PR #73 is MERGED into main at `bcca2238e019b750f564d4b5568e33f2a7aaf5cf` (source head `cb7829e3e3c13c6b6433b6625f2df35d1991a65d`). Code integration does not activate production, provision independent off-device backup, ratify the final ADR, resolve R09, or close #71/#67. E-91.
+
+OD-01 Option B is owner-approved in #76 comment6383377178; #77 comment6383377744 authorizes additive research implementation on Draft78, not merge. OD-02/03/05 remain proposals. This specific approval supersedes older pending-OD01 wording. E-92.
+
+Issue #80 is FUTURE / UNPRIORITIZED / NON-BLOCKING: event registry/versioned as-known-at-decision references, complete opportunity population and missed-opportunity analysis belong to future reconciliation. No code/PR/subissue or trading influence is authorized by #80. Existing PIT rules cover only part of that future capability. E-93.

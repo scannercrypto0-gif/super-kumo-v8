@@ -1,6 +1,6 @@
 # ATLAS Quant Lab — Master Development Roadmap
-**Version:** 1.1-DRAFT | **Evidence snapshot:** 2026-10-24
-**Main source baseline:** `4e4c3537036bdf2b106c1a63ec65b2a9855972a7` | **Documentation:** PR #74, Draft/unmerged.
+**Version:** 1.2-CLOSEOUT | **Evidence snapshot:** 2026-10-24
+**Main source baseline:** `bcca2238e019b750f564d4b5568e33f2a7aaf5cf` | **Documentation:** PR #74, pre-merge closeout snapshot; ready/merge state is authoritative in GitHub metadata.
 Reviewed documentation baseline: `e4ce1c8a5d7911f52fb67e52f7e58c2e0ee5b476`; final document HEAD is in PR metadata/correction matrix, not the main-source SHA.
 Evidence IDs and scope: [09_EVIDENCE_REGISTER.md](09_EVIDENCE_REGISTER.md). No production authorization or owner decision is created by this map.
 
@@ -27,9 +27,9 @@ converted into promises. No date for first paper trade is asserted.
 | Indicator V2/Strategy JSON | Merged #68/#69; #66 closed; main216-case acceptance complete | Native offline binding exists; no full Factory engine |
 | G1 pipeline | Merged #32/#40/#42/#45/#62 | Bounded Binance report accepted; sustained/unattended/scale remain unvalidated |
 | Storage direction | #67 Option B conditionally DECIDED | Final ADR/operating budgets; no new Free-vs-Pro binary decision needed now |
-| Phase1 archive/backup | Draft73 cb7829e; technical READY FOR OWNER MERGE APPROVAL,60 cases×6 CI | Owner merge decision; production/offsite activation separately gated |
+| Phase1 archive/backup | merged PR73 cb7829e; MERGED at bcca2238e019b750f564d4b5568e33f2a7aaf5cf,60 cases×6 pre-merge CI | Owner production/offsite activation and final ADR separately gated |
 | Research R0–R40/Batch01 | Code/tests in unmerged #46 ancestry, legacy204-case CI | Reconcile existing temporal/ledger/engine interfaces with main, not rebuild from zero |
-| Historical input adapter | Draft78,393 cases×6 CI; #77 full milestone BLOCKED | Owner review, identity/ledger reconciliation and real data |
+| Historical input adapter | Draft78 initial393 cases×6 CI; authorized identity continuation in progress; #77 full milestone BLOCKED | Owner review; approved OD01B implementation, ledger reconciliation and real data |
 | Asset Intelligence | #72 owner-approved future concept under C, unscheduled | No current implementation task; preserve initial request + future bounded reassessment design |
 | Supabase | Main adapter/migrations/disposable PostgreSQL tests | #65 named cloud sandbox permission and least-privilege/TLS/RLS acceptance absent |
 
@@ -37,8 +37,8 @@ converted into promises. No date for first paper trade is asserted.
 
 | Milestone | Required inputs / real dependency | Permitted parallel work | Acceptance / owner gate |
 |---|---|---|---|
-| M-A Documentation/contract reconciliation | This PR74, canonical contracts, latest decisions | Owner resolves OD-01/02/03/05; no runtime changes | Ten coherent docs, scoped evidence and owner architecture approval; no auto-merge |
-| M-B Optional archive acceptance | Conditional Option B; corrected Draft73 | Owner disk/media/encryption/RPO/RTO planning | Exact-head tests + virtual integration already green; separate merge approval. Activation/off-device/retention deletion not implied |
+| M-A Documentation/contract reconciliation | This PR74, canonical contracts, latest decisions | OD-02/03/05 remain proposals; no runtime changes | Ten coherent docs, scoped evidence and descriptive baseline acceptance; explicit closeout authorizes merge after checks/CI |
+| M-B Optional archive acceptance | Conditional Option B; corrected merged PR73 | Owner disk/media/encryption/RPO/RTO planning | Exact-head tests + virtual integration already green; merge completed. Activation/off-device/retention deletion not implied |
 | M-C Research-line reconciliation | Main foundations + #46 typed family/journal/temporal contracts + Draft78 | Offline contract/data inventory, static compatibility review | Explicit staged adapter/migration plan, complete candidate accounting and restart/anchor tests before formal empirical runs; avoid silently importing divergent chain |
 | M-D Admissible research dataset | Authorized offline source, rights, version/units/symbol/listing/adjustment/receipt metadata; OD-03 artifact boundary | Source feasibility/coverage and library sizing | Frozen scope, gaps/missingness/quality/PIT classifications and retained commitments; no automatic use of operational feed or retrospective receipt promotion |
 | M-E Reproducible historical evaluation | M-C and M-D; preregistered family/splits/baselines/costs, protected final holdout | Synthetic software fixtures without empirical claims | Deterministic input/result lineage, full population including failures/no-fill, purged/embargoed splits, dependence/multiplicity/sample evidence; independent review before confirmatory/forward claims |
@@ -62,7 +62,7 @@ graph TD
   R["Unmerged46 synthetic engine + ledger + custody"] --> C
   D["M-D authorized source / PIT coverage"] --> E["M-E empirical evaluation"]
   C --> E
-  B["M-B Draft73 optional archive"] -. "future offline artifacts, OD-03" .-> D
+  B["M-B merged PR73 optional archive"] -. "future offline artifacts, OD-03" .-> D
   G["Bounded G1 baseline + scope authorization"] --> F["M-F observation / routing"]
   F --> T["M-G paper trader engineering"]
   E -. "reviewed candidate proposal only" .-> T
@@ -99,3 +99,11 @@ and prefer quality/scalability over the earliest first trade.
 
 #71/#67/#64/#65/#77 remain open at this snapshot; technical delivery, owner
 acceptance, merge and production authorization are separate state transitions.
+
+## Closeout continuity — owner directives, 2026-10-24
+
+PR #73 is MERGED into main at `bcca2238e019b750f564d4b5568e33f2a7aaf5cf` (source head `cb7829e3e3c13c6b6433b6625f2df35d1991a65d`). Code integration does not activate production, provision independent off-device backup, ratify the final ADR, resolve R09, or close #71/#67. E-91.
+
+OD-01 Option B is owner-approved in #76 comment6383377178; #77 comment6383377744 authorizes additive research implementation on Draft78, not merge. OD-02/03/05 remain proposals. This specific approval supersedes older pending-OD01 wording. E-92.
+
+Issue #80 is FUTURE / UNPRIORITIZED / NON-BLOCKING: event registry/versioned as-known-at-decision references, complete opportunity population and missed-opportunity analysis belong to future reconciliation. No code/PR/subissue or trading influence is authorized by #80. Existing PIT rules cover only part of that future capability. E-93.

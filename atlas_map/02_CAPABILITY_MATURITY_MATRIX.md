@@ -1,6 +1,6 @@
 # ATLAS Quant Lab — Capability Maturity Matrix
-**Version:** 1.1-DRAFT | **Evidence snapshot:** 2026-10-24
-**Main source baseline:** `4e4c3537036bdf2b106c1a63ec65b2a9855972a7` | **Documentation:** PR #74, Draft/unmerged.
+**Version:** 1.2-CLOSEOUT | **Evidence snapshot:** 2026-10-24
+**Main source baseline:** `bcca2238e019b750f564d4b5568e33f2a7aaf5cf` | **Documentation:** PR #74, pre-merge closeout snapshot; ready/merge state is authoritative in GitHub metadata.
 Reviewed documentation baseline: `e4ce1c8a5d7911f52fb67e52f7e58c2e0ee5b476`; final document HEAD is in PR metadata/correction matrix, not the main-source SHA.
 Evidence IDs and scope: [09_EVIDENCE_REGISTER.md](09_EVIDENCE_REGISTER.md). No production authorization or owner decision is created by this map.
 
@@ -30,7 +30,7 @@ No department is assigned L4/L5 here. Individual software acceptance may be vali
 | J | Market Intelligence | L1 | Documented context requirements; no runtime producer |
 | K | Monitoring & Dashboard | L2 | Health snapshot code exists; unified UI/alerts deferred |
 | L | Governance & Orchestration | L2 | Versioned documents/GitHub/CI tooling; approval is a separate authority axis |
-| M | Shared Infrastructure & Storage | L2 | Main SQLite foundation; technically reviewed archive/backup in unmerged #73 |
+| M | Shared Infrastructure & Storage | L2 | Main SQLite plus merged #73 optional archive/backup; not activated |
 
 Representative departmental distribution: **L0=1, L1=5, L2=6, L3=1, L4=0, L5=0 (13 total)**.
 B's L3 concerns bounded integrated G1, not live trading. F's L2 recognizes actual research code across main and unmerged ancestry; it is neither zero-code nor an integrated accepted Lab.
@@ -54,9 +54,9 @@ CI references: E-82 main 216-test combined acceptance; E-83 legacy204-per-OS sui
 | OOS/walk-forward | Split/temporal/purging code exists in #46; no accepted empirical OOS runner | R1/R5/R42; E-83 | Development versus synthetic_validation separation | No admissible real split/untouched empirical study | Synthetic validation only, not profitability |
 | Historical input bridge | Yes/Draft78, not main |36 new+357 inherited=393; E-86 | Accepted-main definitions+custody+native V1/V2 prefix, no legacy engine | Contract review; full milestone #77 BLOCKED | Input adapter/contracts ready for owner review |
 | Shadow/prospective testing | Authority guards and design exist; forward Shadow runtime not implemented in inspected main/#46 | Guard tests/design, not a forward-run result | #46 explicitly says forward_shadow=NOT_STARTED_NOT_TESTED | None for prospective operation | Future implementation/approval |
-| Operational outcome/decision capture | Synthetic records in #46; PIT serialization in Draft73; no live trader lifecycle capture | Synthetic outcome/contract tests only | No paper trader→durable decision/outcome pipeline | None | Future runtime; schema alone is not capture |
+| Operational outcome/decision capture | Synthetic records in #46; PIT serialization in merged PR73; no live trader lifecycle capture | Synthetic outcome/contract tests only | No paper trader→durable decision/outcome pipeline | None | Future runtime; schema alone is not capture |
 
-Legacy research PRs #18–#31/#33–#39/#41/#43/#46 remain OPEN/unmerged. #32/#40/#42/#45 are the merged G1 line, not evidence that the research chain merged. #48 closed without merge; isolated historical library arrived through #57. Compare main...#46:115 ahead/55 behind, ancestor ed188f1902d397fe74613dd966c5a3e88b32f8c0. Do not import the entire chain silently.
+Legacy research PRs #18–#31/#33–#39/#41/#43/#46 remain OPEN/unmerged. #32/#40/#42/#45 are the merged G1 line, not evidence that the research chain merged. #48 closed without merge; isolated historical library arrived through #57. Historical comparison at main4e4c353...#46:115 ahead/55 behind, ancestor ed188f1902d397fe74613dd966c5a3e88b32f8c0. Do not import the entire chain silently.
 
 ## Counted capability catalogue
 
@@ -73,8 +73,8 @@ Counts refer to these25 IDs only, not independent statistical evidence or a weig
 | CAP-06 | G1 ingestion/recovery pipeline | L3 | Main; E-15/E-71 |
 | CAP-07 | Journal→local persistence/replay | L3 | Main; E-15/E-85 |
 | CAP-08 | G1 health snapshots | L3 | Main integrated health; E-15 |
-| CAP-09 | Sealed local archive | L2 | Unmerged73; E-84 |
-| CAP-10 | Verified backup/restore | L2 | Unmerged73; E-84 |
+| CAP-09 | Sealed local archive | L2 | Merged73 optional/inactive; E-84/E-91 |
+| CAP-10 | Verified backup/restore | L2 | Merged73 optional/inactive; E-84/E-91 |
 | CAP-11 | Statistical helpers | L2 | Unmerged46; E-80/E-83 |
 | CAP-12 | Paired opportunities/outcomes | L2 | Unmerged46; E-80/E-83 |
 | CAP-13 | Holdout access/taint gates | L2 | Unmerged46; E-80/E-83 |
@@ -95,3 +95,11 @@ Catalogue distribution: **L0=1, L1=6, L2=14, L3=4, L4=0, L5=0 (25 total)**.
 Foundation presence, isolated implementation, integration and readiness must not
 be collapsed into one score. Department C/F remain L2 despite one accepted
 binding interface at L3; that interface is not a full Factory/Lab runtime.
+
+## Closeout continuity — owner directives, 2026-10-24
+
+PR #73 is MERGED into main at `bcca2238e019b750f564d4b5568e33f2a7aaf5cf` (source head `cb7829e3e3c13c6b6433b6625f2df35d1991a65d`). Code integration does not activate production, provision independent off-device backup, ratify the final ADR, resolve R09, or close #71/#67. E-91.
+
+OD-01 Option B is owner-approved in #76 comment6383377178; #77 comment6383377744 authorizes additive research implementation on Draft78, not merge. OD-02/03/05 remain proposals. This specific approval supersedes older pending-OD01 wording. E-92.
+
+Issue #80 is FUTURE / UNPRIORITIZED / NON-BLOCKING: event registry/versioned as-known-at-decision references, complete opportunity population and missed-opportunity analysis belong to future reconciliation. No code/PR/subissue or trading influence is authorized by #80. Existing PIT rules cover only part of that future capability. E-93.

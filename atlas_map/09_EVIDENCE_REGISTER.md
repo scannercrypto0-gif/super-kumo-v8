@@ -1,6 +1,6 @@
 # ATLAS Quant Lab — Evidence Register
-**Version:** 1.1-DRAFT | **Evidence snapshot:** 2026-10-24
-**Main source baseline:** `4e4c3537036bdf2b106c1a63ec65b2a9855972a7` | **Documentation:** PR #74, Draft/unmerged.
+**Version:** 1.2-CLOSEOUT | **Evidence snapshot:** 2026-10-24
+**Main source baseline:** `bcca2238e019b750f564d4b5568e33f2a7aaf5cf` | **Documentation:** PR #74, pre-merge closeout snapshot; ready/merge state is authoritative in GitHub metadata.
 Reviewed documentation baseline: `e4ce1c8a5d7911f52fb67e52f7e58c2e0ee5b476`; final document HEAD is in PR metadata/correction matrix, not the main-source SHA.
 Evidence IDs and scope: [09_EVIDENCE_REGISTER.md](09_EVIDENCE_REGISTER.md). No production authorization or owner decision is created by this map.
 
@@ -76,7 +76,7 @@ Rounds1/2 citations are not silently repurposed.
 | E-52 | [#64 bounded report6381329727](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/64#issuecomment-6381329727) | OPEN; REPORTED bounded ACCEPTED WITH FOLLOW-UPS supersedes earlier clock-blocked report |
 | E-53 | [#65](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/65) | OPEN; named Supabase Cloud sandbox/credential route absent, cloud NOT TESTED |
 | E-54 | [#67 owner decision6382338071](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/67#issuecomment-6382338071) | OPEN issue; Option B conditionally DECIDED, Phase1 authorized, final ADR/operating budgets not approved |
-| E-55 | [#71 RESULT6383654040](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/71#issuecomment-6383654040) | OPEN; Draft73 technical READY FOR OWNER MERGE APPROVAL, not merged/activated |
+| E-55 | [#71 RESULT6383654040](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/71#issuecomment-6383654040) | OPEN; merged PR73 technical READY FOR OWNER MERGE APPROVAL, merged as inactive code; not activated |
 | E-56 | [#72](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/72) | OPEN; owner-approved FUTURE concept under C, unprioritized; initial request then future conditional/deadline-triggered reassessment design |
 | E-60 | [PR62](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/62) | MERGED baf762e874995b2cede3b02fa0846b0cb5389de1; G1 isolation/sandbox preparation, not IndicatorV2 merge |
 | E-61 | [PR63](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/63) | MERGED72a183c445fbfc2de20311870e34f861dd85535f; SF-IND guard/CI fix, not pipeline integration |
@@ -95,23 +95,34 @@ Rounds1/2 citations are not silently repurposed.
 | ID | Evidence | Exact scope and limitations |
 |---|---|---|
 | E-80 | [PR46 source](https://github.com/scannercrypto0-gif/super-kumo-v8/tree/a4c106a02c55ee012eedf4c55c1488d71d850203/research_wp_r0) | VERIFIED PR ONLY: integrity/statistics/evaluation/opportunity_clusters/temporal_contract/trial_holdout/durable_journal/owner_checkpoints/external_custody/strategy_factory/measured_pipeline. Actual code inspected; tests R0/R1/R2/R3/R5/R6/R7/R9/R10/R11/R12/R13/R14/R15/R16/R18/R19/R40/R42 present |
-| E-81 | [Draft78](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/78) | OPEN/Draft/unmerged1887fa3880c39faa306a21152518d6a1dcaac509, tree40c7996af4f2654e06bace3df3cca3d730e1bf89; accepted-main-compatible input contracts, no imported engine/durable ledger; #77 OPEN/BLOCKED full milestone |
+| E-81 | [Draft78](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/78) | OPEN/Draft/unmerged; initial validated head1887fa3880c39faa306a21152518d6a1dcaac509, tree40c7996af4f2654e06bace3df3cca3d730e1bf89; authorized continuation head6e905a2a469ec616922fbc6095dc34dcaeb5cb60, tree9b609d2323ba0ad5566f0545c6e42243dda7d146 (CI pending at this docs snapshot); accepted-main-compatible input contracts, no imported engine/durable ledger; #77 OPEN/BLOCKED full milestone |
 | E-82 | [SF66 native combined-main CI40085840893](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40085840893) | VERIFIED CI:6×216=1296 passing executions,0skip/fail.50V1+45guard+58V2+57strategy+6integration. Workflow harness head a36715a3942caef87e5db5157e47e51a86ce9bfe; actual checked-out source4e4c3537036bdf2b106c1a63ec65b2a9855972a7, not harness source. Linux/Windows job logs inspected; #66 closed |
 | E-83 | [Legacy research CI39786828419](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/39786828419) | VERIFIED CI: Ubuntu/Windows Python3.14.8, unittest discover test_research_wp_r*.py; Ran204tests/OK each. Metadata head a4c106a; actual synthetic merge ed65174045d1db69fbd27c04ebe837ab05e782ac has identical tree c2b33fb2c455309b792e0de34fae5ffe792c03ee to PR head. Not main integration or empirical validation |
-| E-84 | [Draft73 CI40089205693](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40089205693), [final report](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/73#issuecomment-6383587680) | VERIFIED CI/PR: headcb7829e3e3c13c6b6433b6625f2df35d1991a65d, treef20adbc9e0c8487ed350475a16b79ed1eebf8a1c;6×60=360pass,0skip/fail; technically reviewed optional inactive code, Draft/unmerged.4096-row local synthetic drill, no off-device/power-loss certification |
+| E-84 | [merged PR73 CI40089205693](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40089205693), [final report](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/73#issuecomment-6383587680) | VERIFIED CI/PR: headcb7829e3e3c13c6b6433b6625f2df35d1991a65d, treef20adbc9e0c8487ed350475a16b79ed1eebf8a1c;6×60=360pass,0skip/fail; technically reviewed optional inactive code, merged in main at bcca2238e019b750f564d4b5568e33f2a7aaf5cf.4096-row local synthetic drill, no off-device/power-loss certification |
 | E-85 | [G1 virtual integration CI40089205666](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40089205666) | VERIFIED CI: actual synthetic merge707f7489e094817f35537eee4907a22ca07f045e, parents main4e4c353+PR73cb7829e; treed1f1df246e092ba118f26348e8f73de25771162a equals independent local merge-tree. Ubuntu155pass/2skip, Windows147pass/10skip; disposable PostgreSQL1pass/26deselected, NOT Supabase |
 | E-86 | [Draft78 CI40087361925](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40087361925) | VERIFIED CI: actual head1887fa3880c39faa306a21152518d6a1dcaac509;6×393=2358pass,0skip/fail (141historical+216core+36new). Local Windows391pass/2existing symlink-privilege failures explicitly reported; not silently skipped |
 | E-87 | [#65 RESULT6381563663](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/65#issuecomment-6381563663) | REPORTED offline/local PostgreSQL evidence; Supabase Cloud TLS/RLS/roles/outage NOT TESTED; authorization needed |
 | E-88 | [Journal callers](https://github.com/scannercrypto0-gif/super-kumo-v8/blob/4e4c3537036bdf2b106c1a63ec65b2a9855972a7/src/aql/journal/durable_journal.py#L88), [priority test](https://github.com/scannercrypto0-gif/super-kumo-v8/blob/4e4c3537036bdf2b106c1a63ec65b2a9855972a7/tests/test_g1_completion.py#L60) | VERIFIED MAIN: constructor + commit/mark_persisted + pipeline background=True disprove zero-caller #75 premise; no host-wide scheduling guarantee |
-| E-89 | [Manifest identity source](https://github.com/scannercrypto0-gif/super-kumo-v8/blob/4e4c3537036bdf2b106c1a63ec65b2a9855972a7/research_wp_r0/historical_library.py#L301), [#77 RESULT](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/77#issuecomment-6383320738) | VERIFIED code/current contract + E-86 tests: independent imports differ by creation/instance identity; retained-manifest replay can match across processes; no Python object-id dependency or authorized new content_hash |
+| E-89 | [Manifest identity source](https://github.com/scannercrypto0-gif/super-kumo-v8/blob/4e4c3537036bdf2b106c1a63ec65b2a9855972a7/research_wp_r0/historical_library.py#L301), [#77 RESULT](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/77#issuecomment-6383320738) | VERIFIED code/current contract + E-86 tests: independent imports differ by creation/instance identity; retained-manifest replay can match across processes; no Python object-id dependency; additive identity now authorized by E-92 |
 | E-90 | This documentation package | Ten-file static cross-consistency audit and final PR metadata/correction matrix. No runtime test reruns or independent external performance/custody certification are claimed |
+
+| E-91 | [PR73 merge](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/73), [owner closeout](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/74#issuecomment-6384037397) | VERIFIED API: merged bcca2238e019b750f564d4b5568e33f2a7aaf5cf; inactive code only; #71/#67 remain OPEN pending operating/ADR acceptance |
+| E-92 | [OD01B owner approval](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/76#issuecomment-6383377178), [research continuation](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/77#issuecomment-6383377744) | Explicit additive identity implementation authorization on existing Draft78; no research merge/holdout/runtime authority |
+| E-93 | [Future event memory](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/80) | FUTURE/UNPRIORITIZED/NON-BLOCKING; future immutable event versions/PIT linkage/all outcomes/missed-opportunity methods, no implementation authority now |
 
 ## Continuity and evidence precedence
 
-Current owner attachment is authority for this docs-only closeout. Latest relevant
+Owner closeout comment6384037397 is the latest docs execution authority; research continuation6383377744 is independently scoped. The earlier attachment remains context. Latest relevant
 agent storage delivery: #71 RESULT6383654040/HANDOFF6383661132; research input
 delivery #77 RESULT6383320738/HANDOFF6383324299. These are not represented as
 separate unavailable owner-submitted Work messages. GitHub source/API/CI facts
 are distinguished from quoted reports and historical state prose. No inaccessible
-conversation was reviewed. This PR remains Draft; owner architecture approval,
-runtime decisions and merge authorization are separate.
+conversation was reviewed. This snapshot precedes the final ready/merge transition. Owner closeout authorizes descriptive PR74 merge after consistency and CI; runtime decisions remain separate.
+
+## Closeout continuity — owner directives, 2026-10-24
+
+PR #73 is MERGED into main at `bcca2238e019b750f564d4b5568e33f2a7aaf5cf` (source head `cb7829e3e3c13c6b6433b6625f2df35d1991a65d`). Code integration does not activate production, provision independent off-device backup, ratify the final ADR, resolve R09, or close #71/#67. E-91.
+
+OD-01 Option B is owner-approved in #76 comment6383377178; #77 comment6383377744 authorizes additive research implementation on Draft78, not merge. OD-02/03/05 remain proposals. This specific approval supersedes older pending-OD01 wording. E-92.
+
+Issue #80 is FUTURE / UNPRIORITIZED / NON-BLOCKING: event registry/versioned as-known-at-decision references, complete opportunity population and missed-opportunity analysis belong to future reconciliation. No code/PR/subissue or trading influence is authorized by #80. Existing PIT rules cover only part of that future capability. E-93.

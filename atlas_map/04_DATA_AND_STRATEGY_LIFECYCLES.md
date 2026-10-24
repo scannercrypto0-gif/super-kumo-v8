@@ -1,6 +1,6 @@
 # ATLAS Quant Lab — Data & Strategy Lifecycles
-**Version:** 1.1-DRAFT | **Evidence snapshot:** 2026-10-24
-**Main source baseline:** `4e4c3537036bdf2b106c1a63ec65b2a9855972a7` | **Documentation:** PR #74, Draft/unmerged.
+**Version:** 1.2-CLOSEOUT | **Evidence snapshot:** 2026-10-24
+**Main source baseline:** `bcca2238e019b750f564d4b5568e33f2a7aaf5cf` | **Documentation:** PR #74, pre-merge closeout snapshot; ready/merge state is authoritative in GitHub metadata.
 Reviewed documentation baseline: `e4ce1c8a5d7911f52fb67e52f7e58c2e0ee5b476`; final document HEAD is in PR metadata/correction matrix, not the main-source SHA.
 Evidence IDs and scope: [09_EVIDENCE_REGISTER.md](09_EVIDENCE_REGISTER.md). No production authorization or owner decision is created by this map.
 
@@ -52,7 +52,7 @@ SOURCE → ACQUISITION → DURABILITY → PERSISTENCE → CUSTODY → RESEARCH U
 - Retains observation_cutoff_ms and availability_kind. Imported fixtures are RETROSPECTIVE with unknown actual receipt; close+1 is only a derived lower bound. CONFIRMED labels require truthful recorded evidence, not an automatic importer promotion.
 - Computes `manifest_integrity_hash` (includes `created_at_ms` — wall clock at validate_bars time)
 - Each dataset gets integer version
-- HistoricalLibrary is IMPLEMENTED IN MAIN. Only the automated operational→historical artifact bridge is missing. Draft73 seals journal records; it does not feed CustodyAccessor or fabricate confirmed research receipt.
+- HistoricalLibrary is IMPLEMENTED IN MAIN. Only the automated operational→historical artifact bridge is missing. merged PR73 seals journal records; it does not feed CustodyAccessor or fabricate confirmed research receipt.
 - Gap: separately approved artifact/export protocol, eligibility/missingness and retained commitments (OD-03); no synchronous core dependency.
 
 ### Stage 7: RESEARCH USE
@@ -178,8 +178,16 @@ research_wp_r0/_dep_guard.py — explicit static AST check in CLI/tests/CI:
 
 AssetOutlook (#72, future under C): owner request→immutable initial version→lightweight trigger/deadline watch→REASSESSMENT_REQUIRED/STALE→bounded idempotent reassessment→new linked version. Confirmation, contradiction, non-occurrence and material-change triggers are reasons to reassess, not proof of predictive success. Missing evidence is UNKNOWN; no silent TTL extension or trading command.
 
-Draft73 market envelope: event/receipt/ingest/recorded journal commit remain distinct; source_event_ms/available_ms/fsync_completed_ms are null where missing. availability_lower_bound_ms is explicitly derived, not confirmed. Schema decision_context is plumbing, not a runtime trader event recorder.
+merged PR73 market envelope: event/receipt/ingest/recorded journal commit remain distinct; source_event_ms/available_ms/fsync_completed_ms are null where missing. availability_lower_bound_ms is explicitly derived, not confirmed. Schema decision_context is plumbing, not a runtime trader event recorder.
 
 Draft78: prepare_inputs produces INPUTS_ONLY_NOT_EVALUATED for one cutoff. prepare_candidate uses the accepted AttemptRecorder port; successful preparation remains PENDING, input failure FAILED, malformed definition INVALID, explicit stop ABANDONED. Sink durability/restart/idempotency/family completeness belong to an unreconciled ledger, not a memory sink.
 
 Prospective Shadow/outcome operation needs frozen parent/variant versions, complete opportunity denominators, independently observed visibility, preregistration and later owner approval. Synthetic outcomes and purged folds do not establish forward evidence. Retrospective explanation never rewrites an original decision.
+
+## Closeout continuity — owner directives, 2026-10-24
+
+PR #73 is MERGED into main at `bcca2238e019b750f564d4b5568e33f2a7aaf5cf` (source head `cb7829e3e3c13c6b6433b6625f2df35d1991a65d`). Code integration does not activate production, provision independent off-device backup, ratify the final ADR, resolve R09, or close #71/#67. E-91.
+
+OD-01 Option B is owner-approved in #76 comment6383377178; #77 comment6383377744 authorizes additive research implementation on Draft78, not merge. OD-02/03/05 remain proposals. This specific approval supersedes older pending-OD01 wording. E-92.
+
+Issue #80 is FUTURE / UNPRIORITIZED / NON-BLOCKING: event registry/versioned as-known-at-decision references, complete opportunity population and missed-opportunity analysis belong to future reconciliation. No code/PR/subissue or trading influence is authorized by #80. Existing PIT rules cover only part of that future capability. E-93.

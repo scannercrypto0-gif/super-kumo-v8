@@ -1,6 +1,6 @@
 # ATLAS Quant Lab — التقييم التنفيذي وحزمة الاعتماد
-**Version:** 1.1-DRAFT | **Evidence snapshot:** 2026-10-24
-**Main source baseline:** `4e4c3537036bdf2b106c1a63ec65b2a9855972a7` | **Documentation:** PR #74, Draft/unmerged.
+**Version:** 1.2-CLOSEOUT | **Evidence snapshot:** 2026-10-24
+**Main source baseline:** `bcca2238e019b750f564d4b5568e33f2a7aaf5cf` | **Documentation:** PR #74, pre-merge closeout snapshot; ready/merge state is authoritative in GitHub metadata.
 Reviewed documentation baseline: `e4ce1c8a5d7911f52fb67e52f7e58c2e0ee5b476`; final document HEAD is in PR metadata/correction matrix, not the main-source SHA.
 Evidence IDs and scope: [09_EVIDENCE_REGISTER.md](09_EVIDENCE_REGISTER.md). No production authorization or owner decision is created by this map.
 
@@ -18,7 +18,7 @@ Evidence IDs and scope: [09_EVIDENCE_REGISTER.md](09_EVIDENCE_REGISTER.md). No p
   Correction Matrix، والنتيجة النهائية والـHEAD في وصف PR.
 - **Open documentation blockers:** صفر بعد إغلاق الملاحظات؛ فجوات التشغيل
   والبحث موثقة، وليست اختفاءً للكود أو موافقات ضمنية.
-- **PR Status:** READY FOR OWNER ARCHITECTURE APPROVAL، يظل Draft بلا دمج.
+- **PR Status:** READY FOR FINAL DOCUMENTATION REVIEW؛ الدمج الوصفي مصرح به بعد الفحوص وCI.
 
 ## ما هو موجود فعلًا؟
 
@@ -38,11 +38,11 @@ CI القديم شغّل204 اختبارات لكل نظام على شجرة ا�
 
 **Draft #78/#77:** جسر مدخلات تاريخية وعقود فقط؛393 اختبار لكل وظيفة على ست
 بيئات. لا يستورد محرك/دفتر #46؛ المهمة التجريبية الكاملة BLOCKED لحد تسوية
-العقود وتوفير البيانات المقبولة وقرار الهوية.
+العقود وتوفير البيانات المقبولة؛ قرار الهوية B اتوافق عليه صراحةً.
 
 **التخزين:** Option B مقرر مشروطًا في #67، مش قرارًا لم يُتخذ.
 PR #73 عند cb7829e3e3c13c6b6433b6625f2df35d1991a65d جاهز فنيًا
-لموافقة المالك على الدمج ككود اختياري غير مفعّل، لكنه Draft وغير مدموج.
+واتدمج عند bcca2238e019b750f564d4b5568e33f2a7aaf5cf ككود اختياري غير مفعّل؛ مش تفويض إنتاج.
 60 اختبار لكل بيئة،360 تنفيذ ناجح؛ استعادة4096 سجل اصطناعي مطابقة.
 Windows directory fsync غير مدعوم، والنسخة المستقلة خارج الجهاز NOT_VERIFIED.
 الحدود8192 ملف/2GB/60 ثانية تمنع ادعاء خدمة backup غير محدودة.
@@ -68,7 +68,7 @@ Supabase Cloud لم يُختبر؛ الحاوية المؤقتة PostgreSQL لي
 | J | Market Intelligence | L1 | Documented context requirements; no runtime producer |
 | K | Monitoring & Dashboard | L2 | Health snapshot code exists; unified UI/alerts deferred |
 | L | Governance & Orchestration | L2 | Versioned documents/GitHub/CI tooling; approval is a separate authority axis |
-| M | Shared Infrastructure & Storage | L2 | Main SQLite foundation; technically reviewed archive/backup in unmerged #73 |
+| M | Shared Infrastructure & Storage | L2 | Main SQLite plus merged #73 optional archive/backup; not activated |
 
 توزيع الأقسام13: L0=1، L1=5، L2=6، L3=1، L4=0، L5=0.
 كتالوج القدرات25 في02: L0=1، L1=6، L2=14، L3=4، L4=0، L5=0.
@@ -77,8 +77,7 @@ Supabase Cloud لم يُختبر؛ الحاوية المؤقتة PostgreSQL لي
 
 ## القرارات الحقيقية المتبقية
 
-- OD-01: هل نعتمد هوية محتوى دلالية إضافية تحفظ الزمن والمصدر مع إبقاء
-  instance hash؟ الترشيح: إضافة versioned identity، بدون حذف التوقيتات.
+- OD-01: اتحسم لصالح B في #76؛ التنفيذ على Draft78 مع الحفاظ على hashes القديمة.
 - OD-02: ملكية حد المؤشرات الحية مقابل البحثية؛ الترشيح مواصفات حساب مشتركة
   مع وصول وreceipts وجدولة منفصلة.
 - OD-03: عقد نقل offline موثق من الأرشيف للمكتبة، لا اعتماد متزامن على Core Run.
@@ -100,7 +99,7 @@ G4 المختبر البحثي، G5 أحداث، G6 تعدد المتداولي�
 جمع نتائج4/24/72 ساعة والتحقق الأمامي يحتاج مرور الزمن وعينة مناسبة،
 ولا يتحول لنجاح لمجرد انتهاء ساعة أو يوم.
 
-الخطوات المقترحة: اعتماد حزمة التوثيق؛ قرار دمج #73 إن وافق المالك؛ تسوية
+الخطوات المقترحة: اعتماد حزمة التوثيق؛ اعتمادات تشغيل #73 بعد دمجه؛ تسوية
 خط البحث بدل بناء نسخة مكررة؛ بيانات تاريخية مرخصة ومقبولة بنقطة الزمن؛
 ثم تقييم مقيد وواجهات الرصد والمتداول وفق التفويض. المكتبة والبحث
 والنسخ السحابي مش متطلبات متزامنة تعطل Core Run.
@@ -108,4 +107,12 @@ G4 المختبر البحثي، G5 أحداث، G6 تعدد المتداولي�
 R09 يظل CRITICAL/UNRESOLVED. المصادر الحالية تعرض #1 CLOSED وتقرير G0
 APPROVED، لكن هذه الجلسة لا تعيد إثبات توقيع المالك التاريخي ولا تمنح اعتمادًا
 للقرارات الجديدة أو تشغيلًا إنتاجيًا. لا تعديل كود/إصلاح #75/#76، لا PR جديد،
-لا main/دمج/Cloud/Holdout أو تغيير لمسارات التنفيذ الجارية.
+لا تعديل كود أو Cloud/Holdout أو تغيير لمسارات التشغيل. دمج التوثيق الوصفي فقط مصرح به بعد الفحوص.
+
+## Closeout continuity — owner directives, 2026-10-24
+
+PR #73 is MERGED into main at `bcca2238e019b750f564d4b5568e33f2a7aaf5cf` (source head `cb7829e3e3c13c6b6433b6625f2df35d1991a65d`). Code integration does not activate production, provision independent off-device backup, ratify the final ADR, resolve R09, or close #71/#67. E-91.
+
+OD-01 Option B is owner-approved in #76 comment6383377178; #77 comment6383377744 authorizes additive research implementation on Draft78, not merge. OD-02/03/05 remain proposals. This specific approval supersedes older pending-OD01 wording. E-92.
+
+Issue #80 is FUTURE / UNPRIORITIZED / NON-BLOCKING: event registry/versioned as-known-at-decision references, complete opportunity population and missed-opportunity analysis belong to future reconciliation. No code/PR/subissue or trading influence is authorized by #80. Existing PIT rules cover only part of that future capability. E-93.

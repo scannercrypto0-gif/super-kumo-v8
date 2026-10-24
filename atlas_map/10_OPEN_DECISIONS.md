@@ -1,6 +1,6 @@
 # ATLAS Quant Lab — Architectural Decisions and Preserved Directions
-**Version:** 1.1-DRAFT | **Evidence snapshot:** 2026-10-24
-**Main source baseline:** `4e4c3537036bdf2b106c1a63ec65b2a9855972a7` | **Documentation:** PR #74, Draft/unmerged.
+**Version:** 1.2-CLOSEOUT | **Evidence snapshot:** 2026-10-24
+**Main source baseline:** `bcca2238e019b750f564d4b5568e33f2a7aaf5cf` | **Documentation:** PR #74, pre-merge closeout snapshot; ready/merge state is authoritative in GitHub metadata.
 Reviewed documentation baseline: `e4ce1c8a5d7911f52fb67e52f7e58c2e0ee5b476`; final document HEAD is in PR metadata/correction matrix, not the main-source SHA.
 Evidence IDs and scope: [09_EVIDENCE_REGISTER.md](09_EVIDENCE_REGISTER.md). No production authorization or owner decision is created by this map.
 
@@ -8,13 +8,13 @@ Evidence IDs and scope: [09_EVIDENCE_REGISTER.md](09_EVIDENCE_REGISTER.md). No p
 
 Objective→concrete example→A/B/C options→trade-offs→recommendation. These are
 review proposals, not approvals or implementation orders. Preserve owner choices
-already recorded. Four current architectural choices remain for owner review
-(OD-01/02/03/05); OD-04 is only a future alternative, OD-06 a disproved premise,
+already recorded. Three current architectural choices remain for owner review
+(OD-02/03/05); OD-04 is only a future alternative, OD-06 a disproved premise,
 and OD-07 a conditionally decided direction awaiting final ADR/operating approval.
 
 ## OD-01 — comparison identity versus instance integrity
 
-**Status: OWNER DECISION REQUIRED.** Objective: compare equivalent research data
+**Status: OWNER APPROVED — OPTION B (E-92).** Objective: compare equivalent research data
 without weakening temporal provenance. Example: two imports of identical bars
 at different creation times have equal existing full-bar manifest_hash but
 different manifest_integrity_hash; replaying the retained original manifest can
@@ -29,9 +29,8 @@ match computation receipts across processes. No accessor object id is hashed.
 - C: separate OHLCV-only analytical fingerprint. Useful for value comparisons,
   explicitly unsuitable for provenance/PIT equivalence.
 
-**Recommend B as a future authorized contract change; A remains current behavior.**
-Adding a field still needs schema/version/consumer review; “additive” is not
-automatic authorization. Do not rename/remove old hashes or strip all timestamps.
+**Recorded owner decision: B, authorized on Draft78; legacy A behavior remains compatible.**
+Implementation must preserve schema/version/consumer compatibility; explicit authorization is #76 comment6383377178. Do not rename/remove old hashes or strip all timestamps.
 Related #76/#77; no code fix in this PR.
 
 ## OD-02 — shared indicator ownership, separate runtime semantics
@@ -55,7 +54,7 @@ or turn the accepted offline registry into a live service.
 ## OD-03 — operational archive to historical custody
 
 **Status: OWNER DECISION REQUIRED.** Objective: an auditable, asynchronous data
-artifact boundary. Example: a sealed Draft73 journal segment contains recorded
+artifact boundary. Example: a sealed merged PR73 journal segment contains recorded
 receipt/commit values but available_ms is unknown; export must not promote its
 derived lower bound to CONFIRMED research availability.
 
@@ -67,7 +66,7 @@ derived lower bound to CONFIRMED research availability.
   backpressure/PIT risk; inconsistent with core-run independence unless redesigned.
 
 **Recommend A first; B only after the contract/measurements warrant automation.**
-Draft73 is archival durability, Draft78 input binding; neither implements this
+merged PR73 is archival durability, Draft78 input binding; neither implements this
 bridge. Import-boundary and source eligibility must be reviewed without runtime
 cross-imports or duplicate acquisition.
 
@@ -140,13 +139,12 @@ backed up; a future read-only dashboard consumes capped rebuildable summaries.
 - C: B with paid projection infrastructure only if justified and authorized.
 
 **Recorded direction/recommendation: B, preserve it.** PR73 implements bounded
-Phase1 in Draft and has final technical acceptance, but is unmerged and not
+Phase1 is merged at bcca2238e019b750f564d4b5568e33f2a7aaf5cf with bounded technical acceptance, but is not
 production-authorized. Its ADR proposal explicitly reconciles prior004; this
 map does not silently supersede the canonical register or approve that ADR.
 
 Remaining operational approvals: disk/capture horizon, independent backup
-destination/media, encryption/access, RPO/RTO, activation/retention policy and
-merge. Free-tier fit is conditional on measured projection budgets; named
+destination/media, encryption/access, RPO/RTO, activation/retention policy. Merge is complete; activation is not. Free-tier fit is conditional on measured projection budgets; named
 Supabase sandbox/TLS/RLS acceptance is still absent. These are not permission
 to revisit A/B/C without new owner direction or to implement cloud services.
 
@@ -154,6 +152,14 @@ to revisit A/B/C without new owner direction or to implement cloud services.
 
 Owner may approve this documentation while deferring runtime choices. Decisions
 in this file do not authorize source changes, cloud, final-holdout access, paid
-services, production activation or merging PR74/73/78. No generic “all seven
+services or production activation. PR73 merge is complete; owner closeout authorizes descriptive PR74 merge after checks/CI, while PR78 remains Draft-only. No generic “all seven
 must be decided before any progress” gate is invented. Milestone prerequisites
 and operational approvals are scoped separately in06 and the relevant issues.
+
+## Closeout continuity — owner directives, 2026-10-24
+
+PR #73 is MERGED into main at `bcca2238e019b750f564d4b5568e33f2a7aaf5cf` (source head `cb7829e3e3c13c6b6433b6625f2df35d1991a65d`). Code integration does not activate production, provision independent off-device backup, ratify the final ADR, resolve R09, or close #71/#67. E-91.
+
+OD-01 Option B is owner-approved in #76 comment6383377178; #77 comment6383377744 authorizes additive research implementation on Draft78, not merge. OD-02/03/05 remain proposals. This specific approval supersedes older pending-OD01 wording. E-92.
+
+Issue #80 is FUTURE / UNPRIORITIZED / NON-BLOCKING: event registry/versioned as-known-at-decision references, complete opportunity population and missed-opportunity analysis belong to future reconciliation. No code/PR/subissue or trading influence is authorized by #80. Existing PIT rules cover only part of that future capability. E-93.
