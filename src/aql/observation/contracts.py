@@ -27,7 +27,7 @@ class ContextValue:
                 raise ContractError('missing context requires reason without fabricated provenance')
         elif not self.source or self.observed_ms is None or self.available_ms is None or self.missing_reason:
             raise ContractError('present context requires provenance and timestamps')
-        if self.observed_ms is not None and (self.observed_ms < 0 or self.available_ms < self.observed_ms or self.available_ms > decision_ms):
+        if self.observed_ms is not None and (self.observed_ms < 0 or self.available_ms is None or self.available_ms < self.observed_ms or self.available_ms > decision_ms):
             raise ContractError('future or invalid context')
 
 @dataclass(frozen=True)
@@ -46,9 +46,9 @@ class DecisionSnapshot:
     def __post_init__(self):
         if not self.opportunity_key or not self.source or self.disposition not in DISPOSITIONS:
             raise ContractError('invalid identity/disposition')
-        if not (0 <= self.event_ms <= self.receipt_ms <= self.decision_ms):
+        if not all(type(v) is int for v in (self.event_ms, self.receipt_ms, self.decision_ms)) or not (0 <= self.event_ms <= self.receipt_ms <= self.decision_ms):
             raise ContractError('invalid event/receipt/decision order')
-        if self.schema_version != 1 or self.freshness_limit_ms < 0 or self.uncertainty_ms < 0:
+        if self.schema_version != 1 or not all(type(v) is int and v >= 0 for v in (self.freshness_limit_ms, self.uncertainty_ms)):
             raise ContractError('invalid version/time bounds')
         if set(self.context) != CONTEXT_KEYS:
             raise ContractError('all eight context slots required')
@@ -79,7 +79,7 @@ class Observation:
     def validate(self,decision_ms):
         if self.horizon_ms not in HORIZONS_MS or not self.source or not self.evidence_id:
             raise ContractError('invalid horizon/provenance')
-        if self.observed_ms < decision_ms+self.horizon_ms or self.received_ms < self.observed_ms:
+        if not all(type(v) is int for v in (self.observed_ms,self.received_ms)) or self.observed_ms < decision_ms+self.horizon_ms or self.received_ms < self.observed_ms:
             raise ContractError('premature/impossible observation')
         if (self.value is None) == (self.missing_reason is None):
             raise ContractError('require either value or missing reason')
