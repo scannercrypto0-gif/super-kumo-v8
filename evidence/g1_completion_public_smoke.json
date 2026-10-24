@@ -1,0 +1,50 @@
+{
+  "scope": "public BTCUSDT 1m; no database, account or order calls",
+  "host_utc": "2026-10-24T05:59:51.348268+00:00",
+  "rest": {
+    "status": "PASS_TRANSPORT_ONLY",
+    "http_status": 200,
+    "server_date": "Sat, 24 Oct 2026 06:10:26 GMT",
+    "latency_ms": 517.76,
+    "rows": 100,
+    "first_open_ms": 1792816260000,
+    "last_open_ms": 1792822200000,
+    "closed_rows": 88,
+    "unique_opens": 100,
+    "ordered_contiguous": true,
+    "used_weight": "2",
+    "transport_status": "PASS",
+    "temporal_status": "BLOCKED_CLOCK_SKEW",
+    "server_minus_host_seconds": 634.651732
+  },
+  "websocket": {
+    "status": "PASS_TRANSPORT_ONLY",
+    "elapsed_ms": 5411.68,
+    "observations": [
+      {
+        "event_ms": 1792822228024,
+        "bar_open_ms": 1792822200000,
+        "bar_close_ms": 1792822259999,
+        "final": false,
+        "received_utc": "2026-10-24T05:59:53.253256+00:00"
+      },
+      {
+        "event_ms": 1792822230039,
+        "bar_open_ms": 1792822200000,
+        "bar_close_ms": 1792822259999,
+        "final": false,
+        "received_utc": "2026-10-24T05:59:55.269029+00:00"
+      },
+      {
+        "event_ms": 1792822232045,
+        "bar_open_ms": 1792822200000,
+        "bar_close_ms": 1792822259999,
+        "final": false,
+        "received_utc": "2026-10-24T05:59:57.277884+00:00"
+      }
+    ],
+    "limitation": "Receipt only; no closed-bar/reconnect proof",
+    "transport_status": "PASS",
+    "temporal_status": "BLOCKED_CLOCK_SKEW"
+  }
+}

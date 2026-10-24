@@ -189,3 +189,18 @@ Owner explicitly approved C: improve documentary acceptance scenarios, notificat
 - **R09:** Remains mandatory; no V7 credentials accessed or present in this session.
 - **Production authorization:** NOT granted. G1 code merged ≠ G1 production authorized.
 - No merges, no main modifications, no live trading/deployment, no Strategy Factory work performed in this session.
+
+## 2026-10-24 - Owner-authorized G1 operational completion (Draft, not merged)
+
+Inspected current main 8e8690e58451e4fdd38f3e5e5f3cc89817e59c26 and live
+G0/G1 metadata. Reconciled closed #61 preflight with direct owner Final Execution
+Mission. No claim of reviewing inaccessible originating chats.
+Implemented bounded recovery/persistence lanes, core-first local journal writes,
+REST cooldown/bounds, clock fail-closed checks, sandbox adapter/migrations and
+independent durable remote cursor. Preserved SQLite and Linux SIGKILL tests.
+Public read-only Binance smoke returned HTTP200/100 unique contiguous candles
+and three WS observations; source/host clock divergence prevents temporal PASS.
+No orders, production DB, credentials, research changes or merges.
+See docs/operations/G1_COMPLETION_20261024.md and evidence/g1_completion_public_smoke.json.
+Final-head local/CI evidence belongs to the resulting consolidated Draft PR.
+R09 unresolved; PR16 left open with a scoped supersession recommendation.

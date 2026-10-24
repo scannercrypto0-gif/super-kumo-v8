@@ -29,6 +29,8 @@ from typing import List, Optional
 import urllib.request
 import urllib.parse
 import json
+import urllib.error
+from .rest_budget import SHARED_REST_BUDGET
 
 from ..models.bar import BarState, MarketBar
 
@@ -71,6 +73,8 @@ def _binance_interval_ms(interval: str) -> int:
     try:
         n = int(interval[:-1])
         unit = interval[-1]
+        if n <= 0:
+            raise ValueError("Positive interval required")
         return n * unit_map[unit]
     except (KeyError, ValueError, IndexError):
         raise ValueError(f"Unsupported interval: {interval}")
@@ -115,11 +119,25 @@ def _fetch_klines(
     logger.debug("REST klines fetch: %s", url)
 
     req = urllib.request.Request(url, headers={"User-Agent": "AQL-G1-MVP/0.1"})
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    SHARED_REST_BUDGET.acquire(KLINES_WEIGHT_PER_REQUEST)
+    try:
+        response = urllib.request.urlopen(req, timeout=5)
+    except urllib.error.HTTPError as exc:
+        if exc.code in (418, 429):
+            try:
+                retry = float(exc.headers.get("Retry-After", 60))
+            except (TypeError, ValueError):
+                retry = 60
+            SHARED_REST_BUDGET.cooldown(retry)
+        raise RuntimeError(f"Binance public REST HTTP {exc.code}") from None
+    with response as resp:
         # This is the CUMULATIVE rolling-window weight, not the request cost.
         window_weight = int(resp.headers.get("X-MBX-USED-WEIGHT-1M", 0))
         data = json.loads(resp.read())
 
+    SHARED_REST_BUDGET.observe(window_weight)
+    if not isinstance(data, list):
+        raise ValueError("Unexpected kline response")
     return data, window_weight
 
 
@@ -145,11 +163,16 @@ def recover_gap(
     separately for observability only.
     """
     interval_ms = _binance_interval_ms(interval)
+    gap_end_ms = min(gap_end_ms, int(time.time() * 1000))
 
     # Align gap boundaries to bar grid for accurate expected-count calculation.
     # Gap start: first bar boundary at or after gap_start_ms
     # Gap end:   last fully-closed bar boundary at or before gap_end_ms
     aligned_start = _align_to_grid(gap_start_ms, interval_ms, "ceil")
+    original_end = gap_end_ms
+    # A bounded job never materializes an unbounded missing-opportunity list.
+    # A clipped range is explicitly unresolved; next restart rediscovers it.
+    gap_end_ms = min(gap_end_ms, aligned_start + 8000 * interval_ms)
     aligned_end = _align_to_grid(gap_end_ms, interval_ms, "floor")
 
     # Expected number of bars on the aligned grid.
@@ -164,7 +187,7 @@ def recover_gap(
     http_error: Optional[str] = None
     cursor = aligned_start
 
-    while cursor <= aligned_end and expected > 0:
+    while cursor <= aligned_end and expected > 0 and requests_made < 8:
         # Safety: stop if we've used too much of our self-imposed budget.
         session_cost = requests_made * KLINES_WEIGHT_PER_REQUEST
         if session_cost >= MAX_SESSION_WEIGHT:
@@ -210,6 +233,9 @@ def recover_gap(
             all_bars.append(bar)
 
         last_open = int(rows[-1][0])
+        if last_open + interval_ms <= cursor:
+            http_error = "REST pagination did not advance"
+            break
         cursor = last_open + interval_ms
 
         if len(rows) < MAX_KLINES_PER_REQUEST:
@@ -257,6 +283,10 @@ def recover_gap(
     else:
         status = "PARTIAL"
 
+    if original_end > gap_end_ms:
+        status = "UNRESOLVED_DATA_GAP"
+        unresolved += max(0, (original_end - gap_end_ms) // interval_ms)
+        expected += max(0, (original_end - gap_end_ms) // interval_ms)
     weight_cost = requests_made * KLINES_WEIGHT_PER_REQUEST
 
     # If REST fetch errored and we have unresolved bars, force status to HTTP_ERROR

@@ -1,3 +1,19 @@
+## Current execution addendum - 2026-10-24 (Draft PR, not merged)
+
+Verified main baseline: 8e8690e58451e4fdd38f3e5e5f3cc89817e59c26. G0 is
+APPROVED; Issues #1/#44/#52/#53/#61 closed and PRs #32/#40/#42/#45/#56 merged.
+Post-merge G1 baseline run 40062092633 supersedes the older NOT TRIGGERED
+snapshot below; it does not certify later research changes.
+
+This owner-authorized G1-only branch implements bounded background recovery,
+journal-first ingestion, independent persistence/replay and sandbox PostgreSQL
+adapter/migrations. [Scope, evidence, owner-only R09 checklist and limits](docs/operations/G1_COMPLETION_20261024.md).
+Public Binance REST/WS transport observed successfully; approximately 635s
+source/host clock divergence BLOCKS temporal acceptance. Supabase cloud NOT TESTED.
+R09 remains CRITICAL/UNRESOLVED pending real revocation/rotation evidence.
+PR #16 remains open; superseded-MVP closure recommendation preserves deferred
+Inbox/archive/backup requirements. No research changes, main writes or trading.
+
 # ATLAS Quant Lab — CURRENT STATE
 Project ID: `AQL-CRYPTO-RESEARCH-001`
 Former name: SUPER KUMO V8

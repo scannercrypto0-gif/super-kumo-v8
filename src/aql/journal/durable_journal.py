@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from ..models.bar import BarState, MarketBar
+from ..lanes import WritePriority
 
 logger = logging.getLogger(__name__)
 
@@ -83,11 +84,12 @@ class DurableJournal:
 
     def __init__(self, db_path: str):
         self.db_path = db_path
+        self.write_priority = WritePriority()
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, isolation_level=None, check_same_thread=False)
+        conn = sqlite3.connect(self.db_path, isolation_level=None, check_same_thread=False, timeout=0.25)
         conn.row_factory = sqlite3.Row
         for pragma in PRAGMAS:
             conn.execute(pragma)
@@ -101,7 +103,11 @@ class DurableJournal:
         finally:
             conn.close()
 
-    def commit(self, bar: MarketBar) -> bool:
+    def commit(self, bar: MarketBar, *, background: bool = False) -> bool:
+        with self.write_priority.hold(background):
+            return self._commit(bar)
+
+    def _commit(self, bar: MarketBar) -> bool:
         """
         Append a bar to the journal.  Returns True if newly committed,
         False if already present (idempotent).
@@ -175,6 +181,7 @@ class DurableJournal:
         symbol: Optional[str] = None,
         interval: Optional[str] = None,
         final_only: bool = True,
+        *, pending_only: bool = False, limit: int | None = None,
     ) -> List[MarketBar]:
         """
         Return all committed entries in bar_open order.
@@ -192,7 +199,15 @@ class DurableJournal:
                 params.append(interval)
             if final_only:
                 query += " AND is_final = 1"
+            if pending_only:
+                query += " AND state = ?"
+                params.append(BarState.LOCAL_COMMITTED.value)
             query += " ORDER BY bar_open ASC"
+            if limit is not None:
+                if type(limit) is not int or limit < 1:
+                    raise ValueError("Positive batch limit required")
+                query += " LIMIT ?"
+                params.append(limit)
 
             rows = conn.execute(query, params).fetchall()
         finally:
@@ -221,6 +236,10 @@ class DurableJournal:
         return bars
 
     def mark_persisted(self, stable_key: str) -> None:
+        with self.write_priority.hold(background=True):
+            self._mark_persisted(stable_key)
+
+    def _mark_persisted(self, stable_key: str) -> None:
         """Mark a journal entry as PERSISTED after successful operational storage write."""
         conn = self._connect()
         try:

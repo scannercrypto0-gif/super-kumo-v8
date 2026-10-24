@@ -11,10 +11,12 @@ from __future__ import annotations
 import argparse
 import logging
 import time
+import threading
 from pathlib import Path
 
 from .collector.binance_collector import BinanceCollector
 from .health import take_snapshot
+from .lanes import BackgroundLane, JournalConsumer
 from .journal.durable_journal import DurableJournal
 from .recovery.gap_recovery import recover_gap
 from .storage.operational_store import OperationalStore
@@ -34,12 +36,13 @@ def _run_gap_recovery(
     interval: str,
     gap_start_ms: int,
     gap_end_ms: int,
+    stop_event=None,
 ) -> dict:
     """
     Recover bars for a gap window.
 
     Sequence (mandatory, per G1-WP01 fix order):
-      1. journal.commit(bar)        — durable local record first
+      1. journal.commit(bar, background=True)        ط£آ¢أ¢â€ڑآ¬أ¢â‚¬â€Œ durable local record first
       2. store.upsert(bar)          — write to operational store
       3. journal.mark_persisted()   — ONLY if upsert confirmed insertion/presence
 
@@ -67,9 +70,12 @@ def _run_gap_recovery(
     errors = 0
 
     for bar in recovered_bars:
+        if stop_event is not None and stop_event.is_set():
+            errors += 1
+            break
         # Step 1: Journal commit (durable local record)
         try:
-            journal.commit(bar)
+            journal.commit(bar, background=True)
         except Exception as exc:
             logger.error(
                 "Journal commit failed for recovered bar %s: %s",
@@ -142,6 +148,9 @@ def run_pipeline(
 
     journal = DurableJournal(journal_path)
     store = OperationalStore(store_path)
+    recovery_lane = BackgroundLane()
+    startup_ready = threading.Event()
+    consumer = JournalConsumer(journal, store, symbol, interval, ready=startup_ready)
 
     logger.info(
         "Pipeline start: symbol=%s interval=%s duration=%.0fs",
@@ -152,50 +161,55 @@ def run_pipeline(
     logger.info("Supabase: NOT_TESTED (SQLite fallback active)")
 
     # --- Startup reconciliation (handles clean restarts AND SIGKILL recovery) ---
-    # This runs before WebSocket connection so any gap from the previous process
-    # is detected and recovered, even if _on_close was never called.
+    # Runs independently of WebSocket connection. Replay and gaps from a previous
+    # process remain visible even when _on_close was never called.
     startup_recovery_results: list = []
     startup_reconcile_error: str | None = None
     startup_replay_inserted: int = 0
     startup_replay_errors: int = 0
     startup_bars_replayed: int = 0
-    try:
-        (startup_bars_replayed,
-         startup_replay_inserted,
-         startup_replay_errors,
-         startup_gaps) = journal.startup_reconcile(
-            store=store,
-            symbol=symbol,
-            interval=interval,
-        )
-        logger.info(
-            "Startup reconciliation complete: bars_replayed=%d "
-            "replay_inserted=%d replay_errors=%d gaps_detected=%d",
-            startup_bars_replayed, startup_replay_inserted, startup_replay_errors,
-            len(startup_gaps),
-        )
-        if startup_replay_errors > 0:
-            logger.error(
-                "Startup reconciliation: %d bar(s) failed to replay into store — "
-                "unresolved backlog exists",
-                startup_replay_errors,
-            )
-        # Run REST recovery for every detected gap (internal + trailing).
-        # A failed REST fetch is captured in the RecoveryReport (status=HTTP_ERROR)
-        # and carried in startup_recovery_results — never silently swallowed.
-        for gap_start, gap_end in startup_gaps:
-            gr = _run_gap_recovery(
-                journal=journal,
+    def reconcile_background(stop):
+        nonlocal startup_bars_replayed, startup_replay_inserted
+        nonlocal startup_replay_errors, startup_reconcile_error
+        if stop.is_set():
+            return
+        try:
+            (startup_bars_replayed,
+             startup_replay_inserted,
+             startup_replay_errors,
+             startup_gaps) = journal.startup_reconcile(
                 store=store,
                 symbol=symbol,
                 interval=interval,
-                gap_start_ms=gap_start,
-                gap_end_ms=gap_end,
             )
-            startup_recovery_results.append(gr)
-    except Exception as exc:
-        startup_reconcile_error = str(exc)
-        logger.error("Startup reconciliation FAILED: %s", startup_reconcile_error)
+            logger.info(
+                "Startup reconciliation complete: bars_replayed=%d "
+                "replay_inserted=%d replay_errors=%d gaps_detected=%d",
+                startup_bars_replayed, startup_replay_inserted, startup_replay_errors,
+                len(startup_gaps),
+            )
+            if startup_replay_errors > 0:
+                logger.error(
+                    "Startup reconciliation: %d bar(s) failed to replay into store — "
+                    "unresolved backlog exists",
+                    startup_replay_errors,
+                )
+            # Run REST recovery for every detected gap (internal + trailing).
+            # A failed REST fetch is captured in the RecoveryReport (status=HTTP_ERROR)
+            # and carried in startup_recovery_results — never silently swallowed.
+            for gap_start, gap_end in startup_gaps:
+                def recover(stop, start=gap_start, end=gap_end):
+                    if not stop.is_set():
+                        gr = _run_gap_recovery(journal, store, symbol, interval, start, end, stop)
+                        startup_recovery_results.append(gr)
+                recovery_lane.submit(recover)
+        except Exception as exc:
+            startup_reconcile_error = str(exc)
+            logger.error("Startup reconciliation FAILED: %s", startup_reconcile_error)
+        finally:
+            startup_ready.set()
+
+    recovery_lane.submit(reconcile_background)
 
     # --- WebSocket collection ---
     collector = BinanceCollector(
@@ -205,21 +219,35 @@ def run_pipeline(
         store=store,
     )
 
+    collector.background_persistence = True
+    consumer.start()
     t_start = time.time()
-    metrics = collector.run(timeout_s=duration_s)
+    try:
+        metrics = collector.run(timeout_s=duration_s)
+    except BaseException:
+        consumer.stop_event.set()
+        recovery_lane.stop_event.set()
+        raise
     elapsed = time.time() - t_start
 
     # --- Post-collection gap recovery (handles WS disconnects during run) ---
     ws_recovery_result = None
     if collector.gap_start_ms is not None and collector.gap_end_ms is not None:
-        ws_recovery_result = _run_gap_recovery(
-            journal=journal,
-            store=store,
-            symbol=symbol,
-            interval=interval,
-            gap_start_ms=collector.gap_start_ms,
-            gap_end_ms=collector.gap_end_ms,
-        )
+        def recover_ws(stop):
+            nonlocal ws_recovery_result
+            if not stop.is_set():
+                ws_recovery_result = _run_gap_recovery(
+                    journal, store, symbol, interval,
+                    collector.gap_start_ms, collector.gap_end_ms, stop)
+        recovery_lane.submit(recover_ws)
+
+    recovery_lane_status = recovery_lane.finish()
+    consumer_status = consumer.finish()
+    if (recovery_lane_status['pending'] or recovery_lane_status['rejected']
+            or recovery_lane_status['errors'] or consumer_status['worker_alive']
+            or any(r['recovery_errors'] for r in startup_recovery_results)
+            or (ws_recovery_result and ws_recovery_result['recovery_errors'])):
+        startup_reconcile_error = startup_reconcile_error or "Background work pending/failed; retry from durable journal on restart"
 
     # --- Final counts ---
     journal_counts = journal.count_by_state()
@@ -233,6 +261,8 @@ def run_pipeline(
     _all_recovery_reports = [r["gap_report"] for r in startup_recovery_results]
     if ws_recovery_result is not None:
         _all_recovery_reports.append(ws_recovery_result["gap_report"])
+    if getattr(collector, "health_state", "") == "CLOCK_UNCERTAIN":
+        startup_reconcile_error = startup_reconcile_error or "Source/local clock divergence; temporal eligibility denied"
     health = take_snapshot(
         journal=journal,
         store=store,
@@ -275,6 +305,8 @@ def run_pipeline(
         "store_total": store_count,
         "errors": metrics.error_count,
         "reconnects": metrics.reconnect_count,
+        "collector_health": getattr(collector, "health_state", "SYNTHETIC"),
+        "source_clock_skew_ms": metrics.source_clock_skew_ms,
         "avg_latency_ws_to_commit_ms": metrics.avg_latency_ws_to_commit_ms(),
         "journal_state_counts": journal_counts,
         "bar_range": {
@@ -292,6 +324,8 @@ def run_pipeline(
         },
         "ws_gap_recovery": _report_from(ws_recovery_result),
         "supabase_status": OperationalStore.SUPABASE_STATUS,
+        "background_recovery": recovery_lane_status,
+        "background_persistence": consumer_status,
         "health_snapshot": health.to_dict(),
     }
 
