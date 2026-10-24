@@ -50,6 +50,20 @@ class AdmissionTests(unittest.TestCase):
                                        "input_digest": "f" * 64, "strategy_digest": "0" * 64})
             self.assertEqual(ledger.snapshot()[0], [])
 
+    def test_transaction_admission_rejects_without_append(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ledger = AttemptLedger(Path(tmp) / "attempts.sqlite")
+            event = {"state": "PENDING", "family_id": "Family1",
+                     "candidate_id": "Candidate1", "input_digest": "f" * 64,
+                     "strategy_digest": "a" * 64}
+            def reject(event, prior, checkpoint):
+                self.assertEqual(prior, ())
+                self.assertEqual(checkpoint[0], 0)
+                raise ValueError("Frozen plan admission rejected")
+            with self.assertRaisesRegex(ValueError, "Frozen plan admission rejected"):
+                ledger.record_attempt(event, admission=reject)
+            self.assertEqual(ledger.snapshot()[0], [])
+
     def test_existing_unplanned_attempt_blocks_writer(self):
         with tempfile.TemporaryDirectory() as tmp:
             ledger = AttemptLedger(Path(tmp) / "attempts.sqlite")
