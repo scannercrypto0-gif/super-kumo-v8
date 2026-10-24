@@ -16,6 +16,12 @@ class G2Contracts(unittest.TestCase):
     def test_future_context(self):
         c=self.ctx();c['btc_eth']=ContextValue('1','feed',100,121)
         with self.assertRaises(ContractError): self.snap(context=c)
+    def test_incomplete_context_timestamps_fail_closed(self):
+        c=self.ctx();c['btc_eth']=ContextValue('1','feed',100,None)
+        with self.assertRaises(ContractError): self.snap(context=c)
+    def test_noninteger_clock_fails_closed(self):
+        with self.assertRaises(ContractError): self.snap(receipt_ms='110')
+        with self.assertRaises(ContractError): self.snap(freshness_limit_ms='30')
     def test_stale_context(self):
         c=self.ctx();c['btc_eth']=ContextValue('1','feed',1,2)
         with self.assertRaises(ContractError): self.snap(context=c)
