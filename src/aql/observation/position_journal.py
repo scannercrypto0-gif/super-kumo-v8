@@ -42,6 +42,14 @@ class DurablePositionJournal:
         current_size=self.path.stat().st_size if self.path.exists() else 0
         if current_size != self._expected_size:
             raise JournalIntegrityError('journal changed outside this writer; reopen and replay')
+        # Same-size edits are also unsafe; verify the complete chain against disk.
+        probe=object.__new__(DurablePositionJournal)
+        probe.path=self.path
+        probe.ledger=PositionLedger()
+        probe._tail='0'*64
+        probe._replay()
+        if probe._tail != self._tail:
+            raise JournalIntegrityError('journal contents changed outside this writer')
         if not isinstance(event,PositionEvent): raise PositionContractError('invalid event')
         # Validate against a disposable replay before touching durable bytes.
         candidate=PositionLedger()
