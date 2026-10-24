@@ -30,7 +30,7 @@ jobs:
       - name: Exact independent Indicator V2 review head (PR68)
         uses: actions/checkout@v4
         with:
-          ref: f3ca2d5dde019a836fe6994b658a444c34b1cfb2
+          ref: bfbb725bee48d26cba5d988b9c1ff50d86a9d0da
           path: .integration-v2
       - name: Cross-PR integration without modifying tracked strategy files
         run: python -B -c "import research_wp_r0,pytest; research_wp_r0.__path__.append('.integration-v2/research_wp_r0'); raise SystemExit(pytest.main(['integration_tests/test_sf_strat_ind02.py','-v','--tb=short','--junitxml=sf-integration.xml']))"
