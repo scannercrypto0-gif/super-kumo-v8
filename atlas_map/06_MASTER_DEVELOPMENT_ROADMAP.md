@@ -1,177 +1,101 @@
 # ATLAS Quant Lab — Master Development Roadmap
-**Version:** 1.0-DRAFT | **Date:** 2026-10-24 | **HEAD:** `4e4c353`
+**Version:** 1.1-DRAFT | **Evidence snapshot:** 2026-10-24
+**Main source baseline:** `4e4c3537036bdf2b106c1a63ec65b2a9855972a7` | **Documentation:** PR #74, Draft/unmerged.
+Reviewed documentation baseline: `e4ce1c8a5d7911f52fb67e52f7e58c2e0ee5b476`; final document HEAD is in PR metadata/correction matrix, not the main-source SHA.
+Evidence IDs and scope: [09_EVIDENCE_REGISTER.md](09_EVIDENCE_REGISTER.md). No production authorization or owner decision is created by this map.
 
----
+## 1. Preserve canonical gates; remove unsupported dates
 
-## Priority Classification
+The canonical [02_ROADMAP.md](../02_ROADMAP.md) defines:
+G0 governance; G1 market foundation; G2 observation (including4/24/72h outcomes);
+G3 Momentum Trader; G4 Research Lab; G5 events; G6 multi-trader expansion.
+This package does not rename G2 as Research Foundation, G5 as general
+intelligence or G6 as Dashboard. Independent research foundations and bounded
+storage work may proceed in parallel under their specific authorization.
 
-- **P0** — Blocks production authorization or data integrity. Must be done before live operation.
-- **P1** — Core platform capability. Required for primary research and trading mission.
-- **P2** — Important improvement. Needed for production quality but not blocking P1 mission.
-- **P3** — Future enhancement. Valuable but can be deferred to later stages.
+No defensible elapsed-time forecast is available: one-task completion times,
+CI seconds and synthetic benchmark timings do not measure remaining engineering
+velocity, available sustained staffing, review latency or forward data adequacy.
+The old serial totals and percentage parallelism discounts are withdrawn, not
+converted into promises. No date for first paper trade is asserted.
 
----
+## 2. Work already delivered; avoid duplicate implementation
 
-## G1 Completion (Current Stage)
+| Work | Actual state | Remaining work |
+|---|---|---|
+| Historical library/Indicator V1/guard | Merged #57/#60/#63 | Preserve contracts; obtain admissible dataset coverage |
+| Indicator V2/Strategy JSON | Merged #68/#69; #66 closed; main216-case acceptance complete | Native offline binding exists; no full Factory engine |
+| G1 pipeline | Merged #32/#40/#42/#45/#62 | Bounded Binance report accepted; sustained/unattended/scale remain unvalidated |
+| Storage direction | #67 Option B conditionally DECIDED | Final ADR/operating budgets; no new Free-vs-Pro binary decision needed now |
+| Phase1 archive/backup | Draft73 cb7829e; technical READY FOR OWNER MERGE APPROVAL,60 cases×6 CI | Owner merge decision; production/offsite activation separately gated |
+| Research R0–R40/Batch01 | Code/tests in unmerged #46 ancestry, legacy204-case CI | Reconcile existing temporal/ledger/engine interfaces with main, not rebuild from zero |
+| Historical input adapter | Draft78,393 cases×6 CI; #77 full milestone BLOCKED | Owner review, identity/ledger reconciliation and real data |
+| Asset Intelligence | #72 owner-approved future concept under C, unscheduled | No current implementation task; preserve initial request + future bounded reassessment design |
+| Supabase | Main adapter/migrations/disposable PostgreSQL tests | #65 named cloud sandbox permission and least-privilege/TLS/RLS acceptance absent |
 
-### P0 — Production Authorization Gates
+## 3. Milestone dependency and acceptance plan
 
-| Task | Issue/PR | Owner | Dependency | Estimate |
-|------|---------|-------|-----------|---------|
-| R09: Document V7 credential revocation | `08_RISKS.md` | OWNER ACTION | None | 1 day |
-| Controlled integration acceptance (live Binance) | Issue #64 | Dev | R09 | BOUNDED PASS — follow-ups open |
-| Supabase sandbox acceptance | Issue #65 | Dev | Issue #64 | Open — pending Supabase cloud authorization |
-| Supabase storage architecture | Issue #67 | Owner | — | **DECIDED** — Option B approved; Phase 1 #71 authorized; ADR pending |
-| Windows production throughput benchmark | `04_STATE.md` gate | Dev | Issue #64 | 1–2 days |
+| Milestone | Required inputs / real dependency | Permitted parallel work | Acceptance / owner gate |
+|---|---|---|---|
+| M-A Documentation/contract reconciliation | This PR74, canonical contracts, latest decisions | Owner resolves OD-01/02/03/05; no runtime changes | Ten coherent docs, scoped evidence and owner architecture approval; no auto-merge |
+| M-B Optional archive acceptance | Conditional Option B; corrected Draft73 | Owner disk/media/encryption/RPO/RTO planning | Exact-head tests + virtual integration already green; separate merge approval. Activation/off-device/retention deletion not implied |
+| M-C Research-line reconciliation | Main foundations + #46 typed family/journal/temporal contracts + Draft78 | Offline contract/data inventory, static compatibility review | Explicit staged adapter/migration plan, complete candidate accounting and restart/anchor tests before formal empirical runs; avoid silently importing divergent chain |
+| M-D Admissible research dataset | Authorized offline source, rights, version/units/symbol/listing/adjustment/receipt metadata; OD-03 artifact boundary | Source feasibility/coverage and library sizing | Frozen scope, gaps/missingness/quality/PIT classifications and retained commitments; no automatic use of operational feed or retrospective receipt promotion |
+| M-E Reproducible historical evaluation | M-C and M-D; preregistered family/splits/baselines/costs, protected final holdout | Synthetic software fixtures without empirical claims | Deterministic input/result lineage, full population including failures/no-fill, purged/embargoed splits, dependence/multiplicity/sample evidence; independent review before confirmatory/forward claims |
+| M-F Observation/secretariat/scanner | G1 authorized scope and provisional G2/data-service contracts | Design/fixtures can proceed independently of offline experiments when explicitly authorized | Trader-owned decisions preserved;4/24/72h outcome maturity/missingness, feed/latency/backpressure and resource isolation evidence |
+| M-G First paper trader | Frozen strategy/version, routed mandatory context, deterministic fees/slippage/expiry/ambiguity/recovery | Simulator fixtures and interface specs, not live activation | Signal replay, full denominators, restart/no duplicates, owner paper-operation authorization; profitability is not required for engineering completion |
+| M-H Prospective Shadow/validation | Frozen parent/variant protocols, approved data path and forward start timestamp | Build report contracts while data accumulates | Observe prespecified horizons/sample rules; no backdating, retrospective Shadow claims or final-holdout tuning. Independent validation + owner promotion decision |
+| M-I Cloud projection acceptance | Separately authorized named disposable sandbox; selective schema/quota plan | Local storage/research do not wait synchronously on cloud | TLS/identity/least-privilege/RLS/denied operations/replay/quota evidence in that sandbox; no routine cloud candle archive |
+| M-J Intelligence/events/dashboard/scale | Owner prioritization + source/rights/resource/record availability | Read-only contracts, source feasibility, bounded tests | #72 remains future; later event/trigger/TTL/isolation/consumer-policy tests. Dashboard consumes actual records; multi-trader and scale follow canonical gates |
 
-### P1 — Phase 1 Archive & Research Data Path
+Cloud validation, R09 issuer-side remediation and off-device provisioning have
+external authorization/evidence dependencies. They are not invented serial
+prerequisites for all offline synthetic research development. None of this
+waives the production gates or owner-required disposition of remaining G1 work.
 
-| Task | Issue | Dependency | Estimate |
-|------|-------|-----------|---------|
-| Phase 1 local archive, PIT integrity, backup/restore | Issue #71 / PR #73 (DRAFT) | Issue #67 decision ✅ | In progress — PR #73 open, not merged |
-| Operational Store → Historical Library bridge | (new) | Issue #71 | 3–5 days |
+## 4. Dependency map (work packages, not automatic execution permission)
 
----
-
-## Strategy Factory Foundations — COMPLETED IN MAIN
-
-> These are merged and in main @ `4e4c353`. They are isolated research foundations — not yet integrated into a working Research Lab.
-
-| Deliverable | PR | Merged SHA | Status |
-|------------|-----|-----------|--------|
-| Indicator Library V2 (6 OHLCV indicators, `VectorResult`) | PR #68 | `ea9cf19a` | **VERIFIED MAIN** |
-| Strategy Definition JSON V1 + PIT provenance binding | PR #69 | `4e4c353` | **VERIFIED MAIN** |
-| Historical Library (CustodyAccessor) | earlier | in main | **VERIFIED MAIN** |
-| Indicator Library V1 | earlier | in main | **VERIFIED MAIN** |
-| Dependency Guard (`_dep_guard.py`) | earlier | in main | **VERIFIED MAIN** |
-
----
-
-## G2 — Research Foundation (Post-G1 Authorization)
-
-### P0 — Holdout Protection (Pre-condition for any research claims)
-
-| Task | Issue | Dependency | Estimate |
-|------|-------|-----------|---------|
-| WP-R6: Holdout Custody | Issue #24 | Issue #71 | 5–8 days |
-| WP-R7: Pre-registered Trial Journal | Issue #25 | Issue #24 | 3–5 days |
-
-### P1 — Core Research Engine (Batch-01)
-
-| Task | Issue/PR | Dependency | Estimate |
-|------|---------|-----------|---------|
-| WP-R0: Research Environment Setup | Issue #18/PR #17 | Issue #71 | 2–3 days |
-| WP-R1: Backtest Engine | Issue #19 | WP-R0, WP-R6 | 8–13 days |
-| WP-R2: Paired Evaluation Engine | Issue #20 | WP-R1 | 5–8 days |
-| WP-R3: No-fill Opportunity Accounting | Issue #21 | WP-R1 | 3–5 days |
-| WP-R4: Statistical Audit | Issue #22 | WP-R2 | 5–8 days |
-| WP-R5: Walk-Forward Analysis | Issue #23 | WP-R2 | 5–8 days |
-| Strategy Batch-01 Candidates | Issue #46 | WP-R1 | 5–8 days |
-
-### P2 — Secretariat & Scanner (G2 Architecture)
-
-| Task | Issue | Dependency | Estimate |
-|------|-------|-----------|---------|
-| Secretariat Office implementation (G1-ARCH-01–11) | (new) | G1 authorization | 8–13 days |
-| Opportunity Scanner implementation (G1-ARCH-12–20) | (new) | Secretariat | 8–13 days |
-| Shared Indicator Box (G1-ARCH-21–44) | (new) | Secretariat | 5–8 days |
-
----
-
-## G3 — First Virtual Trader
-
-### P1 — Momentum Trader (G3 per roadmap)
-
-| Task | Dependency | Estimate |
-|------|-----------|---------|
-| Trader base lifecycle (WATCH→TRIGGERED→CLOSED) | G2 Secretariat+Scanner | 8–13 days |
-| Paper fill engine (fees, slippage, ambiguity) | Trader base | 5–8 days |
-| Position Monitor implementation (DATA-07 compliant) | Trader base | 5–8 days |
-| Momentum Trader v1 (first concrete strategy) | Strategy Batch-01, Trader base | 8–13 days |
-
-### P2 — Research Integration
-
-| Task | Dependency | Estimate |
-|------|-----------|---------|
-| Trade → Research Lab pipeline | Trader base | 3–5 days |
-| Paper trading performance reporting | Trade pipeline | 5–8 days |
-
----
-
-## G4 — Strategy Promotion & Validation
-
-### P1
-
-| Task | Dependency | Estimate |
-|------|-----------|---------|
-| Out-of-sample holdout validation workflow | WP-R6 + Trader | 5–8 days |
-| Strategy promotion authorization workflow | OOS validation | 3–5 days |
-| Live shadow testing framework | Strategy promotion | 8–13 days |
-
----
-
-## G5 — Multi-Asset & Intelligence
-
-### P2–P3
-
-| Task | Dependency | Estimate |
-|------|-----------|---------|
-| Market Intelligence (J) — BTC trend, ETH/BTC | G3 operational | 8–13 days |
-| Asset Intelligence Lab (E) — BTC/PAXG specialist | Market Intelligence | 5–8 days |
-| Multiple virtual traders | G3 Momentum Trader | 8–13 days |
-| Events/News Intelligence | G5 | 13–21 days |
-
----
-
-## G6 — Monitoring, Dashboard & Scale
-
-### P2–P3
-
-| Task | Dependency | Estimate |
-|------|-----------|---------|
-| Monitoring & Dashboard (K) | Operational records exist | 13–21 days |
-| Telegram notifications | Dashboard | 3–5 days |
-| Multi-symbol production scale | G5 | 8–13 days |
-| Supabase production migration | Multi-symbol | 3–5 days |
-
----
-
-## Time Estimates Summary
-
-> **⚠️ Uncertainty Notice:** These estimates are based on task-count and per-task heuristics only. They do NOT reflect measured historical velocity, parallel work capacity, review/integration overhead, or owner decision latency. Treat as directional order-of-magnitude guidance, not a project schedule. Critical dependencies (R09, live integration acceptance, owner decisions on OD-01–07) are not factored into the lower bounds.
-
-| Stage | Conservative | Base | Optimistic | Key Assumptions |
-|-------|-------------|------|-----------|----------------|
-| G1 Completion (P0 gates) | 8–10 days | 6–8 days | 4–5 days | R09 done; Issue #64 follow-ups clear; no blockers |
-| G2 Research Foundation | 55–75 days | 40–55 days | 30–40 days | WP-R0→R7 sequential; one engineer; no scope changes |
-| G3 First Trader | 30–50 days | 25–40 days | 20–30 days | Secretariat+Scanner+Trader sequential |
-| G4 Strategy Promotion | 20–30 days | 15–25 days | 10–18 days | OOS validation framework in place |
-| G5 Multi-Asset | 40–60 days | 30–45 days | 20–30 days | Multi-symbol infrastructure designed |
-| G6 Dashboard & Scale | 30–45 days | 22–35 days | 15–25 days | Operational records available |
-| **TOTAL** | **183–270 days** | **138–208 days** | **99–148 days** | **All assumptions hold simultaneously** |
-
-*Velocity assumption: one focused engineer, sequential implementation, no major rework. Parallel work between Research and G1 completion may reduce total by 10–20%. Owner decision latency not included.*
-
----
-
-## Critical Path
-
-```
-R09 (Owner — REQUIRED) → Issue #64 follow-ups (clock sync, Supabase cloud, multi-symbol)
-    ↓
-Issue #71 (archive + PIT integrity) [PARTIAL: PR #73 Draft]
-    ↓
-WP-R6 (holdout custody) → WP-R1 (backtest engine) → Strategy Batch-01
-    ↓
-G2 Secretariat → G2 Scanner
-    ↓
-G3 Momentum Trader → Paper Trading
-    ↓
-G4 OOS Validation → Strategy Promotion
+```mermaid
+graph TD
+  A["Main historical + indicator + definition foundations"] --> C["M-C legacy research reconciliation"]
+  P["Draft78 input contracts"] --> C
+  R["Unmerged46 synthetic engine + ledger + custody"] --> C
+  D["M-D authorized source / PIT coverage"] --> E["M-E empirical evaluation"]
+  C --> E
+  B["M-B Draft73 optional archive"] -. "future offline artifacts, OD-03" .-> D
+  G["Bounded G1 baseline + scope authorization"] --> F["M-F observation / routing"]
+  F --> T["M-G paper trader engineering"]
+  E -. "reviewed candidate proposal only" .-> T
+  T --> H["M-H prospective Shadow / validation"]
+  E --> H
+  O["Owner approvals / policy"] --> T
+  O --> H
+  O --> I["M-I named cloud sandbox"]
+  O --> J["M-J future intelligence/dashboard/scale"]
 ```
 
-> **Note on Issue #64:** Bounded Binance acceptance PASSED (REST + WS + reconnect + gap recovery, disposition ACCEPTED WITH FOLLOW-UPS). Issue #64 is NOT a pending gate from zero — follow-up tasks remain open (clock sync, Supabase cloud, multi-symbol). R09 credential revocation is the true blocking owner action.
+Archive completion is not a synchronous Core Run prerequisite. The data bridge
+must retain provenance and actual receipt uncertainty. Candidate/evaluation
+output is not automatic trader activation. Arrows denote inputs, not new
+department placements or approved sequencing outside existing stage gates.
 
-> **Note on parallelism:** R09 credential documentation (owner action) can proceed in parallel with Issue #71 Phase 1 archive implementation. WP-R0 research environment setup can begin in parallel with G1 follow-up tasks if dep_guard isolation is maintained. Serial estimates in the table above do not reflect potential parallel work; actual elapsed time may be 10–20% shorter with parallel execution.
+## 5. Resources, elapsed time and forward evidence
 
-**Shortest path to first paper trade:** ~100–140 days (optimistic-base) from G1 authorization, assuming parallel R09+#71 execution and no major blockers.
+No dedicated sustained engineer count, task-size history or measured review
+throughput was supplied. Several tools/tasks completing on one day is not a
+staffing forecast; no agent/conversation capacity is assumed. Before scheduling,
+estimate only the scoped remaining delta per milestone, list implementer/reviewer/
+owner availability, account for rework and interface reconciliation, and update
+ranges from actual completed comparable work. No calendar range is published
+without those inputs.
+
+Forward4/24/72h observations require actual elapsed horizon completion, source
+availability and enough eligible independent occurrences for the declared claim;
+they cannot be compressed by parallel coding. There is no requirement to wait
+for every conceivable regime before engineering completion, nor permission to
+claim validation merely because a horizon elapsed. Record confidence and
+unresolved missingness, separate historical-development/OOS/forward evidence,
+and prefer quality/scalability over the earliest first trade.
+
+#71/#67/#64/#65/#77 remain open at this snapshot; technical delivery, owner
+acceptance, merge and production authorization are separate state transitions.

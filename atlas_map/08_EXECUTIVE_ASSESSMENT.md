@@ -1,127 +1,111 @@
-# ATLAS Quant Lab — التقييم التنفيذي الشامل
-**الإصدار:** 1.0-DRAFT | **التاريخ:** 2026-10-24 | **HEAD:** `4e4c353`
+# ATLAS Quant Lab — التقييم التنفيذي وحزمة الاعتماد
+**Version:** 1.1-DRAFT | **Evidence snapshot:** 2026-10-24
+**Main source baseline:** `4e4c3537036bdf2b106c1a63ec65b2a9855972a7` | **Documentation:** PR #74, Draft/unmerged.
+Reviewed documentation baseline: `e4ce1c8a5d7911f52fb67e52f7e58c2e0ee5b476`; final document HEAD is in PR metadata/correction matrix, not the main-source SHA.
+Evidence IDs and scope: [09_EVIDENCE_REGISTER.md](09_EVIDENCE_REGISTER.md). No production authorization or owner decision is created by this map.
 
----
+## النتيجة للمالك
 
-## ملخص حالة المشروع
+الخريطة تفرّق بين وجود الكود ودمجه وتكامله والتحقق منه وتفويض تشغيله.
+المشروع فيه أساس سوق مدمج، ومكونات بحث منفذة فعلًا في main وفروع غير مدموجة؛
+مش مجرد تصميم، ومش منصة تداول تشغيلية مكتملة.
 
-المشروع في مرحلة G1 — البنية التحتية لبيانات السوق. تم بناء الأساس التقني بشكل متين، لكن الجزء الأكبر من القيمة التجارية الفعلية (التداول الورقي، الأبحاث، تقييم الاستراتيجيات) لم يُنفَّذ بعد.
+- **Architecture Documentation Quality:** ACCEPTABLE بعد تصحيحات هذه النسخة.
+- **Evidence Quality:** PARTIAL إجمالًا: المصدر وحالات GitHub وCI متحقق منها؛
+  قبول Binance المحدود مبني على تقرير #64، والبيانات التاريخية الحقيقية/الحفظ
+  المستقل/التحقق الأمامي والتشغيل الإنتاجي غير مثبتين.
+- **Cross-Document Consistency:** PASS؛ فحص الحزمة النهائي مسجل في
+  Correction Matrix، والنتيجة النهائية والـHEAD في وصف PR.
+- **Open documentation blockers:** صفر بعد إغلاق الملاحظات؛ فجوات التشغيل
+  والبحث موثقة، وليست اختفاءً للكود أو موافقات ضمنية.
+- **PR Status:** READY FOR OWNER ARCHITECTURE APPROVAL، يظل Draft بلا دمج.
 
----
+## ما هو موجود فعلًا؟
 
-## ما تم إنجازه (مُتحقق في main @ `4e4c353`)
+**في main:** HistoricalLibrary/CustodyAccessor، مؤشرات V1/V2، Strategy JSON،
+candidate_grid وbind_evaluation وAttemptRecorder كمنفذ تسجيل، مع خط G1
+للاستقبال والسجل المحلي والتخزين والتعافي وHealthSnapshot.
+#68 مدمج عند ea9cf19a3b77019c8c0673756fad54068a50532b؛ #69 عند
+4e4c3537036bdf2b106c1a63ec65b2a9855972a7؛ #66 مغلقة بعد قبول216 اختبار
+للوظيفة الواحدة على ست بيئات. الحارس فحص AST في CI، مش عزلًا أمنيًا وقت التشغيل.
 
-**البنية التحتية لبيانات السوق (G1):**
-- مجمع Binance WebSocket مع إعادة الاتصال التلقائي والبيانات اللحظية
-- سجل دائم (SQLite WAL) كصندوق وارد مقاوم للأعطال قبل الكتابة في المخزن
-- مخزن تشغيلي مع ضمان الإدراج المتكرر (idempotent upsert)
-- استرداد الفجوات عبر REST API مع تتبع ميزانية الطلبات
-- لقطة صحية منظمة (HEALTHY/DEGRADED/UNHEALTHY)
-- اختبارات اصطناعية تغطي WP01–WP04 (CI run #40085463732 success @ `453a14d`)
-- **قبول محدود لـBinance الحقيقي:** Issue #64 ACCEPTED WITH FOLLOW-UPS — تم التحقق من REST + WebSocket + reconnect + gap recovery في بيئة محدودة (ليس شهادة إنتاج)
+**في سلسلة البحث غير المدموجة #46:** أساس backtest اصطناعي وتوليد مرشحين،
+إحصاء/purging ومقارنات مزدوجة، NO_FILL/outcomes، ExperimentRegistry،
+TrialFamilyLedger، HoldoutCustody، journal/checkpoints وعقود إعادة الإنتاج.
+CI القديم شغّل204 اختبارات لكل نظام على شجرة السلسلة نفسها. ده مش دليل
+إنها اندمجت، أو إننا عندنا OOS حقيقي أو holdout مستقل أو Shadow شغّال.
+درجة F هي L2؛ لا L0 ولا اعتماد مختبر متكامل L3.
 
-**مصنع الاستراتيجيات / أسس البحث (مدمج في main):**
-- مكتبة بيانات تاريخية بدقة نقطة في الزمن (CustodyAccessor) — `historical_library.py`
-- مكتبة مؤشرات V1 (`indicator_library.py`) — مدمجة
-- مكتبة مؤشرات V2 مع `VectorResult` (PR #68 مدمج @ `ea9cf19a`) — `indicator_library_v2.py`
-- تعريفات الاستراتيجية بـ SHA-256 وتسلسل JSON محدد (PR #69 مدمج @ `4e4c353`) — `strategy_definition.py`
-- حارس التبعيات يمنع أي استيراد بين مسار البحث ومسار التشغيل — `_dep_guard.py`
-- ملاحظة: هذه أسس بحثية معزولة — وليست مختبر بحث متكامل مع backtest أو holdout
+**Draft #78/#77:** جسر مدخلات تاريخية وعقود فقط؛393 اختبار لكل وظيفة على ست
+بيئات. لا يستورد محرك/دفتر #46؛ المهمة التجريبية الكاملة BLOCKED لحد تسوية
+العقود وتوفير البيانات المقبولة وقرار الهوية.
 
----
+**التخزين:** Option B مقرر مشروطًا في #67، مش قرارًا لم يُتخذ.
+PR #73 عند cb7829e3e3c13c6b6433b6625f2df35d1991a65d جاهز فنيًا
+لموافقة المالك على الدمج ككود اختياري غير مفعّل، لكنه Draft وغير مدموج.
+60 اختبار لكل بيئة،360 تنفيذ ناجح؛ استعادة4096 سجل اصطناعي مطابقة.
+Windows directory fsync غير مدعوم، والنسخة المستقلة خارج الجهاز NOT_VERIFIED.
+الحدود8192 ملف/2GB/60 ثانية تمنع ادعاء خدمة backup غير محدودة.
 
-## الفجوات الحرجة (تمنع التفويض للإنتاج)
+**Binance:** #64 يوثّق ACCEPTED WITH FOLLOW-UPS لاختبار REST وWS/finality
+وانقطاع مفروض وإعادة اتصال وتعافٍ جدولته أداة الاختبار. ده يتجاوز اختبار
+نقل اصطناعي فقط، لكنه مش اعتماد تشغيل unattended أو انقطاع حقيقي طويل.
+Supabase Cloud لم يُختبر؛ الحاوية المؤقتة PostgreSQL ليست Supabase.
 
-### 1. التحقق من التكامل الحي — Issue #64
-قبول Binance المحدود اكتمل (**ACCEPTED WITH FOLLOW-UPS**) — تم التحقق من REST + WebSocket + reconnect + gap recovery في بيئة غير إنتاجية. هذا ليس شهادة إنتاج. Issue #64 لا يزال مفتوحاً لمتطلبات المتابعة (clock sync، Supabase cloud، multi-symbol). Supabase السحابي لم يُختبر (`SUPABASE_STATUS = "NOT_TESTED"`).
+## التقييم حسب الأقسام
 
-### 2. إلغاء بيانات اعتماد V7 القديمة — R09 (إجراء مطلوب من المالك)
-يجب على المالك توثيق إلغاء بيانات اعتماد Binance القديمة قبل أي وصول حي.
+| ID | Functional area | Representative level | Scope |
+|---|---|---|---|
+| A | Historical Data Library | L2 | Main: isolated versioned historical/custody foundation |
+| B | Live Market Data Center | L3 | Main: integrated bounded G1 path; reported bounded Binance acceptance |
+| C | Strategy Factory | L2 | Main: indicator/definition foundations; no accepted factory runner |
+| D | Strategy Explorer | L0 | Concept; no dedicated implementation/specification accepted |
+| E | Asset Intelligence Lab | L1 | Owner-approved future concept under C; #72 unprioritized |
+| F | Research Lab | L2 | Main foundations plus isolated unmerged research chain; not an integrated accepted Lab |
+| G | Secretariat Office | L1 | Provisional design; no runtime |
+| H | Opportunity Scanner | L1 | Provisional design; no runtime |
+| I | Virtual Traders | L1 | Provisional lifecycle/fill design; no runtime |
+| J | Market Intelligence | L1 | Documented context requirements; no runtime producer |
+| K | Monitoring & Dashboard | L2 | Health snapshot code exists; unified UI/alerts deferred |
+| L | Governance & Orchestration | L2 | Versioned documents/GitHub/CI tooling; approval is a separate authority axis |
+| M | Shared Infrastructure & Storage | L2 | Main SQLite foundation; technically reviewed archive/backup in unmerged #73 |
 
-### 3. Supabase غير مُختبر — Issue #65, #67
-`SUPABASE_STATUS = "NOT_TESTED"` موجود في الكود. لا يوجد حل للتخزين السحابي.
+توزيع الأقسام13: L0=1، L1=5، L2=6، L3=1، L4=0، L5=0.
+كتالوج القدرات25 في02: L0=1، L1=6، L2=14، L3=4، L4=0، L5=0.
+الأرقام دي عدّ لعناصر معلنة، مش متوسط علمي أو ضمان جودة المشروع.
+وجود واجهة binding متكاملة لا يساوي تكامل مصنع الاستراتيجيات أو المختبر كله.
 
-### 4. مسار البيانات للبحث غير موجود
-لا يوجد ربط بين المخزن التشغيلي والمكتبة التاريخية. الباحثون لا يمكنهم استخدام البيانات الحية للبحث حتى الآن.
+## القرارات الحقيقية المتبقية
 
----
+- OD-01: هل نعتمد هوية محتوى دلالية إضافية تحفظ الزمن والمصدر مع إبقاء
+  instance hash؟ الترشيح: إضافة versioned identity، بدون حذف التوقيتات.
+- OD-02: ملكية حد المؤشرات الحية مقابل البحثية؛ الترشيح مواصفات حساب مشتركة
+  مع وصول وreceipts وجدولة منفصلة.
+- OD-03: عقد نقل offline موثق من الأرشيف للمكتبة، لا اعتماد متزامن على Core Run.
+- OD-05: تثبيت الفرق بين سياق السوق العام J ونظرة الأصل المتخصصة E؛ لا تحويل
+  النظرة لإشارة تداول أو سياسة مخاطرة تلقائيًا.
+- OD-04 ليس طلب إعادة اختيار مكان E الآن: #72 يضعه بالفعل تحت C، مستقبلًا وغير
+  مجدول. الاستقلال التنظيمي بديل لاحق فقط. OD-06 مبني على فرضية خاطئة:
+  WritePriority مستخدم داخل DurableJournal، ولا يلزم استيراده في pipeline.
+- OD-07 اتجاهه محسوم مشروطًا؛ اعتماد ADR النهائي وسعة القرص والنسخ المستقل
+  والتشفير وRPO/RTO وتفويض التشغيل قرارات اعتماد/تشغيل لاحقة، مش إعادة سؤال
+  هل نحفظ كل الشموع في Supabase.
 
-## الفجوة الاستراتيجية الكبرى
+## الأولوية والخطة
 
-**المختبر البحثي (F) — أسس معزولة مدمجة؛ لكن المختبر المتكامل غير منفذ.**
+نحافظ على بوابات02_ROADMAP الأصلية: G2 رصد، G3 متداول Momentum،
+G4 المختبر البحثي، G5 أحداث، G6 تعدد المتداولين. لا نعيد تسميتها.
+الخطة في06 قائمة على milestones وعقود وأدلة قبول واعتماديات حقيقية.
+مفيش معدل تنفيذ أو فريق دائم مقاس يبرر تاريخًا لأول صفقة أو نسبة تسريع.
+جمع نتائج4/24/72 ساعة والتحقق الأمامي يحتاج مرور الزمن وعينة مناسبة،
+ولا يتحول لنجاح لمجرد انتهاء ساعة أو يوم.
 
-الأسس المدمجة في main: CustodyAccessor + Indicator V1/V2 + StrategyDefinition (PRs #68, #69). هذه أسس بحثية معزولة — ليست مختبر بحث متكامل. 22+ إشكالية (WP-R1–WP-R40) مفتوحة. هذا يعني:
-- لا اختبار خلفي (backtest)
-- لا تقييم خارج العينة
-- لا حماية من البيانات المحجوزة (holdout)
-- لا تسجيل التجارب المسبق
-- لا تداول ورقي
+الخطوات المقترحة: اعتماد حزمة التوثيق؛ قرار دمج #73 إن وافق المالك؛ تسوية
+خط البحث بدل بناء نسخة مكررة؛ بيانات تاريخية مرخصة ومقبولة بنقطة الزمن؛
+ثم تقييم مقيد وواجهات الرصد والمتداول وفق التفويض. المكتبة والبحث
+والنسخ السحابي مش متطلبات متزامنة تعطل Core Run.
 
-المشروع بنى قاعدة متينة — لكن المنتج الفعلي لم يُبنَ بعد.
-
----
-
-## تقدير الوقت للوصول إلى أول تداول ورقي
-
-| السيناريو | الوقت التقديري |
-|-----------|---------------|
-| متفائل | 99–148 يوم |
-| متوسط | 138–208 يوم |
-| محافظ | 183–270 يوم |
-
-**المسار الحرج:**
-```
-R09 (مالك) → Issue #64 (تكامل حي) → Issue #71 (أرشيف)
-    ↓
-WP-R6 (حماية holdout) → WP-R1 (محرك backtest)
-    ↓
-G2 Secretariat → G2 Scanner → G3 Momentum Trader
-```
-
----
-
-## التقييم حسب القسم
-
-| القسم | الناضج | الكود | الاختبارات | الحالة |
-|-------|--------|-------|-----------|--------|
-| A — مكتبة البيانات | L2 | ✅ | ✅ | يعمل |
-| B — بيانات السوق الحية | L2 | ✅ | ✅ اصطناعي | يحتاج تحقق حي |
-| C — مصنع الاستراتيجية | L2-L3 | ✅ أسس | ✅ | PRs #68, #69 مدمجة في main |
-| D — مستكشف الاستراتيجية | L0 | ❌ | ❌ | مفهوم فقط |
-| E — مختبر ذكاء الأصول | L0 | ❌ | ❌ | Issue #72 — backlog مستقبلي، تحت Strategy Factory |
-| F — المختبر البحثي | L1 | ⚠️ أسس | ⚠️ أسس | أسس مدمجة؛ backtest/holdout/trials غير منفذة |
-| G — مكتب الأمانة | L1 | ❌ | ❌ | تصميم فقط |
-| H — ماسح الفرص | L1 | ❌ | ❌ | تصميم فقط |
-| I — المتداولون الافتراضيون | L1 | ❌ | ❌ | تصميم فقط |
-| J — ذكاء السوق | L0 | ❌ | ❌ | غير مُصمم |
-| K — الرصد والتقارير | L0 | ❌ | ❌ | مؤجل |
-| L — الحوكمة | L4 | ✅ | ✅ | الأفضل توثيقاً |
-| M — البنية التحتية | L1-L2 | ✅ جزئي | ✅ اصطناعي | SQLite جيد؛ الباقي غير مُختبر |
-
-**متوسط الناضج:** L1.5 — البنية التحتية وثلاثة وحدات منفذة؛ معظم الرؤية الاستراتيجية تصميم على الورق.
-
----
-
-## أولويات العمل المقترحة
-
-### فوري (قبل أي شيء آخر)
-1. **R09** — المالك يوثق إلغاء بيانات اعتماد V7 (إجراء مطلوب من المالك — لم يكتمل بعد)
-2. **Issue #64 متابعات** — قبول Binance المحدود اكتمل (ACCEPTED WITH FOLLOW-UPS)؛ المتبقي: clock sync، Supabase cloud، multi-symbol
-3. **Issue #65/#67** — Supabase cloud: Option B مُقرر (PR #73 Draft)؛ لم يُختبر بعد
-
-### قصير المدى (G2 Research Foundation)
-4. **Issue #71** — أرشيف محلي، جسر البيانات
-5. **WP-R6** — حماية holdout (شرط مسبق لأي ادعاء بحثي)
-6. **WP-R1** — محرك الاختبار الخلفي
-
-### متوسط المدى (G3 First Trader)
-7. تنفيذ Secretariat + Scanner
-8. أول متداول افتراضي (Momentum Trader)
-
----
-
-## خلاصة
-
-المشروع يمتلك أساساً تقنياً قوياً ومعمارية موثقة بشكل ممتاز. القرارات الحوكمية محكمة. الخطر الأكبر ليس في البنية التحتية — بل في الفجوة الكبيرة بين ما هو موثق كتصميم وما هو منفذ فعلياً في المختبر البحثي، الذي هو صميم الرسالة.
-
-**توصية:** أولوية قصوى لـ R09 + Issue #64 + Issue #71 + WP-R6 لإرساء الطريق نحو أول تداول ورقي حقيقي.
+R09 يظل CRITICAL/UNRESOLVED. المصادر الحالية تعرض #1 CLOSED وتقرير G0
+APPROVED، لكن هذه الجلسة لا تعيد إثبات توقيع المالك التاريخي ولا تمنح اعتمادًا
+للقرارات الجديدة أو تشغيلًا إنتاجيًا. لا تعديل كود/إصلاح #75/#76، لا PR جديد،
+لا main/دمج/Cloud/Holdout أو تغيير لمسارات التنفيذ الجارية.

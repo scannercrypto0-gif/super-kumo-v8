@@ -1,149 +1,159 @@
-# ATLAS Quant Lab — Open Architectural Decisions
-**Version:** 1.0-DRAFT | **Date:** 2026-10-24 | **HEAD:** `4e4c353`
+# ATLAS Quant Lab — Architectural Decisions and Preserved Directions
+**Version:** 1.1-DRAFT | **Evidence snapshot:** 2026-10-24
+**Main source baseline:** `4e4c3537036bdf2b106c1a63ec65b2a9855972a7` | **Documentation:** PR #74, Draft/unmerged.
+Reviewed documentation baseline: `e4ce1c8a5d7911f52fb67e52f7e58c2e0ee5b476`; final document HEAD is in PR metadata/correction matrix, not the main-source SHA.
+Evidence IDs and scope: [09_EVIDENCE_REGISTER.md](09_EVIDENCE_REGISTER.md). No production authorization or owner decision is created by this map.
 
----
+## Decision discipline
 
-## Decision Format
-Each decision lists: objective, context, options (A/B/C), trade-offs, and recommendation.
-All decisions require **owner approval** before implementation.
+Objective→concrete example→A/B/C options→trade-offs→recommendation. These are
+review proposals, not approvals or implementation orders. Preserve owner choices
+already recorded. Four current architectural choices remain for owner review
+(OD-01/02/03/05); OD-04 is only a future alternative, OD-06 a disproved premise,
+and OD-07 a conditionally decided direction awaiting final ADR/operating approval.
 
----
+## OD-01 — comparison identity versus instance integrity
 
-## OD-01: `manifest_integrity_hash` — Instance vs. Content Determinism
+**Status: OWNER DECISION REQUIRED.** Objective: compare equivalent research data
+without weakening temporal provenance. Example: two imports of identical bars
+at different creation times have equal existing full-bar manifest_hash but
+different manifest_integrity_hash; replaying the retained original manifest can
+match computation receipts across processes. No accessor object id is hashed.
 
-**Objective:** Clarify whether `manifest_integrity_hash` should be deterministic across library instances.
+- A: keep current fields; replay retained manifests and compare ordered full-bar
+  commitments with explicit metadata. No schema change; callers must respect scope.
+- B: add a versioned semantic content identity over ordered full-bar checksums
+  and agreed dataset/source/units metadata, excluding only instance creation/
+  self-hash fields. Preserve old instance hash, all market/receipt/availability
+  semantics and independently retained anchor separately.
+- C: separate OHLCV-only analytical fingerprint. Useful for value comparisons,
+  explicitly unsuitable for provenance/PIT equivalence.
 
-**Context:** Currently includes `created_at_ms` (wall-clock at validate_bars time), making it non-deterministic across instances or processes running on different machines or at different times.
+**Recommend B as a future authorized contract change; A remains current behavior.**
+Adding a field still needs schema/version/consumer review; “additive” is not
+automatic authorization. Do not rename/remove old hashes or strip all timestamps.
+Related #76/#77; no code fix in this PR.
 
-**Impact:** Cannot use this hash to verify that two researchers processed the same dataset identically across separate runs. The audit trail for multi-researcher reproducibility is weakened.
+## OD-02 — shared indicator ownership, separate runtime semantics
 
-**Options:**
-- **A — Keep as-is:** Document the instance-scope limitation explicitly. The hash serves as an instance fingerprint, not a cross-instance reproducibility guarantee.
-- **B — Add `content_hash`:** Keep `manifest_integrity_hash` (instance fingerprint), add a separate `content_hash` = deterministic hash of bar content only. Both hashes serve different purposes.
-- **C — Make fully deterministic:** Remove `created_at_ms` from the hash; rename to `content_hash`.
+**Status: OWNER DECISION REQUIRED.** Objective: reuse maths without coupling
+offline research custody to live secretary/trader subscriptions. Example: one
+SMA specification may serve batch analysis and a live demand-aware box, with
+different availability receipts, freshness and resource budgets.
 
-**Trade-offs:**
-- A: Zero code change; limits reproducibility verification.
-- B: Dual-hash adds clarity at the cost of schema complexity.
-- C: Breaks existing API contracts (field rename); requires test updates.
+- A: common versioned calculation specifications/library, distinct research/live
+  adapters, schedules and evidence. Reuse without mixing authority.
+- B: wholly separate live/research implementations. Strong organizational split,
+  more duplicate formula/version drift risk.
+- C: one shared runtime box for both. Fewer wrappers, but greater contention and
+  contamination risk; must prove isolation before adoption.
 
-**Recommendation:** B — Add `content_hash` alongside the existing hash. Preserves backward compatibility.
+**Recommend A**, subject to the existing G1-ARCH-21–44 contract and owner approval.
+This does not relocate the approved future central box, grant trading authority,
+or turn the accepted offline registry into a live service.
 
-**Status:** AWAITING OWNER DECISION | **Related Issue:** #76
+## OD-03 — operational archive to historical custody
 
----
+**Status: OWNER DECISION REQUIRED.** Objective: an auditable, asynchronous data
+artifact boundary. Example: a sealed Draft73 journal segment contains recorded
+receipt/commit values but available_ms is unknown; export must not promote its
+derived lower bound to CONFIRMED research availability.
 
-## OD-02: Shared Indicator Box Ownership (G1-ARCH-21–44)
+- A: explicit offline CLI/export-import protocol with source/version/units/
+  listing/adjustment/missingness and retained commitments, validated before use.
+- B: scheduled bounded automation using the same reviewed artifact protocol,
+  with idempotent replay and failure inventory.
+- C: synchronous per-bar core→research callback. Tighter latency coupling and
+  backpressure/PIT risk; inconsistent with core-run independence unless redesigned.
 
-**Objective:** Clarify whether the Shared Indicator Box (G1-ARCH-21–44) belongs to Strategy Factory (C) or is a separate sub-system between Secretariat (G) and Traders (I).
+**Recommend A first; B only after the contract/measurements warrant automation.**
+Draft73 is archival durability, Draft78 input binding; neither implements this
+bridge. Import-boundary and source eligibility must be reviewed without runtime
+cross-imports or duplicate acquisition.
 
-**Context:** The indicator box as designed in `01_CONTRACT.md` (G1-ARCH-21–44) seems to serve two purposes: (1) indicator computation for research (Strategy Factory role), and (2) live indicator streaming for the Secretariat/Scanner/Traders workflow. These have different lifecycle, consistency, and latency requirements.
+## OD-04 — Asset Intelligence structure
 
-**Options:**
-- **A — Single box, dual purpose:** One Shared Indicator Box serves both research (batch PIT) and live trading (streaming). Strict API boundaries prevent contamination.
-- **B — Two separate boxes:** Research Indicator Box (inside Strategy Factory, PIT-correct, batch) and Live Indicator Box (inside Secretariat, streaming, eventual).
-- **C — Defer:** Keep current design (one box); split only when demand is proven.
+**Status: CURRENT PLACEMENT PRESERVED; FUTURE ALTERNATIVE ONLY.** #72 owner-approved
+concept is a future/unprioritized sub-lab under Strategy Factory. Example: an
+owner-requested BTC outlook may later trigger bounded automatic reassessment
+when its completed-candle condition is confirmed or its deadline expires; that
+does not make the lab a trader.
 
-**Trade-offs:**
-- A: Simple; risk of research PIT leaking into live path or vice versa.
-- B: Clean separation; doubles implementation effort.
-- C: Avoids premature optimization.
+- A: retain E under C, shared datasets/indicators, F independently validates.
+- B: future independent organizational/service domain if workload/ownership
+  demands it; requires owner decision, not simply access to live data.
+- C: combine specialist and broad-market intelligence with separate contracts;
+  fewer organizational boundaries, higher responsibility/authority ambiguity.
 
-**Recommendation:** C for now — defer until Secretariat is implemented. Flag as a split decision point when G2 work begins.
+**Recommend A now (already the recorded direction).** No new placement approval
+is required to document it; no implementation is prioritized. AssetOutlook
+machine-readable hypotheses include source/timeframe/session, exact comparator/
+units/window/deadline, freshness, debounce and next action. Confirmation,
+contradiction, non-occurrence and material-change evidence cause reassessment,
+not automatic trade/risk actions. UNKNOWN data stays UNKNOWN. TTL never extends
+silently; new deep analysis creates a new immutable linked version.
 
-**Status:** AWAITING OWNER DECISION
+## OD-05 — specialist outlook versus broad context
 
----
+**Status: OWNER DECISION REQUIRED for the future contract boundary.** Objective:
+prevent ambiguous ownership when BTC appears in both E and J. Example: J may
+publish observed BTC/ETH/breadth context; E publishes a hypothesis about BTC
+drawdown with uncertainty and horizon. Neither is a trader command.
 
-## OD-03: Operational Store → Historical Library Bridge Design
+- A: J owns cross-market context; E under C owns asset-specific outlooks; F owns
+  independent claim validation; consumers opt in under approved policy.
+- B: combine E/J ownership but preserve separate artifact/validation types.
+- C: defer runtime ownership details while retaining the documented distinction;
+  no consumer may treat an outlook as approved operational policy.
 
-**Objective:** Define how live-collected bars flow from the G1 Operational Store into the Historical Library for research use.
+**Recommend A as the target boundary; C is the safe present non-activation state.**
+No code or existing owner placement is changed. Consumer-policy and Core Run
+resource-isolation acceptance precede any paper/production influence.
 
-**Context:** Currently the two are completely isolated (dep_guard enforces this). Research data must be imported manually. Issue #71 covers Phase 1 archiving but doesn't define the bridge protocol.
+## OD-06 — WritePriority finding disposition
 
-**Options:**
-- **A — CLI export tool:** A standalone script that reads the operational store and imports into the historical library. Triggered manually by the owner.
-- **B — Automated nightly job:** A scheduled process that exports new bars daily into the historical library.
-- **C — Event-driven bridge:** Each finalized bar in the operational store triggers an append to the historical library in near-real-time.
+**Status: RECONCILED; NOT AN UNDECIDED WIRING CHOICE.** #75's zero-caller premise
+is contradicted by DurableJournal construction, commit()/mark_persisted() and
+pipeline background=True recovery calls plus the foreground-order test.
+A direct import in pipeline.py is not needed.
 
-**Trade-offs:**
-- A: Simple, owner-controlled, no new architecture. Manual effort.
-- B: Automation; risk of partial-bar import if job runs mid-session.
-- C: Complex; PIT correctness harder to guarantee in real-time.
+- A: retain current shared-journal cooperative gate and document scope.
+- B: future cross-process/host resource coordination if measured contention
+  requires it, as a new scoped design—not a fix for an absent caller.
+- C: remove or duplicate wiring solely because pipeline lacks the import;
+  unjustified by current evidence.
 
-**Recommendation:** A for G2; upgrade to B when operational data volume justifies automation.
+**Recommend A; no code change or owner action is requested for the false premise.**
+High-load host-wide scheduling remains unverified; no current anomaly is proven.
+This docs PR does not close/edit #75 or run scheduling experiments.
 
-**Status:** AWAITING OWNER DECISION
+## OD-07 — local authority and selective cloud projections
 
----
+**Status: DECIDED CONDITIONALLY — Option B** (#67 owner decision6382338071).
+Objective: preserve economically scalable authoritative evidence independently
+of cloud availability. Example: bulk one-minute bars remain local/archived and
+backed up; a future read-only dashboard consumes capped rebuildable summaries.
 
-## OD-04: Asset Intelligence Lab (E) — Standalone vs. Strategy Factory Sub-Lab
+- A: cloud-central bulk candle/evidence storage (old register004 direction).
+- B: local authoritative journal/full evidence + immutable bulk archive +
+  independent backup; later selective capped cloud projections.
+- C: B with paid projection infrastructure only if justified and authorized.
 
-**Objective:** Decide whether the Asset Intelligence Lab (Issue #72) is an independent department or a sub-component of the Strategy Factory.
+**Recorded direction/recommendation: B, preserve it.** PR73 implements bounded
+Phase1 in Draft and has final technical acceptance, but is unmerged and not
+production-authorized. Its ADR proposal explicitly reconciles prior004; this
+map does not silently supersede the canonical register or approve that ADR.
 
-**Context:** Issue #72 proposes BTC/PAXG specialist outlooks. The outputs (AssetOutlook) are read-only and informational. The question is whether this justifies a separate department with its own code boundary or can be implemented as a factory extension.
+Remaining operational approvals: disk/capture horizon, independent backup
+destination/media, encryption/access, RPO/RTO, activation/retention policy and
+merge. Free-tier fit is conditional on measured projection budgets; named
+Supabase sandbox/TLS/RLS acceptance is still absent. These are not permission
+to revisit A/B/C without new owner direction or to implement cloud services.
 
-**Options:**
-- **A — Sub-lab of Strategy Factory:** Implement as `research_wp_r0/asset_intelligence/`. Shares the PIT-correct accessor and indicator library. No new department boundary.
-- **B — Standalone department:** Own code directory, own interfaces. Can evolve independently.
+## Approval package boundary
 
-**Trade-offs:**
-- A: Less overhead; natural integration with existing research lane.
-- B: Cleaner separation if AIL grows to consume live signals or external data.
-
-**Recommendation:** A — Start as a Factory sub-lab. Promote to standalone only if it needs live data access (which would require its own boundary).
-
-**Status:** AWAITING OWNER DECISION
-
----
-
-## OD-05: Market Intelligence (J) vs. Asset Intelligence Lab (E) Boundary
-
-**Objective:** Define the boundary between Market Intelligence (broad market signals) and Asset Intelligence Lab (deep per-asset analysis).
-
-**Context:** Both departments touch BTC. Market Intelligence focuses on market-wide context (BTC dominance, ETH/BTC ratio, altseason). Asset Intelligence Lab produces deep specialist outlooks for specific assets.
-
-**Options:**
-- **A — Strict separation:** MI covers only cross-market ratios and breadth; AIL covers individual-asset deep analysis. BTC appears in both but at different levels.
-- **B — AIL subsumes MI:** One department covers all intelligence (broad + deep). Simpler.
-- **C — Defer:** Both are L0 concepts; define boundary only when one begins implementation.
-
-**Recommendation:** C — Defer until one department reaches implementation stage. The current distinction is adequate for documentation.
-
-**Status:** AWAITING OWNER DECISION (deferred to G5)
-
----
-
-## OD-06: `WritePriority` — Wire into Pipeline or Remove (Issue #75)
-
-**Objective:** Decide whether `WritePriority` (designed in `lanes.py`) should be connected in `pipeline.py`.
-
-**Context:** `WritePriority` exists in `lanes.py` but is not wired into `pipeline.py`. It's designed to give core ingestion commits priority over background SQLite writes. Under low single-symbol load, it may be unnecessary.
-
-**Options:**
-- **A — Wire it in:** Connect `WritePriority` in pipeline. Correct under high concurrency.
-- **B — Remove it:** It adds complexity without proven need at current scale.
-- **C — Keep as is:** Leave it in `lanes.py` unconnected; wire when multi-symbol scale is needed.
-
-**Recommendation:** C — Keep unconnected until SC-03 (multi-symbol) is approached.
-
-**Status:** AWAITING OWNER DECISION
-
----
-
-## OD-07: Storage Architecture — OWNER DECISION MADE
-
-**Decision:** Owner conditionally approved **Option B** (Issue #67 owner comment, 2026-10-24):
-- **Local authoritative store:** Durable SQLite journal + full PIT/outcome evidence — local, independently backed up
-- **Immutable bulk archive:** Local, independently backed up
-- **Supabase:** Only bounded/rebuildable dashboard summaries — no routine cloud candle archive
-- **Phase 1 authorized:** Issue #71 (local archive + integrity manifests + restore/backup contracts + isolation/failure tests) — see PR #73 (OPEN/DRAFT, not merged)
-
-**What this changes:**
-- OD-07 is no longer "undecided" — architecture direction is set
-- Early ADR-004 (Supabase-central authority) must be superseded by a new ADR — see Issue #67
-- Supabase Free tier adequate for base projections (200MB/year dashboard summaries); cloud candle storage explicitly rejected
-
-**Outstanding:** Phase 1 (#71) implementation and ADR proposal are not yet merged or accepted. Supabase cloud NOT_TESTED. No Supabase cloud authorization granted.
-
-**Status:** OWNER DECISION MADE — Phase 1 execution in progress (PR #73 Draft) | Issue #67 OPEN (pending ADR + Phase 1 acceptance)
+Owner may approve this documentation while deferring runtime choices. Decisions
+in this file do not authorize source changes, cloud, final-holdout access, paid
+services, production activation or merging PR74/73/78. No generic “all seven
+must be decided before any progress” gate is invented. Milestone prerequisites
+and operational approvals are scoped separately in06 and the relevant issues.

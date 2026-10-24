@@ -1,150 +1,81 @@
 # ATLAS Quant Lab — Capacity & Scalability Review
-**Version:** 1.0-DRAFT | **Date:** 2026-10-24 | **HEAD:** `4e4c353`
+**Version:** 1.1-DRAFT | **Evidence snapshot:** 2026-10-24
+**Main source baseline:** `4e4c3537036bdf2b106c1a63ec65b2a9855972a7` | **Documentation:** PR #74, Draft/unmerged.
+Reviewed documentation baseline: `e4ce1c8a5d7911f52fb67e52f7e58c2e0ee5b476`; final document HEAD is in PR metadata/correction matrix, not the main-source SHA.
+Evidence IDs and scope: [09_EVIDENCE_REGISTER.md](09_EVIDENCE_REGISTER.md). No production authorization or owner decision is created by this map.
 
----
+## Thirteen scenarios: observations, code assumptions and unknowns
 
-## Scalability Scenarios (13)
+All rates below are arithmetic scenarios, not deployed universe cardinalities.
+Provider constants are the inspected code's assumptions, not freshly verified
+current Binance plan/endpoint entitlements. No new live/network/load test was
+run for this documentation-only correction.
 
-### SC-01: Single Symbol, Single Interval (Current Baseline)
-- **Config:** BTCUSDT 1m
-- **Throughput:** 1 final bar/minute = ~60 bars/hour
-- **SQLite journal:** Trivially low load
-- **SQLite store:** Trivially low load
-- **Status:** VERIFIED SYNTHETIC — G1 WP01–WP04 tests pass (CI run #40085463732 @ `453a14d`); Binance bounded acceptance PASS for REST + WS + reconnect + gap recovery (Issue #64 ACCEPTED WITH FOLLOW-UPS)
-- **Gap:** Not production-certified; multi-symbol, Supabase cloud, and sustained uptime not validated
+| Scenario | Corrected capacity statement | Evidence / actual status | Remaining work |
+|---|---|---|---|
+| SC-01 single symbol/interval | BTCUSDT1m=1440 final bars/day,60/hour | Main G1 fixtures and #64 bounded live report accepted | Sustained unattended operation/authorization not proven |
+| SC-02 one symbol/multiple intervals | Example1m+5m+15m+1h=77 bars/hour, not four equal-rate streams. Journal/store keys include interval in the same schemas | run_pipeline defaults to one symbol/interval; multi-interval orchestration absent | Subscription planning/shared budgets; no need to invent four separate tables |
+| SC-03 four symbols1m |4×1440=5760/day,240/hour | Schemas support symbol keys; no accepted universe orchestrator | Collector/subscription sharing, global limits and load tests; four separate collectors are not a mandated design |
+| SC-04 ten symbols×three intervals | Example1m/5m/15m=760 bars/hour;30 streams does not prove a SQLite bottleneck or insufficient recovery budget | No sustained target-scale run | Measure write/latency/recovery budgets before sizing or declaring failure |
+| SC-05 eight-hour gap |480 one-minute bars fit one code-sized1000-row request if fully returned; code request cost2, not480 units | Arithmetic from recover_gap; #64 observed one recovered bar, not an eight-hour outage | Exercise actual multi-page/gap/error/weight scenarios before broad acceptance |
+| SC-06 recovery/API budget | Code MAX_SESSION_WEIGHT=1200, KLINES_WEIGHT_PER_REQUEST=2; cumulative IP-window header is separate from this job's cost | Bounded source tests/report; no induced live429/exhaustion or global multi-job budget proof | Validate current provider rules when separately authorized and design aggregate concurrency accounting |
+| SC-07 concurrent writers | SQLite serializes writes; WritePriority already gates shared DurableJournal commits and ACK writes, recovery background=True | Caller chain and test_core_waiter_precedes_next_background_writer verified; #75 zero-caller premise false | Measure high-load/multi-process fairness; no wiring/removal fix justified here |
+| SC-08 disk pressure | Uncommitted failures are not successful durability; later source recovery is conditional, not guaranteed. Source must remain until verified backup/retention approval | Error/lock/disk-fault fixtures; Draft73 archive reserve defaults10GB | No host quota/physical disk-full certification; backups/partials share disk unless isolated and budgeted |
+| SC-09 selective cloud storage | Option B already conditionally decided: local bulk authority + later capped rebuildable summaries; no routine cloud candles | #67 measured/modelled design; #65 cloud NOT TESTED | Recheck official plan limits only before actual sandbox/budget decisions; old map's2GB bandwidth/720 candles/day were incorrect |
+| SC-10 process termination/replay | Journal-first and idempotent replay/ACK fixtures, real Linux SIGKILL and #73 cross-platform process-exit tests exist | Software recovery evidence; not actual exchange-wide failure or power loss | Independent off-device restoration and operating procedure before activation |
+| SC-11 reconnect/backpressure | Bounded background jobs expose rejection/errors; source records remain durable where committed. Rejection does not itself fabricate a recovered gap | #64 forced real reconnect+harness recovery; queue saturation/retry fixtures | Reconnect storms, unattended orchestration and whole-host pressure remain unvalidated |
+| SC-12 historical data volume | One symbol1m/year=525600 bars.500B/row would be262.8MB before overhead, only an assumed representation | HistoricalLibrary is in-memory; durable bulk is Draft73 JSONL, not main HistoricalLibrary persistence | Coverage/RAM/storage/query measurements; Parquet/incremental access only if justified |
+| SC-13 concurrent research | Instance manifest differences do not prevent parallel comparison; retained-manifest/semantic identity and exact config must be specified | #46 isolated synthetic composition, #78 input contracts/repro tests; no accepted parallel historical runner | Process/CPU/memory budget and deterministic comparison protocol; no unsupported GIL throughput prediction |
 
----
+## Fresh Phase1 measurement versus extrapolation
 
-### SC-02: Single Symbol, Multiple Intervals
-- **Config:** BTCUSDT × [1m, 5m, 15m, 1h] = 4 streams
-- **Throughput:** ~70+ bars/hour
-- **Journal:** 4 separate tables or multiplexed — design unclear
-- **Store:** UNIQUE key includes `interval` — supports multi-interval
-- **Gap:** Pipeline parameterized for single interval only; multi-interval NOT designed
-- **Risk:** Journal schema supports it by design (symbol+interval keys); pipeline does not
+Draft73 head **cb7829e3e3c13c6b6433b6625f2df35d1991a65d** is technically reviewed,
+Draft/unmerged, not production-authorized. Its versioned final evidence records
+4096 synthetic rows/64 sealed segments, JSONL4507946B, manifests141378B,
+catalog831488B and journal2560000B. Archive footprint **1338.088867B/row**;
+archive13.0065s, verified backup9.2705s/restore9.8016s with exact4096 keys/hashes/
+watermark.20 core commits while archive blocked: p95=25.700ms, max33.470ms,
+not a latency SLA or a controlled comparison. Older512-row measurements belong
+to the prior source, not a second independent production trial (E-84).
 
----
+Decimal archive-only GB=symbols×1440×days×1338.0888671875/1e9:
 
-### SC-03: Multiple Symbols, Single Interval
-- **Config:** [BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT] × 1m = 4 streams
-- **Throughput:** ~240 bars/hour
-- **Issue:** No multi-symbol orchestration; `run_pipeline()` is single-symbol
-- **Gap:** Requires: 4 BinanceCollector instances, 4 JournalConsumer instances, shared store
-- **Status:** NOT DESIGNED — multi-symbol production scale explicitly flagged as gap in `04_STATE.md`
+| Symbols |30d GB|90d GB|365d GB|
+|---|---:|---:|---:|
+|10|0.5781|1.7342|7.0330|
+|100|5.7805|17.3416|70.3300|
+|500|28.9027|86.7082|351.6498|
 
----
+Exclude journal/hot/PIT/research/WAL/partials and every backup copy. The
+separately measured #67 journal+hot high-scenario estimate257.27GB/year plus
+this archive implies about608.92GB primary/year before richer evidence, not a
+measured annual allocation or approved disk budget. Two full copies total about
+1.22TB, three1.83TB across media under those assumptions. No compression claimed.
 
-### SC-04: Multi-Symbol, Multi-Interval (Production Target)
-- **Config:** 10 symbols × 3 intervals = 30 streams
-- **Throughput:** ~1,800 bars/hour
-- **SQLite write contention:** High — WAL mode helps but serial writes are bottleneck
-- **Recovery weight budget:** `MAX_SESSION_WEIGHT=1200` — insufficient for 30-stream gap recovery
-- **Gap:** Significant architectural work needed; no design for this scale
+## Protective limits, not a production backup-service capacity claim
 
----
+Default8192 inventory files/2GB/60s bounds fail closed. At default64 rows per
+segment, two files per segment plus two SQLite files permit at most4095
+segments/262080 archived rows before other limits: roughly18.2/1.82/0.364 days
+at10/100/500 one-minute symbols. Optional hot snapshot, sparse partitions and
+short runs can lower this. Time/byte constraints may bind earlier; no linear
+runtime extrapolation is certified. Larger/incremental inventories are a future
+scoped task, not an unlimited setting or a reason to impose Parquet now.
 
-### SC-05: Overnight Gap Recovery (Process Restart after 8 hours)
-- **Config:** BTCUSDT 1m × 480 missing bars
-- **Recovery:** REST `/api/v3/klines` max 1000 bars/call
-- **Weight cost:** ~480 weight units (1 per kline request + pagination)
-- **Constraint:** `MAX_SESSION_WEIGHT=1200` → sufficient for single symbol
-- **Gap:** Multi-symbol restart would exhaust weight budget
-- **Evidence:** `GapRecovery` design; `RecoveryReport.weight_cost` tracked
+Windows directory fsync unsupported→explicit DEGRADED; no hardware power-loss
+guarantee. Archive10GB reserve is not a host-protected disk quota. Bounded
+sidecar work/queue prevents synchronous callbacks, not competition for all I/O.
+Partial/quarantine files accumulate without automatic deletion; owner must
+approve cleanup/retention independently. Off-device backup remains NOT_VERIFIED;
+same-host drills and retained hashes are not independent media/custody.
+RPO/RTO remain proposed targets, not established by4096 rows.
 
----
+## Cloud design model is not current platform acceptance
 
-### SC-06: Binance Rate Limit Under Load
-- **Config:** Sustained recovery + live ingestion simultaneously
-- **Risk:** Recovery uses 1200 weight units; spot rate limit is 6000/min
-- **Design:** `MAX_SESSION_WEIGHT=1200` is conservative; `last_seen_window_weight` tracked
-- **Gap:** No weight coordination between multiple recovery jobs
-- **Status:** Designed but not live-tested
-
----
-
-### SC-07: SQLite WAL Under Concurrent Writers
-- **Config:** JournalConsumer (writes) + GapRecovery (background writes) + health reads
-- **SQLite WAL:** Supports one writer, multiple readers — not full concurrency
-- **Risk:** BackgroundLane recovery job + JournalConsumer could contend on journal SQLite
-- **`WritePriority`:** Cooperative priority designed in `lanes.py` — core commits yield over background
-- **Gap:** `WritePriority` is NOT connected in current pipeline; not tested under high concurrency
-- **Evidence:** `lanes.py` `WritePriority` class exists but is unused in `pipeline.py`
-
----
-
-### SC-08: Disk Full During Collection
-- **Config:** Continuous collection fills disk
-- **Risk:** SQLite WAL journal write fails → bar lost before store write
-- **Current behavior:** Exception propagated to pipeline → unhandled at high level
-- **Gap:** No disk-space monitoring, no graceful degradation, no alert
-- **Status:** NOT DESIGNED — G1-PLAN-02 (Durable Inbox capacity and disk-full policy) deferred
-
----
-
-### SC-09: Supabase Free Tier Capacity
-- **Config:** Continuous collection → Supabase sync
-- **Supabase Free:** 500MB storage, 2GB bandwidth/month
-- **Risk:** BTCUSDT 1m generates ~720 bars/day; with OHLCV+timestamps ~500 bytes/bar = ~360KB/day
-- **At 10 symbols:** ~3.6MB/day → Free tier exhausted in ~4.2 months
-- **Gap:** Decision on Supabase tier not made (Issue #67)
-- **Status:** `SUPABASE_STATUS = "NOT_TESTED"`
-
----
-
-### SC-10: SIGKILL During Gap Recovery
-- **Config:** Process killed during REST batch recovery
-- **Mechanism:** Bars committed to journal before store write → `LOCAL_COMMITTED` state
-- **Recovery:** On next startup, `startup_reconcile()` finds unacknowledged bars and replays
-- **Risk:** `mark_persisted` not called for killed recovery bars → duplicate recovery attempt on next start
-- **Idempotency:** `INSERT OR IGNORE` handles duplicates → safe
-- **Status:** DESIGNED — synthetic crash tests pass; not live-tested
-
----
-
-### SC-11: WebSocket Reconnect Loop (Binance Unstable)
-- **Config:** Rapid connect/disconnect cycle (e.g. network instability)
-- **Mechanism:** Exponential backoff, `MAX_RECONNECT_ATTEMPTS=10`
-- **Risk:** Multiple gap windows accumulate; recovery queue fills up
-- **BackgroundLane:** `capacity=16` — after 16 jobs, rejections counted
-- **Gap:** If 17+ gap windows accumulate, later gaps are rejected from recovery queue → `UNRESOLVED_DATA_GAP`
-- **Status:** DESIGNED — rejection counted and surfaced in health; not tested
-
----
-
-### SC-12: Historical Library at Scale (1 Year of Data)
-- **Config:** BTCUSDT 1m × 1 year = 525,600 bars
-- **Storage:** ~262MB (500 bytes/bar) in SQLite
-- **CustodyAccessor:** In-memory range queries on loaded dataset → RAM limited
-- **Gap:** No Parquet or chunked storage designed; no large-scale benchmark
-- **Status:** NOT DESIGNED — deferred
-
----
-
-### SC-13: Concurrent Strategy Evaluation
-- **Config:** 10 strategies backtesting simultaneously against same dataset
-- **Risk:** `computation_hash` is per-instance → cannot parallelize and compare results
-- **CPU:** Python GIL — thread-based parallelism limited
-- **Gap:** No parallel backtest runner designed; single-threaded assumed
-- **Status:** NOT DESIGNED
-
----
-
-## Capacity Summary
-
-| Scenario | Risk Level | Status | Mitigation |
-|---------|-----------|--------|-----------|
-| SC-01: Single symbol baseline | LOW | Verified (synthetic) | Live test needed |
-| SC-02: Multi-interval | MEDIUM | Not designed | Future work |
-| SC-03: Multi-symbol | HIGH | Not designed | G2+ work |
-| SC-04: Production scale | VERY HIGH | Not designed | G5+ work |
-| SC-05: 8-hour gap recovery | MEDIUM | Bounded acceptance PASS (Issue #64) | Issue #64 follow-ups |
-| SC-06: Rate limit under load | MEDIUM | Bounded acceptance PASS (Issue #64) | Issue #64 follow-ups |
-| SC-07: Concurrent writers | MEDIUM | WritePriority unused | Connect WritePriority |
-| SC-08: Disk full | HIGH | Not designed | G1-PLAN-02 |
-| SC-09: Supabase capacity | HIGH | Architecture decided Option B; cloud NOT_TESTED | Issue #71 Phase 1 |
-| SC-10: SIGKILL during recovery | LOW | Bounded acceptance PASS (Issue #64) | Issue #64 follow-ups |
-| SC-11: Reconnect loop | MEDIUM | Bounded acceptance PASS (Issue #64) | Issue #64 follow-ups |
-| SC-12: Historical Library at scale | MEDIUM | Not designed | Deferred |
-| SC-13: Concurrent backtest | MEDIUM | Not designed | Deferred |
-
-**Bottom line:** SC-01 has a bounded tested baseline (synthetic acceptance + bounded Binance PASS for Issue #64 REST/WS/reconnect/recovery) — it is **not production-authorized**. Production authorization requires resolution of Issue #64 follow-ups (clock sync, Supabase cloud, multi-symbol), R09 credential revocation, and explicit owner sign-off. Everything from SC-02 onward requires design and/or implementation work before production authorization.
+#67's historical design worksheet predicts selective projection footprints
+under declared row/retention/bloat/egress assumptions. Free-tier fit is conditional
+for low/base capped projections; high scenarios and sustained egress/WAL may
+exceed it. No cloud quota/role/TLS/RLS measurements were performed. Do not
+present old plan numbers or a hypothetical200MB model as a current guarantee.
+Owner-approved Option B direction remains; named sandbox, final quotas/budgets,
+retention and any paid upgrade need their own authority and fresh official facts.

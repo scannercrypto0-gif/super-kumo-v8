@@ -1,5 +1,8 @@
 # ATLAS Quant Lab — Department Interfaces & Responsibility Boundaries
-**Version:** 1.0-DRAFT | **Date:** 2026-10-24 | **HEAD:** `4e4c353`
+**Version:** 1.1-DRAFT | **Evidence snapshot:** 2026-10-24
+**Main source baseline:** `4e4c3537036bdf2b106c1a63ec65b2a9855972a7` | **Documentation:** PR #74, Draft/unmerged.
+Reviewed documentation baseline: `e4ce1c8a5d7911f52fb67e52f7e58c2e0ee5b476`; final document HEAD is in PR metadata/correction matrix, not the main-source SHA.
+Evidence IDs and scope: [09_EVIDENCE_REGISTER.md](09_EVIDENCE_REGISTER.md). No production authorization or owner decision is created by this map.
 
 ---
 
@@ -8,7 +11,7 @@
 | Data Type | Canonical Owner | Source | Consumers |
 |-----------|----------------|--------|-----------|
 | Raw OHLCV bars (live) | Live Market Data Center (B) | Binance WS | G1 Operational Store → future Secretariat |
-| Raw OHLCV bars (historical) | Historical Data Library (A) | G1 Store or bulk download | Strategy Factory (C), Research Lab (F) |
+| Raw OHLCV bars (historical) | Historical Data Library (A) | Authorized offline fixtures; future versioned export, no automatic G1 feed | Strategy Factory (C), Research Lab (F) |
 | Versioned indicator results | Strategy Factory (C) | Historical Library | Research Lab (F), future Scanner (H) |
 | Strategy definitions | Strategy Factory (C) | Owner-declared | Research Lab (F), Virtual Traders (I) |
 | Paper trade records | Virtual Traders (I) | Trader decisions | Research Lab (F), Monitoring (K) |
@@ -27,7 +30,7 @@ accessor.range_query(
     end_ms: int,
     decision_cutoff_ms: int,
     *,
-    version: int = 1,
+    version: int | None = None,
     require_complete: bool = True
 ) -> list[HistoricalBar]
 ```
@@ -37,24 +40,25 @@ accessor.range_query(
 
 ### B → M: DurableJournal write
 ```python
-journal.commit(bar: MarketBar) -> None        # WAL commit before ACK
-journal.replay(symbol, interval, pending_only, limit) -> list[MarketBar]
-journal.acknowledge(symbol, interval, bar_open) -> None
+journal.commit(bar: MarketBar, *, background=False) -> bool  # True=new row, False=duplicate
+journal.replay(symbol=None, interval=None, final_only=True, *, pending_only=False, limit=None) -> list[MarketBar]
+journal.mark_persisted(stable_key: str) -> None  # after store success; no acknowledge() method
 ```
 
 ### M → M: OperationalStore upsert
 ```python
-store.write_bar(bar: MarketBar) -> None       # UNIQUE(symbol,interval,bar_open)
-store.get_bars(symbol, interval, limit) -> list[MarketBar]
-store.get_latest_bar(symbol, interval) -> Optional[MarketBar]
+store.upsert(bar: MarketBar) -> bool  # UNIQUE(symbol,interval,bar_open)
+store.get_stored_keys(symbol, interval) -> set
+store.get_range(symbol, interval)  # returns min/max stored opens
 ```
 
 ### B → M: GapRecovery
 ```python
 recover_gap(
     symbol, interval, gap_start_ms, gap_end_ms,
-    journal, store, session_weight_used
-) -> RecoveryReport  # status: FULL|PARTIAL|UNRESOLVED_DATA_GAP|HTTP_ERROR
+    existing_keys: set
+) -> tuple[list[MarketBar], RecoveryReport]
+# pipeline._run_gap_recovery handles commit(background=True), upsert, mark_persisted
 ```
 
 ### C → C: IndicatorLibrary (V1)
@@ -65,7 +69,9 @@ indicator.compute(
     start_ms: int,
     end_ms: int,
     decision_cutoff_ms: int,
-    version: int = 1
+    *,
+    version: int | None = None,
+    require_complete: bool = True
 ) -> tuple[list[IndicatorResult], IndicatorManifest]
 ```
 
@@ -73,7 +79,10 @@ indicator.compute(
 ```python
 StrategyDefinition.from_json(raw: str) -> StrategyDefinition  # validates + canonicalizes
 definition.digest  # SHA-256 of canonical JSON
-definition.bind_indicators(registry) -> BoundStrategy
+bind_evaluation(definition, accessor, dataset_id, version, start_ms, end_ms,
+                decision_cutoff_ms, *, registry=None) -> EvaluationBinding
+candidate_grid(definition, axes, *, registry=None, maximum=256) -> tuple
+# AttemptRecorder(sink): caller-owned persist-or-raise port, not a durable journal
 ```
 
 ---
@@ -103,9 +112,9 @@ definition.bind_indicators(registry) -> BoundStrategy
 - **I (Trader) owns:** final entry decision with complete mandatory evidence
 - **Rule:** Scanner READY ≠ trade permission; trader decides independently
 
-### C ↔ F: Research Isolation Boundary (DESIGNED — not implemented)
+### C ↔ F: Research Isolation Boundary (partial contracts implemented)
 - **C owns:** strategy definitions, indicator results, provenance
-- **F owns:** experiment registration, paired evaluation, holdout custody
+- **F owns:** experiment registration, paired evaluation, holdout custody. Those components have unmerged isolated implementations; accepted-main orchestration is missing.
 - **Rule:** Holdout data must never be accessible during strategy development
 - **Rule:** Historical development / OOS / forward sections must remain separate
 
@@ -115,14 +124,14 @@ definition.bind_indicators(registry) -> BoundStrategy
 
 | Dependency | Direction | Risk |
 |-----------|----------|------|
-| `research_wp_r0` → `src/aql` | NONE — verified by dep_guard | ✅ Safe |
+| `research_wp_r0` → `src/aql` | No cross-import in inspected main; explicit static guard | Import policy only, not a runtime security sandbox |
 | `src/aql` → `research_wp_r0` | NONE | ✅ Safe |
 | Secretariat → Trader | Secretariat routes TO Trader | ✅ One-way |
 | Scanner → Trader | Scanner routes TO Trader | ✅ One-way |
 | Trader → Research Lab | Trader produces data FOR Lab | ✅ One-way |
 | Research Lab → Strategy Factory | Lab consumes FROM Factory | ✅ One-way |
 
-**No circular dependencies identified** in existing code or designed interfaces.
+No runtime cross-import cycle was identified in inspected main. Proposed future feedback loops need versioned immutable artifacts, queues, authority limits and independent schedules; arrows alone do not prove absence of runtime coupling.
 
 ---
 
@@ -151,3 +160,52 @@ definition.bind_indicators(registry) -> BoundStrategy
 | Entry/exit trade decision | Owning Virtual Trader | `01_CONTRACT.md` DATA-07 |
 | Indicator technical validity | Shared Indicator Box manager | G1-ARCH-21 (designed) |
 | Strategy-manifest eligibility | Trader's Secretary | G1-ARCH-22 (designed) |
+
+## 7. Storage, research ancestry and ownership proposals
+
+- #73 archive reads journal read-only; its catalog ACK is independent of existing local/remote ACKs. No pipeline activation or decision capture is implied. Optional backup snapshots are individually coherent, not a global transaction.
+- #46 DurableTrialJournal.record_attempt requires typed Attempt plus event_id; main AttemptRecorder emits dictionaries. These cannot be connected implicitly. #78 prepares immutable inputs only and leaves successful preparation PENDING, not COMPLETE.
+- B owns acquisition/freshness/provider budgets; A owns versioned data eligibility/coverage; C owns immutable definitions and reusable indicator algorithms; F owns independent evaluation/contamination accounting; I alone owns trade entry/exit. M owns persistence/recovery primitives, not trading decisions.
+- Proposed PIT decision chain: I produces immutable decisions/outcomes, G routes, M persists, F evaluates. Runtime producer/journal and coverage policy remain unimplemented and need a scoped package.
+- E stays under C (#72). J supplies broad cross-market context; E supplies asset-specific research. AssetOutlook consumers must opt in, enforce TTL/validation/missingness and never turn an outlook directly into an order/risk command. F validates claims independently. K observes, L/owner approves policy.
+- Lightweight trigger watch is future: shared streams, completed time-window semantics, confirmation/contradiction/non-occurrence/material-change evidence, bounded deduplicated reassessment jobs. Heavy analysis stays outside core queues. UNKNOWN data is not a failed thesis.
+- OD-02/03/05 recommend shared computation specifications with separate research/live receipts, an offline artifact bridge first, and distinct broad-context versus specialist-outlook contracts. These are proposals, not new implementation authorization.
+
+## 8. Thirteen-area dependency map
+
+Solid arrows denote inspected main software inputs. Dotted arrows denote
+designed/future artifact, policy or oversight relationships, not deployed
+services, implementation authorization or synchronous calls. E remains under C;
+D placement as an F hypothesis function is a recommendation, not an approved
+reorganization.
+
+```mermaid
+graph LR
+  A["A Historical Data Library"] --> C["C Strategy Factory"]
+  M["M Shared Infrastructure & Storage"] --> B["B Live Market Data Center"]
+  B -. "reviewed offline export, OD-03" .-> A
+  C -. "frozen definitions / evidence" .-> F["F Research Lab"]
+  D["D Strategy Explorer"] -. "hypothesis proposals" .-> F
+  C -. "current architectural parent" .-> E["E Asset Intelligence Lab"]
+  E -. "outlook for independent evaluation" .-> F
+  E -. "read-only specialist outlook" .-> J["J Market Intelligence"]
+  J -. "versioned context" .-> G["G Secretariat Office"]
+  B -. "observations" .-> H["H Opportunity Scanner"]
+  H -. "qualified candidates" .-> G
+  G -. "routes evidence; never decides" .-> I["I Virtual Traders"]
+  I -. "immutable outcomes" .-> F
+  B --> K["K Monitoring & Dashboard"]
+  M -. "storage telemetry" .-> K
+  F -. "reviewed research reports" .-> K
+  I -. "paper lifecycle records" .-> K
+  L["L Governance & Orchestration"] -. "owner gates / policies" .-> C
+  L -. "owner gates / policies" .-> F
+  L -. "owner gates / policies" .-> I
+  L -. "owner gates / policies" .-> M
+```
+
+B→K refers only to existing structured health; a graphical dashboard is future.
+Operational indicators/secretarial subscriptions still require the separately
+reviewed live Indicator Box boundary. M supplies shared persistence primitives;
+it does not own trading eligibility. Future feedback/reassessment topics require
+bounded queues, idempotency and stable versions, never an implicit import cycle.
