@@ -1,0 +1,56 @@
+"""Offline durable event journal; no trading, price retrieval or cloud dependencies."""
+from dataclasses import asdict
+import hashlib
+import json
+import os
+from pathlib import Path
+from .positions import PositionContractError, PositionEvent, PositionLedger
+
+class JournalIntegrityError(PositionContractError): pass
+
+class DurablePositionJournal:
+    """Single-writer append-only JSONL with fsync; torn trailing records fail closed.
+
+    Caller must serialize writers externally; no cross-process locking is claimed.
+    """
+    def __init__(self, path):
+        self.path=Path(path)
+        self.ledger=PositionLedger()
+        self._tail='0'*64
+        self._replay()
+    def _replay(self):
+        if not self.path.exists(): return
+        with self.path.open('rb') as f:
+            for number,raw in enumerate(f,1):
+                if not raw.endswith(b'\\n'): raise JournalIntegrityError(f'torn record at line {number}')
+                try:
+                    row=json.loads(raw)
+                    if set(row)!= {'previous','event','digest'} or row['previous']!=self._tail:
+                        raise JournalIntegrityError(f'chain mismatch at line {number}')
+                    material=json.dumps({'previous':row['previous'],'event':row['event']},sort_keys=True,separators=(',',':')).encode()
+                    if hashlib.sha256(material).hexdigest()!=row['digest']:
+                        raise JournalIntegrityError(f'checksum mismatch at line {number}')
+                    e=PositionEvent(**row['event'])
+                    if self.ledger.append(e)!='inserted': raise JournalIntegrityError(f'duplicate record at line {number}')
+                    self._tail=row['digest']
+                except (ValueError,TypeError,KeyError,UnicodeError,PositionContractError) as exc:
+                    raise JournalIntegrityError(f'invalid journal line {number}') from exc
+    def append(self,event):
+        if not isinstance(event,PositionEvent): raise PositionContractError('invalid event')
+        # Validate against a disposable replay before touching durable bytes.
+        candidate=PositionLedger()
+        for prior in self.ledger.events.values(): candidate.append(prior)
+        result=candidate.append(event)
+        if result=='duplicate': return 'duplicate'
+        row={'previous':self._tail,'event':asdict(event)}
+        material=json.dumps(row,sort_keys=True,separators=(',',':')).encode()
+        row['digest']=hashlib.sha256(material).hexdigest()
+        encoded=(json.dumps(row,sort_keys=True,separators=(',',':'))+'\\n').encode()
+        self.path.parent.mkdir(parents=True,exist_ok=True)
+        with self.path.open('ab') as f:
+            f.write(encoded)
+            f.flush()
+            os.fsync(f.fileno())
+        self.ledger=candidate
+        self._tail=row['digest']
+        return 'inserted'
