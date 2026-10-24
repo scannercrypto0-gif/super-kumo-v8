@@ -42,4 +42,14 @@ class JournalTests(unittest.TestCase):
             with self.assertRaises(JournalIntegrityError):
                 second.append(self.e('other','opened',1))
             self.assertEqual(DurablePositionJournal(p).ledger.status('p1',10),'open')
+    def test_same_size_tamper_rejected_before_append(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/'journal.jsonl'
+            j=DurablePositionJournal(p)
+            j.append(self.e('start','opened',0))
+            data=p.read_bytes()
+            self.assertIn(b'opened',data)
+            p.write_bytes(data.replace(b'opened',b'closed'))
+            with self.assertRaises(JournalIntegrityError):
+                j.append(self.e('later','closed',10,'exit'))
 if __name__=='__main__':unittest.main()
