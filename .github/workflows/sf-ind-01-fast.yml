@@ -49,20 +49,15 @@ jobs:
         # Calls the extracted, testable guard module — same code as the tests.
         # Previously: inline python -c with names[0]-only bug (caught research_wp_r0
         # as a false positive AND missed multi-alias imports like 'import os, numpy').
-        run: |
-          python research_wp_r0/_dep_guard.py research_wp_r0/indicator_library.py
+        run: python research_wp_r0/_dep_guard.py research_wp_r0/indicator_library.py
 
       - name: Run SF-IND-01 indicator tests
-        run: |
-          python -m pytest tests/test_sf_ind_01.py -v \
-            --tb=short \
-            --junit-xml=test-results-sf-ind-01.xml
+        # Single-line: backslash continuation is bash-only; PowerShell (Windows) rejects it.
+        run: python -m pytest tests/test_sf_ind_01.py -v --tb=short --junit-xml=test-results-sf-ind-01.xml
 
       - name: Run SF-IND-01 dependency-guard regression tests
-        run: |
-          python -m pytest tests/test_sf_dep_guard.py -v \
-            --tb=short \
-            --junit-xml=test-results-sf-dep-guard.xml
+        # Single-line: same Windows/PowerShell compatibility reason.
+        run: python -m pytest tests/test_sf_dep_guard.py -v --tb=short --junit-xml=test-results-sf-dep-guard.xml
 
       - name: Upload test results
         if: always()
