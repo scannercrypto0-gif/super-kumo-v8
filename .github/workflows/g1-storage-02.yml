@@ -1,0 +1,49 @@
+name: G1-STORAGE-02 Local archive acceptance
+on:
+  pull_request:
+    branches: [main]
+    paths: ["src/aql/archive/**", "src/aql/journal/**", "src/aql/models/bar.py", "src/aql/lanes.py", "src/aql/recovery/gap_recovery.py", "tests/test_g1_storage_02.py", "scripts/measure_g1_storage_02.py", "pyproject.toml", ".github/workflows/g1-storage-02.yml"]
+  push:
+    branches: [feat/g1-storage-02-local-archive]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  archive:
+    name: Archive (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.12", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Explicit existing dev/runtime dependencies (CI only)
+        run: python -m pip install -e ".[dev]"
+      - name: Exact imported archive checkout
+        run: python -B -c "import aql.archive.local,pathlib; p=pathlib.Path(aql.archive.local.__file__).resolve(); print(p); assert pathlib.Path.cwd() in p.parents"
+      - name: Exact source and environment evidence
+        shell: bash
+        run: |
+          git rev-parse HEAD | tee storage02-source.txt
+          git rev-parse 'HEAD^{tree}' | tee -a storage02-source.txt
+          python --version | tee -a storage02-source.txt
+          python -m pip freeze | tee -a storage02-source.txt
+      - name: Local-only archive and restore acceptance
+        run: python -B -m pytest tests/test_g1_storage_02.py -v --tb=short --junitxml=storage02.xml
+      - name: Require complete Phase1 acceptance without skips
+        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('storage02.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==60; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: storage02-${{ matrix.os }}-${{ matrix.python }}
+          path: |
+            storage02.xml
+            storage02-source.txt
