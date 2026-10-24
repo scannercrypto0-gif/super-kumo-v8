@@ -116,4 +116,28 @@ class JournalTests(unittest.TestCase):
             with self.assertRaises(JournalIntegrityError):
                 DurablePositionJournal(p).append(self.e('start','opened',0))
             self.assertFalse(p.exists())
+    def test_partial_event_after_valid_record_fails_closed(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/'journal.jsonl'
+            j=DurablePositionJournal(p)
+            j.append(self.e('start','opened',0))
+            intact=p.read_bytes()
+            with p.open('ab') as handle:
+                handle.write(b'{"previous":"incomplete"')
+                handle.flush()
+            with self.assertRaises(JournalIntegrityError):
+                DurablePositionJournal(p)
+            self.assertEqual(p.read_bytes()[:len(intact)],intact)
+            self.assertEqual(len(p.read_bytes()),len(intact)+len(b'{"previous":"incomplete"'))
+    def test_partial_event_does_not_silently_repair_on_append(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/'journal.jsonl'
+            j=DurablePositionJournal(p)
+            j.append(self.e('start','opened',0))
+            with p.open('ab') as handle:
+                handle.write(b'{"partial":')
+            before=p.read_bytes()
+            with self.assertRaises(JournalIntegrityError):
+                j.append(self.e('exit','closed',10,'exit'))
+            self.assertEqual(p.read_bytes(),before)
 if __name__=='__main__':unittest.main()
