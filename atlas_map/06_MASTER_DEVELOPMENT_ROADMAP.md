@@ -19,17 +19,31 @@
 | Task | Issue/PR | Owner | Dependency | Estimate |
 |------|---------|-------|-----------|---------|
 | R09: Document V7 credential revocation | `08_RISKS.md` | OWNER ACTION | None | 1 day |
-| Controlled integration acceptance (live Binance) | Issue #64 | Dev | R09 | 3–5 days |
-| Supabase sandbox acceptance | Issue #65 | Dev | Issue #64 | 2–3 days |
-| Supabase capacity decision | Issue #67 | Owner | Issue #65 | 1 day |
+| Controlled integration acceptance (live Binance) | Issue #64 | Dev | R09 | BOUNDED PASS — follow-ups open |
+| Supabase sandbox acceptance | Issue #65 | Dev | Issue #64 | Open — pending Supabase cloud authorization |
+| Supabase storage architecture | Issue #67 | Owner | — | **DECIDED** — Option B approved; Phase 1 #71 authorized; ADR pending |
 | Windows production throughput benchmark | `04_STATE.md` gate | Dev | Issue #64 | 1–2 days |
 
 ### P1 — Phase 1 Archive & Research Data Path
 
 | Task | Issue | Dependency | Estimate |
 |------|-------|-----------|---------|
-| Phase 1 local archive, PIT integrity, backup/restore | Issue #71 | Issue #64 | 5–8 days |
+| Phase 1 local archive, PIT integrity, backup/restore | Issue #71 / PR #73 (DRAFT) | Issue #67 decision ✅ | In progress — PR #73 open, not merged |
 | Operational Store → Historical Library bridge | (new) | Issue #71 | 3–5 days |
+
+---
+
+## Strategy Factory Foundations — COMPLETED IN MAIN
+
+> These are merged and in main @ `4e4c353`. They are isolated research foundations — not yet integrated into a working Research Lab.
+
+| Deliverable | PR | Merged SHA | Status |
+|------------|-----|-----------|--------|
+| Indicator Library V2 (6 OHLCV indicators, `VectorResult`) | PR #68 | `ea9cf19a` | **VERIFIED MAIN** |
+| Strategy Definition JSON V1 + PIT provenance binding | PR #69 | `4e4c353` | **VERIFIED MAIN** |
+| Historical Library (CustodyAccessor) | earlier | in main | **VERIFIED MAIN** |
+| Indicator Library V1 | earlier | in main | **VERIFIED MAIN** |
+| Dependency Guard (`_dep_guard.py`) | earlier | in main | **VERIFIED MAIN** |
 
 ---
 
@@ -124,17 +138,19 @@
 
 ## Time Estimates Summary
 
-| Stage | Conservative | Base | Optimistic |
-|-------|-------------|------|-----------|
-| G1 Completion (P0 gates) | 8–10 days | 6–8 days | 4–5 days |
-| G2 Research Foundation | 55–75 days | 40–55 days | 30–40 days |
-| G3 First Trader | 30–50 days | 25–40 days | 20–30 days |
-| G4 Strategy Promotion | 20–30 days | 15–25 days | 10–18 days |
-| G5 Multi-Asset | 40–60 days | 30–45 days | 20–30 days |
-| G6 Dashboard & Scale | 30–45 days | 22–35 days | 15–25 days |
-| **TOTAL** | **183–270 days** | **138–208 days** | **99–148 days** |
+> **⚠️ Uncertainty Notice:** These estimates are based on task-count and per-task heuristics only. They do NOT reflect measured historical velocity, parallel work capacity, review/integration overhead, or owner decision latency. Treat as directional order-of-magnitude guidance, not a project schedule. Critical dependencies (R09, live integration acceptance, owner decisions on OD-01–07) are not factored into the lower bounds.
 
-*Note: Estimates assume one focused engineer. Parallel work between Research and G1 completion possible.*
+| Stage | Conservative | Base | Optimistic | Key Assumptions |
+|-------|-------------|------|-----------|----------------|
+| G1 Completion (P0 gates) | 8–10 days | 6–8 days | 4–5 days | R09 done; Issue #64 follow-ups clear; no blockers |
+| G2 Research Foundation | 55–75 days | 40–55 days | 30–40 days | WP-R0→R7 sequential; one engineer; no scope changes |
+| G3 First Trader | 30–50 days | 25–40 days | 20–30 days | Secretariat+Scanner+Trader sequential |
+| G4 Strategy Promotion | 20–30 days | 15–25 days | 10–18 days | OOS validation framework in place |
+| G5 Multi-Asset | 40–60 days | 30–45 days | 20–30 days | Multi-symbol infrastructure designed |
+| G6 Dashboard & Scale | 30–45 days | 22–35 days | 15–25 days | Operational records available |
+| **TOTAL** | **183–270 days** | **138–208 days** | **99–148 days** | **All assumptions hold simultaneously** |
+
+*Velocity assumption: one focused engineer, sequential implementation, no major rework. Parallel work between Research and G1 completion may reduce total by 10–20%. Owner decision latency not included.*
 
 ---
 

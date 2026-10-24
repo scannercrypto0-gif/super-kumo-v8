@@ -10,8 +10,8 @@
 - **Throughput:** 1 final bar/minute = ~60 bars/hour
 - **SQLite journal:** Trivially low load
 - **SQLite store:** Trivially low load
-- **Status:** VERIFIED — 506 synthetic tests pass
-- **Gap:** Not tested with live network; proxy blocks live Binance
+- **Status:** VERIFIED SYNTHETIC — G1 WP01–WP04 tests pass (CI run #40085463732 @ `453a14d`); Binance bounded acceptance PASS for REST + WS + reconnect + gap recovery (Issue #64 ACCEPTED WITH FOLLOW-UPS)
+- **Gap:** Not production-certified; multi-symbol, Supabase cloud, and sustained uptime not validated
 
 ---
 
@@ -137,13 +137,13 @@
 | SC-02: Multi-interval | MEDIUM | Not designed | Future work |
 | SC-03: Multi-symbol | HIGH | Not designed | G2+ work |
 | SC-04: Production scale | VERY HIGH | Not designed | G5+ work |
-| SC-05: 8-hour gap recovery | MEDIUM | Designed; not live-tested | Issue #64 |
-| SC-06: Rate limit under load | MEDIUM | Designed; not live-tested | Issue #64 |
+| SC-05: 8-hour gap recovery | MEDIUM | Bounded acceptance PASS (Issue #64) | Issue #64 follow-ups |
+| SC-06: Rate limit under load | MEDIUM | Bounded acceptance PASS (Issue #64) | Issue #64 follow-ups |
 | SC-07: Concurrent writers | MEDIUM | WritePriority unused | Connect WritePriority |
 | SC-08: Disk full | HIGH | Not designed | G1-PLAN-02 |
-| SC-09: Supabase capacity | HIGH | NOT_TESTED | Issue #67 |
-| SC-10: SIGKILL during recovery | LOW | Designed; synthetic tested | Issue #64 |
-| SC-11: Reconnect loop | MEDIUM | Designed; not tested | Issue #64 |
+| SC-09: Supabase capacity | HIGH | Architecture decided Option B; cloud NOT_TESTED | Issue #71 Phase 1 |
+| SC-10: SIGKILL during recovery | LOW | Bounded acceptance PASS (Issue #64) | Issue #64 follow-ups |
+| SC-11: Reconnect loop | MEDIUM | Bounded acceptance PASS (Issue #64) | Issue #64 follow-ups |
 | SC-12: Historical Library at scale | MEDIUM | Not designed | Deferred |
 | SC-13: Concurrent backtest | MEDIUM | Not designed | Deferred |
 

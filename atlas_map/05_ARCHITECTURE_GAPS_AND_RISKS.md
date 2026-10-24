@@ -5,13 +5,13 @@
 
 ## 1. Critical Gaps (Block Production Authorization)
 
-### GAP-01: Live Integration Not Validated
-- **Severity:** CRITICAL
+### GAP-01: Live Integration — Bounded Binance Accepted; Supabase and Production Not Validated
+- **Severity:** HIGH (downgraded from CRITICAL — bounded Binance acceptance complete)
 - **Departments:** B, M
-- **Description:** The entire G1 operational pipeline has only been tested with synthetic data and mock connections. No live Binance WebSocket or REST connection has been validated in production conditions.
-- **Impact:** Unknown behavior under real network conditions — reconnects, rate limits, Binance API changes, WebSocket message format drift.
-- **Evidence:** `operational_store.py` `SUPABASE_STATUS = "NOT_TESTED"`; Issue #64, #65 open.
-- **Remediation:** Issue #64 (controlled non-production integration acceptance). Owner authorization required before live access.
+- **Description:** Issue #64 bounded acceptance passed for Binance REST + WebSocket + disconnect/reconnect/gap recovery (disposition: **ACCEPTED WITH FOLLOW-UPS**, reported in Issue #64 comment by owner, 2026-10-24). This is NOT production certification. Supabase cloud path remains untested (`SUPABASE_STATUS = "NOT_TESTED"`). Full production readiness (multi-symbol, cloud storage, 24/7 uptime) is not yet validated.
+- **Impact:** Binance public-endpoint behavior under bounded conditions is confirmed. Unknown behavior under sustained production conditions — prolonged uptime, rate-limit exhaustion, Supabase cloud writes, multi-symbol concurrency.
+- **Evidence:** `[REPORTED — Issue #64 owner comment]` Binance bounded PASS; `[VERIFIED MAIN]` `operational_store.py` `SUPABASE_STATUS = "NOT_TESTED"`; Issue #64 open (follow-ups pending), Issue #65 open.
+- **Remediation:** Issue #64 follow-up acceptance tasks (clock, Supabase, multi-symbol). Owner authorization required before live access.
 
 ### GAP-02: Holdout Custody Not Implemented
 - **Severity:** CRITICAL
@@ -48,13 +48,13 @@
 - **Evidence:** `SUPABASE_STATUS = "NOT_TESTED"` in `operational_store.py`; Issue #67 open.
 - **Remediation:** Issue #65 (Supabase sandbox acceptance), Issue #67 (capacity decision).
 
-### GAP-06: Research Lab Has Zero Implementation
-- **Severity:** HIGH
+### GAP-06: Research Lab — Synthetic Foundations Merged; Integrated Operational Research Not Implemented
+- **Severity:** HIGH (revised — isolated research foundations exist in main; not yet integrated or accepted)
 - **Departments:** F
-- **Description:** The Research Lab — the primary business-value-generating component — has no implemented code. All 22+ WP-R0 through WP-R40 issues are open.
-- **Impact:** No backtesting, no strategy evaluation, no research reproducibility — the core purpose of the platform is not yet achievable.
-- **Evidence:** Issues #17–#46 open; no research code in main.
-- **Remediation:** Requires systematic WP-R0 through WP-R9 implementation (Batch-01).
+- **Description:** `research_wp_r0/` contains 5 merged Python modules in main (`4e4c353`): `historical_library.py`, `indicator_library.py`, `indicator_library_v2.py` (PR #68, merged `ea9cf19a`), `strategy_definition.py` (PR #69, merged `4e4c353`), `_dep_guard.py`. These are isolated research foundations — PIT-correct CustodyAccessor, typed Indicator Library V1+V2, Strategy Definition with SHA-256 provenance. They are NOT an integrated Research Lab with backtesting, holdout custody, or trial registry. WP-R6 (holdout), WP-R7 (trial journal), WP-R1 (backtest engine), and Strategy Batch-01 are not implemented.
+- **Impact:** No backtesting, no out-of-sample validation, no holdout protection, no pre-registered trials — the end-to-end research workflow is not yet achievable. The core strategic gap remains.
+- **Evidence:** `[VERIFIED MAIN @ 4e4c353]` — `research_wp_r0/*.py` present; PRs #68, #69 merged. `[NOT IMPLEMENTED]` — WP-R1, WP-R6, WP-R7, Batch-01; Issues #17–#46 open.
+- **Remediation:** WP-R6 (holdout) is the critical prerequisite before any OOS claim. Then WP-R1 (backtest engine), WP-R7 (trial registry).
 
 ### GAP-07 (Issue #75): `WritePriority` Not Wired in Pipeline
 
@@ -74,13 +74,13 @@
 - **Evidence:** `04_STATE.md` Outstanding gates — Windows production throughput.
 - **Remediation:** Dedicated Windows production throughput test.
 
-### GAP-08: `manifest_integrity_hash` Wall-Clock Dependency
-- **Severity:** MEDIUM-HIGH
+### GAP-08: `manifest_integrity_hash` — Probable Wall-Clock Dependency (Hypothesis, Not Confirmed)
+- **Severity:** MEDIUM (revised from MEDIUM-HIGH — pending independent code verification)
 - **Departments:** A, C
-- **Description:** `manifest_integrity_hash` includes `created_at_ms` (wall-clock at validate_bars time). This means the hash is non-deterministic across `HistoricalLibrary` instances — two instances processing the same dataset will produce different hashes.
-- **Impact:** Cannot use `manifest_integrity_hash` to verify reproducibility across processes or machines. Affects audit trail reliability.
-- **Evidence:** `historical_library.py` docstring; `indicator_library.py` `computation_hash` note.
-- **Remediation:** Document the constraint explicitly. Consider a `content_hash` (deterministic) alongside `manifest_integrity_hash` (instance fingerprint). See OD-01.
+- **Description:** Based on docstring evidence in `historical_library.py`, `manifest_integrity_hash` appears to include `created_at_ms` (wall-clock at validate_bars time), which would make it non-deterministic across `HistoricalLibrary` instances. This is inferred from documentation, not independently verified by tracing the hash computation code path.
+- **Impact (if confirmed):** Cannot use `manifest_integrity_hash` to verify reproducibility across separate processes or machines. Affects cross-session audit trail.
+- **Evidence:** `[DOCUMENTED — docstring in historical_library.py; NOT independently code-verified]` — hash semantics stated in documentation; `computation_hash` in `indicator_library.py` scoped to CustodyAccessor instance per docstring. Precise code semantics require independent verification before treating as confirmed defect.
+- **Remediation:** Independent code trace of `manifest_integrity_hash` computation path (owner action). If confirmed non-deterministic: add `content_hash` (deterministic, SHA-256 of bar content only) without changing existing field. See OD-01.
 
 ---
 
@@ -122,8 +122,8 @@
 |---------|-------------|----------|-------------------|
 | R01 | PIT leakage — future bars in research | CRITICAL | Mitigated by `decision_cutoff_ms`; not live-tested |
 | R02 | DATA-07 violation — Secretariat making trade decisions | HIGH | Designed against; not yet implemented |
-| R03 | Live data quality — gaps, duplicates, clock skew | HIGH | GAP RECOVERY implemented; not live-tested |
-| R04 | Supabase capacity exhaustion | HIGH | NOT_TESTED — Issue #67 |
+| R03 | Live data quality — gaps, duplicates, clock skew | HIGH | GAP RECOVERY implemented; bounded Binance acceptance PASS (Issue #64) |
+| R04 | Supabase capacity exhaustion | HIGH | Architecture Option B owner-approved (Issue #67); Phase 1 #71 authorized; Supabase cloud NOT_TESTED |
 | R05 | Holdout contamination | CRITICAL | Architecture designed; WP-R6 not implemented |
 | R06 | Overfitting — no OOS validation | CRITICAL | Designed; not implemented |
 | R07 | Strategy promotion without evidence | HIGH | Governance protocol designed; no enforcement code |

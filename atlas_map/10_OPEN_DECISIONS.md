@@ -131,17 +131,19 @@ All decisions require **owner approval** before implementation.
 
 ---
 
-## OD-07: Supabase Tier Selection
+## OD-07: Storage Architecture — OWNER DECISION MADE
 
-**Objective:** Decide which Supabase tier to use based on expected data volume.
+**Decision:** Owner conditionally approved **Option B** (Issue #67 owner comment, 2026-10-24):
+- **Local authoritative store:** Durable SQLite journal + full PIT/outcome evidence — local, independently backed up
+- **Immutable bulk archive:** Local, independently backed up
+- **Supabase:** Only bounded/rebuildable dashboard summaries — no routine cloud candle archive
+- **Phase 1 authorized:** Issue #71 (local archive + integrity manifests + restore/backup contracts + isolation/failure tests) — see PR #73 (OPEN/DRAFT, not merged)
 
-**Context:** At 10 symbols × 1m interval, data grows ~3.6MB/day. Supabase Free tier (500MB) would be exhausted in ~4.2 months. Issue #67 tracks this decision.
+**What this changes:**
+- OD-07 is no longer "undecided" — architecture direction is set
+- Early ADR-004 (Supabase-central authority) must be superseded by a new ADR — see Issue #67
+- Supabase Free tier adequate for base projections (200MB/year dashboard summaries); cloud candle storage explicitly rejected
 
-**Options:**
-- **A — Supabase Free:** Acceptable for proof-of-concept / first 4 months.
-- **B — Supabase Pro ($25/month):** 8GB storage, suitable for long-term single-cluster use.
-- **C — Self-hosted PostgreSQL:** Full control, no recurring cost, but DevOps overhead.
+**Outstanding:** Phase 1 (#71) implementation and ADR proposal are not yet merged or accepted. Supabase cloud NOT_TESTED. No Supabase cloud authorization granted.
 
-**Recommendation:** Start with A for proof-of-concept; upgrade to B when proof-of-concept validates the approach.
-
-**Status:** AWAITING OWNER DECISION (Issue #67)
+**Status:** OWNER DECISION MADE — Phase 1 execution in progress (PR #73 Draft) | Issue #67 OPEN (pending ADR + Phase 1 acceptance)
