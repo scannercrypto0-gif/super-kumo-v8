@@ -78,6 +78,19 @@ class AdmissionTests(unittest.TestCase):
                 reopened.record_attempt(event)
             self.assertEqual(len(reopened.snapshot()[0]), 1)
 
+    def test_protected_policy_cannot_be_downgraded_by_reopen(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "attempts.sqlite"
+            AttemptLedger(path, require_admission=True)
+            reopened = AttemptLedger(path, require_admission=False)
+            self.assertTrue(reopened.require_admission)
+            event = {"state": "PENDING", "family_id": "Family1",
+                     "candidate_id": "Candidate1", "input_digest": "f" * 64,
+                     "strategy_digest": "a" * 64}
+            with self.assertRaisesRegex(ValueError, "admission"):
+                reopened.record_attempt(event)
+            self.assertEqual(reopened.snapshot()[0], [])
+
     def test_transaction_admission_rejects_without_append(self):
         with tempfile.TemporaryDirectory() as tmp:
             ledger = AttemptLedger(Path(tmp) / "attempts.sqlite")
