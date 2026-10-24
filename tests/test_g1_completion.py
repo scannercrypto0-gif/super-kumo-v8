@@ -149,7 +149,7 @@ def test_429_cooldown_without_retrying_endpoint():
 def connection(inserted=True):
     conn = MagicMock()
     cursor = conn.cursor.return_value.__enter__.return_value
-    cursor.fetchone.return_value = (0,) if inserted else None
+    cursor.fetchone.side_effect = [(0,)] if inserted else [None, (bar().compute_checksum(),)]
     return conn
 
 
@@ -307,6 +307,11 @@ def test_disposable_postgres_sandbox():
     store = PostgresSandboxStore(writer, sandbox=True)
     assert store.upsert(bar())
     assert not store.upsert(bar())
+    conflicting = bar()
+    conflicting.close = 10.25
+    conflicting.with_checksum()
+    with pytest.raises(StoreUnavailable):
+        store.upsert(conflicting)
     with connect() as conn:
         row = conn.execute("SELECT count(*), min(source), min(ingested_at) "
                            "FROM aql_sandbox.market_bars").fetchone()
@@ -320,4 +325,110 @@ def test_clock_ahead_source_is_fail_closed(tmp_path):
         c._on_message(Mock(), json.dumps({"E":1010001,"k":{"x":False}}))
     assert c.health_state == "CLOCK_UNCERTAIN"
     assert c.metrics.error_count == 1
+    assert not j.replay()
+
+def test_conflicting_postgres_duplicate_is_not_acknowledged():
+    conn = connection(False)
+    conn.cursor.return_value.__enter__.return_value.fetchone.side_effect = [None, ("other-hash",)]
+    with pytest.raises(StoreUnavailable):
+        PostgresSandboxStore(lambda:conn, sandbox=True).upsert(bar())
+    conn.commit.assert_not_called()
+    conn.rollback.assert_called_once()
+
+
+def test_journal_identity_survives_restart_and_replacement_denies_cursor(tmp_path):
+    import os
+    j, local = stores(tmp_path)
+    identity = j.instance_id
+    j.commit(bar())
+    assert DurableJournal(j.db_path).instance_id == identity
+    remote = OperationalStore(str(tmp_path/"remote.sqlite"))
+    path = str(tmp_path/"cursor.sqlite")
+    consumer = SandboxReplicator(j, remote, path)
+    assert consumer.deliver_once() == 1
+    replacement = DurableJournal(str(tmp_path/"replacement.sqlite"))
+    replacement.commit(bar(7))
+    os.replace(replacement.db_path, j.db_path)
+    with pytest.raises(ValueError, match="replaced"):
+        consumer.deliver_once()
+    with pytest.raises(ValueError, match="different journal"):
+        SandboxReplicator(j, remote, path)
+    assert remote.count() == 1
+
+
+def test_delivery_cursor_detects_journal_rollback(tmp_path):
+    j, remote = stores(tmp_path)
+    j.commit(bar())
+    consumer = SandboxReplicator(j, remote, str(tmp_path/"cursor.sqlite"))
+    assert consumer.deliver_once() == 1
+    conn = j._connect()
+    try:
+        conn.execute("DELETE FROM journal_entries")
+    finally:
+        conn.close()
+    with pytest.raises(ValueError, match="rollback"):
+        consumer.deliver_once()
+
+
+def test_commit_failure_does_not_advance_gap_watermark(tmp_path):
+    j, store = stores(tmp_path)
+    c = BinanceCollector("BTCUSDT","1m",j,store)
+    c.background_persistence = True
+    def receive(i):
+        k = dict(s="BTCUSDT",i="1m",t=i*60000,T=(i+1)*60000-1,
+                 o="10",h="11",l="9",c="10",v="1",x=True)
+        c._on_message(Mock(),json.dumps({"k":k}))
+    receive(0)
+    with patch.object(j,"commit",side_effect=OSError("synthetic unavailable journal")):
+        receive(1)
+    assert c.metrics.last_bar_open == 0
+    receive(2)
+    assert c.metrics.error_count == 1
+    assert c.gap_start_ms == 60000
+    assert c.gap_end_ms == 120000
+
+
+def test_clock_fault_survives_socket_close(tmp_path):
+    j, store = stores(tmp_path)
+    c = BinanceCollector("BTCUSDT","1m",j,store)
+    with patch("aql.collector.binance_collector.time.time",return_value=1000):
+        c._on_message(Mock(),json.dumps({"E":1010001,"k":{"x":False}}))
+    c._on_close(Mock(),1000,"synthetic close")
+    assert c.clock_uncertain
+    assert c.health_state == "DISCONNECTED"
+
+
+def test_pipeline_cannot_report_healthy_after_collector_error(tmp_path):
+    from aql.pipeline import run_pipeline
+    from aql.collector.binance_collector import CollectorMetrics
+    class Collector:
+        def __init__(self,symbol,interval,journal,store):
+            self.journal,self.store=journal,store
+            self.gap_start_ms=self.gap_end_ms=None
+        def run(self,timeout_s):
+            b=bar();self.journal.commit(b);self.store.upsert(b)
+            self.journal.mark_persisted(b.stable_key())
+            return CollectorMetrics(error_count=1)
+    with patch("aql.pipeline.BinanceCollector",Collector):
+        result=run_pipeline(data_dir=str(tmp_path),duration_s=0,now_ms_fn=lambda:60000)
+    assert result["health_snapshot"]["status"]=="UNHEALTHY"
+    assert result["health_snapshot"]["reconcile_error"]
+
+
+def test_sqlite_write_lock_is_bounded_and_uncommitted_bar_not_claimed(tmp_path):
+    j, store = stores(tmp_path)
+    c=BinanceCollector("BTCUSDT","1m",j,store)
+    c.background_persistence=True
+    conn=j._connect()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        started=time.monotonic()
+        k=dict(s="BTCUSDT",i="1m",t=0,T=59999,o="10",h="11",l="9",c="10",v="1",x=True)
+        c._on_message(Mock(),json.dumps({"k":k}))
+        assert time.monotonic()-started<2
+        assert c.metrics.error_count==1
+        assert c.metrics.journal_commit_count==0
+        assert c.metrics.last_bar_open is None
+    finally:
+        conn.execute("ROLLBACK");conn.close()
     assert not j.replay()

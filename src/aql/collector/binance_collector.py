@@ -91,6 +91,7 @@ class BinanceCollector:
         self.background_persistence = False
         self.health_state = "CONNECTING"
         self.clock_tolerance_ms = 5000
+        self.clock_uncertain = False
         self.metrics = CollectorMetrics()
         self._stop_event = threading.Event()
         self._ws: Optional[websocket.WebSocketApp] = None
@@ -114,6 +115,7 @@ class BinanceCollector:
                 self.metrics.source_clock_skew_ms = skew
                 if skew > self.clock_tolerance_ms:
                     self.health_state = "CLOCK_UNCERTAIN"
+                    self.clock_uncertain = True
                     raise ValueError("Source event is ahead of local clock; temporal eligibility denied")
             k = data["k"]
             if type(k.get("x")) is not bool:
@@ -127,8 +129,13 @@ class BinanceCollector:
                 return
 
             if bar.bar_close >= bar.ingested_at:
+                self.clock_uncertain = True
                 raise ValueError("Closed candle claims future close time")
             self.metrics.final_bar_count += 1
+            self.metrics.last_ingested_at = bar.ingested_at
+
+            # Commit to journal (fsync boundary)
+            committed = self.journal.commit(bar)
             previous = self.metrics.last_bar_open
             if previous is not None:
                 from ..recovery.gap_recovery import _binance_interval_ms
@@ -137,10 +144,6 @@ class BinanceCollector:
                     self.gap_start_ms = min(self.gap_start_ms if self.gap_start_ms is not None else next_open, next_open)
                     self.gap_end_ms = max(self.gap_end_ms or 0, bar.bar_open)
             self.metrics.last_bar_open = max(previous if previous is not None else bar.bar_open, bar.bar_open)
-            self.metrics.last_ingested_at = bar.ingested_at
-
-            # Commit to journal (fsync boundary)
-            committed = self.journal.commit(bar)
             if committed:
                 self.metrics.journal_commit_count += 1
                 committed_at = bar.committed_at

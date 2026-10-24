@@ -5,6 +5,7 @@ connection factory. Connection exceptions are deliberately redacted.
 """
 from __future__ import annotations
 from typing import Protocol
+from contextlib import contextmanager
 import json
 import sqlite3
 import time
@@ -52,6 +53,13 @@ class PostgresSandboxStore:
                         RETURNING bar_open
                     """, values)
                     inserted = cur.fetchone() is not None
+                    if not inserted:
+                        cur.execute("SELECT checksum FROM aql_sandbox.market_bars "
+                                    "WHERE symbol=%s AND interval=%s AND bar_open=%s",
+                                    (bar.symbol, bar.interval, bar.bar_open))
+                        existing = cur.fetchone()
+                        if existing is None or existing[0] != values[-2]:
+                            raise ValueError("Conflicting or unconfirmed duplicate")
                 conn.commit()
                 return inserted
             except Exception as exc:
@@ -93,7 +101,7 @@ class SandboxReplicator:
             conn.execute("CREATE TABLE IF NOT EXISTS delivery_cursor "
                          "(consumer TEXT PRIMARY KEY, journal_path TEXT NOT NULL, seq INTEGER NOT NULL)")
         from pathlib import Path
-        self.identity = str(Path(journal.db_path).resolve())
+        self.identity = str(Path(journal.db_path).resolve()) + "#" + journal.instance_id
         with self._connect() as conn:
             conn.execute("INSERT OR IGNORE INTO delivery_cursor VALUES (?, ?, 0)",
                          (consumer_id, self.identity))
@@ -101,18 +109,29 @@ class SandboxReplicator:
                             (consumer_id,)).fetchone()[0] != self.identity:
                 raise ValueError("Cursor belongs to a different journal")
 
+    @contextmanager
     def _connect(self):
         conn = sqlite3.connect(self.path, timeout=0.25)
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=FULL")
-        return conn
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=FULL")
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     def deliver_once(self):
+        from pathlib import Path
+        if str(Path(self.journal.db_path).resolve()) + "#" + self.journal.instance_id != self.identity:
+            raise ValueError("Journal replaced; delivery denied")
         with self._connect() as checkpoint:
             cursor = checkpoint.execute("SELECT seq FROM delivery_cursor WHERE consumer=?",
                                         (self.consumer_id,)).fetchone()[0]
         conn = self.journal._connect()
         try:
+            maximum = conn.execute("SELECT COALESCE(MAX(id),0) FROM journal_entries").fetchone()[0]
+            if cursor > maximum:
+                raise ValueError("Journal rollback behind delivery cursor")
             rows = conn.execute("SELECT id,payload_json,checksum FROM journal_entries "
                                 "WHERE id>? ORDER BY id LIMIT ?",
                                 (cursor, self.batch_size)).fetchall()

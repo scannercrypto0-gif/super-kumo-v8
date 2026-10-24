@@ -21,6 +21,7 @@ Durability guarantee:
 from __future__ import annotations
 
 import json
+import uuid
 import logging
 import sqlite3
 import time
@@ -99,7 +100,20 @@ class DurableJournal:
         conn = self._connect()
         try:
             conn.executescript(JOURNAL_SCHEMA)
+            conn.execute("INSERT OR IGNORE INTO journal_meta(key,value) VALUES ('instance_id',?)",
+                         (uuid.uuid4().hex,))
             conn.execute("PRAGMA wal_checkpoint(FULL)")
+        finally:
+            conn.close()
+
+    @property
+    def instance_id(self) -> str:
+        conn = self._connect()
+        try:
+            row = conn.execute("SELECT value FROM journal_meta WHERE key='instance_id'").fetchone()
+            if row is None:
+                raise JournalCorruptionError("Journal identity missing")
+            return row[0]
         finally:
             conn.close()
 

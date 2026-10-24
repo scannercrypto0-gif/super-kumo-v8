@@ -81,8 +81,8 @@ are redacted. Caller must configure bounded connection establishment (e.g.
 psycopg `connect_timeout=3`); statement timeout is five seconds.
 
 `SandboxReplicator` is separate from local persistence ACK. It reads bounded pages
-from the journal and stores a FULL/WAL cursor scoped to the journal path and
-consumer. Remote commit precedes local cursor commit, so crash/retry repeats an
+from the journal and stores a FULL/WAL cursor scoped to the journal path, persistent instance UUID and
+consumer. Journal replacement or a maximum sequence behind the cursor is rejected. Remote commit precedes local cursor commit, so crash/retry repeats an
 idempotent write. It is opt-in; the core pipeline does not start remote access.
 
 Sandbox setup, owner-controlled:
@@ -161,3 +161,30 @@ Implemented/offline-tested engineering can proceed to controlled synthetic
 integration after review of the Draft PR. Real temporal integration remains
 BLOCKED by clock divergence; real Supabase integration remains NOT TESTED;
 R09 remains UNRESOLVED. No production/trading readiness or gate closure is claimed.
+
+## Final code-level acceptance fixes - 2026-10-24
+
+Under the owner's explicit review/fix/merge authorization on PR62:
+- Clock uncertainty survives socket close/reconnect state changes; any collector
+  acquisition error prevents an unqualified HEALTHY final snapshot.
+- The observed latest-open watermark advances only after successful journal
+  commit, so a failed commit cannot conceal the next missing-bar window.
+- A durable journal instance UUID binds the optional remote delivery cursor,
+  including checks at each delivery. Replaced journals or rollback behind the
+  cursor fail closed rather than silently skipping new records at the same path.
+- PostgreSQL ON CONFLICT is ACKed only after SELECT confirms the existing checksum.
+  Missing/conflicting duplicates roll back; connection errors remain redacted.
+- Cursor SQLite connections are explicitly closed after each transaction,
+  including failure paths, rather than relying on garbage collection.
+- Regression fixtures include actual SQLite write-lock contention and bounded
+  rejection, replaced/rolled-back journals, conflicting duplicate, and close after
+  a clock fault. No production services or credentials are used.
+
+The recorded ~635s difference is between UTC epoch/UTC Date observations, not
+a demonstrated timezone-conversion bug. Host clock, source/proxy timing and cache
+interpretation need an independent time reference; no automatic correction,
+backdating, tolerance relaxation or additional endpoint call was performed.
+The real SIGKILL fixture explicitly withholds operational-store availability
+while the production consumer is running; commit/restart/key/health assertions
+remain intact. Final exact-head and post-merge CI evidence belongs in PR62's
+final report. R09, live temporal/finality and Supabase-cloud gates stay open.

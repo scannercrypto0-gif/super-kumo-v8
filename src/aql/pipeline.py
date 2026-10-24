@@ -42,7 +42,7 @@ def _run_gap_recovery(
     Recover bars for a gap window.
 
     Sequence (mandatory, per G1-WP01 fix order):
-      1. journal.commit(bar, background=True)        ط£آ¢أ¢â€ڑآ¬أ¢â‚¬â€Œ durable local record first
+      1. journal.commit(bar, background=True) - durable local record first
       2. store.upsert(bar)          — write to operational store
       3. journal.mark_persisted()   — ONLY if upsert confirmed insertion/presence
 
@@ -261,8 +261,10 @@ def run_pipeline(
     _all_recovery_reports = [r["gap_report"] for r in startup_recovery_results]
     if ws_recovery_result is not None:
         _all_recovery_reports.append(ws_recovery_result["gap_report"])
-    if getattr(collector, "health_state", "") == "CLOCK_UNCERTAIN":
+    if getattr(collector, "clock_uncertain", False) or getattr(collector, "health_state", "") == "CLOCK_UNCERTAIN":
         startup_reconcile_error = startup_reconcile_error or "Source/local clock divergence; temporal eligibility denied"
+    if metrics.error_count:
+        startup_reconcile_error = startup_reconcile_error or "Collector reported acquisition errors; no unqualified healthy claim"
     health = take_snapshot(
         journal=journal,
         store=store,
