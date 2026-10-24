@@ -1,0 +1,40 @@
+name: SF-DATA-01 Isolated Fast CI
+
+on:
+  push:
+    branches:
+      - feat/research-sf-data-01-isolated
+  pull_request:
+    paths:
+      - "research_wp_r0/historical_library.py"
+      - "tests/test_sf_data_01.py"
+      - ".github/workflows/sf-data-01-fast.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sf-data-01-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sf-data-01:
+    name: SF-DATA-01 Historical Library (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Python version
+        run: python --version
+      - name: Install pytest
+        run: pip install pytest -q
+      - name: SF-DATA-01 Historical Library tests
+        run: python -B -m pytest tests/test_sf_data_01.py -v
