@@ -64,6 +64,20 @@ class AdmissionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "admission"):
                 ledger.record_attempt(event)
 
+    def test_durable_policy_survives_reopen(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "attempts.sqlite"
+            ledger = AttemptLedger(path, require_admission=True)
+            raw, commitment = plan()
+            event = {"state": "PENDING", "family_id": "Family1",
+                     "candidate_id": "Candidate1", "input_digest": "f" * 64,
+                     "strategy_digest": "a" * 64}
+            FrozenAttemptWriter(ledger, raw, commitment).record_attempt(event)
+            reopened = AttemptLedger(path)
+            with self.assertRaisesRegex(ValueError, "admission"):
+                reopened.record_attempt(event)
+            self.assertEqual(len(reopened.snapshot()[0]), 1)
+
     def test_transaction_admission_rejects_without_append(self):
         with tempfile.TemporaryDirectory() as tmp:
             ledger = AttemptLedger(Path(tmp) / "attempts.sqlite")
