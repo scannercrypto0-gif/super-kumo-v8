@@ -50,6 +50,18 @@ class G2Contracts(unittest.TestCase):
         l.add_observation(Observation(s.snapshot_id,h,s.decision_ms+h,s.decision_ms+h,'feed','receipt',None,'gap'))
         self.assertEqual(l.horizon_state(s.snapshot_id,h,s.decision_ms+h),'missing')
         self.assertEqual(l.horizon_state(s.snapshot_id,5,200),'invalid')
+    def test_late_context_append_only(self):
+        l=ObservationLedger();s=self.snap();l.add_snapshot(s)
+        e=LateContextEvent(s.snapshot_id,'late:1','feed',119,121,'btc_trend','up')
+        self.assertEqual(l.add_late_context(e),'inserted')
+        self.assertEqual(l.add_late_context(e),'duplicate')
+        self.assertEqual(l.snapshots[s.opportunity_key].serialized(),s.serialized())
+        with self.assertRaises(ContractError):
+            l.add_late_context(LateContextEvent(s.snapshot_id,'late:1','feed',119,122,'btc_trend','down'))
+    def test_late_context_temporal_guard(self):
+        l=ObservationLedger();s=self.snap();l.add_snapshot(s)
+        with self.assertRaises(ContractError):
+            l.add_late_context(LateContextEvent(s.snapshot_id,'early','feed',100,120,'btc_trend','up'))
     def test_premature(self):
         l=ObservationLedger();s=self.snap();l.add_snapshot(s)
         with self.assertRaises(ContractError): l.add_observation(Observation(s.snapshot_id,HORIZONS_MS[0],200,200,'feed','receipt','up'))
