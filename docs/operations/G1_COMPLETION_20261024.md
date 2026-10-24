@@ -42,7 +42,7 @@ descriptions. This change introduces:
 - Observed missing candles without a disconnect are detected; out-of-order bars
   cannot move the latest-open watermark backward. Reconnect waits are interruptible.
 - Local store uses FULL/WAL before ACK, strengthening ordinary crash recovery.
-  Existing Linux SIGKILL tests are retained unchanged.
+  Linux SIGKILL assertions are retained. The child fixture explicitly injects a\n  store outage so independent persistence cannot drain the intended crash window.
 
 No research workload is started or modified. Host-wide quotas, multi-process/IP-wide
 provider arbitration, full multi-consumer Inbox/archive reclaim and independent
@@ -135,7 +135,7 @@ Owner-only actions:
 - Affected orchestration + new acceptance tests: 25 passed / 5 skipped, then the
   additional clock test passed (new test file: 19 passed / 1 skipped).
 - Earlier local G1 regression during development: 121 passed / 9 skipped.
-  Final regression and final-head CI are recorded in PR evidence; do not treat
+  Final local regression: 140 passed / 10 skipped. Initial Ubuntu CI exposed\n  an outdated crash fixture (consumer had legitimately drained the orphan window);\n  the fixture now injects store outage, keeping all recovery assertions intact.\n  Disposable PostgreSQL16 migration/restricted-role integration passed in CI.\n  Final-head CI is recorded in PR evidence; do not treat
   earlier runs as testing later code.
 - Existing Windows skips are POSIX SIGKILL variants and heavy fsync/stress coverage,
   plus opt-in live REST. They were not weakened or removed. New pipeline isolation,

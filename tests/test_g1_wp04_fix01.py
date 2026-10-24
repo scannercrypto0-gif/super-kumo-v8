@@ -998,6 +998,11 @@ _PIPELINE_CHILD_SCRIPT = textwrap.dedent(
     with (
         patch("aql.pipeline.BinanceCollector", _CrashCollector),
         patch("aql.pipeline.recover_gap", _noop_recover_gap),
+        # Independent persistence now runs beside collection. Explicitly inject
+        # a store outage so the SIGKILL boundary still has N orphaned commits.
+        # All original exact key/replay/health assertions remain unchanged.
+        patch("aql.pipeline.OperationalStore.upsert",
+              side_effect=ConnectionError("synthetic store outage before SIGKILL")),
     ):
         run_pipeline(
             symbol=SYMBOL,
