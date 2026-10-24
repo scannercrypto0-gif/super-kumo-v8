@@ -77,14 +77,14 @@ Owner options (OD-01):
 * A: preserve current contracts; replay retained manifests and compare existing
   full-bar commitments diagnostically. This delivery uses A, without claiming
   an approved cross-import public identity.
-* B (recommended for a later authorized change): add a versioned content identity
+* B (owner-approved additive implementation): add a versioned content identity
   binding ordered full bar checksums plus semantic dataset metadata, excluding
   only manifest creation time and self-hash; keep instance identity, temporal
   provenance and independently retained anchor as separate commitments.
 * C: OHLCV-only analytical fingerprint, explicitly unsuitable for custody/PIT.
 
 The new public `content_hash`, field list/versioning and downstream receipt
-migration remain **BLOCKED on owner decision**. Existing hashes are not redefined.
+migration are **AUTHORIZED by #76 comment6383377178 / #77 comment6383377744**. Existing hashes are not redefined.
 
 ## Simulator requirements: specified, not implemented
 
@@ -142,3 +142,72 @@ No system settings or legacy tests were changed; failures are not hidden as
 skips. Final workflow expects **393** tests: 141 historical + 216 accepted core
 + 36 new contracts, with zero failures/errors/skips on each CI job. Local final
 evidence and exact tested head are recorded in the Issue #77 RESULT.
+
+## OD-01B continuation: implemented additive content identity
+
+`research_wp_r0.content_identity.content_hash_v1(manifest, bars, *, price_unit,
+volume_unit, session, normalization, adjustment)` accepts a complete strictly
+ordered, unique, manifest-bound dataset. It verifies stored manifest provenance,
+manifest integrity, every bar checksum, count/range and the ordered legacy hash.
+It rejects partial prefixes; the existing one-cutoff bridge may legitimately use
+a partial prefix and is therefore not silently assigned a whole-dataset identity.
+Callers retain this new sidecar commitment separately alongside the immutable
+original manifest. Old manifests are not rewritten or given unverifiable hashes.
+
+Domain is ASCII `AQL:CONTENT_HASH_V1` followed by NUL, then canonical ASCII JSON.
+Scalar encoding is tagged: null, bool, int decimal string, float64 Python hex,
+string; arrays ordered, object keys Unicode-codepoint sorted, ensure_ascii=True,
+compact separators. Nonfinite floats/unsupported values fail. Int/float and signed
+zero remain distinct. Existing bar checksums are retained too, preserving legacy
+numeric representation distinctions; there is no rounding or Unicode normalization.
+Version changes require a new hash contract, never silent reinterpretation.
+
+All HistoricalBar fields including finality, source/source_label, receipt (null
+when unknown), availability_kind, observation cutoff and checksum are committed.
+All persisted manifest fields except dataset_id/version/created_at_ms,
+parent_version/lineage_reason/manifest_integrity_hash are committed: exchange,
+market, symbol/interval/timezone/source, raw-file hash or null, coverage/gaps,
+quality counts and existing full-bar hash remain included. Caller units/session/
+normalization/adjustment are required, retained assertions, not authenticated facts.
+Different raw source bytes are intentionally distinct even if decoded OHLCV agrees.
+Unknown receipt is hashable as UNKNOWN, never promoted to confirmed eligibility.
+The function computes on demand once per dataset adoption; no per-bar runtime or
+automatic recomputation/caching/migration is introduced. Existing input-1 schema,
+strategy bindings, legacy hash algorithms and stored records remain unchanged.
+
+## Concrete staged Research Ledger reconciliation (BLOCKED durable acceptance)
+
+Read-only comparison: main AttemptRecorder sends dictionaries with family_id,
+candidate_id, input_digest/strategy_digest, PENDING/INVALID/FAILED/ABANDONED/COMPLETE;
+unmerged PR46 a4c106a's DurableResearchJournal accepts typed Attempt plus keyword
+event_id, and replays FrozenSearchFamily/TrialFamilyLedger with protocol_digest,
+temporal_manifest_digest, dataset_version, metric/direction, alpha, declared_at.
+That journal imports unmerged trial_holdout. Its on-disk family/attempt schema is
+not main's port. A dictionary cast would lose family/temporal/error semantics.
+No safe durable adapter or new journal is claimed by this PR.
+
+Executable next stage, before empirical work:
+1. Inventory and freeze legacy family/attempt/checkpoint formats at PR46 SHA;
+   use golden retained journals in disposable directories only, never old records.
+2. Reconcile a versioned research-only family declaration (complete candidate
+   universe, metric, alpha, protocol/split/data commitments) with accepted main.
+   Review schema/reader dependencies before selecting the smallest legacy modules.
+3. Map deterministic event ID = domain + family + candidate + input commitment +
+   lifecycle transition + result/error commitment. Same ID+same bytes is replay;
+   same ID+different bytes is corruption. Require unique family/candidate attempt
+   identity, legal PENDING→terminal transitions; rejected definitions still count.
+4. Persist or raise before acknowledgement; preserve INVALID and failure details.
+   COMPLETE requires actual evaluated result and binding, not prepared inputs.
+   Restart leaves PENDING unresolved until explicit ABANDONED/reconciliation;
+   never infer COMPLETE or silently lose the trial-family denominator.
+5. Test process kill at each write/fsync/ACK/checkpoint boundary, torn-tail reject,
+   full-chain/state replay, family mismatch, duplicate/conflicting IDs and restored
+   checkpoints relative to a separately retained trusted commitment. Real Windows
+   locking/path-replacement tests are required; file fsync is not power-loss or
+   independently trusted external-anchor certification.
+
+Historical engine remains BLOCKED on that reconciliation plus credible real
+source/receipt/coverage and frozen splits. No compatible accepted-main simulator
+exists; implementing another independent engine here would duplicate unmerged46.
+The explicit execution contract above remains the safe boundary. Final Holdout
+stays CLOSED, shadow future-only, no cloud or operational data path is touched.
