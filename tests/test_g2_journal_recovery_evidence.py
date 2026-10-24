@@ -43,6 +43,42 @@ class RecoveryEvidenceTests(unittest.TestCase):
                                              "offline", reason="exit"))
             self.assertEqual(path.read_bytes(), corrupted)
 
+    def test_subprocess_crash_inside_journal_append_preserves_orphan_lock(self):
+        """Crash at the real append fsync boundary without modifying production."""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "events.jsonl"
+            src = str(Path(__file__).resolve().parents[1] / "src")
+            child = """
+import os, sys
+sys.path.insert(0, sys.argv[2])
+import aql.observation.position_journal as module
+from aql.observation.positions import PositionEvent
+real_fsync = module.os.fsync
+def crash_at_fsync(fd):
+    # The first fsync belongs to the writer lock; the second to the journal.
+    crash_at_fsync.calls += 1
+    if crash_at_fsync.calls == 2:
+        os._exit(31)
+    return real_fsync(fd)
+crash_at_fsync.calls = 0
+module.os.fsync = crash_at_fsync
+module.DurablePositionJournal(sys.argv[1]).append(
+    PositionEvent("p1", "open", "opened", 0, 0, "offline"))
+"""
+            result = subprocess.run([sys.executable, "-c", child, str(path), src],
+                                    capture_output=True, timeout=15)
+            self.assertEqual(result.returncode, 31, result.stderr.decode(errors="replace"))
+            lock = path.with_name(path.name + ".writer.lock")
+            self.assertTrue(lock.exists())
+            before = path.read_bytes()
+            # Record may be complete or partial at this injection point; never
+            # infer durability from the crash or automatically remove the lock.
+            with self.assertRaises(JournalIntegrityError):
+                DurablePositionJournal(path).append(
+                    PositionEvent("p1", "other", "opened", 1, 1, "offline"))
+            self.assertEqual(path.read_bytes(), before)
+            self.assertTrue(lock.exists())
+
     def test_verified_byte_copy_restores_without_mutating_source(self):
         """Baseline byte-copy verification; not a complete backup protocol."""
         with tempfile.TemporaryDirectory() as directory:
