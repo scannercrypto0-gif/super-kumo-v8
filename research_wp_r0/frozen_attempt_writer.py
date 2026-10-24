@@ -40,6 +40,15 @@ class FrozenAttemptWriter:
         # Recheck previous journal state before append. This is not an
         # interprocess admission lock: a direct writer can race the check.
         reconcile_full_research_plan(self.raw_plan, self.expected_digest, self.ledger)
-        checkpoint = self.ledger.record_attempt(event)
+        def admission(candidate_event, prior_events, prior_checkpoint):
+            for prior in prior_events:
+                if prior["family_id"] != self.family_id:
+                    continue
+                cid = prior["candidate_id"]
+                if cid not in self.allowed or prior.get("strategy_digest") != self.allowed[cid]:
+                    raise ValueError("Existing attempt violates frozen plan")
+            if candidate_event["candidate_id"] not in self.allowed or (\n                candidate_event.get("strategy_digest") != self.allowed[candidate_event["candidate_id"]]\n            ):
+                raise ValueError("Attempt violates frozen plan")
+        checkpoint = self.ledger.record_attempt(event, admission=admission)
         reconcile_full_research_plan(self.raw_plan, self.expected_digest, self.ledger)
         return checkpoint
