@@ -36,7 +36,7 @@ STDLIB: frozenset = frozenset({
     '__future__', 'abc', 'collections', 'dataclasses', 'datetime',
     'enum', 'functools', 'hashlib', 'itertools', 'json', 'math',
     'operator', 'os', 'pathlib', 're', 'struct', 'time', 'typing',
-    'uuid', 'warnings',
+    'uuid', 'warnings', 'sqlite3',  # Factory-owned offline receipt transactions.
 })
 
 # Project-internal packages (same repo, not third-party).
