@@ -3,7 +3,7 @@ on:
   pull_request:
     paths:
       - 'research_wp_r0/frozen_research_plan.py'
-      - 'research_wp_r0/test_frozen_research_plan.py'\n      - 'research_wp_r0/test_full_plan_ledger.py'\n      - 'research_wp_r0/frozen_plan_reconciliation.py'
+      - 'research_wp_r0/test_frozen_research_plan.py'\n      - 'research_wp_r0/test_full_plan_ledger.py'\n      - 'research_wp_r0/frozen_attempt_writer.py'\n      - 'research_wp_r0/test_frozen_attempt_writer.py'\n      - 'research_wp_r0/frozen_plan_reconciliation.py'
       - '.github/workflows/sf-full-research-plan.yml'
   workflow_dispatch:
 
@@ -23,4 +23,4 @@ jobs:
       - name: Install test dependencies
         run: python -m pip install pytest pytest-timeout
       - name: Verify frozen research plan
-        run: python -B -m pytest -p no:cacheprovider research_wp_r0/test_frozen_research_plan.py research_wp_r0/test_full_plan_ledger.py -v --tb=short
+        run: python -B -m pytest -p no:cacheprovider research_wp_r0/test_frozen_research_plan.py research_wp_r0/test_full_plan_ledger.py research_wp_r0/test_frozen_attempt_writer.py -v --tb=short
