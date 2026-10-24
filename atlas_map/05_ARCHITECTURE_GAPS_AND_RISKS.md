@@ -56,7 +56,18 @@
 - **Evidence:** Issues #17–#46 open; no research code in main.
 - **Remediation:** Requires systematic WP-R0 through WP-R9 implementation (Batch-01).
 
-### GAP-07: Windows Production Performance Unverified
+### GAP-07 (Issue #75): `WritePriority` Not Wired in Pipeline
+
+- **Severity:** LOW (current scale) / MEDIUM (SC-03+ multi-symbol)
+- **Departments:** B, M
+- **Description:** `WritePriority` class exists in `src/aql/lanes.py` (lines 110–141) but is not imported or used in `pipeline.py`. The cooperative-yield mechanism for core vs. background SQLite writes is inactive.
+- **Impact:** Under high concurrent write load, background `JournalConsumer` writes may delay core ingestion commits without the intended priority guard.
+- **Evidence:** `lanes.py` line 110 — class defined; `pipeline.py` line 19 — `WritePriority` not in import list. `[VERIFIED]`
+- **Remediation:** Wire when multi-symbol work (SC-03) begins. See OD-06.
+
+---
+
+### GAP-07b: Windows Production Performance Unverified
 - **Severity:** HIGH
 - **Departments:** B, M
 - **Description:** CI runs on both Ubuntu and Windows, but production-level throughput on Windows is not benchmarked. Minimum 5 bars/s floor is synthetic only.

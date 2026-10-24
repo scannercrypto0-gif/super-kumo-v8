@@ -29,7 +29,7 @@ All decisions require **owner approval** before implementation.
 
 **Recommendation:** B — Add `content_hash` alongside the existing hash. Preserves backward compatibility.
 
-**Status:** AWAITING OWNER DECISION
+**Status:** AWAITING OWNER DECISION | **Related Issue:** #76
 
 ---
 
@@ -114,7 +114,7 @@ All decisions require **owner approval** before implementation.
 
 ---
 
-## OD-06: `WritePriority` — Wire into Pipeline or Remove
+## OD-06: `WritePriority` — Wire into Pipeline or Remove (Issue #75)
 
 **Objective:** Decide whether `WritePriority` (designed in `lanes.py`) should be connected in `pipeline.py`.
 
