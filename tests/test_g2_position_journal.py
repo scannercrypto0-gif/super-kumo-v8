@@ -140,4 +140,23 @@ class JournalTests(unittest.TestCase):
             with self.assertRaises(JournalIntegrityError):
                 j.append(self.e('exit','closed',10,'exit'))
             self.assertEqual(p.read_bytes(),before)
+    def test_lock_released_after_validation_error(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/'journal.jsonl'
+            j=DurablePositionJournal(p)
+            with self.assertRaises(Exception):
+                j.append(self.e('close','closed',1,'exit'))
+            self.assertFalse(p.with_name(p.name+'.writer.lock').exists())
+            self.assertFalse(p.exists())
+            self.assertEqual(j.append(self.e('start','opened',0)),'inserted')
+    def test_reopen_after_other_writer_preserves_history(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/'journal.jsonl'
+            stale=DurablePositionJournal(p)
+            DurablePositionJournal(p).append(self.e('start','opened',0))
+            with self.assertRaises(JournalIntegrityError):
+                stale.append(self.e('close','closed',10,'exit'))
+            fresh=DurablePositionJournal(p)
+            self.assertEqual(fresh.append(self.e('close','closed',10,'exit')),'inserted')
+            self.assertEqual(DurablePositionJournal(p).ledger.status('p1',11),'closed')
 if __name__=='__main__':unittest.main()
