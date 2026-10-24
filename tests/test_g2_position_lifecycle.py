@@ -43,4 +43,14 @@ class PositionTests(unittest.TestCase):
         l=PositionLedger();l.append(self.e('open','opened',0))
         l.append(self.e('close','closed',8*DAY,reason='exit'))
         self.assertEqual(l.status('p1',7*DAY),'open')
+    def test_invalid_assessment_times_fail_closed(self):
+        l=PositionLedger();l.append(self.e('open','opened',0))
+        for bad in (None,'100',-1,True):
+            with self.subTest(bad=bad):
+                with self.assertRaises(PositionContractError): l.elapsed_ms('p1',bad)
+        p=HorizonPolicy('swing',1,(DAY,))
+        self.assertEqual(l.checkpoint_state('p1',p,DAY,'bad'),'invalid')
+    def test_price_type_guard(self):
+        with self.assertRaises(PositionContractError): self.e('q','quote',DAY,price=1.2)
+        with self.assertRaises(PositionContractError): self.e('q','quote',DAY,price='NaN')
 if __name__=='__main__': unittest.main()
