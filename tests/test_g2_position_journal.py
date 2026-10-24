@@ -52,4 +52,20 @@ class JournalTests(unittest.TestCase):
             p.write_bytes(data.replace(b'opened',b'closed'))
             with self.assertRaises(JournalIntegrityError):
                 j.append(self.e('later','closed',10,'exit'))
+    def test_existing_writer_lock_fails_closed(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/'journal.jsonl'
+            lock=p.with_name(p.name+'.writer.lock')
+            lock.write_text('other-process')
+            with self.assertRaises(JournalIntegrityError):
+                DurablePositionJournal(p).append(self.e('start','opened',0))
+            self.assertFalse(p.exists())
+            self.assertTrue(lock.exists())
+
+    def test_writer_lock_released_after_append(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/'journal.jsonl'
+            DurablePositionJournal(p).append(self.e('start','opened',0))
+            self.assertFalse(p.with_name(p.name+'.writer.lock').exists())
+            self.assertEqual(DurablePositionJournal(p).ledger.status('p1',1),'open')
 if __name__=='__main__':unittest.main()
