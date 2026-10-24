@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import threading
+from contextlib import contextmanager
 from pathlib import Path
 from .positions import PositionContractError, PositionEvent, PositionLedger
 
@@ -11,10 +12,29 @@ class JournalIntegrityError(PositionContractError): pass
 
 _WRITER_MUTEX = threading.Lock()
 
+@contextmanager
+def _exclusive_writer(path):
+    """Exclusive local writer lease; orphaned locks require manual recovery."""
+    lock_path = path.with_name(path.name + '.writer.lock')
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError as exc:
+        raise JournalIntegrityError('writer lock held or orphaned; inspect before recovery') from exc
+    try:
+        with os.fdopen(fd, 'w') as handle:
+            handle.write(str(os.getpid()))
+            handle.flush()
+            os.fsync(handle.fileno())
+        yield
+    finally:
+        lock_path.unlink()
+
+
 class DurablePositionJournal:
     """Single-writer append-only JSONL with fsync; torn trailing records fail closed.
 
-    Caller must serialize writers externally; no cross-process locking is claimed.
+    Cooperating writers use an exclusive sidecar lock. Orphan locks fail closed.
     """
     def __init__(self, path):
         self.path=Path(path)
@@ -41,7 +61,8 @@ class DurablePositionJournal:
                     raise JournalIntegrityError(f'invalid journal line {number}') from exc
     def append(self,event):
         with _WRITER_MUTEX:
-            return self._append_locked(event)
+            with _exclusive_writer(self.path):
+                return self._append_locked(event)
 
     def _append_locked(self,event):
         # Refuse stale instances and out-of-band changes before every write.
