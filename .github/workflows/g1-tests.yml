@@ -3,6 +3,7 @@ name: G1 WP01–WP04 Tests
 on:
   push:
     branches:
+      - main
       - feat/g1-wp01-minimal-ingest
       - feat/g1-wp02-stress-test
       - feat/g1-wp03-health-snapshot

@@ -1,6 +1,53 @@
 # ATLAS Quant Lab — CURRENT STATE
 Project ID: `AQL-CRYPTO-RESEARCH-001`
 Former name: SUPER KUMO V8
+
+---
+
+## ⚡ CURRENT STATUS ADDENDUM — 2026-10-23 (supersedes stale header below)
+
+**Updated:** 2026-10-23T21:30:00Z  
+**Verification source:** GitHub API (Issues, PRs, Actions), local test run on main HEAD `0af0dce5b3d5`.  
+**Updated by:** Claude Sonnet 4.6 scheduled execution agent — [Issue #53](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/53)
+
+| Item | Status |
+|------|--------|
+| **G0 Gate** | ✅ **APPROVED** — Issue #1 closed 2026-10-22; owner sign-off recorded. R09 legacy-credential revocation/rotation **mandatory** before any V7 code or credential reuse. |
+| **G1 WP01–WP04** | ✅ **MERGED** into `main` — PRs #32→#40→#42→#45 all merged (merge commits below). Runtime implementation verified via synthetic/mock tests. Production/live NOT authorized. |
+| **main HEAD** | `0af0dce5b3d5e16f5e44935fef76f77b4b8cdb87` — confirmed 2026-10-23 |
+| **Local G1 test run on main** | ✅ 129 passed, 1 skipped (live Binance REST proxy-blocked), 0 failed — Linux/Ubuntu, 2026-10-23 |
+| **Post-merge main CI** | ⚠️ **NOT TRIGGERED** — `.github/workflows/g1-tests.yml` push trigger excluded `main`; fix on feature branch PR (this PR or `fix/g1-post-merge-ci-and-docs`) |
+| **Binance REST live** | ❌ BLOCKED (proxy) — all REST uses mock fixtures |
+| **Binance WebSocket live** | ❌ BLOCKED (proxy) — all WS uses synthetic fixtures |
+| **Supabase integration** | ❌ NOT TESTED — not in G1 operational scope |
+| **Windows POSIX SIGKILL** | ⏭ SKIPPED — `signal.SIGKILL` unavailable on Windows (9 platform-specific skips in CI) |
+| **Production / live trading** | ❌ NOT AUTHORIZED |
+
+### G1 Merge Ancestry (verified 2026-10-23)
+
+| PR | Branch | Merge Commit | Pre-merge CI Run | Result |
+|----|--------|-------------|-----------------|--------|
+| #32 WP01 | `feat/g1-wp01-minimal-ingest` | `9609711d6ff9` | [40011286037](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40011286037) | ✅ Ubuntu+Win |
+| #40 WP02 | `feat/g1-wp02-stress-test` | `fd6f8cfc999e` | [40017268781](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40017268781) | ✅ Ubuntu+Win |
+| #42 WP03 | `feat/g1-wp03-health-snapshot` | `c6392150cd9c` | [40018212783](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40018212783) | ✅ Ubuntu+Win |
+| #45 WP04 | `feat/g1-wp04-operational-readiness` | `0af0dce5b3d5` | [40018228077](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40018228077) | ✅ Ubuntu+Win |
+
+> **Note:** All CI runs above are **pre-merge branch runs**, not post-merge-to-main runs. Post-merge main CI was not triggered due to the push trigger gap (now fixed on this PR). Local regression on `main` HEAD `0af0dce5` confirms 129 passed on Linux.
+
+### Outstanding gates (owner decision required)
+
+1. **R09** — Legacy V7 credential revocation/rotation **mandatory** before any V7 code/credential reuse. G0 approval does not waive this.
+2. **Post-merge main CI** — Merge this PR to add `main` to the push trigger; a CI run on `main` will then be independently verifiable.
+3. **Live Binance / Supabase** — Not tested; separate authorized task required.
+4. **Windows production throughput** — 5 bars/s floor in CI vs 50 bars/s Linux; not a production SLA.
+5. **G1 production/live authorization** — Separate owner decision; G1 code merged ≠ production authorized.
+
+---
+
+## HISTORICAL STATE SNAPSHOT — 2026-10-21 (preserved, not current)
+
+> The content below is the original snapshot dated 2026-10-21. It is preserved for audit/historical continuity. For current state see the addendum above.
+
 Operational V8 implementation: not yet verified or started.
 
 Date: 2026-10-21
