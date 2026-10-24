@@ -1,0 +1,41 @@
+name: SF Integrity Stage Gate
+on:
+  pull_request:
+    paths:
+      - 'research_wp_r0/**'
+      - '.github/workflows/sf-integrity-stage-gate.yml'
+  workflow_dispatch:
+
+jobs:
+  focused-matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.10', '3.11', '3.12']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install pytest pytest-timeout
+      - name: Compile all Factory Python sources
+        run: python -m compileall -q research_wp_r0
+      - name: Focused plan, ledger and admission tests
+        run: python -B -m pytest -p no:cacheprovider research_wp_r0/test_frozen_plan_reconciliation.py research_wp_r0/test_frozen_research_plan.py research_wp_r0/test_full_plan_ledger.py research_wp_r0/test_frozen_attempt_writer.py -v --tb=short
+
+  factory-regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pytest pytest-timeout
+      - name: Factory regression suite
+        run: python -B -m pytest -p no:cacheprovider research_wp_r0 -q --tb=short
