@@ -1,0 +1,26 @@
+{
+  "MACD_v2": {
+    "result": "fc913900db9007a4eb7aed06dbe0e757690e341c6f9a252333ce9a9db988de47",
+    "manifest": "48f17edf8d271955a2f4d6fdb0ec07d1aaeb384db7e8dcd888d5b9ebdfc97101"
+  },
+  "BBANDS_v2": {
+    "result": "5af362440bc3c9aeaa32fc0b790a00ac2058f8bfe2a30a8bb984efb5f4ae1f31",
+    "manifest": "2736535620621452cb4b2eb892c2d3fffe302f5094bce5627440b26723dc383f"
+  },
+  "ADX_v2": {
+    "result": "16bca79fadc19323e6e85dc7c60974ea9c3fa17bb2687b517d00297908cb337f",
+    "manifest": "b50008a1471bb76d138db48d984e4ebc22b289921002b4c4eeda2750ebba7269"
+  },
+  "STOCH_v2": {
+    "result": "7cf867a1ae920d9f92bc0aa114eb03ab761fdd7a2787782343be2f5b50ef7e43",
+    "manifest": "becbda1942ecf37528c163afa658e092e6f8daf8d73e28f1480365663598c3a2"
+  },
+  "ROC_v2": {
+    "result": "56a889657387229e81212afedcdcec5953c218c67d6ad4f178520e6f5bbaeee4",
+    "manifest": "726105f74a47615ec78e6efad7219ce8045ac49aba78fff5d45073ed8159d154"
+  },
+  "OBV_v2": {
+    "result": "7379337ba21325336a0f55910b82989a907335d3416caf4cf9f8cefee1e914ef",
+    "manifest": "c3272ec0632a7364020f87acd3a1fbcb5c3ac324916c72bd3e7c8add3d98f984"
+  }
+}

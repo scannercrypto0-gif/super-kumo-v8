@@ -1,0 +1,33 @@
+name: SF-IND-02 Research Tests
+on:
+  pull_request:
+    branches: [main]
+    paths: ["research_wp_r0/indicator_library_v2.py", "tests/test_sf_ind_02.py", "tests/fixtures/sf_ind_02_golden.json", ".github/workflows/sf-ind-02.yml"]
+  push:
+    branches: [feat/sf-ind-02-expansion]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install pytest pytest-timeout
+      - run: python -B research_wp_r0/_dep_guard.py research_wp_r0/indicator_library.py research_wp_r0/indicator_library_v2.py
+      - run: python -B -m pytest tests/test_sf_ind_01.py tests/test_sf_dep_guard.py tests/test_sf_ind_02.py -v --tb=short --junitxml=sf-ind-02.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sf-ind-02-${{ matrix.os }}-${{ matrix.python }}
+          path: sf-ind-02.xml
