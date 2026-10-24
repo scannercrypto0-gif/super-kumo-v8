@@ -10,3 +10,7 @@ This experimental single-writer JSONL journal fsyncs each event, verifies a SHA-
 - **Fail closed:** a torn tail, corrupt record, or unexpected file change requires operator recovery; never truncate or silently discard records.
 - **Scalability:** full replay before each append is intentionally conservative and may become expensive as the journal grows. A bounded, verified checkpoint/index is future work.
 - **No Core Run activation:** this journal is not connected to quote ingestion, live monitoring, paper orders, portfolio accounting, or Strategy Factory.
+
+## In-process serialization
+
+A module-wide Python threading mutex now serializes `append` calls made by journal instances **within the same interpreter process**. Together with the pre-append disk verification, this rejects stale second instances rather than allowing sequential interleaving. This is **not** a cross-process file lock and does not prevent another executable from changing the file. Do not interpret it as production multi-process safety.
