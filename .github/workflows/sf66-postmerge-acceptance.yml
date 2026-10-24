@@ -1,0 +1,50 @@
+name: SF66 actual combined-main post-merge acceptance
+on:
+  push:
+    branches: [test/sf66-postmerge-main-20261024]
+permissions:
+  contents: read
+jobs:
+  combined:
+    name: Combined main (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.10", "3.11", "3.12"]
+    steps:
+      - name: Exact actual merged main, never harness code or separate PR pins
+        uses: actions/checkout@v4
+        with:
+          ref: 4e4c3537036bdf2b106c1a63ec65b2a9855972a7
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify exact merged-main SHA, tree and merge ancestry
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "4e4c3537036bdf2b106c1a63ec65b2a9855972a7"
+          test "$(git rev-parse 'HEAD^{tree}')" = "af7e56a4d88d5273286cbeb9077cb240c2aa2e81"
+          git merge-base --is-ancestor ea9cf19a3b77019c8c0673756fad54068a50532b HEAD
+          git merge-base --is-ancestor 4e4c3537036bdf2b106c1a63ec65b2a9855972a7 HEAD
+          git status --porcelain
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Explicit research-only runner dependencies, no project install
+        run: python -m pip install pytest pytest-timeout
+      - name: Native imports from single main package, no path injection
+        run: python -B -c "import pathlib,sys,research_wp_r0.indicator_library_v2 as v2,research_wp_r0.strategy_definition as strategy,research_wp_r0.historical_library as custody; root=pathlib.Path.cwd().resolve(); modules=[v2,strategy,custody]; print(sys.version); [print(m.__name__,pathlib.Path(m.__file__).resolve()) for m in modules]; assert all(pathlib.Path(m.__file__).resolve().parent==root/'research_wp_r0' for m in modules); print(v2.IndicatorRegistryV2.available())"
+      - name: Actual dependency guards
+        run: python -B research_wp_r0/_dep_guard.py research_wp_r0/indicator_library.py research_wp_r0/indicator_library_v2.py research_wp_r0/strategy_definition.py
+      - name: All five suites together on actual main
+        run: python -B -m pytest -p no:cacheprovider tests/test_sf_ind_01.py tests/test_sf_dep_guard.py tests/test_sf_ind_02.py tests/test_sf_strat_01.py integration_tests/test_sf_strat_ind02.py -q -rs --tb=short --junitxml=sf66-postmerge.xml
+      - name: Verify exact counts and unchanged tracked source
+        run: python -B -c "import subprocess,xml.etree.ElementTree as ET; root=ET.parse('sf66-postmerge.xml').getroot(); suites=[root] if root.tag=='testsuite' else list(root); totals={k:sum(int(s.attrib.get(k,0)) for s in suites) for k in ('tests','failures','errors','skipped')}; print(totals); assert totals==dict(tests=216,failures=0,errors=0,skipped=0); subprocess.run(['git','diff','--exit-code'],check=True); subprocess.run(['git','diff','--cached','--exit-code'],check=True)"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sf66-main-${{ matrix.os }}-${{ matrix.python }}
+          path: sf66-postmerge.xml
+
