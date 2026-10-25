@@ -42,7 +42,8 @@ class SyntheticExecutionTests(unittest.TestCase):
     def run_case(self, future, signal=True):
         with patch("research_wp_r0.offline_simulator.audit_offline_inputs"):
             return simulate_single_long(self.inputs, expected_digest=self.inputs.digest,
-                                        signal=signal, future=future)
+                                        signal=signal, future=future,
+                                        expected_future_digest=future.digest if future else None)
 
     def test_synthetic_closed_and_round_trip_costs(self):
         result = self.run_case(self.evidence())
@@ -88,6 +89,19 @@ class SyntheticExecutionTests(unittest.TestCase):
         value["bars"][1]["observed_at_ms"] = value["bars"][1]["close_ms"] + 1
         with self.assertRaisesRegex(ValueError, "interval"):
             self.run_case(FutureBarEvidence(value))
+
+    def test_wrong_future_commitment_rejected(self):
+        with patch("research_wp_r0.offline_simulator.audit_offline_inputs"):
+            with self.assertRaisesRegex(ValueError, "future evidence digest"):
+                simulate_single_long(self.inputs, expected_digest=self.inputs.digest,
+                                     signal=True, future=self.evidence(),
+                                     expected_future_digest="f" * 64)
+
+    def test_future_without_separate_commitment_rejected(self):
+        with patch("research_wp_r0.offline_simulator.audit_offline_inputs"):
+            with self.assertRaisesRegex(ValueError, "future evidence digest"):
+                simulate_single_long(self.inputs, expected_digest=self.inputs.digest,
+                                     signal=True, future=self.evidence())
 
     def test_no_signal_remains_zero_exposure(self):
         result = self.run_case(self.evidence(), signal=False)
