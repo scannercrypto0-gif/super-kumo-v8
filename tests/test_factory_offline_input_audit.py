@@ -51,6 +51,20 @@ class TestInputAudit(unittest.TestCase):
         with self.assertRaises(ValueError):
             audit_offline_inputs(data, expected_digest=data.digest)  # placeholder hashes rejected
 
+    def test_real_bar_checksum_is_bound_to_prices(self):
+        bar, manifest = valid_receipt()
+        self.assertTrue(bar.verify_checksum())
+        self.assertTrue(manifest.verify_integrity())
+        self.assertTrue(manifest.verify_hash([bar]))
+        modified = asdict(bar)
+        modified["close"] = 100.5
+        modified["quality"] = BarQuality(modified["quality"])
+        modified["source"] = SourceType(modified["source"])
+        modified["availability_kind"] = DataAvailabilityKind(modified["availability_kind"])
+        forged = HistoricalBar(**modified)
+        self.assertNotEqual(forged.checksum, bar.checksum)
+        self.assertFalse(manifest.verify_hash([forged]))
+
     def test_tamper_rejected_by_commitment(self):
         data = OfflineInputs(fixture())
         changed = fixture()
