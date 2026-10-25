@@ -70,3 +70,42 @@ class TestObservationWorker(unittest.TestCase):
             finally:
                 release.set()
                 worker.finish(timeout=5)
+
+    def test_failed_g2_writer_fails_closed_without_blocking_g1_journal(self):
+        from threading import Event
+        from aql.journal.durable_journal import DurableJournal
+        from aql.models.bar import MarketBar
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            core = DurableJournal(str(root / "core.sqlite"))
+            worker = ObservationWorker(root / "positions.jsonl", capacity=2)
+            entered, release = Event(), Event()
+
+            def broken_append(event):
+                entered.set()
+                release.wait(timeout=5)
+                raise OSError("synthetic G2 disk failure")
+
+            worker.journal.append = broken_append
+            self.assertTrue(worker.submit(PositionEvent(
+                "p", "open", "opened", 0, 0, "offline")))
+            self.assertTrue(entered.wait(timeout=3))
+            self.assertTrue(worker.submit(PositionEvent(
+                "p", "quote", "quote", 1, 1, "offline", price="1")))
+
+            # G1 commit is independent of the blocked G2 writer.
+            bar = MarketBar("BTCUSDT", "1m", 0, 59999, 100., 101., 99.,
+                            100., 1., True, "synthetic-offline", 60000)
+            self.assertTrue(core.commit(bar))
+            self.assertEqual(len(core.replay()), 1)
+            release.set()
+            status = worker.finish(timeout=5)
+            self.assertIn("OSError", status["errors"])
+            self.assertEqual(status["committed_or_duplicate"], 0)
+            self.assertEqual(status["accepted_but_unconfirmed"], 1)
+            self.assertEqual(status["unconfirmed_event_ids"], ["quote"])
+            self.assertFalse(worker.submit(PositionEvent(
+                "p", "close", "closed", 2, 2, "offline", reason="explicit")))
+            self.assertEqual(DurablePositionJournal(root / "positions.jsonl").ledger.status(
+                "p", 100), "unknown")
