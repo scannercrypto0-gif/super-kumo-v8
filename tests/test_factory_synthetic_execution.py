@@ -80,6 +80,19 @@ class TestSyntheticExecution(unittest.TestCase):
         with self.assertRaises(ValueError):
             run(data)
 
+    def test_excessive_exit_slippage_rejected(self):
+        with self.assertRaises(ValueError):
+            execute_synthetic_long(bars(), 0, stop_fraction=.05,
+                target_fraction=.05, ttl_bars=1, holding_bars=1,
+                fee_bps=10, slippage_bps=10000)
+
+    def test_unobserved_horizon_not_scored(self):
+        result = execute_synthetic_long(bars(), 0, stop_fraction=.05,
+            target_fraction=.05, ttl_bars=1, holding_bars=3,
+            fee_bps=10, slippage_bps=0)
+        self.assertEqual(result["status"], "UNRESOLVED")
+        self.assertNotIn("net_return", result["details"])
+
     def test_bad_ohlc_rejected(self):
         data = bars()
         data[1]["high"] = 90
