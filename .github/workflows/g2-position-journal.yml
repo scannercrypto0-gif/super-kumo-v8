@@ -65,5 +65,6 @@ jobs:
             g2-lifecycle-tests.txt
             g2-replay.json
             g2-contention.json
+            g2-contention-cpu.json
             g2-replay.txt
             g2-contention.txt
