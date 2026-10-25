@@ -53,9 +53,15 @@ def execute_synthetic_long(bars, decision_bar_index, *, stop_fraction,
             if stop_hit and target_hit:
                 details = {"reason": "SAME_BAR_STOP_TARGET"}
                 break
+            if idx > entry_idx and bar["open"] <= stop:
+                # A stop crossed between bars fills no better than the opening print.
+                stop_hit = True
+            if idx > entry_idx and bar["open"] >= target:
+                # Favorable gaps cannot be credited without an explicit fill model.
+                details = {"reason": "TARGET_GAP_UNRESOLVED"}
+                break
             if stop_hit or target_hit:
-                exit_price = (min(bar["open"], stop) if stop_hit else
-                              max(bar["open"], target) if bar["open"] >= target else target)
+                exit_price = (min(bar["open"], stop) if stop_hit else target)
                 exit_price *= 1 - slippage_bps / 10000
                 gross = exit_price / entry - 1
                 fees = (fee_bps / 10000) * (1 + exit_price / entry)
