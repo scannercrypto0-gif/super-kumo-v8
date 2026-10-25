@@ -94,6 +94,9 @@ def audit_offline_inputs(inputs, *, expected_digest):
     if len(checked) == meta.bar_count and checked[0].bar_open == meta.min_bar_open and checked[-1].bar_open == meta.max_bar_open:
         if not meta.verify_hash(checked):
             raise ValueError("Dataset bar-manifest hash mismatch")
+    if (binding["decision_cutoff_ms"] - (checked[-1].bar_close + 1)
+            > spec["protocol"]["max_age_ms"]):
+        raise ValueError("Stale input receipt at decision cutoff")
     if spec["protocol"]["symbol_mapping"] != meta.symbol or spec["protocol"]["timezone"] != meta.timezone:
         raise ValueError("Protocol/dataset identity mismatch")
     if spec["protocol"]["data_class"] == "SYNTHETIC_TEST":
