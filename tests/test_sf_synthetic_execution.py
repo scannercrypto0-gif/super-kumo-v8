@@ -63,6 +63,15 @@ class SyntheticExecutionTests(unittest.TestCase):
         self.assertAlmostEqual(result.spec["gross_return_bps"], -500)
         self.assertAlmostEqual(result.spec["net_return_bps"], -530)
 
+    def test_real_auditor_rejects_incomplete_receipt(self):
+        # Deliberately incomplete test receipts must never pass production audit.
+        # No mock here: verifies the simulator actually invokes the real gate.
+        with self.assertRaises(ValueError):
+            simulate_single_long(self.inputs,
+                                 expected_digest=self.inputs.digest,
+                                 signal=True, future=self.evidence(),
+                                 expected_future_digest=self.evidence().digest)
+
     def test_no_evidence_never_fabricates_fill(self):
         with patch("research_wp_r0.offline_simulator.audit_offline_inputs"):
             result = simulate_single_long(self.inputs,
