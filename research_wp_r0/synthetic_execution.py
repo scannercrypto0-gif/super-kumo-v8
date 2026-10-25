@@ -19,6 +19,8 @@ def execute_synthetic_long(bars, decision_bar_index, *, stop_fraction,
     integer(holding_bars, 1, 10000)
     number(fee_bps, 0, 10000)
     number(slippage_bps, 0, 10000)
+    if slippage_bps >= 10000:
+        raise ValueError("Exit slippage must leave a positive price")
     previous_close = None
     expected_span = None
     for row in bars:
@@ -43,6 +45,8 @@ def execute_synthetic_long(bars, decision_bar_index, *, stop_fraction,
         status, details = "NO_FILL", {"reason": "NO_NEXT_BAR"}
     elif bars[entry_idx]["bar_open"] != decision["bar_close"] + 1:
         status, details = "UNRESOLVED", {"reason": "ENTRY_GAP"}
+    elif entry_idx + holding_bars > len(bars):
+        status, details = "UNRESOLVED", {"reason": "HOLDING_HORIZON_INCOMPLETE"}
     else:
         entry = bars[entry_idx]["open"] * (1 + slippage_bps / 10000)
         stop = entry * (1 - stop_fraction)
