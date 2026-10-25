@@ -43,3 +43,30 @@ class TestObservationWorker(unittest.TestCase):
             self.assertFalse(worker.submit(event))
             self.assertEqual(worker.snapshot()["rejected"], 1)
             self.assertTrue(worker.snapshot()["uncommitted_inputs_are_volatile"])
+
+    def test_unconfirmed_event_ids_are_visible_when_writer_is_blocked(self):
+        from threading import Event
+        with tempfile.TemporaryDirectory() as d:
+            worker = ObservationWorker(Path(d) / "positions.jsonl", capacity=2)
+            entered, release = Event(), Event()
+            real_append = worker.journal.append
+
+            def blocked_append(event):
+                entered.set()
+                if not release.wait(timeout=5):
+                    raise TimeoutError("synthetic blocked writer")
+                return real_append(event)
+
+            worker.journal.append = blocked_append
+            first = PositionEvent("p", "open", "opened", 0, 0, "offline")
+            second = PositionEvent("p", "quote-1", "quote", 1, 1, "offline", price="1")
+            try:
+                self.assertTrue(worker.submit(first))
+                self.assertTrue(entered.wait(timeout=3))
+                self.assertTrue(worker.submit(second))
+                status = worker.snapshot()
+                self.assertEqual(status["accepted_but_unconfirmed"], 2)
+                self.assertEqual(status["unconfirmed_event_ids"], ["open", "quote-1"])
+            finally:
+                release.set()
+                worker.finish(timeout=5)
