@@ -81,6 +81,11 @@ skips are not successful performance checks. Separate manual diagnostics actuall
 ran: larger replay **1PASS**, contention + blocked-backup isolation **2PASS**.
 An initial orphan-test assertion incorrectly equated the Windows launcher PID with
 interpreter PID; it was corrected to record both, then all focused tests passed.
+The first Python3.11 CI run also exposed a test-double portability error: mocked
+lstat metadata omitted st_mode used by Path.is_symlink in3.11. The mock now retains
+the actual file mode; no production check was relaxed or skipped. Larger CI
+diagnostics on the preceding commit remain evidence for identical production and
+benchmark blobs; raw source byte hashes can differ across checkout line endings.
 
 ### Measured before/after, no invented speedup
 
@@ -128,6 +133,25 @@ Process/resource scheduling or pipeline integration needs separately authorized
 cross-component scope; no edits to pipeline/storage/shared infrastructure here.
 
 ## Reproduction and focused CI
+
+### Hosted larger diagnostics (separate from ordinary CI)
+
+Explicit manual run [40169292104](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40169292104)
+at `92ee59537330228f664867563840566f91ec349e` completed both jobs successfully;
+each ran replay1case and contention/isolation2cases, no test skips. Production
+and benchmark files are unchanged by the subsequent test-mock/docs correction.
+
+| Platform/filesystem |250 append p50/p95/p99 ms|1000|5000|10000|
+|---|---|---|---|---|
+|Windows Python3.11.9 /NTFS|15.5667/17.5977/17.6515|22.3817/25.7615/26.0261|60.2946/66.1891/68.6565|114.4811/136.0254/136.5571|
+|Ubuntu Python3.11.17 /tmpfs|5.1264/5.3277/5.4256|18.7582/19.3846/19.4322|90.8078/96.0018/96.5764|183.2796/193.1897/194.7001|
+
+10k reopen samples: Windows103.329/102.582/113.759ms; Ubuntu194.065/195.854/195.729ms.
+Python allocation peaks5,070,133 /5,065,051bytes. Actual G1 commit p95 under background
+load: Windows30.3622→113.3969ms (10background passes); Ubuntu0.4912→139.3518ms
+(3passes). tmpfs is memory-backed: Linux results **do not prove physical-disk
+durability or disk throughput**. No cross-machine speed ranking/SLA is inferred.
+Full raw20timing samples, source/tree, logs and per-platform JSON are in run artifacts.
 
 Routine:
 ```powershell

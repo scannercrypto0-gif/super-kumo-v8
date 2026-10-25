@@ -63,7 +63,7 @@ class HardeningTests(unittest.TestCase):
             def reparse(path,*a,**kw):
                 if path==p:
                     from types import SimpleNamespace
-                    return SimpleNamespace(st_file_attributes=0x400)
+                    return SimpleNamespace(st_mode=original(path,*a,**kw).st_mode, st_file_attributes=0x400)
                 return original(path,*a,**kw)
             with patch.object(Path,'lstat',reparse):
                 with self.assertRaises(JournalIntegrityError):DurablePositionJournal(p)
