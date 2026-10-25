@@ -10,10 +10,13 @@ from .offline_evaluation_result import OfflineEvaluationResult
 from .future_bar_evidence import FutureBarEvidence
 from .strategy_definition import number
 from .historical_library import _interval_to_ms
+import re
+
+_SHA256 = re.compile(r"[0-9a-f]{64}\\Z")
 
 
 def simulate_single_long(inputs, *, expected_digest, signal, ttl_bars=1,
-                         future=None):
+                         future=None, expected_future_digest=None):
     """Evaluate one explicitly supplied long signal, not a strategy signal engine.
 
     Supported: zero-exposure NO_SIGNAL or UNKNOWN when post-decision
@@ -47,10 +50,16 @@ def simulate_single_long(inputs, *, expected_digest, signal, ttl_bars=1,
         return OfflineEvaluationResult({**common, "outcome": "NO_SIGNAL",
                                         "reason": "NO_SIGNAL"})
     if future is None:
+        if expected_future_digest is not None:
+            raise ValueError("Future digest supplied without evidence")
         return OfflineEvaluationResult({**common, "outcome": "UNRESOLVED",
                                         "reason": "UNKNOWN"})
     if not isinstance(future, FutureBarEvidence):
         raise ValueError("Validated future evidence required")
+    if (type(expected_future_digest) is not str or
+        not _SHA256.fullmatch(expected_future_digest) or
+        expected_future_digest != future.digest):
+        raise ValueError("Separately retained future evidence digest required")
     evidence = future.spec
     if (evidence["inputs_digest"] != inputs.digest or
         evidence["decision_cutoff_ms"] != decision or
