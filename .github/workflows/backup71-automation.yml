@@ -1,7 +1,7 @@
 name: Backup71 encrypted automation acceptance
 on:
   pull_request:
-    paths: ["src/aql/archive/automation.py", "src/aql/archive/encrypted.py", "scripts/*backup71*", "tests/test_backup71_automation.py", "pyproject.toml", ".github/workflows/backup71-automation.yml"]
+    paths: ["src/aql/archive/automation.py", "src/aql/archive/encrypted.py", "scripts/*backup71*", "tests/test_backup71_automation.py", "tests/test_backup71_trust.py", "pyproject.toml", ".github/workflows/backup71-automation.yml"]
   workflow_dispatch:
 permissions:
   contents: read
@@ -30,9 +30,9 @@ jobs:
           python --version | tee -a backup71-source.txt
           python -m pip freeze | tee -a backup71-source.txt
       - name: Synthetic encryption, failure and recovery tests
-        run: python -B -m pytest tests/test_backup71_automation.py -v --tb=short --junitxml=backup71.xml
+        run: python -B -m pytest tests/test_backup71_automation.py tests/test_backup71_trust.py tests/test_g1_storage_02.py::test_backup_wal_restore_exact_and_out_of_place_replay tests/test_g1_storage_02_followup.py::test_live_wal_snapshot_excludes_uncommitted_transaction_and_reconciles_rows -v --tb=short --junitxml=backup71.xml
       - name: No skipped acceptance cases
-        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('backup71.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==29; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
+        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('backup71.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==55; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
       - name: PowerShell syntax (no task registration in CI)
         shell: pwsh
         run: |

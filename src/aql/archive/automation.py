@@ -73,17 +73,32 @@ def media(value):
     return root.stat().st_dev, root.stat().st_ino, marker.read_bytes()
 
 
+def verify_generation(source, kind, commitment, anchor):
+    source = Path(source)
+    kit, (files, _) = limited_scan(source)
+    if kind == "custody_bundle":
+        # A manifest of copied live DB bytes does not establish WAL consistency.
+        # SQLite belongs only in the existing verified archive-backup adapter.
+        for name in files:
+            if name.lower().endswith(("-wal", "-shm", "-journal")):
+                raise ValueError("SQLite sidecar requires WAL-aware archive backup")
+            with open(source/name,"rb") as stream:
+                if stream.read(16)==b"SQLite format 3\x00":
+                    raise ValueError("Raw SQLite requires WAL-aware archive backup")
+        kit.verify_custody_bundle(source,anchor)
+    elif kind == "archive_backup":
+        verify_backup(source,expected_digest=commitment,max_bytes=128 << 20)
+    else:raise ValueError("Unsupported generation kind")
+    return commitment
+
+
 def verify_source(value, source=None):
     source = Path(source or value["source"])
     kit, _ = limited_scan(source)
     anchor = kit.check_anchor(source,Path(value["anchor"]))
     commitment = read_small(anchor,128).decode("ascii").strip()
     if not re.fullmatch("[0-9a-f]{64}",commitment): raise ValueError("Invalid retained anchor")
-    if value["source_kind"] == "custody_bundle":
-        kit.verify_custody_bundle(source,anchor)
-    else:
-        verify_backup(source,expected_digest=commitment,max_bytes=128 << 20)
-    return commitment
+    return verify_generation(source,value["source_kind"],commitment,anchor)
 
 
 def now(): return datetime.now(timezone.utc)
@@ -93,29 +108,87 @@ def save(path, value):
     write_new(path,canonical(value)+b"\n"); sync_dir(path.parent)
 
 
-def completed(destination):
-    if not Path(destination).exists(): return []
-    result=[]; count=0
+def expected_published(destination, state, deadline):
+    """Previously successful LOCAL results detect entire missing generations.
+
+    An intent alone can precede a crash-before-publish, so it must not be treated
+    as proof of publication. Interrupted intents remain degraded in health().
+    """
+    expected=set()
+    if state is None or not Path(state).exists():return expected
+    with os.scandir(check_path(state)) as entries:
+        for count,entry in enumerate(entries,1):
+            if time.monotonic()>deadline:raise TimeoutError("Published-point audit deadline")
+            if count>8192:
+                raise ValueError("Published-point audit bound exhausted")
+            if not entry.name.endswith(".result.json"):continue
+            row=parse(read_small(check_path(entry.path),32768))
+            if row.get("destination")!=str(check_path(destination)):continue
+            if row.get("status")=="VERIFIED_ENCRYPTED_LOCAL":bid=row["backup_id"]
+            elif row.get("status")=="ALREADY_VERIFIED_TODAY":bid=row["existing_backup_id"]
+            else:continue
+            if not re.fullmatch(r"\d{8}T\d{6}Z-[0-9a-f]{32}",bid):raise ValueError("Invalid published identity")
+            expected.add(bid)
+            if len(expected)>4096:raise ValueError("Published-point count bound")
+    return expected
+
+
+def completed(destination, *, receipt_state=None, max_cipher_bytes=2_000_000_000, timeout=60):
+    result=[]; count=0; remaining=max_cipher_bytes; deadline=time.monotonic()+timeout
+    expected_ids=expected_published(destination,receipt_state,deadline)
+    if not Path(destination).exists():
+        if expected_ids:raise FileNotFoundError("Previously published recovery points missing")
+        return []
     with os.scandir(check_path(destination)) as entries:
         for entry in entries:
+            if time.monotonic()>deadline:raise TimeoutError("Retained-generation audit deadline")
             count+=1
             if count>4096: raise ValueError("Backup generation bound reached; no pruning authorized")
             path=check_path(entry.path)
             if path.name.endswith(".partial"): continue
             if not path.is_dir(): raise ValueError("Unexpected backup generation entry")
-            receipt=parse(read_small(path/"receipt.json",32768))
+            raw=read_small(path/"receipt.json",32768)
+            receipt=parse(raw)
+            # Monitoring uses previously retained LOCAL state, not self-hashed
+            # metadata supplied by the external disk. This is not independent
+            # custody: an attacker controlling both stores is outside this gate.
+            if receipt_state is None:raise ValueError("Retained receipt state required")
+            state=check_path(receipt_state)
+            bid=receipt["backup_id"]
+            if not re.fullmatch(r"\d{8}T\d{6}Z-[0-9a-f]{32}",bid) or bid!=path.name:
+                raise ValueError("Backup identity mismatch")
+            pin_path=check_path(state/(bid+".receipt-pin.sha256"))
+            if pin_path.exists():
+                expected=read_small(pin_path,128).decode("ascii").strip()
+                if expected!=hashlib.sha256(raw).hexdigest():raise ValueError("Retained receipt pin mismatch")
+            else:
+                # Compatibility with parent111: only an already retained outbox
+                # receipt can establish this cache. Never bootstrap it from F:.
+                retained=check_path(state/"outbox"/(bid+".receipt.json"))
+                if not retained.exists() or read_small(retained,32768)!=raw:
+                    raise ValueError("Previously retained receipt evidence missing")
             stored=receipt.pop("receipt_sha256")
             if digest(receipt)!=stored or receipt["status"]!="VERIFIED_ENCRYPTED_LOCAL":
                 raise ValueError("Invalid completed receipt")
             if receipt["backup_id"]!=path.name: raise ValueError("Backup identity mismatch")
+            if raw!=canonical(receipt|{"receipt_sha256":stored})+b"\n":
+                raise ValueError("Noncanonical completed receipt")
+            # All retained points must be intact before any can reserve tiers.
+            # A corrupt point or exhausted audit budget fails closed, never
+            # silently drops that point or claims retained coverage is healthy.
+            remaining-=verify_cipher(path,receipt,max_bytes=remaining,deadline=deadline)
             result.append((path,receipt|{"receipt_sha256":stored}))
+    if expected_ids-{receipt["backup_id"] for _,receipt in result}:
+        raise FileNotFoundError("Previously published recovery point missing")
     return result
 
 
-def verify_cipher(path, receipt):
-    size, hashed=file_hash(path/"backup.atlas71",max_bytes=(136 << 20),deadline=time.monotonic()+60)
+def verify_cipher(path, receipt, *, max_bytes=(136 << 20), deadline=None):
+    size, hashed=file_hash(path/"backup.atlas71",max_bytes=min(max_bytes,136 << 20),
+                          deadline=deadline if deadline is not None else time.monotonic()+60)
     if hashed!=receipt["cipher_sha256"] or size!=receipt["cipher_bytes"]:
         raise ValueError("CIPHERTEXT_HASH_MISMATCH")
+    return size
 
 
 def periods(date):
@@ -124,13 +197,17 @@ def periods(date):
 
 def outbox_write(state, receipt):
     outbox=state/"outbox";outbox.mkdir(exist_ok=True)
-    for name,raw in ((receipt["backup_id"]+".receipt.json",canonical(receipt)+b"\n"),
+    receipt_bytes=canonical(receipt)+b"\n"
+    pin=hashlib.sha256(receipt_bytes).hexdigest()
+    for name,raw in ((receipt["backup_id"]+".receipt.json",receipt_bytes),
+                     (receipt["backup_id"]+".receipt.sha256",(pin+"\n").encode("ascii")),
                      (receipt["backup_id"]+".anchor.sha256",(receipt["cipher_sha256"]+"\n").encode("ascii"))):
         path=check_path(outbox/name)
         if path.exists():
             if read_small(path,32768)!=raw:raise ValueError("Outbox conflict; never overwrite")
         else:write_new(path,raw)
     sync_dir(outbox)
+    return pin
 
 
 def run(config_path, *, execute=False, fault=None):
@@ -156,14 +233,14 @@ def run(config_path, *, execute=False, fault=None):
             # source, encrypted copy and bounded ZIP restore temp can coexist.
             if shutil.disk_usage(value["external_root"]).free < value["reserve_bytes"]+total+ (8 << 20):
                 raise OSError("INSUFFICIENT_EXTERNAL_SPACE")
-            previous=completed(value["destination"]); slots=periods(date)
+            previous=completed(value["destination"],receipt_state=state); slots=periods(date)
             for path,receipt in previous:
                 if (receipt["config_hash"]==identity and receipt["periods"]["daily"]==slots["daily"]
                         and receipt["source_commitment"]==commitment):
-                    verify_cipher(path,receipt)
                     if media(value)!=observed: raise ValueError("MEDIA_CHANGED")
-                    outbox_write(state,receipt)
+                    receipt_pin=outbox_write(state,receipt)
                     result=common|{"status":"ALREADY_VERIFIED_TODAY","existing_backup_id":receipt["backup_id"],
+                                   "receipt_file_sha256":receipt_pin,
                                    "finished_at":now().isoformat(),"duration_s":time.monotonic()-started}
                     save(state/(bid+".result.json"),result);return result
             dest=check_path(value["destination"]);dest.mkdir(parents=True,exist_ok=True)
@@ -184,14 +261,19 @@ def run(config_path, *, execute=False, fault=None):
                      "independent_custody_verified":False,"cloud_upload":"NOT_VERIFIED"}
             receipt["receipt_sha256"]=digest(receipt)
             save(partial/"receipt.json",receipt);verify_cipher(partial,receipt)
+            # Durable independent-of-F local intent precedes publication, so a
+            # crash after rename can recover without trusting new local metadata.
+            pin=hashlib.sha256(canonical(receipt)+b"\n").hexdigest()
+            write_new(state/(bid+".receipt-pin.sha256"),(pin+"\n").encode("ascii"));sync_dir(state)
             sync_dir(partial);fault("before_publish")
             if media(value)!=observed: raise ValueError("MEDIA_CHANGED")
             final=dest/bid
             if final.exists(): raise FileExistsError("Completed backup must never be replaced")
             os.rename(partial,final);sync_dir(dest);fault("after_publish")
             # Outbox is deliberately paths-free; uploads are explicit, never automatic.
-            outbox_write(state,receipt)
-            result=common|receipt|{"finished_at":now().isoformat(),"duration_s":time.monotonic()-started}
+            receipt_pin=outbox_write(state,receipt)
+            result=common|receipt|{"receipt_file_sha256":receipt_pin,
+                                   "finished_at":now().isoformat(),"duration_s":time.monotonic()-started}
             save(state/(bid+".result.json"),result);return result
         except Exception as error:
             # Exception text may contain keys/paths/backend details: only class/reason code.
@@ -201,9 +283,12 @@ def run(config_path, *, execute=False, fault=None):
             raise
 
 
-def restore(config_path, backup, target, private_key, *, password=None):
+def restore(config_path, backup, target, private_key, *, expected_receipt_sha256, password=None):
     value=config(config_path);backup=check_path(backup);target=check_path(target)
-    state=check_path(value["local_state"]);state.mkdir(parents=True,exist_ok=True)
+    state=check_path(value["local_state"])
+    if state==backup or backup in state.parents or state in backup.parents:
+        raise ValueError("Restore audit state must not overlap backup")
+    state.mkdir(parents=True,exist_ok=True)
     rid="restore-"+uuid.uuid4().hex;started=now()
     try:
         if target.exists() or target==backup or target in backup.parents or backup in target.parents:
@@ -211,8 +296,16 @@ def restore(config_path, backup, target, private_key, *, password=None):
         private_path=check_path(private_key)
         if private_path==backup or backup in private_path.parents:
             raise ValueError("Private recovery key must be separate from backup")
-        receipt=parse(read_small(backup/"receipt.json",32768));stored=receipt.pop("receipt_sha256")
-        if digest(receipt)!=stored or receipt["config_hash"]!=digest(value): raise ValueError("Wrong receipt/config")
+        raw=read_small(backup/"receipt.json",32768)
+        if (type(expected_receipt_sha256) is not str or not re.fullmatch(r"[0-9a-f]{64}",expected_receipt_sha256)
+                or hashlib.sha256(raw).hexdigest()!=expected_receipt_sha256):
+            raise ValueError("Independently retained receipt pin mismatch")
+        receipt=parse(raw);stored=receipt.pop("receipt_sha256")
+        if (digest(receipt)!=stored or receipt["schema"]!="atlas-backup71-receipt-1"
+                or receipt["status"]!="VERIFIED_ENCRYPTED_LOCAL"
+                or receipt["source_kind"] not in ("custody_bundle","archive_backup")
+                or not re.fullmatch(r"[0-9a-f]{64}",receipt["source_commitment"])):
+            raise ValueError("Invalid pinned receipt")
         if receipt["key_fingerprint"]!=value["public_key_sha256"]:raise ValueError("Wrong recovery key commitment")
         verify_cipher(backup,receipt)
         deadline=time.monotonic()+120
@@ -225,12 +318,18 @@ def restore(config_path, backup, target, private_key, *, password=None):
             target.parent.mkdir(parents=True,exist_ok=True)
             partial=target.parent/(rid+".restore-partial")
             extract(plain,partial,deadline=deadline)
-        if verify_source(value,partial)!=receipt["source_commitment"]: raise ValueError("Restore commitment mismatch")
+        # The external receipt pin binds this OLD generation's source identity.
+        # Never compare it with a rotated current anchor or old absolute paths.
+        anchor=state/(rid+".source-anchor.sha256")
+        write_new(anchor,(receipt["source_commitment"]+"\n").encode("ascii"));sync_dir(state)
+        verify_generation(partial,receipt["source_kind"],receipt["source_commitment"],anchor)
         verify_cipher(backup,receipt)
         if target.exists(): raise FileExistsError("Restore target appeared")
         os.rename(partial,target);sync_dir(target.parent)
         result={"status":"ENCRYPTED_RESTORE_VERIFIED","backup_id":receipt["backup_id"],"restore_id":rid,
                 "config_hash":digest(value),
+                "source_version":receipt["source_version"],"source_kind":receipt["source_kind"],
+                "receipt_file_sha256":expected_receipt_sha256,"receipt_pin_verified":True,
                 "started_at":started.isoformat(),"finished_at":now().isoformat(),
                 "independent_custody_verified":False}
         save(state/(rid+".result.json"),result);return result
@@ -245,9 +344,9 @@ def health(config_path):
     try:
         media(value)
         if shutil.disk_usage(value["external_root"]).free<value["reserve_bytes"]+(8 << 20): issues.append("LOW_SPACE")
-        previous=[(p,r) for p,r in completed(value["destination"]) if r["config_hash"]==digest(value)]
+        previous=[(p,r) for p,r in completed(value["destination"],receipt_state=value["local_state"]) if r["config_hash"]==digest(value)]
         if previous:
-            path,success=max(previous,key=lambda pair:pair[1]["created_at"]);verify_cipher(path,success)
+            path,success=max(previous,key=lambda pair:pair[1]["created_at"])
             age=(date-datetime.fromisoformat(success["created_at"])).total_seconds()
             if not 0<=age<=26*3600:issues.append("BACKUP_OVERDUE_OR_CLOCK_UNCERTAIN")
         else:issues.append("NO_VERIFIED_BACKUP")
@@ -264,7 +363,8 @@ def health(config_path):
                     if p.name.endswith(".result.json"):
                         row=parse(read_small(p,32768))
                         if last is None or row["finished_at"]>last["finished_at"]:last=row
-                        if row["status"]=="ENCRYPTED_RESTORE_VERIFIED" and row.get("config_hash")==digest(value):
+                        if (row["status"]=="ENCRYPTED_RESTORE_VERIFIED" and row.get("config_hash")==digest(value)
+                                and row.get("source_version")==value["source_version"] and row.get("receipt_pin_verified") is True):
                             if last_restore is None or row["finished_at"]>last_restore:last_restore=row["finished_at"]
                     elif p.name.endswith(".started.json") and not p.with_name(p.name.replace(".started.json",".result.json")).exists():
                         issues.append("INTERRUPTED_ATTEMPT_REQUIRES_REVIEW")
@@ -280,7 +380,7 @@ def health(config_path):
 
 def retention(config_path):
     value=config(config_path);media(value);date=now();candidates=[]
-    for path,receipt in completed(value["destination"]):
+    for path,receipt in completed(value["destination"],receipt_state=value["local_state"]):
         created=datetime.fromisoformat(receipt["created_at"])
         anniversary=created.replace(year=created.year+1,
             day=min(created.day,calendar.monthrange(created.year+1,created.month)[1]))
@@ -297,17 +397,19 @@ def main():
     parser.add_argument("action",choices=("backup","health","retention","restore"))
     parser.add_argument("--config",required=True);parser.add_argument("--execute",action="store_true")
     parser.add_argument("--backup");parser.add_argument("--target");parser.add_argument("--private-key")
+    parser.add_argument("--receipt-sha256",help="Raw receipt-file SHA256 from independently retained evidence")
     args=parser.parse_args()
     try:
         if args.action=="backup":result=run(args.config,execute=args.execute)
         elif args.action=="health":result=health(args.config)
         elif args.action=="retention":result=retention(args.config)
         else:
-            if not args.execute or not all((args.backup,args.target,args.private_key)):
-                parser.error("restore requires execute, backup, new target and private-key")
+            if not args.execute or not all((args.backup,args.target,args.private_key,args.receipt_sha256)):
+                parser.error("restore requires execute, backup, new target, private-key and independent receipt-sha256")
             # Optional secure process environment, never CLI argument or log.
             password=os.environ.get("ATLAS_BACKUP_RECOVERY_PASSPHRASE")
             result=restore(args.config,args.backup,args.target,args.private_key,
+                           expected_receipt_sha256=args.receipt_sha256,
                            password=password.encode() if password else None)
         print(canonical(result).decode())
         return 1 if result.get("status")=="DEGRADED" else 0

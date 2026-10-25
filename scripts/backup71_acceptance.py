@@ -46,10 +46,13 @@ def main():
         (root/"config.json").write_bytes(canonical(value))
         print(json.dumps({"status":"SYNTHETIC_PREPARED_NOT_A_BACKUP","config":str(root/"config.json")}))
     else:
-        cfg=root/"config.json";value=a.config(cfg);backups=a.completed(value["destination"])
+        cfg=root/"config.json";value=a.config(cfg);backups=a.completed(value["destination"],receipt_state=value["local_state"])
         if len(backups)!=1:raise ValueError("Expected one actual scheduled/manual fixture backup")
         backup,receipt=backups[0]
-        restored=a.restore(cfg,backup,root/"restored",root/"synthetic-private.pem",password=TEST_PASSWORD)
+        # Synthetic harness models the independent pin input. This locally
+        # computed fixture value is NOT independent custody acceptance.
+        pin=hashlib.sha256((backup/"receipt.json").read_bytes()).hexdigest()
+        restored=a.restore(cfg,backup,root/"restored",root/"synthetic-private.pem",expected_receipt_sha256=pin,password=TEST_PASSWORD)
         left=(root/"source/synthetic.txt").read_bytes();right=(root/"restored/synthetic.txt").read_bytes()
         if left!=right:raise ValueError("Synthetic restore bytes differ")
         before=hashlib.sha256((backup/"backup.atlas71").read_bytes()).hexdigest()
