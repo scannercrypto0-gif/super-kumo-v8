@@ -171,19 +171,23 @@ class TestObservationWorker(unittest.TestCase):
     def test_handoff_race_reports_unattributed_instead_of_missing_identity(self):
         from threading import Event
         with tempfile.TemporaryDirectory() as d:
-            worker = ObservationWorker(Path(d) / "positions.jsonl")
+            import queue
+            from unittest.mock import patch
             entered, release = Event(), Event()
-            real_get = worker.jobs.get
+            real_get = queue.Queue.get
 
-            def held_get(*args, **kwargs):
-                event = real_get(*args, **kwargs)
+            def held_get(q, *args, **kwargs):
+                event = real_get(q, *args, **kwargs)
                 entered.set()
                 release.wait(timeout=5)
                 return event
 
-            worker.jobs.get = held_get
-            self.assertTrue(worker.submit(PositionEvent(
-                "p", "open", "opened", 0, 0, "offline")))
+            # Patch before the worker thread starts; the worker can then
+            # be deterministically held between dequeue and inflight assignment.
+            with patch.object(queue.Queue, "get", held_get):
+                worker = ObservationWorker(Path(d) / "positions.jsonl")
+                self.assertTrue(worker.submit(PositionEvent(
+                    "p", "open", "opened", 0, 0, "offline")))
             try:
                 self.assertTrue(entered.wait(timeout=3))
                 report = worker.snapshot()
