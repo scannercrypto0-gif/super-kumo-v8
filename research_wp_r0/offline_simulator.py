@@ -12,7 +12,7 @@ from .strategy_definition import number
 from .historical_library import _interval_to_ms
 import re
 
-_SHA256 = re.compile(r"[0-9a-f]{64}\\Z")
+_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 
 
 def simulate_single_long(inputs, *, expected_digest, signal, ttl_bars=1,
