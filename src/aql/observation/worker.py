@@ -26,7 +26,7 @@ class ObservationWorker:
         self.rejected = 0
         self.committed = 0
         self._inflight: PositionEvent | None = None
-        self._failed_event_ids: list[str] = []
+        self._failed_event_ids: list[tuple[str, str]] = []
         self._lock = threading.Lock()
         # Fail closed on corrupt historical journal BEFORE admitting any work.
         self.journal = DurablePositionJournal(self.journal_path)
@@ -63,7 +63,7 @@ class ObservationWorker:
             except Exception as exc:
                 with self._lock:
                     self.errors.append(type(exc).__name__)
-                    self._failed_event_ids.append(event.event_id)
+                    self._failed_event_ids.append((event.position_id, event.event_id))
                     self.errors[:] = self.errors[-16:]
                 # Fail closed: no more writes after an uncommitted event.
                 self.stop_event.set()
@@ -73,20 +73,40 @@ class ObservationWorker:
                 self.jobs.task_done()
 
     def snapshot(self) -> dict:
+        # Queue transitions are guarded by queue.mutex; worker inflight
+        # transitions use _lock. They are NOT one atomic transaction.
+        # Never claim a complete identity inventory across that handoff.
         with self._lock:
-            return {
-                "accepted_but_unconfirmed": self.jobs.unfinished_tasks,
-                "failed_event_ids": list(self._failed_event_ids),
-                "unconfirmed_event_ids": ([self._inflight.event_id] if self._inflight else [])
-                    + [event.event_id for event in list(self.jobs.queue)],
-                "committed_or_duplicate": self.committed,
-                "rejected": self.rejected,
-                "errors": list(self.errors),
-                "worker_alive": self.thread.is_alive(),
-                "healthy": not self.errors and not self.stop_event.is_set()
-                           and self.thread.is_alive(),
-                "uncommitted_inputs_are_volatile": True,
-            }
+            inflight = ((self._inflight.position_id, self._inflight.event_id)
+                        if self._inflight is not None else None)
+            failed = list(self._failed_event_ids)
+            errors = list(self.errors)
+            committed = self.committed
+            rejected = self.rejected
+            stopped = self.stop_event.is_set()
+            alive = self.thread.is_alive()
+        with self.jobs.mutex:
+            queued = [(event.position_id, event.event_id)
+                      for event in self.jobs.queue]
+            pending = self.jobs.unfinished_tasks
+        identities = ([inflight] if inflight else []) + queued
+        # A dequeued event may be between queue.get and _inflight assignment.
+        # Unattributed work is explicit, not silently omitted.
+        unattributed = max(0, pending - len(identities))
+        return {
+            "accepted_but_unconfirmed": pending,
+            "unconfirmed_event_ids": identities,
+            "unattributed_unconfirmed_count": unattributed,
+            "identities_exhaustive": unattributed == 0
+                                     and len(identities) == pending,
+            "failed_event_ids": failed,
+            "committed_or_duplicate": committed,
+            "rejected": rejected,
+            "errors": errors,
+            "worker_alive": alive,
+            "healthy": not errors and not stopped and alive,
+            "uncommitted_inputs_are_volatile": True,
+        }
 
     def finish(self, timeout: float = 1.0) -> dict:
         if timeout < 0:
