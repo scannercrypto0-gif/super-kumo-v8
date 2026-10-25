@@ -20,13 +20,16 @@ class FrozenAttemptWriter:
         self.family_id = plan["family_id"]
         self.allowed = {r["candidate_id"]: r["strategy_digest"]
                         for r in plan["candidates"]}
+        # Enrollment and legacy-history rejection are atomic with ledger writes.
+        # Reconciliation alone does not install the durable membership policy.
+        ledger.bind_frozen_plan(raw_plan, expected_digest)
         reconcile_full_research_plan(raw_plan, expected_digest, ledger)
 
     def record_attempt(self, event):
         """Validate before writing, then delegate atomic append to real ledger.
 
-        All writes for this family MUST go through this adapter. The underlying
-        ledger does not enforce manifest membership against direct callers.
+        The ledger's sealed policy is authoritative even for direct callers;
+        this callback adds validation, but cannot replace plan membership.
         """
         if type(event) is not dict or event.get("family_id") != self.family_id:
             raise ValueError("Wrong frozen experiment family")
@@ -37,8 +40,8 @@ class FrozenAttemptWriter:
             raise ValueError("Strategy differs from frozen plan")
         if event.get("state") not in {"PENDING", "INPUTS", "FAILED", "ABANDONED", "INVALID"}:
             raise ValueError("Unsupported attempt state")
-        # Recheck previous journal state before append. This is not an
-        # interprocess admission lock: a direct writer can race the check.
+        # This read-only inventory is diagnostic. Membership is enforced again
+        # inside the ledger's BEGIN IMMEDIATE transaction, not by this read.
         reconcile_full_research_plan(self.raw_plan, self.expected_digest, self.ledger)
         def admission(candidate_event, prior_events, prior_checkpoint):
             for prior in prior_events:

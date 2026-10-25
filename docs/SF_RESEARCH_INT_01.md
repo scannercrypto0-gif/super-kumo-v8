@@ -1,8 +1,10 @@
 # SF-RESEARCH-INT-01: historical evaluation integration boundary
 
-Issue #77; research only. This delivers the accepted-main **input adapter and
-contracts**, not a reconciled backtest engine, durable ledger, empirical study or
-promotion decision. Main baseline: `4e4c3537036bdf2b106c1a63ec65b2a9855972a7`.
+Issue #77; research only. Current remediation baseline:
+`20f28986e33b5079a3c8b8b866f2d8841e715271` (merged #78/#89). Accepted foundations
+include input contracts, durable attempt receipts and frozen-plan inventory;
+these are not an evaluated backtest, independent custody or promotion decision.
+Earlier milestone measurements below retain their original source attribution.
 
 ## Capability and ancestry inventory
 
@@ -13,13 +15,13 @@ promotion decision. Main baseline: `4e4c3537036bdf2b106c1a63ec65b2a9855972a7`.
 | Strategy JSON, bounded candidate grid | `strategy_definition.py`; #69 merged | Definition/binding only, no AST signal execution in main. |
 | Input protocol / bridge | This additive module | One complete prefix and cutoff per call, immutable envelope; no signal or return calculation. |
 | Backtest / evaluation / temporal manifests | PR #46 head a4c106a02c55ee012eedf4c55c1488d71d850203, `strategy_factory.py`, `evaluation.py` | OPEN, UNMERGED, API draft=false when inspected. Reference only. |
-| Family ledger, journal, fsync, replay | PR #46 inherited `durable_journal.py` and trial-family code | Not present in accepted main. Existing main AttemptRecorder is a caller-owned sink port, not that ledger. |
+| Received-attempt ledger / frozen family inventory | Main AttemptLedger, FrozenAttemptWriter, commit_research_plan and reconciliation (#78/#89) | Local receipts and plan inventory exist; this remediation seals the default writer before receipts. Independent custody/evaluated results remain blocked. PR46's typed journal is still unmerged and not imported. |
 | Baselines, block bootstrap, multiplicity | PR #46 research ancestry | Unmerged reference; no calibrated statistical claims imported. |
 | OOS / holdout / shadow | No accepted-main custody/evaluation runtime | No OOS evidence, final holdout access, shadow deployment or trading in this work. |
-| Operational archive | Draft #73, Issue #71 | Outside scope; never used as research runtime/feed. |
-| Architecture map | Draft #74 | Documentation proposal, not merged runtime authority. #76/OD-01 remains owner-gated. |
+| Operational archive | Merged #73, Issue #71 | Outside scope; never used as research runtime/feed. |
+| Architecture map / content identity | Merged #74 / OD01B approved and implemented in merged #78 | Documentation and identity are not production, evaluated-result or independent-custody authority. |
 
-GitHub compare main...PR46 reports **diverged, 115 ahead / 55 behind**, common
+Historical compare at main4e4c353...PR46 reported **diverged, 115 ahead / 55 behind**, common
 ancestor `ed188f1902d397fe74613dd966c5a3e88b32f8c0`. PR46 base is the old #43
 research line, not accepted current main. Its journal accepts typed `Attempt`
 plus an `event_id`; the accepted AttemptRecorder sends event dictionaries.
@@ -239,15 +241,47 @@ hardware caches and independently authenticated anchors remain unproven/out of s
 
 ### Remaining honest blockers
 
-Received-attempt receipts now have durable local replay; complete preregistered
-family accounting (including candidates never submitted), metric/alpha/selection
-policy and legacy checkpoint interchange are NOT delivered by this narrow adapter.
+Received-attempt receipts have durable local replay; #89 added full-plan candidate,
+metric/selection/cost/split commitments and missing/pending inventory. Those are
+not independent provenance or evaluated-family acceptance. Legacy checkpoint
+interchange remains separate and unimplemented by this remediation.
 No compatible evaluated-result/backend is installed, so COMPLETE remains disabled.
 Historical evaluator/real source receipt/coverage and frozen splits remain blocked;
 no duplicate engine, empirical result, profit, OOS or shadow-runtime claim. Final
 Holdout remains CLOSED; no G1/Scanner/cloud/production or main change.
 
-Final evidence/counts/head/CI and local invocation details are recorded on Issue77
-and existing Draft78. Prior393+36identity+32receipt tests =461 distinct final CI
-cases. One final PR-triggered Factory matrix; remove duplicate push trigger to avoid
-running that same matrix twice on one submitted change. No manual repeated dispatch.
+Earlier #78 evidence:393+36identity+32receipt =461 cases. #78 is now merged;
+current remediation uses one new Draft linked to #77. Exact new head, commands,
+CI counts and inherited-versus-new evidence are recorded there, without rerunning
+unchanged jobs or treating prior accepted scopes as new acceptance.
+
+## Mandatory frozen admission path — #77 / 2026-10-25 remediation
+
+Use `FrozenAttemptWriter(ledger, raw_plan, expected_digest)` before any receipt.
+It verifies the canonical full plan, calls existing ledger.bind_frozen_plan under
+BEGIN IMMEDIATE, and only then reconciles/exposes the writer. Enrollment of an
+eligible empty ledger stores exact plan bytes/digest and admission-required flag
+in one transaction. Reopening identical sealed plan is idempotent; different plan,
+invalid commitment, incompatible pre-enrollment history or missing policy rejects.
+No old records are silently adopted, rewritten, repaired or assigned a new hash.
+
+The ledger enforces family/candidate/strategy membership inside each append's
+write transaction before duplicate acknowledgement or callback. A permissive
+callback and stale handle cannot authorize an unplanned receipt. Protected ledgers
+without a seal reject even with a callback; callbacks remain an additional check,
+not the source of membership authority. Generic unprotected legacy usage remains
+separate; it cannot be retroactively enrolled after receiving any receipt.
+
+Existing DBs require their existing WAL/schema/policy. Missing rows/tables or an
+incompatible non-WAL DB fail closed, with no automatic schema/journal-mode repair.
+New DB schema initialization is transactional. Same-plan reopening validates prior
+receipts; corrupt plan bytes/digest or inconsistent sealed policy rejects writes.
+SQLite serializes concurrent enrollment and append. If an unprotected write wins
+before enrollment, binding rejects the nonempty ledger; if enrollment wins, the
+unplanned write rejects. No silently adopted history or partial receipt is allowed.
+
+No compatible evaluator is introduced; COMPLETE remains disabled, INPUTS remains
+INPUTS_ONLY_NOT_EVALUATED. Reconciliation's missing/pending/NOT_EVALUATED output
+is inventory, never a performance result, OOS/custody certificate or promotion.
+See the Factory custody runbook for the reproducible independent-custody gap and
+the explicitly BLOCKED acceptance plan; no new storage/provider is installed.
