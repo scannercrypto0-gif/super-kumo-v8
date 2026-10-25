@@ -1,0 +1,28 @@
+name: SF Synthetic Execution
+on:
+  pull_request:
+    paths:
+      - 'research_wp_r0/synthetic_execution.py'
+      - 'tests/test_factory_synthetic_execution.py'
+      - 'research_wp_r0/synthetic_opportunities.py'
+      - 'tests/test_factory_synthetic_opportunities.py'
+      - 'research_wp_r0/synthetic_summary.py'
+      - 'tests/test_factory_synthetic_summary.py'
+      - '.github/workflows/sf-synthetic-execution.yml'
+  workflow_dispatch:
+jobs:
+  synthetic:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.10', '3.12']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m unittest discover -s tests -p test_factory_synthetic_execution.py -v
+      - run: python -m unittest discover -s tests -p test_factory_synthetic_opportunities.py -v
+      - run: python -m unittest discover -s tests -p test_factory_synthetic_summary.py -v
