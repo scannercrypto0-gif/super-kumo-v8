@@ -1,5 +1,39 @@
 # G1-STORAGE-02 — nonproduction local archive/restore runbook
 
+## Consolidated follow-up: explicit finite restore drill
+
+Read [delta evidence](evidence/G1_STORAGE_02_FOLLOWUP.md) and
+[offline contract](G1_STORAGE_02_OFFLINE_CONTRACT.md). Reuse the existing writer;
+no service, pipeline activation, download or second archiver is installed.
+After owner identifies an approved disposable journal/archive/backup parent and
+new restore target, the existing CLI can batch the local drill:
+
+```powershell
+python -B -m aql.archive --journal <approved-journal.sqlite> --root <approved-archive> --market spot --build <same-build> --policy <same-policy> --batches 4 --batch-size 64 --backup-to <approved-backup-parent> --restore-to <new-disposable-restore>
+```
+
+This command **writes opt-in local archive/backup/restore files**. Review paths,
+identity, free space and budgets first; it is not a dry run. Use only authorized
+disposable scope. Optional `--operational <approved-hot.sqlite>` includes an
+individually coherent hot snapshot, not a global journal/hot transaction.
+`--restore-to` and `--operational` require `--backup-to`. Output reports remaining
+backlog; finite execution is not continuous coverage. Periodic external scheduling
+is a separate operating choice; do not create autostart or duplicate fetch cycles.
+
+Same-run restore uses the just-created inventory digest for **local reconciliation**;
+output says `SAME_RUN_LOCAL_COMMITMENT_NOT_INDEPENDENT_CUSTODY`. Retain the digest
+under approved independent protection before claiming independent recovery.
+Source backup completion time is locally observed, hashed metadata; clock trust
+and actual provider availability remain unverified. Future source rows fail
+verification, including unarchived backlog. Legacy inventories without completion
+time use verification time without retroactive timestamp attestation.
+
+Failure preserves primary and partial siblings; no cleanup command. Verify
+returned row/key/hash parity, review health/backlog and retain command output.
+For a previously retained digest use the existing `restore_backup` API; never
+copy a live database file directly. The custody-kit CLI remains separately scoped
+to finalized bundles and does not replace WAL-aware backup.
+
 Read [ADR proposal](adr/G1_STORAGE_02_v1.md) first. All paths below are explicit placeholders for an owner-approved **disposable** environment. Existing pipeline and Strategy Factory stay untouched. Do not apply examples to production or choose a real off-device destination without approval.
 
 Python≥3.11, stdlib archive/backup only. Existing project dependencies needed by reused interval/journal code are declared in pyproject.toml; no Parquet/duckdb install. To use a verified interpreter without editable installation, set PYTHONPATH to this checkout's src for that command/session and verify `aql.archive.local.__file__` belongs to this checkout.
