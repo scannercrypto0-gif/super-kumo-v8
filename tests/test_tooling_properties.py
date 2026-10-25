@@ -42,7 +42,7 @@ def test_archive_child_stays_inside_root(parts):
 
 @settings(max_examples=80, deadline=None)
 @given(
-    decision_ms=st.integers(min_value=1, max_value=253402300799998),
+    decision_ms=st.integers(min_value=1, max_value=253402300699998),
     future_delta=st.integers(min_value=1, max_value=100000),
 )
 def test_pit_context_rejects_future_available_feature(decision_ms, future_delta):
@@ -69,3 +69,35 @@ def test_pit_context_rejects_future_available_feature(decision_ms, future_delta)
         decision_context(context_id="pit-probe", decision_ms=decision_ms,
                          outcome="REJECTED", strategy_version="v1",
                          policy_version="v1", features=features)
+
+
+@settings(max_examples=80, deadline=None)
+@given(
+    decision_ms=st.integers(min_value=1, max_value=253402300799999),
+    age_ms=st.integers(min_value=0, max_value=100000),
+)
+def test_pit_context_accepts_consistent_historical_feature(decision_ms, age_ms):
+    """Historical evidence available before a decision is accepted with exact freshness."""
+    from aql.archive.contracts import FEATURES, decision_context
+
+    available_ms = max(0, decision_ms - age_ms)
+    features = {
+        name: {
+            "value": None, "source": None, "version": None,
+            "event_ms": None, "receipt_ms": None, "available_ms": None,
+            "freshness_ms": None, "status": "UNAVAILABLE",
+        }
+        for name in FEATURES
+    }
+    features["btc_regime"] = {
+        "value": "UP", "source": "synthetic", "version": "v1",
+        "event_ms": available_ms, "receipt_ms": available_ms,
+        "available_ms": available_ms,
+        "freshness_ms": decision_ms - available_ms, "status": "AVAILABLE",
+    }
+    encoded = decision_context(
+        context_id="pit-historical-control", decision_ms=decision_ms,
+        outcome="REJECTED", strategy_version="v1",
+        policy_version="v1", features=features,
+    )
+    assert parse(encoded)["features"]["btc_regime"]["available_ms"] == available_ms
