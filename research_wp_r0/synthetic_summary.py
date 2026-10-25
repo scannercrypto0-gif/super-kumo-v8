@@ -26,7 +26,9 @@ def summarize_synthetic_opportunities(ledger):
         counts[status] += 1
         if status.startswith("RESOLVED_"):
             execution = record["execution"]
-            if execution["status"] != status or "net_return" not in execution["details"]:
+            if (execution["status"] != status or "net_return" not in execution["details"] or
+                    execution.get("synthetic_only") is not True or
+                    digest({k: v for k, v in execution.items() if k != "receipt_hash"}) != execution.get("receipt_hash")):
                 raise ValueError("Missing resolved execution evidence")
             net_returns.append(execution["details"]["net_return"])
         elif "execution" in record and "net_return" in record["execution"].get("details", {}):
