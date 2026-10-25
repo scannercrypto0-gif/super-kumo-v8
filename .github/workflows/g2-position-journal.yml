@@ -8,6 +8,11 @@ on:
       - 'tests/test_g2_*journal*.py'
       - '.github/workflows/g2-position-journal.yml'
   workflow_dispatch:
+    inputs:
+      benchmark:
+        description: 'Explicit bounded 250/1000/5000/10000-event + G1 contention diagnostics'
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -20,13 +25,45 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: python -m unittest discover -s tests -p "test_g2_*journal*.py" -v
-      # One-time diagnostic for #92; keep isolated from the normal G2 test run.
-      - name: Replay benchmark (Ubuntu diagnostic)
-        if: github.event_name == 'workflow_dispatch' && matrix.os == 'ubuntu-latest'
+      - name: Source and environment
+        shell: bash
+        run: |
+          git rev-parse HEAD | tee g2-source.txt
+          git rev-parse 'HEAD^{tree}' | tee -a g2-source.txt
+          python --version | tee -a g2-source.txt
+      - name: Focused regression (two manual diagnostics intentionally skipped)
+        if: github.event_name != 'workflow_dispatch' || !inputs.benchmark
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s tests -p "test_g2_*journal*.py" -v 2>&1 | tee g2-journal-tests.txt
+          python -B -m unittest discover -s tests -p "test_g2_position_lifecycle.py" -v 2>&1 | tee g2-lifecycle-tests.txt
+      - name: Manual bounded diagnostics (both platforms)
+        if: github.event_name == 'workflow_dispatch' && inputs.benchmark
         env:
           AQL_G2_BENCHMARK: '1'
-        run: python -m unittest discover -s tests -p "test_g2_journal_replay_benchmark.py" -v
+          AQL_G2_BENCHMARK_OUTPUT: g2-replay.json
+          AQL_G2_CONTENTION: '1'
+          AQL_G2_CONTENTION_OUTPUT: g2-contention.json
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s tests -p "test_g2_journal_replay_benchmark.py" -v 2>&1 | tee g2-replay.txt
+          python -B -m unittest discover -s tests -p "test_g2_core_journal_contention.py" -v 2>&1 | tee g2-contention.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: g2-journal-${{ matrix.os }}-${{ github.run_id }}
+          path: |
+            g2-source.txt
+            g2-journal-tests.txt
+            g2-lifecycle-tests.txt
+            g2-replay.json
+            g2-contention.json
+            g2-replay.txt
+            g2-contention.txt

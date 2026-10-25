@@ -12,6 +12,36 @@ from aql.observation.positions import PositionEvent
 
 
 class RecoveryEvidenceTests(unittest.TestCase):
+    def test_process_exit_inside_actual_append_write_keeps_torn_bytes_and_lock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/'events.jsonl'
+            src = str(Path(__file__).resolve().parents[1]/'src')
+            child = '''import os,sys
+from pathlib import Path
+sys.path.insert(0,sys.argv[2])
+from aql.observation.position_journal import DurablePositionJournal
+from aql.observation.positions import PositionEvent
+original=Path.open
+class Torn:
+ def __init__(self,handle):self.handle=handle
+ def __enter__(self):return self
+ def __exit__(self,*args):self.handle.close()
+ def write(self,raw):
+  self.handle.write(raw[:len(raw)//2]);self.handle.flush();os._exit(72)
+def opening(path,*args,**kwargs):
+ handle=original(path,*args,**kwargs)
+ return Torn(handle) if args and args[0]=='ab' else handle
+Path.open=opening
+DurablePositionJournal(sys.argv[1]).append(PositionEvent('p','open','opened',0,0,'offline'))
+'''
+            result = subprocess.run([sys.executable,'-B','-c',child,str(path),src],capture_output=True,timeout=15)
+            self.assertEqual(result.returncode,72,result.stderr)
+            before = path.read_bytes()
+            self.assertTrue(before and not before.endswith(b'\n'))
+            self.assertTrue(path.with_name(path.name+'.writer.lock').exists())
+            with self.assertRaises(JournalIntegrityError):DurablePositionJournal(path)
+            self.assertEqual(path.read_bytes(),before)
+
     def test_subprocess_crash_leaves_torn_append_unmodified(self):
         """Inject a process crash while writing a partial journal record.
 

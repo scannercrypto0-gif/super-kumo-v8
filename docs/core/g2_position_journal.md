@@ -1,82 +1,180 @@
-# G2 Core local durable journal (offline)
+# G2 Core position journal — #92 / Draft #93
 
-This experimental single-writer JSONL journal fsyncs each event, verifies a SHA-256 hash chain on startup, and deterministically reconstructs the existing in-memory PositionLedger. Duplicate event IDs with identical content are idempotent; conflicting events fail closed. A torn trailing record fails closed, requiring explicit recovery handling rather than silently discarding data. SHA-256 is an integrity check, **not** protection against an attacker able to rewrite the whole journal. The journal is not encrypted and does not yet have process-level locks, atomic multi-process coordination, backup, rotation, checkpointing or operational Core Run integration. Use only in offline tests; do not deploy for live position custody or trading.
+**Offline experimental scope only. No activation, production readiness or merge approval.**
+This document supersedes earlier partial-proposal wording. Branch `core/g2-92-recovery-evidence`
+started at `f3067fc497d1a762097310f2bfecf27e94648b58`; inspected main was
+`20f28986e33b5079a3c8b8b866f2d8841e715271`. Exact final head/CI are in the PR report.
 
-## Acceptance boundaries and follow-up
+## Implemented boundary and compatible hardening
 
-- **Offline only:** a hash chain detects accidental edits and many corruptions, but cannot prevent full-file rewrite by an attacker with disk access.
-- **No concurrency guarantee:** the pre-append size/hash recheck narrows stale-writer risks but remains subject to a time-of-check/time-of-use race. A real exclusive writer lease/lock with recovery semantics is required before production use.
-- **No external durability guarantee:** fsync of the file is not a substitute for atomic creation/rename, directory sync where supported, verified backups, or recovery testing on actual storage.
-- **Fail closed:** a torn tail, corrupt record, or unexpected file change requires operator recovery; never truncate or silently discard records.
-- **Scalability:** full replay before each append is intentionally conservative and may become expensive as the journal grows. A bounded, verified checkpoint/index is future work.
-- **No Core Run activation:** this journal is not connected to quote ingestion, live monitoring, paper orders, portfolio accounting, or Strategy Factory.
+DurablePositionJournal retains the original JSONL schema (`previous`, `event`, `digest`),
+canonical SHA-256 algorithm and PID-only sidecar format. No checkpoint/index format,
+rotation, operator-unlock API or new fencing protocol has been introduced.
 
-## In-process serialization
+- Every append still verifies the **entire disk hash chain and lifecycle** under the
+  existing cooperating-writer O_EXCL lease; duplicate IDs are idempotent and conflicts
+  reject. Torn records fail closed, without truncation, repair or implicit recovery.
+- Reuse that verified disposable replay as the candidate ledger. Removed the second
+  O(n) rebuild from publicly mutable `self.ledger`; corrupting that public cache cannot
+  manufacture history. Full verification remains O(n) per append / O(n^2) over growth.
+- Reject duplicate JSON keys, symlink/reparse journal paths, nonregular files and
+  observed file-identity replacements, including identical bytes at a different file.
+- A writer checks acquired lock identity and its original PID bytes before normal
+  release. It refuses to unlink a replaced/missing/modified lock. This is protection
+  of the existing lease, **not** a new fenced lease or an orphan-cleanup mechanism.
+- PositionEvent identity/source/kind and optional reason must be strings as annotated;
+  mutable values previously admitted there could make a frozen event mutable/unsafe.
+  Valid existing string-valued events, temporal rules, prices and hashes are unchanged.
+- A short write or fsync/path failure never returns successful insertion. A process
+  exit can leave durable bytes without an ACK; reopen/inspection and duplicate replay
+  are needed, never assumed loss or success.
 
-A module-wide Python threading mutex now serializes `append` calls made by journal instances **within the same interpreter process**. Together with the pre-append disk verification, this rejects stale second instances rather than allowing sequential interleaving. This is **not** a cross-process file lock and does not prevent another executable from changing the file. Do not interpret it as production multi-process safety.
+Only `position_journal.py`, compatible validation in `positions.py`, scoped journal
+unit/diagnostic files, this document and its focused workflow are modified. There are
+**no new production helper modules**, Factory/research/storage/pipeline edits or
+network calls. PR83's paused worker is not launched or used as a dependency.
 
-## Cross-process writer lock (experimental)
+## Controlled backup/restore and operator recovery evidence
 
-Appends now acquire an atomic `O_CREAT | O_EXCL` sidecar `.writer.lock` before checking/replaying/writing the journal. Cooperating processes on a local filesystem cannot simultaneously enter the write critical section. A crash may leave the lock behind: fail closed; **never delete a lock without confirming the owning process is dead and inspecting the journal**. This is not a distributed lock and must not be assumed safe on all network filesystems. There is no automatic orphan-lock recovery, lock ownership fencing, or crash-atomic directory durability guarantee. These are required for production readiness.
+`tests/test_g2_operator_journal_recovery.py` supplies a **test-only** verified_copy
+helper: retain an expected primary byte digest/count/tail/final state before copying;
+acquire the existing source writer lease; revalidate; exclusively create/fsync the
+copy; independently replay and compare its inventory. An isolated restore is another
+exclusive verified copy. Existing destinations, absent/wrong expected inventory,
+corrupt chains and even well-formed but different backups reject before publication.
+No primary overwrite, automatic partial cleanup or retention deletion exists.
 
-## G2-CORE-04 recovery drill: operator-only proposal (not approved for activation)
+The source is quiescent/fenced within a controlled test, not arbitrary production.
+Same-machine temporary copies are **not** offsite protection or independently trusted
+custody. SHA-256 does not authenticate an attacker-controlled full replacement or
+protect a rewritten journal plus rewritten external evidence. Expected digest/tail
+in these drills is local evidence, not a newly approved persisted checkpoint format.
 
-**Status:** documented recovery proposal for offline drills. No automatic lock removal,
-repair, or promotion of a backup is implemented. This section does not grant a
-production custody or recovery policy.
+The orphan drill starts a known child, observes its deliberate process exit via
+wait/communicate and exit status, records the actual interpreter PID from the child
+and PID bytes in the lock. Windows venv launcher PID can differ: both are preserved.
+Before intervention it saves journal/lock bytes and digests, executable, process
+identity and exit evidence in an isolated audit directory and verifies the saved
+journal. **Only test code**, after confirming death and absence of a restart
+supervisor, explicitly removes its disposable orphan lock. A second real process
+is then refused while the recovered writer holds the lease. Original evidence stays
+unchanged. No production unlock command, PID-only death inference or automatic
+orphan lock deletion is delivered.
 
-1. **Quiesce and fence writers first.** Stop every cooperating writer and any
-   service that could restart it. Record host, process identity, journal path,
-   lock path, timestamps, filesystem and operator. A PID in the current lock
-   file is only a hint: PIDs are reusable and a missing PID is not proof that
-   no writer exists. An exclusive lock file by itself provides no durable
-   fencing token or restart prevention. If exclusive ownership cannot be
-   established, **stop; do not delete the lock**.
-2. **Preserve evidence before recovery.** Record byte length and SHA-256 of
-   the journal and lock; preserve immutable, access-controlled copies of both
-   and the failure logs on a separate offline location. Do not truncate a torn
-   tail, replace the primary journal, or copy over an active writer.
-3. **Verify the candidate offline.** Reopen a copy using
-   `DurablePositionJournal` and independently compare expected position/event
-   counts and final hash with the incident inventory. A digest match against
-   the same corrupted source does **not** prove the backup is correct.
-   If either chain validation or reconciliation fails, keep the incident
-   blocked and escalate to the owner.
-4. **Obtain explicit operator/owner authorization for a recovery action.**
-   The operator must specify which verified version is authoritative, how
-   competing writers remain fenced, what evidence is retained, and how the
-   original is rolled back. This repository does not currently supply an
-   approved mechanism for these guarantees.
-5. **Reopen only after the fencing and audit gates are met.** Record the
-   authorization, before/after hashes, validation outcome, and a rollback
-   reference. Do not equate a successful offline reopen with safe activation.
+Process-exit cases include interruption inside the actual append write (half record,
+flush, os._exit), actual append fsync interruption, and preserved orphan lock/torn
+bytes. These prove tested process-failure behavior, **not physical power-loss safety**,
+directory fsync, hostile same-user pathname races, distributed/network filesystem
+semantics or hardware write-cache behavior. Windows reparse rejection is also tested
+through mocked reparse metadata without requiring symlink privileges.
 
-### Benchmark and Core Run isolation acceptance plan
+## Local Windows evidence (2026-10-25)
 
-The current `_append_locked` performs a complete journal replay and rebuilds
-a candidate ledger before each append. For `n` events, this makes a sequence
-of `n` appends potentially quadratic in total work. Do not introduce an
-arbitrary latency threshold or an unverified checkpoint format.
+Python3.14.3, Windows11 build22000, temporary filesystem **NTFS**, as observed through
+GetVolumeInformationW. C: disk query reported TOSHIBA KBG30ZMV256G NVMe; underlying
+virtualization/cache guarantees were not established. Get-Volume/fsutil telemetry
+was unavailable/denied; no configuration/privilege changes were made.
 
-A reproducible benchmark must record OS, Python version, filesystem/storage
-type, event count, journal bytes, per-append p50/p95/p99, full-reopen time,
-peak memory, and checksum/ledger reconciliation. Compare at several journal
-sizes and report raw samples and run-to-run variance. Any checkpoint or
-backup-custody design is a **separate owner decision**, not implicit approval.
+Focused ordinary journal discovery: **35 collected /33PASS /2 intentional manual
+benchmark skips**. Additional PositionLedger lifecycle suite: **12PASS**. The two
+skips are not successful performance checks. Separate manual diagnostics actually
+ran: larger replay **1PASS**, contention + blocked-backup isolation **2PASS**.
+An initial orphan-test assertion incorrectly equated the Windows launcher PID with
+interpreter PID; it was corrected to record both, then all focused tests passed.
 
-Core Run isolation is **not yet proven**: the journal has no operational
-pipeline integration, and background research must not be scheduled onto the
-Core Run execution lane. A future test must show bounded core-loop latency
-while replay/backup work runs in a separately bounded worker with shared
-resource limits. The current offline unit tests cannot establish this.
+### Measured before/after, no invented speedup
 
-### Existing evidence and explicit gaps
+Same harness builds a valid batched fixture (setup NOT measured as per-event durable
+throughput), independently replays it, times20 real append/fsync operations at its
+tail, then three complete reopens. Percentiles use nearest rank: p99 with20samples
+is merely that sample's maximum, not a population bound or SLA. Separate cProfile
+and tracemalloc runs are excluded from latency samples. Before journal source SHA256
+`228fd238a04d2e63adcc2831ca16ec8750f63e14d524f06401c3696f1352fea4`;
+after `945835f9eeeb8d5529770056606307c80c083ad6e73d5c3ef1460e7893958307`.
 
-- Existing journal tests cover torn tails, tampering, stale instances and
-  orphan-lock refusal; avoid duplicating them.
-- Draft PR #93 adds actual append-fsync subprocess crash injection and a
-  minimal byte-copy verification baseline. CI on both Windows and Ubuntu
-  validates those focused tests, **not** backup custody or power-loss safety.
-- **Open gates:** independent coherent backup/restore, operator-fenced
-  recovery with audit, bounded replay benchmark, Core Run isolation, and
-  owner approval of any custody/fencing design. No production activation.
+| Seed events | Before append p50/p95/p99 ms | Hardened append p50/p95/p99 ms | Hardened reopen3samples ms |
+|---|---|---|---|
+|250|45.0955 /54.2714 /55.6404|57.8906 /65.3025 /66.4256|24.865 /13.830 /13.617|
+|1000|64.7577 /70.9081 /96.5801|75.0244 /89.5184 /95.4265|47.336 /33.781 /30.530|
+|5000|171.1889 /182.5860 /190.5470|162.0581 /179.0551 /183.2157|152.559 /145.565 /136.880|
+|10000|273.3966 /319.9559 /341.3033|328.7635 /399.3563 /414.6365|357.541 /294.511 /288.000|
+
+Largest journal3,053,135bytes after21appends. At10,020 existing events, profiled
+PositionLedger.append calls drop **20,041 ->10,021**; full `_replay` remains1 per
+append. Python reopen allocation peak was4,978,046bytes before /5,013,845after
+(**not RSS, not append memory**). New validation plus uncontrolled machine/I/O
+variance means measured latency did **not consistently improve**:10k p99 worsened.
+Removing duplicate work is proven by call counts, not a claimed wall-clock win.
+No useful production capacity/latency bound can be accepted from these samples.
+A verified index/checkpoint or changed integrity contract is an owner decision,
+not silently added here.
+
+### Core Run isolation: bounded dependency PASS, resource acceptance NOT MET
+
+Actual existing G1 DurableJournal.commit succeeded for3 synthetic final bars while
+the position backup lease was deliberately blocked; the position writer correctly
+refused that lease. No shared ACK or pipeline change was required. **Not** deployed
+Core Run evidence: this observation journal is still not wired into that pipeline.
+
+A separate same-interpreter/shared-NTFS contention diagnostic ran30 G1 commits
+without load and30 with10k-event replay + byte-copy/fsync/verification background
+work (4passes /12,186,684bytes). Baseline p50/p95/p99 **17.9847 /22.4551 /33.7651ms**;
+loaded **79.6291 /123.3385 /127.3275ms**. All30commits survived replay, but resource
+latency clearly increased: do **not** claim Core Run unaffected. GIL/CPU/disk/cache
+contributions were not separately isolated. The module-wide observation writer
+mutex also serializes independent observation journals; full synchronous replays
+hold the calling thread. There is no hard host CPU/I/O budget in this scope.
+Process/resource scheduling or pipeline integration needs separately authorized
+cross-component scope; no edits to pipeline/storage/shared infrastructure here.
+
+## Reproduction and focused CI
+
+Routine:
+```powershell
+python -B -m unittest discover -s tests -p 'test_g2_*journal*.py' -v
+python -B -m unittest discover -s tests -p test_g2_position_lifecycle.py -v
+```
+
+Explicit manual diagnostics only (sizes bounded at20000, default250/1000/5000/10000):
+```powershell
+$env:AQL_G2_BENCHMARK='1'
+$env:AQL_G2_BENCHMARK_OUTPUT='g2-replay.json'
+python -B -m unittest discover -s tests -p test_g2_journal_replay_benchmark.py -v
+$env:AQL_G2_CONTENTION='1'
+$env:AQL_G2_CONTENTION_OUTPUT='g2-contention.json'
+python -B -m unittest discover -s tests -p test_g2_core_journal_contention.py -v
+```
+
+The scoped workflow checks out the exact PRhead, records commit/tree/Python, runs
+ordinary journal + lifecycle tests on Windows/Ubuntu, and uploads source/test logs.
+Heavy diagnostics require explicit workflow_dispatch **and benchmark=true**; then
+both platforms retain JSON/raw timing samples and log artifacts. No scheduled or
+routine heavy benchmark, generic CI change or Factory routing is added. Final run
+IDs and per-platform counts are recorded in PR93/Issue92 after inspection.
+
+## Owner decisions, residuals and rollback
+
+No production custody/fencing decision is made by this PR.
+
+1. **Writer exclusion/recovery:** A) offline maintenance window with all writers and
+   restart supervisors stopped, evidence retained and operator-authorized action;
+   B) a separately designed supervised local fenced-writer protocol;
+   C) distributed fencing/custody service if future requirements justify it.
+   Recommend A for current offline experiments only; B needs a separate contract
+   before any operational activation. PID files alone are insufficient. Deferral
+   means an orphaned operational journal remains blocked, never auto-unlocked.
+2. **Backup custody:** owner chooses independent media/location/access/encryption,
+   retained expected anchors and RPO/RTO/retention. Recommend independently verified
+   encrypted off-device custody before activation. Current same-disk drills do not
+   supply it; do not treat restore success as that decision or protection.
+3. **Performance/isolation:** agree actual capacity/latency targets and authorize a
+   separately bounded worker/resource contract if needed. Recommend no synchronous
+   journal replay/backup on Core Run. New checkpoint/index formats and integrity
+   tradeoffs require approval. Without these gates, operational isolation remains
+   NOT MET rather than a generic claim that threads make it safe.
+
+#92/#87 remain open. No live/paper execution, data pruning, production service,
+cloud/secrets/paid resources, Factory/holdout or automatic worker. Rollback is code
+reversion on the feature branch after review; preserve journal/lock/evidence bytes.
+No data migration or hash rewrite is needed. Never roll back by deleting evidence,
+removing orphan locks automatically or overwriting a primary from a candidate copy.
