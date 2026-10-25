@@ -49,16 +49,23 @@ def execute_synthetic_long(bars, decision_bar_index, *, stop_fraction,
             if idx > entry_idx and bar["bar_open"] != bars[idx-1]["bar_close"] + 1:
                 details = {"reason": "HOLDING_GAP"}
                 break
+            # The opening print is temporally prior to the intrabar extremes.
+            # Handle known opening gaps before ambiguous high/low ordering.
+            if idx > entry_idx and bar["open"] <= stop:
+                exit_price = bar["open"] * (1 - slippage_bps / 10000)
+                gross = exit_price / entry - 1
+                fees = (fee_bps / 10000) * (1 + exit_price / entry)
+                status = "RESOLVED_STOP"
+                details = {"entry_bar_index": entry_idx, "exit_bar_index": idx,
+                           "gross_return": gross, "fee_fraction": fees,
+                           "net_return": gross - fees}
+                break
+            if idx > entry_idx and bar["open"] >= target:
+                details = {"reason": "TARGET_GAP_UNRESOLVED"}
+                break
             stop_hit, target_hit = bar["low"] <= stop, bar["high"] >= target
             if stop_hit and target_hit:
                 details = {"reason": "SAME_BAR_STOP_TARGET"}
-                break
-            if idx > entry_idx and bar["open"] <= stop:
-                # A stop crossed between bars fills no better than the opening print.
-                stop_hit = True
-            if idx > entry_idx and bar["open"] >= target:
-                # Favorable gaps cannot be credited without an explicit fill model.
-                details = {"reason": "TARGET_GAP_UNRESOLVED"}
                 break
             if stop_hit or target_hit:
                 exit_price = (min(bar["open"], stop) if stop_hit else target)
