@@ -67,6 +67,7 @@ import signal
 import subprocess
 import sys
 import textwrap
+import threading
 import time
 from pathlib import Path
 from typing import List, Optional
@@ -175,7 +176,7 @@ def _make_static_bar(i: int) -> MarketBar:
 # Synthetic BinanceCollector — drop-in for pipeline patching
 # ---------------------------------------------------------------------------
 
-def _make_synthetic_collector_class(bars: List[MarketBar]):
+def _make_synthetic_collector_class(bars: List[MarketBar], *, startup_replayed=None):
     """
     Return a class whose constructor signature matches BinanceCollector
     and whose run() method injects ``bars`` directly into the pipeline's
@@ -202,6 +203,10 @@ def _make_synthetic_collector_class(bars: List[MarketBar]):
             self.gap_end_ms: Optional[int] = None
 
         def run(self, timeout_s: Optional[float] = None) -> CollectorMetrics:
+            if startup_replayed is not None:
+                # Instant collection must not race durable startup replay into
+                # shutdown. Test barrier only; production budgets are unchanged.
+                assert startup_replayed.wait(5), "Startup replay did not complete within test barrier"
             metrics = CollectorMetrics()
             for bar in _bars:
                 committed = self._journal.commit(bar)
@@ -367,7 +372,15 @@ class TestT_WP04_FIX01_01_PipelineOrchestration:
         del pre_sto
 
         # Restart: empty synthetic collector; startup_reconcile must replay
-        CollectorCls = _make_synthetic_collector_class([])
+        startup_replayed = threading.Event()
+        original_reconcile = DurableJournal.startup_reconcile
+        def reconcile_then_signal(journal, *args, **kwargs):
+            try:
+                return original_reconcile(journal, *args, **kwargs)
+            finally:
+                # Completion, not success: failures still reach strict assertions.
+                startup_replayed.set()
+        CollectorCls = _make_synthetic_collector_class([], startup_replayed=startup_replayed)
 
         # Deterministic clock: pinned at module import (lag ≈ 30 s → HEALTHY).
         _fixed_now_ms = _NOW_AT_IMPORT
@@ -375,6 +388,7 @@ class TestT_WP04_FIX01_01_PipelineOrchestration:
         with (
             patch("aql.pipeline.BinanceCollector", CollectorCls),
             patch("aql.pipeline.recover_gap", _synthetic_recover_gap),
+            patch.object(DurableJournal, "startup_reconcile", reconcile_then_signal),
         ):
             result = run_pipeline(
                 symbol=SYMBOL,
@@ -398,7 +412,10 @@ class TestT_WP04_FIX01_01_PipelineOrchestration:
         assert hs["status"] == "HEALTHY", (
             f"AG-F02 FAIL: expected exactly HEALTHY with deterministic clock "
             f"(lag≈30s) after journal-replay restart. Got: {hs['status']}. "
-            f"Full snapshot: {hs}"
+            f"Full snapshot: {hs}; "
+            f"background_recovery={result.get('background_recovery')}; "
+            f"background_persistence={result.get('background_persistence')}; "
+            f"startup_reconcile={result.get('startup_reconcile')}"
         )
         assert hs["unresolved_backlog"] is False
         assert hs["integrity_ok"] is True
@@ -408,6 +425,52 @@ class TestT_WP04_FIX01_01_PipelineOrchestration:
             f"store={result['store_total']}  health={hs['status']}  "
             f"(now_ms pinned, lag≈30s)"
         )
+
+    def test_ag_f02_slow_startup_finishes_before_synthetic_shutdown(self, tmp_path):
+        """Five injected .25s writes exceed the unchanged1s shutdown budget."""
+        original = OperationalStore.upsert
+        def slow_upsert(store, *args, **kwargs):
+            time.sleep(.25)
+            return original(store, *args, **kwargs)
+        with patch.object(OperationalStore, "upsert", slow_upsert):
+            self.test_ag_f02_pipeline_restart_replays_journal(tmp_path)
+
+    def test_ag_f02_genuinely_pending_background_stays_unhealthy(self, tmp_path):
+        """Completed replay does not excuse an unfinished background job."""
+        import aql.pipeline as pipeline
+        from aql.lanes import BackgroundLane
+        release = threading.Event()
+        lanes, results = [], []
+        original_run = pipeline.run_pipeline
+        class HeldLane(BackgroundLane):
+            def __init__(self):
+                self.first = True
+                super().__init__(); lanes.append(self)
+            def submit(self, job):
+                if self.first:
+                    self.first = False
+                    def held(stop):
+                        job(stop)
+                        assert release.wait(5), "Test must release held startup tail"
+                    return super().submit(held)
+                return super().submit(job)
+        def observed(*args, **kwargs):
+            result = original_run(*args, **kwargs); results.append(result); return result
+        try:
+            with patch.object(pipeline, "BackgroundLane", HeldLane), patch.object(pipeline, "run_pipeline", observed):
+                with pytest.raises(AssertionError, match="Got: UNHEALTHY"):
+                    self.test_ag_f02_pipeline_restart_replays_journal(tmp_path)
+            result = results[0]
+            assert result["store_total"] == N_PIPELINE_BARS
+            assert result["startup_reconcile"]["replay_errors"] == 0
+            assert result["background_recovery"]["pending"] > 0
+            assert result["background_recovery"]["worker_alive"] is True
+            assert result["background_recovery"]["errors"] == []
+            assert result["health_snapshot"]["status"] == "UNHEALTHY"
+            assert result["health_snapshot"]["reconcile_error"]
+        finally:
+            release.set()
+            for lane in lanes: lane.thread.join(2)
 
     def test_pipeline_result_dict_all_keys_present(self, tmp_path):
         """run_pipeline() result dict contains all documented keys."""
