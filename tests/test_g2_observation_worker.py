@@ -199,3 +199,112 @@ class TestObservationWorker(unittest.TestCase):
                     release.set()
                     worker.finish(timeout=5)
 
+    def test_concurrent_submit_and_snapshot_keep_bounded_identity_inventory(self):
+        import threading
+        import time
+        events = [PositionEvent(str(i), "open", "opened", 0, 0, "offline")
+                  for i in range(24)]
+        expected = {(event.position_id, event.event_id) for event in events}
+        failures = []
+        with tempfile.TemporaryDirectory() as d:
+            worker = ObservationWorker(Path(d) / "positions.jsonl", capacity=4)
+            deadline = time.monotonic() + 10
+
+            def produce():
+                try:
+                    for event in events:
+                        while not worker.submit(event):
+                            if time.monotonic() >= deadline:
+                                raise TimeoutError("test producer could not progress")
+                            time.sleep(0.001)
+                except Exception as error:
+                    failures.append(error)
+
+            producer = threading.Thread(target=produce)
+            snapshots = 0
+            producer.start()
+            try:
+                while True:
+                    report = worker.snapshot()
+                    snapshots += 1
+                    identities = report["unconfirmed_event_ids"]
+                    self.assertLessEqual(len(identities), 5)
+                    self.assertEqual(len(identities), len(set(identities)))
+                    self.assertTrue(set(identities) <= expected)
+                    self.assertEqual(report["accepted_but_unconfirmed"],
+                                     len(identities) + report["unattributed_unconfirmed_count"])
+                    self.assertLessEqual(report["unattributed_unconfirmed_count"], 1)
+                    self.assertFalse(report["errors"])
+                    if not producer.is_alive() and not report["accepted_but_unconfirmed"]:
+                        break
+                    self.assertLess(time.monotonic(), deadline)
+                    time.sleep(0.001)
+            finally:
+                producer.join(timeout=10)
+                final = worker.finish(timeout=10)
+            self.assertFalse(producer.is_alive())
+            self.assertFalse(failures)
+            self.assertGreater(snapshots, 0)
+            self.assertEqual(final["committed_or_duplicate"], len(events))
+            self.assertFalse(final["errors"])
+            replayed = DurablePositionJournal(Path(d) / "positions.jsonl")
+            self.assertEqual(len(replayed.ledger.events), len(events))
+
+    def test_snapshot_cannot_mask_new_handoff_with_previous_inflight(self):
+        """A's stale identity must never stand in for accepted, dequeued B."""
+        import queue
+        import threading
+        from unittest.mock import patch
+        first_entered, first_release = threading.Event(), threading.Event()
+        captured, snapshot_release = threading.Event(), threading.Event()
+        second_dequeued, second_release = threading.Event(), threading.Event()
+        reports, errors = [], []
+        real_get = queue.Queue.get
+        def held_second(q, *args, **kwargs):
+            event = real_get(q, *args, **kwargs)
+            if event.position_id == "second":
+                second_dequeued.set()
+                if not second_release.wait(5): raise TimeoutError("test second handoff")
+            return event
+        class SnapshotGate:
+            def __init__(self, lock): self.lock = lock
+            def __enter__(self): self.lock.acquire(); return self
+            def __exit__(self, *args):
+                self.lock.release()
+                if threading.current_thread().name == "G2-diagnostic-snapshot":
+                    captured.set()
+                    if not snapshot_release.wait(5): raise TimeoutError("test snapshot gate")
+        with tempfile.TemporaryDirectory() as d, patch.object(queue.Queue, "get", held_second):
+            worker = ObservationWorker(Path(d) / "positions.jsonl", capacity=2)
+            original = worker.journal.append
+            def held_first(event):
+                if event.position_id == "first":
+                    first_entered.set()
+                    if not first_release.wait(5): raise TimeoutError("test first append")
+                return original(event)
+            worker.journal.append = held_first
+            observer = None
+            try:
+                self.assertTrue(worker.submit(PositionEvent("first", "open", "opened", 0, 0, "offline")))
+                self.assertTrue(first_entered.wait(3))
+                self.assertTrue(worker.submit(PositionEvent("second", "open", "opened", 0, 0, "offline")))
+                worker._lock = SnapshotGate(worker._lock)
+                def observe():
+                    try: reports.append(worker.snapshot())
+                    except Exception as error: errors.append(error)
+                observer = threading.Thread(target=observe, name="G2-diagnostic-snapshot")
+                observer.start(); self.assertTrue(captured.wait(3))
+                first_release.set(); self.assertTrue(second_dequeued.wait(3))
+                snapshot_release.set(); observer.join(3)
+                self.assertFalse(observer.is_alive()); self.assertFalse(errors)
+                report = reports[0]
+                # B was accepted before snapshot and stays uncommitted throughout.
+                # A coherent earlier snapshot may show A+B; a later handoff may
+                # report an attribution hole, but exhaustive A-only is impossible.
+                self.assertTrue(("second", "open") in report["unconfirmed_event_ids"]
+                                or not report["identities_exhaustive"], report)
+            finally:
+                first_release.set(); snapshot_release.set(); second_release.set()
+                if observer is not None: observer.join(3)
+                worker.finish(timeout=5)
+

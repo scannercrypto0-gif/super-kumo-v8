@@ -73,9 +73,10 @@ class ObservationWorker:
                 self.jobs.task_done()
 
     def snapshot(self) -> dict:
-        # Queue transitions are guarded by queue.mutex; worker inflight
-        # transitions use _lock. They are NOT one atomic transaction.
-        # Never claim a complete identity inventory across that handoff.
+        # Read both views while holding _lock, then queue.mutex (the same
+        # order as submit). Otherwise a stale inflight identity can mask a
+        # new dequeued event and falsely appear exhaustive. Journal IO never
+        # holds either lock. The get -> inflight gap remains explicit below.
         with self._lock:
             inflight = ((self._inflight.position_id, self._inflight.event_id)
                         if self._inflight is not None else None)
@@ -85,10 +86,10 @@ class ObservationWorker:
             rejected = self.rejected
             stopped = self.stop_event.is_set()
             alive = self.thread.is_alive()
-        with self.jobs.mutex:
-            queued = [(event.position_id, event.event_id)
-                      for event in self.jobs.queue]
-            pending = self.jobs.unfinished_tasks
+            with self.jobs.mutex:
+                queued = [(event.position_id, event.event_id)
+                          for event in self.jobs.queue]
+                pending = self.jobs.unfinished_tasks
         identities = ([inflight] if inflight else []) + queued
         # A dequeued event may be between queue.get and _inflight assignment.
         # Unattributed work is explicit, not silently omitted.

@@ -17,10 +17,22 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - name: Install test dependencies
         run: python -m pip install -e . pytest pytest-timeout
       - name: Run offline tests
-        run: python -m pytest tests/test_g2_observation_worker.py tests/test_g2_position_journal.py -q
+        run: |
+          git rev-parse HEAD
+          python --version
+          python -m pytest tests/test_g2_observation_worker.py tests/test_g2_position_journal.py -q --junitxml=worker-results.xml
+      - name: Preserve focused test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: g2-worker-${{ matrix.os }}
+          path: worker-results.xml
+          if-no-files-found: error
