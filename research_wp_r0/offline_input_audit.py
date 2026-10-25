@@ -53,7 +53,13 @@ def audit_offline_inputs(inputs, *, expected_digest):
         raise ValueError("Dataset identity mismatch")
     if binding["dataset_manifest_hash"] != manifest["manifest_integrity_hash"]:
         raise ValueError("Manifest commitment mismatch")
-    meta = DatasetManifest.from_dict(manifest)
+    # OfflineInputs canonical JSON collapses integral floats (100.0 -> 100).
+    # The legacy manifest hash encodes coverage_pct as a float; restore that
+    # declared field type before verifying the stored, independently bound hash.
+    if type(manifest.get("coverage_pct")) not in (int, float) or type(manifest["coverage_pct"]) is bool:
+        raise ValueError("Invalid manifest coverage type")
+    normalized_manifest = {**manifest, "coverage_pct": float(manifest["coverage_pct"])}
+    meta = DatasetManifest.from_dict(normalized_manifest)
     if not meta.provenance_verified or not meta.verify_integrity():
         raise ValueError("Unverified manifest")
     bars = spec["bars"]
