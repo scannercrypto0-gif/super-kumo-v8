@@ -53,6 +53,24 @@ class SyntheticExecutionTests(unittest.TestCase):
         self.assertAlmostEqual(result.spec["slippage_bps"], 10)
         self.assertAlmostEqual(result.spec["net_return_bps"], 470)
 
+    def test_losing_trade_includes_costs(self):
+        evidence = self.evidence()
+        value = evidence.spec
+        value["bars"][1].update({"open": 95, "high": 105, "low": 90,
+                                  "close": 96})
+        result = self.run_case(FutureBarEvidence(value))
+        self.assertEqual(result.spec["outcome"], "SIMULATED_CLOSED")
+        self.assertAlmostEqual(result.spec["gross_return_bps"], -500)
+        self.assertAlmostEqual(result.spec["net_return_bps"], -530)
+
+    def test_no_evidence_never_fabricates_fill(self):
+        with patch("research_wp_r0.offline_simulator.audit_offline_inputs"):
+            result = simulate_single_long(self.inputs,
+                                          expected_digest=self.inputs.digest,
+                                          signal=True)
+        self.assertEqual(result.spec["outcome"], "UNRESOLVED")
+        self.assertIsNone(result.spec["gross_return_bps"])
+
     def test_one_future_bar_is_unknown(self):
         evidence = self.evidence()
         value = evidence.spec
