@@ -20,12 +20,18 @@ def execute_synthetic_long(bars, decision_bar_index, *, stop_fraction,
     number(fee_bps, 0, 10000)
     number(slippage_bps, 0, 10000)
     previous_close = None
+    expected_span = None
     for row in bars:
         keys(row, "bar_open bar_close open high low close")
         integer(row["bar_open"], 0, 2**53-1)
         integer(row["bar_close"], 0, 2**53-1)
         if row["bar_close"] < row["bar_open"] or (previous_close is not None and row["bar_open"] <= previous_close):
             raise ValueError("Overlapping or unsorted bars")
+        span = row["bar_close"] - row["bar_open"] + 1
+        if expected_span is None:
+            expected_span = span
+        elif span != expected_span:
+            raise ValueError("Mixed bar durations")
         previous_close = row["bar_close"]
         for field in ("open", "high", "low", "close"):
             number(row[field], 0.0000000001)
@@ -35,8 +41,6 @@ def execute_synthetic_long(bars, decision_bar_index, *, stop_fraction,
     entry_idx = decision_bar_index + 1
     if entry_idx >= len(bars):
         status, details = "NO_FILL", {"reason": "NO_NEXT_BAR"}
-    elif entry_idx - decision_bar_index > ttl_bars:
-        status, details = "NO_FILL", {"reason": "TTL_EXPIRED"}
     elif bars[entry_idx]["bar_open"] != decision["bar_close"] + 1:
         status, details = "UNRESOLVED", {"reason": "ENTRY_GAP"}
     else:
