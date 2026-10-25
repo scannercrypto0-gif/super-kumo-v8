@@ -64,6 +64,31 @@ class SyntheticExecutionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "identity mismatch"):
             self.run_case(self.evidence(inputs_digest="c" * 64))
 
+    def test_missing_first_eligible_bar_is_unresolved_gap(self):
+        evidence = self.evidence()
+        value = evidence.spec
+        for bar in value["bars"]:
+            bar["open_ms"] += 60000
+            bar["close_ms"] += 60000
+            bar["observed_at_ms"] += 60000
+        result = self.run_case(FutureBarEvidence(value))
+        self.assertEqual(result.spec["outcome"], "UNRESOLVED")
+        self.assertEqual(result.spec["reason"], "DATA_GAP")
+        self.assertIsNone(result.spec["net_return_bps"])
+
+    def test_wrong_interval_rejected(self):
+        evidence = self.evidence()
+        value = evidence.spec
+        value["interval_ms"] = 120000
+        for bar in value["bars"]:
+            bar["close_ms"] = bar["open_ms"] + 119999
+            bar["observed_at_ms"] = bar["close_ms"] + 1
+        value["bars"][1]["open_ms"] = value["bars"][0]["open_ms"] + 120000
+        value["bars"][1]["close_ms"] = value["bars"][1]["open_ms"] + 119999
+        value["bars"][1]["observed_at_ms"] = value["bars"][1]["close_ms"] + 1
+        with self.assertRaisesRegex(ValueError, "interval"):
+            self.run_case(FutureBarEvidence(value))
+
     def test_no_signal_remains_zero_exposure(self):
         result = self.run_case(self.evidence(), signal=False)
         self.assertEqual(result.spec["outcome"], "NO_SIGNAL")
