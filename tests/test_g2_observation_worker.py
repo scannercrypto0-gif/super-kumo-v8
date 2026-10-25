@@ -102,6 +102,7 @@ class TestObservationWorker(unittest.TestCase):
             release.set()
             status = worker.finish(timeout=5)
             self.assertIn("OSError", status["errors"])
+            self.assertEqual(status["failed_event_ids"], ["open"])
             self.assertEqual(status["committed_or_duplicate"], 0)
             self.assertEqual(status["accepted_but_unconfirmed"], 1)
             self.assertEqual(status["unconfirmed_event_ids"], ["quote"])
