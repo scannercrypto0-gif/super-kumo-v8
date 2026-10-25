@@ -44,6 +44,26 @@ class TestSyntheticExecution(unittest.TestCase):
             target_fraction=.05, ttl_bars=1, holding_bars=1, fee_bps=10,
             slippage_bps=0)["status"], "NO_FILL")
 
+    def test_target_gap_is_unresolved(self):
+        data = bars()
+        data.append({"bar_open": 120000, "bar_close": 179999,
+                     "open": 108, "high": 109, "low": 107, "close": 108})
+        result = execute_synthetic_long(data, 0, stop_fraction=.05,
+            target_fraction=.05, ttl_bars=1, holding_bars=2,
+            fee_bps=10, slippage_bps=0)
+        self.assertEqual(result["status"], "UNRESOLVED")
+        self.assertEqual(result["details"]["reason"], "TARGET_GAP_UNRESOLVED")
+
+    def test_stop_gap_uses_open(self):
+        data = bars()
+        data.append({"bar_open": 120000, "bar_close": 179999,
+                     "open": 90, "high": 92, "low": 89, "close": 91})
+        result = execute_synthetic_long(data, 0, stop_fraction=.05,
+            target_fraction=.05, ttl_bars=1, holding_bars=2,
+            fee_bps=10, slippage_bps=0)
+        self.assertEqual(result["status"], "RESOLVED_STOP")
+        self.assertAlmostEqual(result["details"]["gross_return"], -.10)
+
     def test_bad_ohlc_rejected(self):
         data = bars()
         data[1]["high"] = 90
