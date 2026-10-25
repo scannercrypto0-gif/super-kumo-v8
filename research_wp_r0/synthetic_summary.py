@@ -15,7 +15,7 @@ def summarize_synthetic_opportunities(ledger):
         raise ValueError("Invalid records")
     previous_decision = -1
     for record in ledger["records"]:
-        keys(record, "decision_bar_index status")
+        keys(record, "decision_bar_index status execution" if "execution" in record else "decision_bar_index status reason")
         decision = record["decision_bar_index"]
         if type(decision) is not int or decision <= previous_decision:
             raise ValueError("Decision order invalid")
