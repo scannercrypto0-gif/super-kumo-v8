@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -52,6 +53,63 @@ class CoreJournalIsolationTests(unittest.TestCase):
 
 @unittest.skipUnless(os.environ.get('AQL_G2_CONTENTION')=='1','manual opt-in load diagnostic')
 class CoreJournalContentionDiagnostic(unittest.TestCase):
+    def test_cpu_only_thread_vs_process_diagnostic(self):
+        """Opt-in causal probe: no G2 file IO; process and thread are distinct."""
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            # Pure Python integer work stresses interpreter scheduling without
+            # any background disk operations. No assertion about which is faster.
+            work = ("x=1\n"
+                    "while True:\n"
+                    "    x=(x*1664525+1013904223)&0xffffffff\n")
+            stop = threading.Event()
+            def cpu_thread():
+                x = 1
+                while not stop.is_set():
+                    for _ in range(10000):
+                        x = (x * 1664525 + 1013904223) & 0xffffffff
+
+            baseline = commit_samples(root / 'cpu-idle.sqlite')
+            thread = threading.Thread(target=cpu_thread, daemon=True)
+            thread.start()
+            try:
+                time.sleep(0.1)
+                thread_load = commit_samples(root / 'cpu-thread.sqlite')
+            finally:
+                stop.set()
+                thread.join(5)
+            self.assertFalse(thread.is_alive())
+
+            # Independent interpreter, not a thread. Separate DB per trial;
+            # all foreground commits remain SQLite FULL synchronous.
+            child = subprocess.Popen([sys.executable, '-B', '-c', work],
+                                     stdout=subprocess.DEVNULL,
+                                     stderr=subprocess.PIPE)
+            try:
+                time.sleep(0.2)
+                self.assertIsNone(child.poll(), 'CPU worker exited unexpectedly')
+                process_load = commit_samples(root / 'cpu-process.sqlite')
+            finally:
+                child.terminate()
+                try:
+                    child.communicate(timeout=5)
+                except subprocess.TimeoutExpired:
+                    child.kill()
+                    child.communicate(timeout=5)
+
+            result = {
+                'baseline': baseline, 'cpu_thread': thread_load,
+                'cpu_process': process_load, 'filesystem': filesystem(root),
+                'os': sys.platform, 'python': sys.version.split()[0],
+                'scope': 'CPU-only scheduling probe; no G2 disk work; '
+                         'sequential trials, no randomization, no SLO inference',
+            }
+            print('G2_CPU_CAUSAL_PROBE ' + json.dumps(result, sort_keys=True))
+            if os.environ.get('AQL_G2_CONTENTION_OUTPUT'):
+                output = Path(os.environ['AQL_G2_CONTENTION_OUTPUT'])
+                output.with_name(output.stem + '-cpu.json').write_text(
+                    json.dumps(result, indent=2) + '\n')
+
     def test_shared_disk_and_python_replay_load(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);path=root/'positions.jsonl';seed(path,10000)
