@@ -38,7 +38,12 @@ def inspect_binance_spot_zip(path, *, expected_sha256, symbol="BTCUSDT",
         raise ValueError("Independent SHA256 required")
     if type(interval_ms) is not int or interval_ms <= 0:
         raise ValueError("Invalid interval")
-    raw = Path(path).read_bytes()
+    archive_path = Path(path)
+    if archive_path.is_symlink() or not archive_path.is_file():
+        raise ValueError("Regular archive file required")
+    if archive_path.stat().st_size > 110_000_000:
+        raise ValueError("Archive exceeds bounded input size")
+    raw = archive_path.read_bytes()
     sha = hashlib.sha256(raw).hexdigest()
     if sha != expected_sha256:
         raise ValueError("Archive checksum mismatch")
@@ -49,6 +54,8 @@ def inspect_binance_spot_zip(path, *, expected_sha256, symbol="BTCUSDT",
                 raise ValueError("Exactly one CSV required")
             if members[0].file_size > 100_000_000:
                 raise ValueError("Archive exceeds bounded CSV size")
+            if members[0].compress_size == 0 or members[0].file_size > 100 * members[0].compress_size:
+                raise ValueError("Excessive archive expansion ratio")
             csv_bytes = z.read(members[0])
     except BadZipFile as exc:
         raise ValueError("Invalid ZIP") from exc
