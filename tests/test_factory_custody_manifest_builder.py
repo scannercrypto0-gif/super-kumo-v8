@@ -24,6 +24,22 @@ class CustodyManifestBuilderTests(unittest.TestCase):
         self.assertFalse(verified["independent_custody_verified"])
         self.assertEqual(verified["file_count"], 1)
 
+    def test_deterministic_across_equivalent_bundles(self):
+        first = build_custody_manifest(self.root)
+        other = Path(self.tmp.name) / "other"
+        other.mkdir()
+        (other / "sample.txt").write_bytes(b"synthetic research")
+        second = build_custody_manifest(other)
+        self.assertEqual(first["manifest_sha256"], second["manifest_sha256"])
+
+    def test_nested_file_roundtrip(self):
+        nested = self.root / "market"
+        nested.mkdir()
+        (nested / "bar.csv").write_bytes(b"synthetic,bar\\n")
+        result = build_custody_manifest(self.root)
+        self.anchor.write_text(result["manifest_sha256"], encoding="ascii")
+        self.assertEqual(verify_custody_bundle(self.root, self.anchor)["file_count"], 2)
+
     def test_never_overwrites_manifest(self):
         build_custody_manifest(self.root)
         with self.assertRaises(FileExistsError):
