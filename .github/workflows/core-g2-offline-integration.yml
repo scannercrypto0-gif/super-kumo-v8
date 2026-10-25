@@ -18,5 +18,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install test runner
+        run: python -m pip install pytest
       - name: Offline concurrent commit and restart acceptance
         run: python -m pytest tests/test_core_g2_offline_integration_acceptance.py -q
