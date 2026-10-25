@@ -39,7 +39,21 @@ def quarantine_synthetic_result(ledger, raw_plan, expected_plan_digest,
                 if row["candidate_id"] == claim["candidate_id"]]
     if len(matching) != 1 or matching[0]["strategy_digest"] != claim["strategy_digest"]:
         raise ValueError("Unfrozen result candidate/strategy")
-    events, checkpoint = ledger.snapshot()
+    db = ledger._connect()
+    try:
+        db.execute("BEGIN")
+        policy = db.execute("SELECT require_admission FROM ledger_policy WHERE id=1").fetchone()
+        sealed = db.execute("SELECT plan_digest,plan_bytes FROM frozen_plan_policy WHERE id=1").fetchone()
+        if (policy != (1,) or sealed is None or
+                sealed[0] != expected_plan_digest or bytes(sealed[1]) != raw_plan):
+            raise ValueError("Exact durable frozen plan policy required")
+        events, checkpoint = ledger._read(db)
+        from .frozen_research_plan import verify_research_plan
+        ledger._frozen_membership(verify_research_plan(bytes(sealed[1]), sealed[0]), events)
+    finally:
+        if db.in_transaction:
+            db.execute("ROLLBACK")
+        db.close()
     pending = [e for e in events if e["state"] == "PENDING"
                and e["family_id"] == manifest["family_id"]
                and e["candidate_id"] == claim["candidate_id"]
@@ -47,6 +61,11 @@ def quarantine_synthetic_result(ledger, raw_plan, expected_plan_digest,
                and e["strategy_digest"] == claim["strategy_digest"]]
     if len(pending) != 1:
         raise ValueError("No uniquely bound PENDING attempt")
+    candidate_events = [e for e in events
+                        if e["family_id"] == manifest["family_id"]
+                        and e["candidate_id"] == claim["candidate_id"]]
+    if candidate_events[-1]["state"] not in {"PENDING", "INPUTS"}:
+        raise ValueError("Stale PENDING after terminal transition")
     canonical(claim)
     return {"claim_digest": digest(claim), "checkpoint": checkpoint,
             "candidate_id": claim["candidate_id"],
