@@ -73,8 +73,13 @@ def audit_offline_inputs(inputs, *, expected_digest):
         if set(row) != required or row["checksum"] != checksum:
             raise ValueError("Bar schema/commitment mismatch")
         try:
+            # Restore OHLCV declared float types before checking legacy bar hashes.
+            # Canonical input JSON may encode 100.0 as 100.
+            normalized_row = {**row, **{k: float(row[k]) for k in
+                ("open", "high", "low", "close", "volume")
+                if type(row[k]) in (int, float)}}
             original = HistoricalBar(
-                **{**row, "quality": BarQuality(row["quality"]),
+                **{**normalized_row, "quality": BarQuality(row["quality"]),
                    "source": SourceType(row["source"]),
                    "availability_kind": DataAvailabilityKind(row["availability_kind"])})
         except (TypeError, ValueError, KeyError) as error:
