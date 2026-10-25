@@ -122,7 +122,7 @@ class TestObservationWorker(unittest.TestCase):
                 PositionEvent("p", "quote", "quote", 1, 1, "retained-source", price="1"),
             ]
             from dataclasses import asdict
-            upstream.write_text("".join(json.dumps(asdict(e)) + "\\n" for e in events))
+            upstream.write_text("".join(json.dumps(asdict(e)) + "\n" for e in events))
             # Simulate the first process having committed only the opening event.
             first = ObservationWorker(path)
             self.assertTrue(first.submit(events[0]))
