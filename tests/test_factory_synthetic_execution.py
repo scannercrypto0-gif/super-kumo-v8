@@ -64,6 +64,16 @@ class TestSyntheticExecution(unittest.TestCase):
         self.assertEqual(result["status"], "RESOLVED_STOP")
         self.assertAlmostEqual(result["details"]["gross_return"], -.10)
 
+    def test_stop_gap_precedes_intrabar_target(self):
+        data = bars()
+        data.append({"bar_open": 120000, "bar_close": 179999,
+                     "open": 90, "high": 110, "low": 89, "close": 100})
+        result = execute_synthetic_long(data, 0, stop_fraction=.05,
+            target_fraction=.05, ttl_bars=1, holding_bars=2,
+            fee_bps=10, slippage_bps=0)
+        self.assertEqual(result["status"], "RESOLVED_STOP")
+        self.assertAlmostEqual(result["details"]["gross_return"], -.10)
+
     def test_bad_ohlc_rejected(self):
         data = bars()
         data[1]["high"] = 90
