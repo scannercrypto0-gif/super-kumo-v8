@@ -109,3 +109,32 @@ class TestObservationWorker(unittest.TestCase):
                 "p", "close", "closed", 2, 2, "offline", reason="explicit")))
             self.assertEqual(DurablePositionJournal(root / "positions.jsonl").ledger.status(
                 "p", 100), "unknown")
+
+    def test_durable_upstream_resubmission_after_restart_is_idempotent(self):
+        """Only a retained upstream source can recover volatile admission loss."""
+        import json
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            path = root / "positions.jsonl"
+            upstream = root / "upstream.jsonl"
+            events = [
+                PositionEvent("p", "open", "opened", 0, 0, "retained-source"),
+                PositionEvent("p", "quote", "quote", 1, 1, "retained-source", price="1"),
+            ]
+            from dataclasses import asdict
+            upstream.write_text("".join(json.dumps(asdict(e)) + "\\n" for e in events))
+            # Simulate the first process having committed only the opening event.
+            first = ObservationWorker(path)
+            self.assertTrue(first.submit(events[0]))
+            self.assertEqual(first.finish(timeout=5)["committed_or_duplicate"], 1)
+
+            # The retained upstream independently re-sends *all* source events.
+            restarted = ObservationWorker(path)
+            for line in upstream.read_text().splitlines():
+                self.assertTrue(restarted.submit(PositionEvent(**json.loads(line))))
+            status = restarted.finish(timeout=5)
+            self.assertEqual(status["committed_or_duplicate"], 2)
+            journal = DurablePositionJournal(path)
+            self.assertEqual(len(journal.ledger.events), 2)
+            self.assertEqual(journal.ledger.status("p", 10), "open")
+            self.assertEqual(len(path.read_text().splitlines()), 2)
