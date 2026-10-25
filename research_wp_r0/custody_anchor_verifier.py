@@ -5,7 +5,16 @@ cannot establish that channel's ACLs, retention, independence or authenticity.
 """
 import hashlib
 import json
+import stat
 from pathlib import Path
+
+
+def _sha256_file(path):
+    hasher = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 def verify_custody_bundle(bundle_root, anchor_path):
@@ -29,6 +38,22 @@ def verify_custody_bundle(bundle_root, anchor_path):
         raise ValueError("Invalid custody manifest")
     if manifest["schema"] != "atlas-custody-v1" or type(manifest["files"]) is not list or not manifest["files"]:
         raise ValueError("Invalid custody schema or empty inventory")
+    # Inspect raw directory entries, not just files returned by rglob.
+    # Reject symlinks (including directory links), devices, FIFOs and sockets.
+    pending = [root]
+    discovered = set()
+    while pending:
+        folder = pending.pop()
+        for entry in folder.iterdir():
+            mode = entry.lstat().st_mode
+            if stat.S_ISLNK(mode):
+                raise ValueError("Symlink in evidence bundle")
+            if stat.S_ISDIR(mode):
+                pending.append(entry)
+            elif stat.S_ISREG(mode):
+                discovered.add(entry.relative_to(root).as_posix())
+            else:
+                raise ValueError("Unsupported filesystem entry")
     seen = set()
     for row in manifest["files"]:
         if type(row) is not dict or set(row) != {"path", "sha256"}:
@@ -45,9 +70,9 @@ def verify_custody_bundle(bundle_root, anchor_path):
         candidate = (root / name).resolve(strict=True)
         if root not in candidate.parents or not candidate.is_file() or candidate.is_symlink():
             raise ValueError("Unsafe or missing file")
-        if hashlib.sha256(candidate.read_bytes()).hexdigest() != checksum:
+        if _sha256_file(candidate) != checksum:
             raise ValueError("Evidence file digest mismatch")
-    actual_files = {p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()}
+    actual_files = discovered
     if actual_files != seen | {"custody-manifest.json"}:
         raise ValueError("Unexpected or missing bundle files")
     return {"file_count": len(seen), "manifest_sha256": actual,
