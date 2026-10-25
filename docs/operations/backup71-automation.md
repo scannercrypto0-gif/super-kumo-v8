@@ -1,5 +1,28 @@
 # Backup71 automation — bounded implementation and Windows runbook
 
+Issue#113 hardening: restore now **requires** `--receipt-sha256` obtained from a
+previously retained trusted channel. It is SHA256 of the exact receipt.json file
+bytes, **not** its internal self-hash or the ciphertext anchor. Current source/
+anchor paths are no longer historical-restore dependencies; pinned per-generation
+metadata supplies the old source commitment. See
+[owner acceptance checklist](backup71-owner-acceptance-113.md).
+Registration recipes later in this historical runbook are capabilities, not
+authorization to activate schedules under#113. That mission prepares/tests code
+and owner-run steps only; real activation requires the separate operating gate.
+
+Before publish, a local receipt intent pin is fsynced outside the external drive;
+monitoring checks it (or parent111's previously retained outbox receipt), canonical
+receipt bytes and **every** retained ciphertext. Missing evidence/corruption/audit
+budget exhaustion stops coverage/health claims. This local cache is not independent
+custody. The whole retained audit is bounded to2GB/60s plus4096generations, so a
+larger retained set fails closed and requires a separately reviewed audit plan;
+no silent unbounded work or deletion. Retention preview also audits first.
+
+Custody bundles containing raw SQLite headers or WAL/SHM/journal sidecars are
+rejected; use only the existing verified WAL-aware `archive_backup` adapter for
+SQLite. Recovery log paths overlapping the supplied backup are rejected before
+creating audit files. No new encryption format, private key or dependency.
+
 Authority: owner's Codex attachment dated2026-10-25; issue#71. Implements the
 approved policy recorded in#71/comment6396451139. Draft#109 is read-only context,
 not a dependency imported into main. No change to its policy document or main.
@@ -110,13 +133,14 @@ python -B -m aql.archive.automation backup --config <approved-config.json>
 python -B -m aql.archive.automation backup --config <approved-config.json> --execute
 python -B -m aql.archive.automation health --config <approved-config.json>
 python -B -m aql.archive.automation retention --config <approved-config.json>
-python -B -m aql.archive.automation restore --config <saved-config.json> --backup <generation> --target <new-disposable-target> --private-key <separately-held-private.pem> --execute
+python -B -m aql.archive.automation restore --config <recovery-config.json> --backup <generation> --target <new-disposable-target> --private-key <separately-held-private.pem> --receipt-sha256 <independently-retained-receipt-file-sha256> --execute
 ```
 
 Default backup is **read-only preflight**, not success. Only `--execute` creates
-new encrypted generations. Retain the immutable original config and anchor for
-each release/rotation: restore deliberately rejects mismatched configs. Configs
-contain paths/public fingerprints, no passwords. Sources must be frozen; changing
+new encrypted generations. Retain versioned configs/anchors for audit, but restore
+uses the independently pinned receipt's old source identity and the recovery
+config's pinned key/local audit path; it does not require old absolute source or
+anchor paths. Configs contain paths/public fingerprints, no passwords. Sources must be frozen; changing
 a release means a new source version/anchor/config, not silent discovery of data.
 Repeated same-day same-config/commitment jobs reverify ciphertext without replacing
 it. Crash retry ignores partials and may adopt a complete verified generation;
@@ -170,11 +194,12 @@ Binance sampling or proof of production scheduling.
 
 ## Drive and alerts
 
-Each successful backup emits unique dated/ID-named paths-free receipt and
-ciphertext `.anchor.sha256` in local state's `outbox`. Receipt has source version,
+Each successful backup emits unique dated/ID-named paths-free receipt,
+`.receipt.sha256` (exact receipt-file bytes) and ciphertext `.anchor.sha256` in
+local state's `outbox`. Receipt has source version,
 plaintext source commitment, ciphertext/payload hashes, verification status and
 receipt ID/hash; **no private key, passphrase or full personal path**. Upload only
-those two small files to the approved Drive subfolders; never upload the large
+those three small files to the approved custody subfolders; never upload the large
 data or overwrite existing anchors, especially old root `anchor.sha256`.
 
 No Drive capability is connected in this Codex environment. Operator uploads the

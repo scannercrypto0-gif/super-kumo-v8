@@ -61,7 +61,7 @@ def test_dry_run_encrypted_backup_restore_and_receipts(tmp_path,key_bytes):
     assert set(result["tiers"])=={"daily","weekly","monthly"}
     assert b"synthetic fixture" not in (backup/"backup.atlas71").read_bytes()
     target=tmp_path/"restored"
-    assert a.restore(config,backup,target,private,password=PASSWORD)["status"]=="ENCRYPTED_RESTORE_VERIFIED"
+    assert a.restore(config,backup,target,private,expected_receipt_sha256=result["receipt_file_sha256"],password=PASSWORD)["status"]=="ENCRYPTED_RESTORE_VERIFIED"
     assert (target/"data.csv").read_bytes()==(Path(v["source"])/"data.csv").read_bytes()
     assert (target/"nested/empty").read_bytes()==b""
     receipt=parse((Path(v["local_state"])/"outbox"/(result["backup_id"]+".receipt.json")).read_bytes())
@@ -73,7 +73,7 @@ def test_dry_run_encrypted_backup_restore_and_receipts(tmp_path,key_bytes):
 def test_same_day_idempotence_and_overlap_denial(tmp_path,key_bytes):
     config,v,_=setup(tmp_path,key_bytes);first=a.run(config,execute=True)
     again=a.run(config,execute=True)
-    assert again["existing_backup_id"]==first["backup_id"] and len(a.completed(v["destination"]))==1
+    assert again["existing_backup_id"]==first["backup_id"] and len(a.completed(v["destination"],receipt_state=v["local_state"]))==1
     with writer_lock(Path(v["local_state"])):
         with pytest.raises(OSError):a.run(config,execute=True)
 
@@ -89,7 +89,7 @@ def test_failure_no_verified_generation_and_typed_local_log(tmp_path,key_bytes,f
          else patch.object(a,"now",wraps=a.now))
     with ctx:
         with pytest.raises((ValueError,OSError)):a.run(config,execute=True)
-    assert not a.completed(v["destination"])
+    assert not a.completed(v["destination"],receipt_state=v["local_state"])
     records=list(Path(v["local_state"]).glob("*.result.json"));assert len(records)==1
     raw=records[0].read_bytes();assert b"SENSITIVE_BACKEND_TEXT" not in raw
     assert parse(raw)["status"]=="FAILED_NO_ACCEPTANCE"
@@ -100,7 +100,7 @@ def test_changed_media_after_encryption_rejected(tmp_path,key_bytes):
     def fault(stage):
         if stage=="after_encrypt":(Path(v["external_root"])/".atlas-backup71-volume").write_text("detached/replaced")
     with pytest.raises(ValueError):a.run(config,execute=True,fault=fault)
-    assert not a.completed(v["destination"])
+    assert not a.completed(v["destination"],receipt_state=v["local_state"])
     assert all(p.name.endswith(".partial") for p in Path(v["destination"]).iterdir())
 
 
@@ -119,13 +119,13 @@ def test_restore_refuses_corruption_wrong_key_overwrite_and_logs(tmp_path,key_by
         other=rsa.generate_private_key(public_exponent=65537,key_size=3072)
         private=tmp_path/"wrong.pem";private.write_bytes(other.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.BestAvailableEncryption(PASSWORD)))
     if mode=="existing_target":target.mkdir();(target/"keep").write_bytes(b"original")
-    with pytest.raises(Exception):a.restore(config,backup,target,private,password=PASSWORD)
+    with pytest.raises(Exception):a.restore(config,backup,target,private,expected_receipt_sha256=result["receipt_file_sha256"],password=PASSWORD)
     if mode=="existing_target":assert (target/"keep").read_bytes()==b"original"
     else:assert not target.exists()
     assert any(parse(p.read_bytes())["status"]=="RESTORE_FAILED_NO_ACCEPTANCE" for p in Path(v["local_state"]).glob("restore-*.result.json"))
 
 
-@pytest.mark.parametrize("stage",["after_encrypt","after_publish"])
+@pytest.mark.parametrize("stage",["after_encrypt","before_publish","after_publish"])
 def test_real_process_interruption_retry_preserves_partial_or_recovers_outbox(tmp_path,key_bytes,stage):
     config,v,_=setup(tmp_path,key_bytes)
     script='''import os,sys
@@ -137,10 +137,10 @@ run(sys.argv[1],execute=True,fault=fault)
     result=subprocess.run([sys.executable,"-B","-c",script,str(config),stage],capture_output=True,timeout=30)
     assert result.returncode==91,result.stderr
     retried=a.run(config,execute=True)
-    assert len(a.completed(v["destination"]))==1
-    receipt=a.completed(v["destination"])[0][1]
+    assert len(a.completed(v["destination"],receipt_state=v["local_state"]))==1
+    receipt=a.completed(v["destination"],receipt_state=v["local_state"])[0][1]
     assert (Path(v["local_state"])/"outbox"/(receipt["backup_id"]+".receipt.json")).exists()
-    if stage=="after_encrypt":assert any(p.name.endswith(".partial") for p in Path(v["destination"]).iterdir())
+    if stage in ("after_encrypt","before_publish"):assert any(p.name.endswith(".partial") for p in Path(v["destination"]).iterdir())
     else:assert retried["status"]=="ALREADY_VERIFIED_TODAY"
     assert "INTERRUPTED_ATTEMPT_REQUIRES_REVIEW" in a.health(config)["issues"]
 
@@ -187,7 +187,7 @@ def test_wal_aware_archive_snapshot_adapter_encrypts_and_restores(tmp_path,key_b
     Path(v["anchor"]).write_text(evidence["inventory_hash"],encoding="ascii")
     v|={"source":str(source),"source_kind":"archive_backup"};config.write_bytes(canonical(v))
     result=a.run(config,execute=True)
-    assert a.restore(config,Path(v["destination"])/result["backup_id"],tmp_path/"restored",private,password=PASSWORD)["status"]=="ENCRYPTED_RESTORE_VERIFIED"
+    assert a.restore(config,Path(v["destination"])/result["backup_id"],tmp_path/"restored",private,expected_receipt_sha256=result["receipt_file_sha256"],password=PASSWORD)["status"]=="ENCRYPTED_RESTORE_VERIFIED"
     assert journal.count_by_state()=={"LOCAL_COMMITTED":1}
 
 
@@ -207,7 +207,7 @@ def test_source_changed_during_encryption_never_published(tmp_path,key_bytes):
         return evidence
     with patch.object(a,"encrypt",side_effect=changed):
         with pytest.raises(ValueError):a.run(config,execute=True)
-    assert not a.completed(v["destination"])
+    assert not a.completed(v["destination"],receipt_state=v["local_state"])
 
 
 @pytest.mark.parametrize("date,expected",[(datetime(2025,1,1,tzinfo=timezone.utc),0),

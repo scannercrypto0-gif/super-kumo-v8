@@ -1,5 +1,10 @@
 # Backup71 execution evidence / acceptance boundary
 
+Historical parentPR111 observations below are retained as recorded, not evidence
+that issue113's new receipt-pin restore contract was executed through Scheduler.
+See [issue113 hardening evidence](BACKUP71_TRUST_113.md) and its targeted CI.
+No schedules/account connections were activated during issue113.
+
 Base main `fc94d833dcb6e87064093ca7ccc4efea3a0732e3` (merged#107). Owner attachment
 requested implementation, not another architecture review. Read#71/latest policy
 and Draft#109/9491c334c162cd2527b52f1adfb3144a6935f060. #109 unchanged; no merge.
