@@ -5,7 +5,7 @@ This layer never produces fills, PnL, COMPLETE or a custody attestation.
 import hashlib
 import math
 import re
-from .historical_library import HistoricalBar, DatasetManifest, BarQuality, SourceType, DataAvailabilityKind
+from .historical_library import HistoricalBar, DatasetManifest, BarQuality, SourceType, DataAvailabilityKind, _interval_to_ms
 from .strategy_definition import canonical, keys
 from .historical_evaluation_bridge import OfflineInputs
 
@@ -104,6 +104,11 @@ def audit_offline_inputs(inputs, *, expected_digest):
         checked.append(original)
     if any(a.bar_open >= b.bar_open or a.bar_close >= b.bar_open for a, b in zip(checked, checked[1:])):
         raise ValueError("Unsorted or overlapping bars")
+    interval_ms = _interval_to_ms(meta.interval)
+    if any(b.bar_close != b.bar_open + interval_ms - 1 for b in checked):
+        raise ValueError("Invalid candle duration")
+    if any(b.bar_open - a.bar_open != interval_ms for a, b in zip(checked, checked[1:])):
+        raise ValueError("Missing candle in audited range")
     if meta.gap_count or meta.duplicate_count or meta.non_final_count or meta.coverage_pct != 100:
         raise ValueError("Incomplete or non-final dataset")
     if [b.checksum for b in checked] != binding["bar_checksums"]:
