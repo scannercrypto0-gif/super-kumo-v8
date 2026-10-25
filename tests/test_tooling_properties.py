@@ -1,6 +1,7 @@
 """Property tests of real ATLAS archive contracts; no mock implementations."""
 
 from pathlib import Path
+import tempfile
 
 import pytest
 from hypothesis import given, settings, strategies as st
@@ -23,14 +24,17 @@ def test_canonical_roundtrip_preserves_real_archive_digest(value):
 
 @settings(max_examples=80, deadline=None)
 @given(st.sampled_from(["../escape", "a/../escape", "/absolute", "a\\\\escape", "C:drive", "", "a//b", "a/./b"]))
-def test_archive_child_rejects_escape_and_ambiguous_paths(tmp_path: Path, name: str):
-    with pytest.raises((ValueError, OSError)):
-        child(tmp_path, name)
+def test_archive_child_rejects_escape_and_ambiguous_paths(name: str):
+    with tempfile.TemporaryDirectory() as root:
+        with pytest.raises((ValueError, OSError)):
+            child(Path(root), name)
 
 
 @settings(max_examples=80, deadline=None)
 @given(st.lists(st.text(alphabet="abcdefghijklmnopqrstuvwxyz0123456789_-", min_size=1, max_size=12), min_size=1, max_size=5))
-def test_archive_child_stays_inside_root(tmp_path: Path, parts):
-    name = "/".join(parts)
-    resolved = child(tmp_path, name)
-    assert resolved.relative_to(tmp_path) == Path(*parts)
+def test_archive_child_stays_inside_root(parts):
+    with tempfile.TemporaryDirectory() as root:
+        base = Path(root)
+        name = "/".join(parts)
+        resolved = child(base, name)
+        assert resolved.relative_to(base) == Path(*parts)
