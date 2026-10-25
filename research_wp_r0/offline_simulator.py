@@ -9,6 +9,7 @@ from .historical_evaluation_bridge import OfflineInputs
 from .offline_evaluation_result import OfflineEvaluationResult
 from .future_bar_evidence import FutureBarEvidence
 from .strategy_definition import number
+from .historical_library import _interval_to_ms
 
 
 def simulate_single_long(inputs, *, expected_digest, signal, ttl_bars=1,
@@ -55,6 +56,19 @@ def simulate_single_long(inputs, *, expected_digest, signal, ttl_bars=1,
         evidence["decision_cutoff_ms"] != decision or
         evidence["symbol"] != spec["dataset_manifest"]["symbol"]):
         raise ValueError("Future evidence identity mismatch")
+    interval = _interval_to_ms(spec["dataset_manifest"]["interval"])
+    if evidence["interval_ms"] != interval:
+        raise ValueError("Future interval does not match audited dataset")
+    # The first bar must be the first *eligible* next open on the
+    # original dataset grid. Otherwise an unobserved fill may be hidden.
+    historical_bars = spec["bars"]
+    if not historical_bars:
+        raise ValueError("Audited historical bars required for grid binding")
+    last_open = historical_bars[-1]["open_ms"]
+    expected_open = last_open + ((decision - last_open) // interval + 1) * interval
+    if evidence["bars"][0]["open_ms"] != expected_open:
+        return OfflineEvaluationResult({**common, "outcome": "UNRESOLVED",
+                                        "reason": "DATA_GAP"})
     if len(evidence["bars"]) < 2:
         return OfflineEvaluationResult({**common, "outcome": "UNRESOLVED",
                                         "reason": "UNKNOWN"})
