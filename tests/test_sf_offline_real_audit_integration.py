@@ -40,6 +40,17 @@ def test_real_library_receipt_audit_and_simulated_close():
              "volume": 10, "observed_at_ms": first_open + 2 * interval},
         ],
     })
+    # Fail closed when a separately stored future commitment is wrong.
+    import pytest
+    with pytest.raises(ValueError, match="future evidence digest"):
+        simulate_single_long(prepared, expected_digest=prepared.digest,
+                             signal=True, future=future,
+                             expected_future_digest="f" * 64)
+    # Fail closed on a separately retained input commitment mismatch.
+    with pytest.raises(ValueError, match="Input commitment mismatch"):
+        simulate_single_long(prepared, expected_digest="f" * 64,
+                             signal=True, future=future,
+                             expected_future_digest=future.digest)
     result = simulate_single_long(prepared, expected_digest=prepared.digest,
                                   signal=True, future=future,
                                   expected_future_digest=future.digest)
