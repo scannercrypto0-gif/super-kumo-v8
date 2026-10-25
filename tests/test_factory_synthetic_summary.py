@@ -28,6 +28,14 @@ class TestSyntheticSummary(unittest.TestCase):
         self.assertFalse(result["profitability_claim"])
         self.assertEqual(result, summarize_synthetic_opportunities(ledger()))
 
+    def test_nested_receipt_tamper_rejected(self):
+        modified = copy.deepcopy(ledger())
+        modified["records"][0]["execution"]["details"]["net_return"] = 999
+        from research_wp_r0.strategy_definition import digest
+        modified["receipt_hash"] = digest({k: v for k, v in modified.items() if k != "receipt_hash"})
+        with self.assertRaises(ValueError):
+            summarize_synthetic_opportunities(modified)
+
     def test_receipt_tamper_rejected(self):
         modified = copy.deepcopy(ledger())
         modified["records"][0]["status"] = "RESOLVED_STOP"
