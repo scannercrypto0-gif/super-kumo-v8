@@ -16,7 +16,7 @@ class SyntheticExecutionTests(unittest.TestCase):
             "protocol_digest": "b" * 64,
             "binding": {"binding": {"decision_cutoff_ms": 59999}},
             "dataset_manifest": {"symbol": "BTCUSDT", "interval": "1m"},
-            "bars": [{"open_ms": 0}],
+            "bars": [{"bar_open": 0}],
         })
 
     def evidence(self, **changes):
