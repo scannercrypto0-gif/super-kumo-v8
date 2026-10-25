@@ -16,6 +16,8 @@ def execute_synthetic_long(bars, decision_bar_index, *, stop_fraction,
     for name, value in (("stop_fraction", stop_fraction), ("target_fraction", target_fraction)):
         number(value, 0.000001, 10 if name == "target_fraction" else 0.999999)
     integer(ttl_bars, 1, 1000)
+    if ttl_bars != 1:
+        raise ValueError("Only next-bar entry TTL=1 is supported")
     integer(holding_bars, 1, 10000)
     number(fee_bps, 0, 10000)
     number(slippage_bps, 0, 10000)
