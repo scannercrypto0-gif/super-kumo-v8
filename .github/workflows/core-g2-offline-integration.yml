@@ -1,0 +1,22 @@
+name: Core G1-G2 offline integration acceptance
+on:
+  pull_request:
+    paths:
+      - "tests/test_core_g2_offline_integration_acceptance.py"
+      - ".github/workflows/core-g2-offline-integration.yml"
+  workflow_dispatch:
+
+jobs:
+  offline-integration:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Offline concurrent commit and restart acceptance
+        run: python -m pytest tests/test_core_g2_offline_integration_acceptance.py -q
