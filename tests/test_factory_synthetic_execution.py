@@ -74,6 +74,12 @@ class TestSyntheticExecution(unittest.TestCase):
         self.assertEqual(result["status"], "RESOLVED_STOP")
         self.assertAlmostEqual(result["details"]["gross_return"], -.10)
 
+    def test_mixed_bar_durations_rejected(self):
+        data = bars()
+        data[1]["bar_close"] = 120000
+        with self.assertRaises(ValueError):
+            run(data)
+
     def test_bad_ohlc_rejected(self):
         data = bars()
         data[1]["high"] = 90
