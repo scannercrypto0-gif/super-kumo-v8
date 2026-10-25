@@ -26,7 +26,7 @@ jobs:
       - run: python -m unittest discover -s tests -p "test_g2_*journal*.py" -v
       # One-time diagnostic for #92; keep isolated from the normal G2 test run.
       - name: Replay benchmark (Ubuntu diagnostic)
-        if: matrix.os == 'ubuntu-latest'
+        if: github.event_name == 'workflow_dispatch' && matrix.os == 'ubuntu-latest'
         env:
           AQL_G2_BENCHMARK: '1'
         run: python -m unittest discover -s tests -p "test_g2_journal_replay_benchmark.py" -v
