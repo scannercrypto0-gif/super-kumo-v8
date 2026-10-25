@@ -6,6 +6,8 @@ on:
       - 'tests/test_factory_synthetic_execution.py'
       - 'research_wp_r0/synthetic_opportunities.py'
       - 'tests/test_factory_synthetic_opportunities.py'
+      - 'research_wp_r0/synthetic_summary.py'
+      - 'tests/test_factory_synthetic_summary.py'
       - '.github/workflows/sf-synthetic-execution.yml'
   workflow_dispatch:
 jobs:
@@ -23,3 +25,4 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m unittest discover -s tests -p test_factory_synthetic_execution.py -v
       - run: python -m unittest discover -s tests -p test_factory_synthetic_opportunities.py -v
+      - run: python -m unittest discover -s tests -p test_factory_synthetic_summary.py -v
