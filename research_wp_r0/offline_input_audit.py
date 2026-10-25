@@ -3,6 +3,7 @@
 This layer never produces fills, PnL, COMPLETE or a custody attestation.
 """
 import hashlib
+import math
 import re
 from .historical_library import HistoricalBar, DatasetManifest, BarQuality, SourceType, DataAvailabilityKind
 from .strategy_definition import canonical, keys
@@ -62,6 +63,11 @@ def audit_offline_inputs(inputs, *, expected_digest):
                    "availability_kind": DataAvailabilityKind(row["availability_kind"])})
         except (TypeError, ValueError, KeyError) as error:
             raise ValueError("Invalid bar provenance") from error
+        if (any(type(v) not in (int, float) or not math.isfinite(v) for v in (original.open, original.high, original.low, original.close, original.volume)) or
+            min(original.open, original.close) <= 0 or original.low <= 0 or original.volume < 0 or
+            original.high < max(original.open, original.close, original.low) or
+            original.low > min(original.open, original.close)):
+            raise ValueError("Invalid OHLCV range")
         if original.checksum != checksum:
             raise ValueError("OHLCV/provenance checksum mismatch")
         if original.quality != BarQuality.FINAL or original.availability_kind != DataAvailabilityKind.CONFIRMED:
@@ -77,6 +83,8 @@ def audit_offline_inputs(inputs, *, expected_digest):
         checked.append(original)
     if any(a.bar_open >= b.bar_open or a.bar_close >= b.bar_open for a, b in zip(checked, checked[1:])):
         raise ValueError("Unsorted or overlapping bars")
+    if meta.gap_count or meta.duplicate_count or meta.non_final_count or meta.coverage_pct != 100:
+        raise ValueError("Incomplete or non-final dataset")
     if [b.checksum for b in checked] != binding["bar_checksums"]:
         raise ValueError("Range commitment mismatch")
     if checked[0].bar_open != binding["start_ms"] or checked[-1].bar_open != binding["end_ms"]:
