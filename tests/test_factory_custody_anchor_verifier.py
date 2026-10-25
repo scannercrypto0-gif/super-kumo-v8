@@ -52,6 +52,35 @@ class CustodyAnchorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             verify_custody_bundle(self.root, self.anchor)
 
+    def test_missing_anchor_rejected(self):
+        self.anchor.unlink()
+        with self.assertRaises(FileNotFoundError):
+            verify_custody_bundle(self.root, self.anchor)
+
+    def test_nested_unlisted_file_rejected(self):
+        nested = self.root / "nested"
+        nested.mkdir()
+        (nested / "extra.txt").write_bytes(b"unlisted")
+        with self.assertRaises(ValueError):
+            verify_custody_bundle(self.root, self.anchor)
+
+    def test_symlink_directory_rejected_if_supported(self):
+        outside = Path(self.tmp.name) / "outside"
+        outside.mkdir()
+        try:
+            (self.root / "linked").symlink_to(outside, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("Directory symlinks unavailable on this host")
+        with self.assertRaises(ValueError):
+            verify_custody_bundle(self.root, self.anchor)
+
+    def test_streamed_large_evidence(self):
+        payload = b"abcd" * (1024 * 1024)
+        (self.root / "evidence.txt").write_bytes(payload)
+        self.manifest["files"][0]["sha256"] = hashlib.sha256(payload).hexdigest()
+        self.refresh()
+        self.assertTrue(verify_custody_bundle(self.root, self.anchor)["content_verified"])
+
     def test_extra_file_and_anchor_inside_bundle_rejected(self):
         (self.root / "unlisted.txt").write_bytes(b"x")
         with self.assertRaises(ValueError):
