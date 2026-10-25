@@ -60,3 +60,21 @@ def test_real_library_receipt_audit_and_simulated_close():
     assert abs(result.spec["gross_return_bps"] - 500) < 1e-7
     assert abs(result.spec["net_return_bps"] - 470) < 1e-7
     assert result.spec["independent_custody"] == "NOT_VERIFIED"
+
+def test_real_auditor_no_signal_keeps_zero_exposure():
+    prepared = inputs()
+    result = simulate_single_long(prepared, expected_digest=prepared.digest,
+                                  signal=False)
+    assert result.spec["outcome"] == "NO_SIGNAL"
+    assert result.spec["entry_bar_open_ms"] is None
+    assert result.spec["net_return_bps"] is None
+
+
+def test_real_auditor_missing_future_does_not_invent_execution():
+    prepared = inputs()
+    result = simulate_single_long(prepared, expected_digest=prepared.digest,
+                                  signal=True)
+    assert result.spec["outcome"] == "UNRESOLVED"
+    assert result.spec["reason"] == "UNKNOWN"
+    assert result.spec["entry_bar_open_ms"] is None
+    assert result.spec["net_return_bps"] is None
