@@ -36,6 +36,7 @@ class TestSyntheticExecution(unittest.TestCase):
     def test_gap_is_not_filled(self):
         data = bars()
         data[1]["bar_open"] = 60001
+        data[1]["bar_close"] = 120000
         self.assertEqual(run(data)["details"]["reason"], "ENTRY_GAP")
 
     def test_no_next_bar(self):
