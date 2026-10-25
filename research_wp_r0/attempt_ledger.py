@@ -68,23 +68,26 @@ class AttemptLedger:
             raise ValueError("Anchored ledger missing; refusing recreation")
         db = self._connect()
         try:
+            db.execute("BEGIN IMMEDIATE")
             if not existed:
                 db.execute("CREATE TABLE receipts(seq INTEGER PRIMARY KEY, event_id TEXT UNIQUE NOT NULL, payload BLOB NOT NULL, chain_hash TEXT NOT NULL)")
                 db.execute("PRAGMA user_version=1")
-            db.execute("CREATE TABLE IF NOT EXISTS ledger_policy (id INTEGER PRIMARY KEY CHECK(id=1), require_admission INTEGER NOT NULL CHECK(require_admission IN (0,1)))")
+                db.execute("CREATE TABLE ledger_policy (id INTEGER PRIMARY KEY CHECK(id=1), require_admission INTEGER NOT NULL CHECK(require_admission IN (0,1)))")
+                db.execute("INSERT INTO ledger_policy VALUES(1,?)", (int(bool(require_admission)),))
+                db.execute("CREATE TABLE frozen_plan_policy (id INTEGER PRIMARY KEY CHECK(id=1), plan_digest TEXT NOT NULL, plan_bytes BLOB NOT NULL)")
             stored = db.execute("SELECT require_admission FROM ledger_policy WHERE id=1").fetchone()
-            if stored is None:
-                db.execute("INSERT INTO ledger_policy(id, require_admission) VALUES(1, ?)",
-                           (int(bool(require_admission)),))
-                self.require_admission = bool(require_admission)
-            else:
-                self.require_admission = bool(stored[0])
-                if require_admission and not self.require_admission:
-                    db.execute("UPDATE ledger_policy SET require_admission=1 WHERE id=1")
-                    self.require_admission = True
-            db.execute("CREATE TABLE IF NOT EXISTS frozen_plan_policy (id INTEGER PRIMARY KEY CHECK(id=1), plan_digest TEXT NOT NULL, plan_bytes BLOB NOT NULL)")
+            if stored is None or stored[0] not in (0, 1):
+                raise ValueError("Missing or invalid durable admission policy; no automatic repair")
+            # Existing legacy/incomplete schemas must not be silently migrated.
+            db.execute("SELECT plan_digest,plan_bytes FROM frozen_plan_policy WHERE id=1").fetchone()
             self._read(db)
+            self.require_admission = bool(stored[0])
+            if require_admission and not self.require_admission:
+                db.execute("UPDATE ledger_policy SET require_admission=1 WHERE id=1")
+                self.require_admission = True
+            db.execute("COMMIT")
         finally:
+            if db.in_transaction: db.execute("ROLLBACK")
             db.close()
         self._identity = (self.path.stat().st_dev, self.path.stat().st_ino)
 
@@ -94,10 +97,15 @@ class AttemptLedger:
             s = self.path.stat()
             if (s.st_dev, s.st_ino) != self._identity:
                 raise ValueError("Ledger path replaced")
+        existed = self.path.exists()
         db = sqlite3.connect(self.path, timeout=1, isolation_level=None)
         try:
             db.execute("PRAGMA synchronous=FULL")
-            db.execute("PRAGMA journal_mode=WAL")
+            if existed:
+                if db.execute("PRAGMA journal_mode").fetchone()[0] != "wal":
+                    raise ValueError("Incompatible ledger journal mode; no automatic migration")
+            else:
+                db.execute("PRAGMA journal_mode=WAL")
         except Exception:
             db.close()
             raise
@@ -191,15 +199,21 @@ class AttemptLedger:
         Custody of the initial digest must be verified independently.
         """
         from .frozen_research_plan import verify_research_plan
-        verify_research_plan(raw_plan, expected_digest)
+        plan = verify_research_plan(raw_plan, expected_digest)
         db = self._connect()
         try:
             db.execute("BEGIN IMMEDIATE")
             events, _ = self._read(db)
+            policy = db.execute("SELECT require_admission FROM ledger_policy WHERE id=1").fetchone()
+            if policy is None or policy[0] not in (0, 1):
+                raise ValueError("Missing durable admission policy; no automatic repair")
             stored = db.execute("SELECT plan_digest,plan_bytes FROM frozen_plan_policy WHERE id=1").fetchone()
             if stored is not None:
                 if stored[0] != expected_digest or bytes(stored[1]) != raw_plan:
                     raise ValueError("Frozen plan policy cannot be replaced")
+                if policy[0] != 1:
+                    raise ValueError("Invalid sealed frozen plan admission policy")
+                self._frozen_membership(plan, events)
             else:
                 if events:
                     raise ValueError("Frozen plan enrollment requires empty ledger")
@@ -207,16 +221,26 @@ class AttemptLedger:
                            (expected_digest, raw_plan))
                 db.execute("UPDATE ledger_policy SET require_admission=1 WHERE id=1")
             db.execute("COMMIT")
+            self.require_admission = True
         finally:
             if db.in_transaction: db.execute("ROLLBACK")
             db.close()
 
+    @staticmethod
+    def _frozen_membership(plan, events):
+        allowed = {item["candidate_id"]: item["strategy_digest"] for item in plan["candidates"]}
+        for event in events:
+            if (event.get("family_id") != plan["family_id"] or
+                    event.get("candidate_id") not in allowed or
+                    event.get("strategy_digest") != allowed[event["candidate_id"]]):
+                raise ValueError("Event violates sealed frozen plan")
+
     def record_attempt(self, event, *, admission=None):
         """Append receipt; optional admission is checked under BEGIN IMMEDIATE.
 
-        An admission callback must be trusted, deterministic and side-effect
-        free. Existing callers remain supported, so this alone does not
-        prohibit unguarded writes through the original API.
+        A callback is supplemental, deterministic and side-effect free. On a
+        sealed ledger it cannot bypass membership, including idempotent replay.
+        Unsealed legacy usage remains separate from the frozen writer path.
         """
         raw = canonical(event)
         if len(raw) > 2_000_000:
@@ -228,26 +252,18 @@ class AttemptLedger:
             db.execute("BEGIN IMMEDIATE")
             events, checkpoint = self._read(db)
             policy = db.execute("SELECT require_admission FROM ledger_policy WHERE id=1").fetchone()
-            if policy is None:
+            if policy is None or policy[0] not in (0, 1):
                 raise ValueError("Missing durable admission policy")
             sealed = db.execute("SELECT plan_digest,plan_bytes FROM frozen_plan_policy WHERE id=1").fetchone()
             if sealed is not None:
                 from .frozen_research_plan import verify_research_plan
                 plan = verify_research_plan(bytes(sealed[1]), sealed[0])
-                if event.get("family_id") != plan["family_id"] or not any(
-                    item["candidate_id"] == event.get("candidate_id") and
-                    item["strategy_digest"] == event.get("strategy_digest")
-                    for item in plan["candidates"]
-                ):
-                    raise ValueError("Event violates sealed frozen plan")
-                for prior in events:
-                    if prior["family_id"] != plan["family_id"] or not any(
-                        item["candidate_id"] == prior.get("candidate_id") and
-                        item["strategy_digest"] == prior.get("strategy_digest")
-                        for item in plan["candidates"]
-                    ):
-                        raise ValueError("Prior event violates sealed frozen plan")
-            elif bool(policy[0]) and admission is None:
+                self._frozen_membership(plan, (*events, event))
+                if policy[0] != 1:
+                    raise ValueError("Invalid sealed frozen plan admission policy")
+            elif bool(policy[0]):
+                raise ValueError("Durable admission policy requires enrolled frozen plan")
+            if bool(policy[0]) and admission is None:
                 raise ValueError("Durable admission policy requires callback")
             existing = db.execute("SELECT payload FROM receipts WHERE event_id=?", (eid,)).fetchone()
             if existing:
