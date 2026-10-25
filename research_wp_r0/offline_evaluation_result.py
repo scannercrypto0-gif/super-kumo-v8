@@ -8,7 +8,7 @@ import re
 
 from .strategy_definition import canonical, digest, keys, integer, number
 
-_SHA = re.compile(r"[0-9a-f]{64}\\Z")
+_SHA = re.compile(r"[0-9a-f]{64}\Z")
 _OUTCOMES = frozenset({"NO_SIGNAL", "NO_FILL", "UNRESOLVED", "SIMULATED_CLOSED"})
 _REASONS = frozenset({
     "NONE", "NO_SIGNAL", "TTL_EXPIRED", "NO_ELIGIBLE_BAR",
