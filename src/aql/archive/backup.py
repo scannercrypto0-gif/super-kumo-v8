@@ -9,7 +9,7 @@ import stat
 import time
 import uuid
 
-from .contracts import canonical, digest, market_envelope, parse
+from .contracts import canonical, digest, market_envelope, parse, timestamp
 from .local import check_path, child, mkdir, read_small, ro, source_row, sync_dir, write_new, writer_lock, verify_segment
 
 
@@ -79,6 +79,12 @@ def verify_backup(root, *, expected_digest, max_files=8192, max_bytes=2_000_000_
     stored = inventory.pop("inventory_hash")
     if stored != expected_digest or digest(inventory) != stored or inventory["schema"] != "aql.backup.v1":
         raise ValueError("Backup retained commitment mismatch")
+    # A valid checksum does not make future/unobserved journal data acceptable.
+    # Legacy inventories lack this observation; validate against verification time
+    # without retroactively attesting when their snapshot was captured.
+    cutoff = timestamp(inventory.get("journal_snapshot_completed_ms", int(time.time()*1000)))
+    if cutoff > int(time.time()*1000):
+        raise ValueError("Future snapshot observation")
     if not 2 <= len(inventory["files"]) <= max_files:
         raise ValueError("Inventory file bound")
     seen = set(); total = 0
@@ -149,7 +155,7 @@ def verify_backup(root, *, expected_digest, max_files=8192, max_bytes=2_000_000_
             records, manifest = verify_segment(child(root/"archive", relative), expected_hash=mh)
             for record in records:
                 row = source_row(journal, record["source_seq"])
-                if row is None or market_envelope(row, journal_id=source_id, market=record["market"], build=record["build"], policy=record["policy"], cutoff_ms=253402300799999) != record:
+                if row is None or market_envelope(row, journal_id=source_id, market=record["market"], build=record["build"], policy=record["policy"], cutoff_ms=cutoff) != record:
                     raise ValueError("Restored journal/archive record mismatch")
                 index = catalog.execute("SELECT record_id,hash,segment FROM records WHERE seq=?", (record["source_seq"],)).fetchone()
                 if tuple(index or ()) != (record["record_id"], record["envelope_hash"], relative):
@@ -167,7 +173,7 @@ def verify_backup(root, *, expected_digest, max_files=8192, max_bytes=2_000_000_
         for sequence in journal.execute("SELECT id FROM journal_entries ORDER BY id"):
             row = source_row(journal, sequence[0])
             market_envelope(row, journal_id=source_id, market=inventory["market"],
-                            build=inventory["build"], policy=inventory["policy"], cutoff_ms=253402300799999)
+                            build=inventory["build"], policy=inventory["policy"], cutoff_ms=cutoff)
             journal_count += 1
             if time.monotonic() > deadline: raise TimeoutError("Journal validation deadline")
         if time.monotonic() > deadline: raise TimeoutError("Verification deadline")
@@ -199,6 +205,7 @@ def create_backup(archive, destination, *, operational_path=None, max_files=8192
         if catalog.execute("SELECT COUNT(*) FROM pending").fetchone()[0]:
             raise ValueError("Resolve pending archive intent before backup")
         sqlite_snapshot(archive.journal_path, temporary/"journal.sqlite", timeout=max(0, deadline-time.monotonic()), max_bytes=budget[0])
+        inventory["journal_snapshot_completed_ms"] = int(time.time()*1000)
         budget[0] -= (temporary/"journal.sqlite").stat().st_size
         sqlite_snapshot(archive.root/"catalog.sqlite", temporary/"archive/catalog.sqlite", timeout=max(0, deadline-time.monotonic()), max_bytes=budget[0])
         budget[0] -= (temporary/"archive/catalog.sqlite").stat().st_size

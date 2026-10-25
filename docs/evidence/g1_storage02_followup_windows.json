@@ -1,0 +1,62 @@
+{
+  "schema": "aql.storage-measurement.v1",
+  "utc": "2026-10-25T09:52:41.781719+00:00",
+  "python": "3.14.3",
+  "platform": "Windows-11-10.0.22000-SP0",
+  "rows": 512,
+  "fixture": "synthetic8 symbols x1m; not live deployment, no compression implemented",
+  "source_sha256": {
+    "contracts.py": "62d530fce5028f12426b78f5364c10d87324792a37b93ba813a63e31c33af04a",
+    "local.py": "148d6ba7624b789f66f475300fabb34cb9b211fa799bdf52af4b4b12564c8511",
+    "backup.py": "7672aebc0fe41a3772055b64a5bcdfa3d9088a9472e99e4723c9fca31b67a26c"
+  },
+  "archive_elapsed_s": 1.2029631999976118,
+  "archive_batches": 8,
+  "core_commit_ms": {
+    "median": 31.288000001950422,
+    "p95": 98.01829999923939
+  },
+  "bytes": {
+    "jsonl": 558728,
+    "manifests": 16929,
+    "catalog": 135168,
+    "journal": 344064
+  },
+  "archive_bytes_per_row_including_fixed_catalog": 1388.330078125,
+  "archive_GB_30_90_365": {
+    "10": {
+      "30": 0.5998,
+      "90": 1.7993,
+      "365": 7.2971
+    },
+    "100": {
+      "30": 5.9976,
+      "90": 17.9928,
+      "365": 72.9706
+    },
+    "500": {
+      "30": 29.9879,
+      "90": 89.9638,
+      "365": 364.8531
+    }
+  },
+  "backup_elapsed_s": 1.3520959000015864,
+  "restore_elapsed_s": 1.5262393000011798,
+  "backup_restore": {
+    "records": 512,
+    "watermark": 512,
+    "journal_max_seq": 512,
+    "journal_records": 512,
+    "files": 18,
+    "bytes": 1054889,
+    "inventory_hash": "910b019e20748e102e9052950135e98e61510034e63bea43c1b49a292b3a13e4",
+    "off_device_protection": "NOT_VERIFIED"
+  },
+  "core_while_archive_blocked_ms": {
+    "count": 20,
+    "median": 15.533249999862164,
+    "p95": 19.973900001787115,
+    "max": 22.672199993394315
+  },
+  "limits": "single synthetic Windows/Linux fixture; same-device copies; no power-loss/offsite/RPO certification; fixed small-sample catalog allocation may overstate asymptotic B/row"
+}

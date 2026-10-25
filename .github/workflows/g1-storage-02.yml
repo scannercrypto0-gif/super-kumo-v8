@@ -2,7 +2,7 @@ name: G1-STORAGE-02 Local archive acceptance
 on:
   pull_request:
     branches: [main]
-    paths: ["src/aql/archive/**", "src/aql/journal/**", "src/aql/models/bar.py", "src/aql/lanes.py", "src/aql/recovery/gap_recovery.py", "tests/test_g1_storage_02.py", "scripts/measure_g1_storage_02.py", "pyproject.toml", ".github/workflows/g1-storage-02.yml"]
+    paths: ["src/aql/archive/**", "src/aql/journal/**", "src/aql/models/bar.py", "src/aql/lanes.py", "src/aql/recovery/gap_recovery.py", "tests/test_g1_storage_02*.py", "scripts/measure_g1_storage_02.py", "pyproject.toml", ".github/workflows/g1-storage-02.yml"]
   push:
     branches: [feat/g1-storage-02-local-archive]
   workflow_dispatch:
@@ -37,9 +37,9 @@ jobs:
           python --version | tee -a storage02-source.txt
           python -m pip freeze | tee -a storage02-source.txt
       - name: Local-only archive and restore acceptance
-        run: python -B -m pytest tests/test_g1_storage_02.py -v --tb=short --junitxml=storage02.xml
+        run: python -B -m pytest tests/test_g1_storage_02.py tests/test_g1_storage_02_followup.py -v --tb=short --junitxml=storage02.xml
       - name: Require complete Phase1 acceptance without skips
-        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('storage02.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==60; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
+        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('storage02.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==78; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

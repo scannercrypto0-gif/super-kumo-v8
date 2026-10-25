@@ -1,5 +1,14 @@
 # ADR proposal G1-STORAGE-02 v1 — local authoritative archive and recovery
 
+Follow-up #71/comment6396104313 retains Option B and this **proposal** status.
+The finite CLI now exposes existing backup/restore primitives together; no live
+pipeline activation or new storage authority. A bounded sealed-backup read-only
+query contract exports retrospective full envelopes without research registration
+or confirmed PIT claims. New backups bind a locally observed source snapshot
+completion time and reject future source records; old inventory verification
+does not invent missing capture attestations. See the follow-up evidence and
+offline-contract documents. ADR-004 is not silently overwritten.
+
 Status: **PROPOSAL FOR REVIEW**, implements only owner-conditionally-authorized Phase1 (#71, #67 owner comment6382338071). No final G0 approval or production migration. Prior register entry004 (Supabase central/local spool) remains unchanged; this proposal would explicitly supersede its storage authority direction upon approval. No other governance decisions are replaced.
 
 One decision: where authoritative bulk evidence resides.
