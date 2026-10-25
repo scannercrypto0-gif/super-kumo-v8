@@ -46,12 +46,12 @@ def simulate_single_long(inputs, *, expected_digest, signal, ttl_bars=1,
         "net_return_bps": None,
         "independent_custody": "NOT_VERIFIED",
     }
-    if not signal:
+    if future is None and expected_future_digest is not None:
+        raise ValueError("Future digest supplied without evidence")
+    if not signal and future is None:
         return OfflineEvaluationResult({**common, "outcome": "NO_SIGNAL",
                                         "reason": "NO_SIGNAL"})
     if future is None:
-        if expected_future_digest is not None:
-            raise ValueError("Future digest supplied without evidence")
         return OfflineEvaluationResult({**common, "outcome": "UNRESOLVED",
                                         "reason": "UNKNOWN"})
     if not isinstance(future, FutureBarEvidence):
@@ -68,6 +68,11 @@ def simulate_single_long(inputs, *, expected_digest, signal, ttl_bars=1,
     interval = _interval_to_ms(spec["dataset_manifest"]["interval"])
     if evidence["interval_ms"] != interval:
         raise ValueError("Future interval does not match audited dataset")
+    # Even zero-exposure opportunities must not silently accept contradictory
+    # or uncommitted future evidence. No fills/PnL are inferred for NO_SIGNAL.
+    if not signal:
+        return OfflineEvaluationResult({**common, "outcome": "NO_SIGNAL",
+                                        "reason": "NO_SIGNAL"})
     # The first bar must be the first *eligible* next open on the
     # original dataset grid. Otherwise an unobserved fill may be hidden.
     historical_bars = spec["bars"]
