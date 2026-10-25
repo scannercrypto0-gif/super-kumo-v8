@@ -66,7 +66,7 @@ class TestObservationWorker(unittest.TestCase):
                 self.assertTrue(worker.submit(second))
                 status = worker.snapshot()
                 self.assertEqual(status["accepted_but_unconfirmed"], 2)
-                self.assertEqual(status["unconfirmed_event_ids"], ["open", "quote-1"])
+                self.assertEqual(status["unconfirmed_event_ids"], [("p", "open"), ("p", "quote-1")])
             finally:
                 release.set()
                 worker.finish(timeout=5)
@@ -102,10 +102,10 @@ class TestObservationWorker(unittest.TestCase):
             release.set()
             status = worker.finish(timeout=5)
             self.assertIn("OSError", status["errors"])
-            self.assertEqual(status["failed_event_ids"], ["open"])
+            self.assertEqual(status["failed_event_ids"], [("p", "open")])
             self.assertEqual(status["committed_or_duplicate"], 0)
             self.assertEqual(status["accepted_but_unconfirmed"], 1)
-            self.assertEqual(status["unconfirmed_event_ids"], ["quote"])
+            self.assertEqual(status["unconfirmed_event_ids"], [("p", "quote")])
             self.assertFalse(worker.submit(PositionEvent(
                 "p", "close", "closed", 2, 2, "offline", reason="explicit")))
             self.assertEqual(DurablePositionJournal(root / "positions.jsonl").ledger.status(
@@ -139,3 +139,58 @@ class TestObservationWorker(unittest.TestCase):
             self.assertEqual(len(journal.ledger.events), 2)
             self.assertEqual(journal.ledger.status("p", 10), "open")
             self.assertEqual(len(path.read_text().splitlines()), 2)
+
+    def test_shared_event_ids_are_disambiguated_by_position(self):
+        from threading import Event
+        with tempfile.TemporaryDirectory() as d:
+            worker = ObservationWorker(Path(d) / "positions.jsonl", capacity=2)
+            entered, release = Event(), Event()
+
+            def fail_first(event):
+                entered.set()
+                release.wait(timeout=5)
+                raise OSError("synthetic failure")
+
+            worker.journal.append = fail_first
+            try:
+                self.assertTrue(worker.submit(PositionEvent(
+                    "first", "open", "opened", 0, 0, "offline")))
+                self.assertTrue(entered.wait(timeout=3))
+                self.assertTrue(worker.submit(PositionEvent(
+                    "second", "open", "opened", 0, 0, "offline")))
+                report = worker.snapshot()
+                self.assertEqual(report["unconfirmed_event_ids"],
+                                 [("first", "open"), ("second", "open")])
+                self.assertEqual(report["unattributed_unconfirmed_count"], 0)
+            finally:
+                release.set()
+                final = worker.finish(timeout=5)
+            self.assertEqual(final["failed_event_ids"], [("first", "open")])
+            self.assertEqual(final["unconfirmed_event_ids"], [("second", "open")])
+
+    def test_handoff_race_reports_unattributed_instead_of_missing_identity(self):
+        from threading import Event
+        with tempfile.TemporaryDirectory() as d:
+            worker = ObservationWorker(Path(d) / "positions.jsonl")
+            entered, release = Event(), Event()
+            real_get = worker.jobs.get
+
+            def held_get(*args, **kwargs):
+                event = real_get(*args, **kwargs)
+                entered.set()
+                release.wait(timeout=5)
+                return event
+
+            worker.jobs.get = held_get
+            self.assertTrue(worker.submit(PositionEvent(
+                "p", "open", "opened", 0, 0, "offline")))
+            try:
+                self.assertTrue(entered.wait(timeout=3))
+                report = worker.snapshot()
+                self.assertEqual(report["accepted_but_unconfirmed"], 1)
+                self.assertEqual(report["unconfirmed_event_ids"], [])
+                self.assertEqual(report["unattributed_unconfirmed_count"], 1)
+                self.assertFalse(report["identities_exhaustive"])
+            finally:
+                release.set()
+                worker.finish(timeout=5)
