@@ -59,7 +59,6 @@ def test_pit_context_rejects_future_available_feature(decision_ms, future_delta)
         "event_ms": decision_ms, "receipt_ms": decision_ms,
         "available_ms": future_ms, "freshness_ms": 0, "status": "AVAILABLE",
     }
-    with pytest.raises(ValueError):
-        decision_context(context_id="pit-probe", decision_ms=decision_ms,
+    # Control: identical evidence at the decision boundary is accepted.\n    features["btc_regime"]["available_ms"] = decision_ms\n    decision_context(context_id="pit-control", decision_ms=decision_ms,\n                     outcome="REJECTED", strategy_version="v1",\n                     policy_version="v1", features=features)\n    features["btc_regime"]["available_ms"] = future_ms\n    with pytest.raises(ValueError):\n        decision_context(context_id="pit-probe", decision_ms=decision_ms,
                          outcome="REJECTED", strategy_version="v1",
                          policy_version="v1", features=features)
