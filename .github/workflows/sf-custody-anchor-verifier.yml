@@ -1,0 +1,25 @@
+name: SF Custody Anchor Verifier
+on:
+  pull_request:
+    paths:
+      - 'research_wp_r0/custody_anchor_verifier.py'
+      - 'tests/test_factory_custody_anchor_verifier.py'
+      - '.github/workflows/sf-custody-anchor-verifier.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.10', '3.12']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Verify custody bundle contract
+        run: python -B -m unittest discover -s tests -p test_factory_custody_anchor_verifier.py -v
