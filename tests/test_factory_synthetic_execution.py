@@ -20,7 +20,7 @@ class TestSyntheticExecution(unittest.TestCase):
         a = run(data)
         self.assertEqual(a, run(data))
         self.assertEqual(a["status"], "RESOLVED_TARGET")
-        self.assertAlmostEqual(a["details"]["net_return"], .05 - .00105)
+        self.assertAlmostEqual(a["details"]["net_return"], .05 - .001 - .00105)
 
     def test_stop(self):
         result = run(bars(low=94))
