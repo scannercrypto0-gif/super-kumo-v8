@@ -130,6 +130,16 @@ class SyntheticExecutionTests(unittest.TestCase):
                 simulate_single_long(self.inputs, expected_digest=self.inputs.digest,
                                      signal=True, future=self.evidence())
 
+    def test_no_signal_rejects_uncommitted_future(self):
+        with patch("research_wp_r0.offline_simulator.audit_offline_inputs"):
+            with self.assertRaisesRegex(ValueError, "future evidence digest"):
+                simulate_single_long(self.inputs, expected_digest=self.inputs.digest,
+                                     signal=False, future=self.evidence())
+
+    def test_no_signal_rejects_mismatched_future_identity(self):
+        with self.assertRaisesRegex(ValueError, "identity mismatch"):
+            self.run_case(self.evidence(inputs_digest="c" * 64), signal=False)
+
     def test_no_signal_remains_zero_exposure(self):
         result = self.run_case(self.evidence(), signal=False)
         self.assertEqual(result.spec["outcome"], "NO_SIGNAL")
