@@ -262,3 +262,45 @@ print(json.dumps([m.created_at_ms, m.manifest_hash, m.manifest_integrity_hash]))
     assert first[0] != second[0]
     assert first[1] == second[1]
     assert first[2] != second[2]
+
+
+def test_offline_audit_accepts_real_prepared_synthetic_receipt():
+    """Positive full bridge -> audit path, without claiming evaluation/custody."""
+    from research_wp_r0.offline_input_audit import audit_offline_inputs
+    prepared = inputs()
+    first = audit_offline_inputs(prepared, expected_digest=prepared.digest)
+    second = audit_offline_inputs(OfflineInputs.restore(
+        prepared.payload.decode("utf-8"), expected_digest=prepared.digest),
+        expected_digest=prepared.digest)
+    assert first == second
+    assert first["status"] == "INPUTS_AUDITED_NOT_EVALUATED"
+    assert first["inputs_digest"] == prepared.digest
+    assert first["independent_custody_verified"] is False
+
+
+def test_offline_audit_rejects_stale_prepared_receipt_with_new_digest():
+    from research_wp_r0.offline_input_audit import audit_offline_inputs
+    prepared = inputs()
+    altered = prepared.spec
+    altered["binding"]["binding"]["decision_cutoff_ms"] += 2 * IMS
+    from research_wp_r0.strategy_definition import digest
+    altered["binding"]["digest"] = digest(altered["binding"]["binding"])
+    changed = OfflineInputs(altered)
+    with pytest.raises(ValueError, match="Stale"):
+        audit_offline_inputs(changed, expected_digest=changed.digest)
+
+
+def test_offline_audit_rejects_gap_even_when_receipt_is_recommitted():
+    """A coherent new input digest cannot legitimize a missing candle."""
+    from research_wp_r0.offline_input_audit import audit_offline_inputs
+    from research_wp_r0.strategy_definition import digest
+    prepared = inputs()
+    altered = prepared.spec
+    # Remove an interior candle and rebind the remaining receipt hashes.
+    del altered["bars"][4]
+    binding = altered["binding"]["binding"]
+    del binding["bar_checksums"][4]
+    altered["binding"]["digest"] = digest(binding)
+    changed = OfflineInputs(altered)
+    with pytest.raises(ValueError, match="Missing candle"):
+        audit_offline_inputs(changed, expected_digest=changed.digest)

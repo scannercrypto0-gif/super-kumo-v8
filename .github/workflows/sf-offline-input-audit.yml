@@ -1,0 +1,23 @@
+name: SF Offline Input Audit
+on:
+  pull_request:
+    paths:
+      - 'research_wp_r0/offline_input_audit.py'
+      - 'tests/test_factory_offline_input_audit.py'
+      - '.github/workflows/sf-offline-input-audit.yml'
+  workflow_dispatch:
+jobs:
+  audit:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.10', '3.12']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run bounded audit tests
+        run: python -m unittest discover -s tests -p test_factory_offline_input_audit.py -v
