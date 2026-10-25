@@ -63,6 +63,44 @@ class ResultQuarantineTests(unittest.TestCase):
                             self.manifest, changed)
             self.assertEqual(ledger.snapshot(), (original, checkpoint))
 
+    def test_unsealed_legacy_pending_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ledger = AttemptLedger(Path(tmp) / "legacy.sqlite")
+            ledger.record_attempt({
+                "state": "PENDING", "family_id": "Batch01",
+                "candidate_id": "CandidateA", "input_digest": "0" * 64,
+                "strategy_digest": "a" * 64})
+            claim = {
+                "data_class": "SYNTHETIC_TEST", "candidate_id": "CandidateA",
+                "input_digest": "0" * 64, "strategy_digest": "a" * 64,
+                "plan_digest": self.plan_digest,
+                "manifest_digest": admitted_manifest_digest(self.manifest),
+                "result_digest": "f" * 64, "claim_version": "V1"}
+            with self.assertRaisesRegex(ValueError, "frozen plan policy"):
+                quarantine_synthetic_result(
+                    ledger, self.raw, self.plan_digest, self.manifest, claim)
+
+    def test_terminal_attempt_is_not_current_pending(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ledger = AttemptLedger(Path(tmp) / "sealed.sqlite")
+            admitted = register_synthetic_batch_attempt(
+                ledger, self.raw, self.plan_digest, self.manifest,
+                candidate_id="CandidateA", input_commitment=self.inputs)
+            claim = {
+                "data_class": "SYNTHETIC_TEST", "candidate_id": "CandidateA",
+                "input_digest": admitted["input_digest"],
+                "strategy_digest": "a" * 64, "plan_digest": self.plan_digest,
+                "manifest_digest": admitted_manifest_digest(self.manifest),
+                "result_digest": "f" * 64, "claim_version": "V1"}
+            from research_wp_r0.frozen_attempt_writer import FrozenAttemptWriter
+            FrozenAttemptWriter(ledger, self.raw, self.plan_digest).record_attempt({
+                "state": "FAILED", "family_id": "Batch01",
+                "candidate_id": "CandidateA", "input_digest": admitted["input_digest"],
+                "strategy_digest": "a" * 64})
+            with self.assertRaisesRegex(ValueError, "Stale PENDING"):
+                quarantine_synthetic_result(
+                    ledger, self.raw, self.plan_digest, self.manifest, claim)
+
     def test_missing_pending_attempt_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             ledger = AttemptLedger(Path(tmp) / "attempts.sqlite")
