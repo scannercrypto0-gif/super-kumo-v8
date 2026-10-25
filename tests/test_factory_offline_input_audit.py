@@ -2,6 +2,8 @@ import unittest
 from research_wp_r0.historical_evaluation_bridge import OfflineInputs
 from research_wp_r0.offline_input_audit import audit_offline_inputs
 from research_wp_r0.strategy_definition import digest
+from research_wp_r0.historical_library import HistoricalBar, DatasetManifest, BarQuality, SourceType, DataAvailabilityKind
+from dataclasses import asdict
 
 
 def fixture():
@@ -20,6 +22,27 @@ def fixture():
                       "availability_kind": "CONFIRMED", "observation_cutoff_ms": 150,
                       "ingest_time_ms": 150}],
             "independent_custody": "NOT_VERIFIED"}
+
+def valid_receipt():
+    from research_wp_r0.historical_evaluation_bridge import EXECUTION_REQUIREMENTS
+    from research_wp_r0.strategy_definition import StrategyDefinition
+    from research_wp_r0.indicator_library_v2 import IndicatorRegistryV2
+    # Real strategy construction is tested by the integration bridge suite;
+    # this audit fixture uses a real bar and manifest rather than placeholder hashes.
+    bar = HistoricalBar(symbol="BTCUSDT", interval="1m", bar_open=0, bar_close=59999,
+                        open=100.0, high=102.0, low=99.0, close=101.0, volume=10.0,
+                        quality=BarQuality.FINAL, source=SourceType.SYNTHETIC,
+                        source_label="fixture", observation_cutoff_ms=60001,
+                        ingest_time_ms=60001, availability_kind=DataAvailabilityKind.CONFIRMED)
+    import hashlib
+    manifest = DatasetManifest(dataset_id="btc", version=1, exchange="test",
+        market="spot", symbol="BTCUSDT", interval="1m", timezone="UTC",
+        source_label="fixture", bar_count=1, min_bar_open=0, max_bar_open=0,
+        coverage_pct=100.0, gap_count=0, gap_bar_opens=(),
+        duplicate_count=0, non_final_count=0,
+        manifest_hash=hashlib.sha256(bar.checksum.encode()).hexdigest(),
+        created_at_ms=70000, parent_version=None, lineage_reason=None)
+    return bar, manifest
 
 
 class TestInputAudit(unittest.TestCase):
