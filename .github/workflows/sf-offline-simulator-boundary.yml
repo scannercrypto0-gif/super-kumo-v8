@@ -1,0 +1,38 @@
+name: SF Offline Simulator Boundary
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'research_wp_r0/offline_simulator.py'
+      - 'research_wp_r0/future_bar_evidence.py'
+      - 'tests/test_sf_offline_simulator_boundary.py'
+      - 'tests/test_sf_future_bar_evidence.py'
+      - '.github/workflows/sf-offline-simulator-boundary.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  boundary:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install pytest pytest-timeout
+      - name: Explicit new boundary regressions
+        run: python -B -m pytest -p no:cacheprovider tests/test_sf_offline_simulator_boundary.py tests/test_sf_future_bar_evidence.py -v --tb=short --junitxml=sf-offline-boundary.xml
+      - name: Require all 11 new tests without skips
+        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('sf-offline-boundary.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==11; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sf-offline-boundary-${{ matrix.os }}-${{ matrix.python }}
+          path: sf-offline-boundary.xml
