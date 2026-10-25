@@ -53,3 +53,10 @@ Do not implement placeholder tests that only assert `hashlib`, JSON or Hypothesi
 3. Record both-platform durations, versions, resource cost and flaky outcomes; evaluate whether the additional feedback justifies maintenance overhead.
 4. Verify no production runtime impact, no core-run blocking, and reversible removal of the optional dependencies/workflow.
 5. Request explicit owner approval only after the above; do not treat green CI as automatic adoption.
+
+### PIT boundary-control trial follow-up — 2026-10-25
+
+- `397c884a` introduced a real `decision_context` future-availability rejection property; run 40190172722 passed on Windows and Ubuntu (4 tests on Ubuntu).
+- `6c9a143f` added a matching acceptance control but accidentally committed literal `\\n` escape sequences into the test file; run 40190389820 failed on both platforms during collection with `IndentationError`. This is a **test authoring failure**, not a demonstrated production PIT defect.
+- `0a67fee1` corrected the formatting. [Run 40190585768](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40190585768) succeeded on both platforms, with 4 Hypothesis tests passing on Ubuntu in 3.02s; Ruff still reported 505 findings and exited 1 (advisory).
+- This is a **positive and negative control for the PIT contract**, but **not a mutation test**: a deliberately weakened implementation has not yet been shown to be detected. Do not claim a defect-detection superiority result from this evidence alone.
