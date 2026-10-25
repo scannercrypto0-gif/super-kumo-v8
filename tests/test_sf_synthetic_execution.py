@@ -28,10 +28,10 @@ class SyntheticExecutionTests(unittest.TestCase):
             "interval_ms": 60000,
             "independent_custody": "NOT_VERIFIED",
             "bars": [
-                {"open_ms": 1000, "close_ms": 159999, "open": 100,
+                {"open_ms": 60000, "close_ms": 119999, "open": 100,
                  "high": 110, "low": 95, "close": 105, "volume": 10,
                  "observed_at_ms": 120000},
-                {"open_ms": 2000, "close_ms": 259999, "open": 105,
+                {"open_ms": 120000, "close_ms": 179999, "open": 105,
                  "high": 115, "low": 100, "close": 110, "volume": 10,
                  "observed_at_ms": 180000},
             ],
