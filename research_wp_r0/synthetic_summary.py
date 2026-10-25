@@ -23,6 +23,18 @@ def summarize_synthetic_opportunities(ledger):
         status = record["status"]
         if status not in counts:
             raise ValueError("Unknown opportunity status")
+        if status == "NO_SIGNAL_EXECUTION":
+            if record.get("reason") != "POSITION_ALREADY_ACTIVE" or "execution" in record:
+                raise ValueError("Invalid blocked opportunity")
+        else:
+            execution = record.get("execution")
+            if type(execution) is not dict or execution.get("status") != status:
+                raise ValueError("Opportunity and execution status mismatch")
+            if (execution.get("schema") != "synthetic-execution-1"
+                    or execution.get("synthetic_only") is not True
+                    or execution.get("independent_custody_verified") is not False
+                    or digest({k: v for k, v in execution.items() if k != "receipt_hash"}) != execution.get("receipt_hash")):
+                raise ValueError("Invalid nested execution receipt")
         counts[status] += 1
         if status.startswith("RESOLVED_"):
             execution = record["execution"]
