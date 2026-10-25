@@ -188,13 +188,14 @@ class TestObservationWorker(unittest.TestCase):
                 worker = ObservationWorker(Path(d) / "positions.jsonl")
                 self.assertTrue(worker.submit(PositionEvent(
                     "p", "open", "opened", 0, 0, "offline")))
-            try:
-                self.assertTrue(entered.wait(timeout=3))
-                report = worker.snapshot()
-                self.assertEqual(report["accepted_but_unconfirmed"], 1)
-                self.assertEqual(report["unconfirmed_event_ids"], [])
-                self.assertEqual(report["unattributed_unconfirmed_count"], 1)
-                self.assertFalse(report["identities_exhaustive"])
-            finally:
-                release.set()
-                worker.finish(timeout=5)
+                try:
+                    self.assertTrue(entered.wait(timeout=3))
+                    report = worker.snapshot()
+                    self.assertEqual(report["accepted_but_unconfirmed"], 1)
+                    self.assertEqual(report["unconfirmed_event_ids"], [])
+                    self.assertEqual(report["unattributed_unconfirmed_count"], 1)
+                    self.assertFalse(report["identities_exhaustive"])
+                finally:
+                    release.set()
+                    worker.finish(timeout=5)
+
