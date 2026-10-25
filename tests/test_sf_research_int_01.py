@@ -288,3 +288,19 @@ def test_offline_audit_rejects_stale_prepared_receipt_with_new_digest():
     changed = OfflineInputs(altered)
     with pytest.raises(ValueError, match="Stale"):
         audit_offline_inputs(changed, expected_digest=changed.digest)
+
+
+def test_offline_audit_rejects_gap_even_when_receipt_is_recommitted():
+    """A coherent new input digest cannot legitimize a missing candle."""
+    from research_wp_r0.offline_input_audit import audit_offline_inputs
+    from research_wp_r0.strategy_definition import digest
+    prepared = inputs()
+    altered = prepared.spec
+    # Remove an interior candle and rebind the remaining receipt hashes.
+    del altered["bars"][4]
+    binding = altered["binding"]["binding"]
+    del binding["bar_checksums"][4]
+    altered["binding"]["digest"] = digest(binding)
+    changed = OfflineInputs(altered)
+    with pytest.raises(ValueError, match="Missing candle"):
+        audit_offline_inputs(changed, expected_digest=changed.digest)
