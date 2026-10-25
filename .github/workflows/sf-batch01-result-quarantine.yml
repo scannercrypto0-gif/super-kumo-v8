@@ -1,0 +1,25 @@
+name: SF Batch01 Result Quarantine
+on:
+  pull_request:
+    paths:
+      - 'research_wp_r0/batch01_result_quarantine.py'
+      - 'tests/test_factory_batch01_result_quarantine.py'
+      - '.github/workflows/sf-batch01-result-quarantine.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  focused:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.10', '3.12']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install pytest pytest-timeout
+      - run: python -B -m pytest -p no:cacheprovider tests/test_factory_batch01_result_quarantine.py tests/test_factory_batch01_attempt_adapter.py tests/test_factory_batch01_admission_bridge.py research_wp_r0/test_frozen_attempt_writer.py -q --tb=short
