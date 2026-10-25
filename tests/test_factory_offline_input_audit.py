@@ -1,6 +1,6 @@
 import unittest
 from research_wp_r0.historical_evaluation_bridge import OfflineInputs
-from research_wp_r0.offline_input_audit import audit_offline_inputs
+from research_wp_r0.offline_input_audit import audit_offline_inputs, check_decision_freshness
 from research_wp_r0.strategy_definition import digest
 from research_wp_r0.historical_library import HistoricalBar, DatasetManifest, BarQuality, SourceType, DataAvailabilityKind
 from dataclasses import asdict
@@ -56,6 +56,15 @@ class TestInputAudit(unittest.TestCase):
         for invalid in ("z" * 64, "A" * 64, "0" * 63, 123):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 audit_offline_inputs(data, expected_digest=invalid)
+
+    def test_decision_freshness_boundary_and_stale_rejection(self):
+        check_decision_freshness(59999, 60001, 1)
+        with self.assertRaises(ValueError):
+            check_decision_freshness(59999, 60002, 1)
+        with self.assertRaises(ValueError):
+            check_decision_freshness(59999, 59999, 1)
+        with self.assertRaises(ValueError):
+            check_decision_freshness(59999, 60001, True)
 
     def test_real_bar_checksum_is_bound_to_prices(self):
         bar, manifest = valid_receipt()
