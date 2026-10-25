@@ -36,3 +36,20 @@ Do not implement placeholder tests that only assert `hashlib`, JSON or Hypothesi
 - Codex's Issue #71 work remains isolated.
 - Do not treat DuckDB/Polars benchmarks as proof of production benefit until evaluated on real ATLAS data.
 - Final merge requires owner review and explicit acceptance.
+
+## Observed trial evidence — 2026-10-25
+
+- Tested head: `f548f47d9d35204696f740ed646ac19a6f35bdaf`.
+- Tooling trial: [run 40189107631](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40189107631), Ubuntu and Windows jobs successful. Ubuntu log: **3 Hypothesis property tests passed**; this is not proof of general defect-detection efficacy.
+- Ruff on Ubuntu reported **505 findings** and exited with code 1. Ruff is **advisory at step level**; the overall green job must not be described as Ruff passing. Baseline attribution (existing vs introduced) has **not** been verified.
+- G1 [run 40189107642](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40189107642), local archive, SF-IND-02 and SF-STRAT-01 workflows all succeeded at that head. A previously intermittent Windows AG-F02 failure has **not** been root-caused or fixed merely by a subsequent pass.
+- Production dependencies remain unchanged; Ruff and Hypothesis are optional development dependencies and run in a separate trial workflow.
+- Current evaluation: **CI compatibility demonstrated; tool benefit and cost not yet accepted. No merge approval.**
+
+### Outstanding measurable acceptance evidence
+
+1. Compare Ruff's exact rule counts and locations on the common base / current main versus the PR head using the **same pinned Ruff version and config**. Report only confirmed new findings as new; do not relabel all 505 as legacy.
+2. Demonstrate a seeded realistic regression caught by Ruff's selected rules, and a separate seeded archive-contract defect caught by Hypothesis. Keep mutations out of production/main and record the expected failing test plus passing control.
+3. Record both-platform durations, versions, resource cost and flaky outcomes; evaluate whether the additional feedback justifies maintenance overhead.
+4. Verify no production runtime impact, no core-run blocking, and reversible removal of the optional dependencies/workflow.
+5. Request explicit owner approval only after the above; do not treat green CI as automatic adoption.
