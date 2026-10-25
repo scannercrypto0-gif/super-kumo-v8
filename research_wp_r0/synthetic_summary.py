@@ -11,7 +11,15 @@ def summarize_synthetic_opportunities(ledger):
     counts = {"RESOLVED_TARGET": 0, "RESOLVED_STOP": 0, "UNRESOLVED": 0,
               "NO_FILL": 0, "NO_SIGNAL_EXECUTION": 0}
     net_returns = []
+    if type(ledger["records"]) is not list:
+        raise ValueError("Invalid records")
+    previous_decision = -1
     for record in ledger["records"]:
+        keys(record, "decision_bar_index status")
+        decision = record["decision_bar_index"]
+        if type(decision) is not int or decision <= previous_decision:
+            raise ValueError("Decision order invalid")
+        previous_decision = decision
         status = record["status"]
         if status not in counts:
             raise ValueError("Unknown opportunity status")
