@@ -14,7 +14,7 @@ def audit_offline_inputs(inputs, *, expected_digest):
     """Fail closed on missing/tampered receipts; return reproducible audit hash."""
     if not isinstance(inputs, OfflineInputs):
         raise ValueError("OfflineInputs required")
-    if type(expected_digest) is not str or len(expected_digest) != 64:
+    if type(expected_digest) is not str or re.fullmatch(r"[0-9a-f]{64}", expected_digest) is None:
         raise ValueError("Separately retained input digest required")
     if inputs.digest != expected_digest:
         raise ValueError("Input commitment mismatch")
