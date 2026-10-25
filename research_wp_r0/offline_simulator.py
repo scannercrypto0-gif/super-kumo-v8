@@ -12,9 +12,9 @@ from .offline_evaluation_result import OfflineEvaluationResult
 def simulate_single_long(inputs, *, expected_digest, signal, ttl_bars=1):
     """Evaluate one explicitly supplied long signal, not a strategy signal engine.
 
-    Supported: no signal or a market entry at the first eligible next bar open,
-    with a conservative exit at the following bar open. No stop/target model.
-    Costs are supplied round-trip bps. Synthetic inputs ONLY.
+    Supported: zero-exposure NO_SIGNAL or UNKNOWN when post-decision
+    execution evidence is absent. Never manufactures fills or no-fill claims.
+    Synthetic inputs ONLY.
     """
     audit_offline_inputs(inputs, expected_digest=expected_digest)
     if type(signal) is not bool:
@@ -25,7 +25,6 @@ def simulate_single_long(inputs, *, expected_digest, signal, ttl_bars=1):
     if spec["protocol"]["data_class"] != "SYNTHETIC_TEST":
         raise ValueError("Historical evaluation not yet admitted")
     decision = spec["binding"]["binding"]["decision_cutoff_ms"]
-    bars = spec["bars"]
     common = {
         "schema_version": "research-eval-result-1",
         "inputs_digest": inputs.digest,
@@ -43,7 +42,6 @@ def simulate_single_long(inputs, *, expected_digest, signal, ttl_bars=1):
     if not signal:
         return OfflineEvaluationResult({**common, "outcome": "NO_SIGNAL",
                                         "reason": "NO_SIGNAL"})
-    # Input receipts are a PIT prefix: no future bars may be present.
-    # Therefore this function must not invent a next-bar fill.
-    return OfflineEvaluationResult({**common, "outcome": "NO_FILL",
-                                    "reason": "NO_ELIGIBLE_BAR"})
+    # Missing post-decision evidence is UNKNOWN, not evidence of NO_FILL.
+    return OfflineEvaluationResult({**common, "outcome": "UNRESOLVED",
+                                    "reason": "UNKNOWN"})
