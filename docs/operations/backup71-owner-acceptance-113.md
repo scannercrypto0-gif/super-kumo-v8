@@ -1,5 +1,9 @@
 # #113 owner-run Windows acceptance — not executed / no activation implied
 
+Track A follow-up6397725932: missing known published generations, not just missing
+files inside them, now stop local coverage/health claims. This relies on retained
+local successful-result evidence and does not replace independent receipt custody.
+
 Use only after review of child hardening PR and parent#111; neither is merged by
 this checklist. No whole-drive ACL change, backup deletion, production key
 generation, schedule activation or account connection has been performed here.

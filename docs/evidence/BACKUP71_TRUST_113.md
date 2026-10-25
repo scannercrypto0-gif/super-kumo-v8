@@ -1,5 +1,28 @@
 # #113 backup trust hardening and AG-F02 handoff
 
+## Track A closure follow-up — owner comment6397725932
+
+Refreshed child c4ff1ef96993c1c44ce3fc4e5ef2987f6cb2bb05 and parent
+5f6f2592b3d24592525d48d078c8e4fcaad1299b: no unexpected drift. Existing53-case
+CI40192469150 remains evidence for that head. One genuine missing negative case
+was found: removing an entire older completed generation was invisible to a scan
+of remaining directories. With a valid latest point/restore, health incorrectly
+remained locallyOK; removing just its ciphertext was already detected.
+
+One parametrized negative regression now checks both missing ciphertext and
+missing whole generation, preserving moved fixture bytes. A bounded scan of
+previous successful local backup/idempotence results establishes expected
+published IDs for this destination. Missing known IDs fail closed before new
+coverage/health claims. Pre-publication intents alone do not imply publication,
+preserving crash-before-publish retry; interrupted starts remain degraded.
+Same53 affected acceptance cases plus these2negatives are rerun because discovery
+code changed, not as a redundant broad G1/Factory sweep. Final55-case results and
+closure matrix are recorded in PR116/#113 after actual CI observation.
+
+No changes to #110/#112/#115, main, G1 runtime, Factory or live operating paths.
+The successful-result inventory is LOCAL evidence, not independent custody;
+compromise/loss of that trust store remains an external recovery gate.
+
 ## Track A: exact reviewed baseline / reproduced defects
 
 Latest parent111 independently re-fetched before coding and before publication:

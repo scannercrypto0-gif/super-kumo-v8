@@ -196,3 +196,21 @@ def test_malicious_archive_member_refused_without_path_escape(tmp_path,name):
     payload.seek(0);target=tmp_path/"partial"
     with pytest.raises(ValueError):e.extract(payload,target,deadline=time.monotonic()+2)
     assert not (tmp_path/"escape").exists() and not list(target.iterdir())
+
+
+@pytest.mark.parametrize("missing",["ciphertext","generation"])
+def test_missing_known_retained_point_blocks_health_and_new_coverage(tmp_path,key_bytes,missing):
+    cfg,value,private=setup(tmp_path,key_bytes)
+    with patch.object(a,"now",return_value=datetime(2026,10,19,tzinfo=timezone.utc)):
+        first=a.run(cfg,execute=True)
+    with patch.object(a,"now",return_value=datetime(2026,10,20,tzinfo=timezone.utc)):
+        latest=a.run(cfg,execute=True)
+        recover(cfg,Path(value["destination"])/latest["backup_id"],tmp_path/"restored",private,latest["receipt_file_sha256"])
+        assert a.health(cfg)["status"]=="LOCAL_BACKUP_OK_NOT_CUSTODY_ACCEPTANCE"
+    old=Path(value["destination"])/first["backup_id"]
+    # Move only disposable fixture evidence aside; do not destroy any bytes.
+    (old/"backup.atlas71" if missing=="ciphertext" else old).rename(tmp_path/"preserved-missing-point")
+    with patch.object(a,"now",return_value=datetime(2026,10,21,tzinfo=timezone.utc)):
+        assert a.health(cfg)["status"]=="DEGRADED"
+        with pytest.raises(FileNotFoundError):a.run(cfg,execute=True)
+    assert (tmp_path/"preserved-missing-point").exists()

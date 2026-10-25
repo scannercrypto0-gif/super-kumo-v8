@@ -108,9 +108,37 @@ def save(path, value):
     write_new(path,canonical(value)+b"\n"); sync_dir(path.parent)
 
 
+def expected_published(destination, state, deadline):
+    """Previously successful LOCAL results detect entire missing generations.
+
+    An intent alone can precede a crash-before-publish, so it must not be treated
+    as proof of publication. Interrupted intents remain degraded in health().
+    """
+    expected=set()
+    if state is None or not Path(state).exists():return expected
+    with os.scandir(check_path(state)) as entries:
+        for count,entry in enumerate(entries,1):
+            if time.monotonic()>deadline:raise TimeoutError("Published-point audit deadline")
+            if count>8192:
+                raise ValueError("Published-point audit bound exhausted")
+            if not entry.name.endswith(".result.json"):continue
+            row=parse(read_small(check_path(entry.path),32768))
+            if row.get("destination")!=str(check_path(destination)):continue
+            if row.get("status")=="VERIFIED_ENCRYPTED_LOCAL":bid=row["backup_id"]
+            elif row.get("status")=="ALREADY_VERIFIED_TODAY":bid=row["existing_backup_id"]
+            else:continue
+            if not re.fullmatch(r"\d{8}T\d{6}Z-[0-9a-f]{32}",bid):raise ValueError("Invalid published identity")
+            expected.add(bid)
+            if len(expected)>4096:raise ValueError("Published-point count bound")
+    return expected
+
+
 def completed(destination, *, receipt_state=None, max_cipher_bytes=2_000_000_000, timeout=60):
-    if not Path(destination).exists(): return []
     result=[]; count=0; remaining=max_cipher_bytes; deadline=time.monotonic()+timeout
+    expected_ids=expected_published(destination,receipt_state,deadline)
+    if not Path(destination).exists():
+        if expected_ids:raise FileNotFoundError("Previously published recovery points missing")
+        return []
     with os.scandir(check_path(destination)) as entries:
         for entry in entries:
             if time.monotonic()>deadline:raise TimeoutError("Retained-generation audit deadline")
@@ -150,6 +178,8 @@ def completed(destination, *, receipt_state=None, max_cipher_bytes=2_000_000_000
             # silently drops that point or claims retained coverage is healthy.
             remaining-=verify_cipher(path,receipt,max_bytes=remaining,deadline=deadline)
             result.append((path,receipt|{"receipt_sha256":stored}))
+    if expected_ids-{receipt["backup_id"] for _,receipt in result}:
+        raise FileNotFoundError("Previously published recovery point missing")
     return result
 
 
