@@ -73,7 +73,7 @@ def simulate_single_long(inputs, *, expected_digest, signal, ttl_bars=1,
     historical_bars = spec["bars"]
     if not historical_bars:
         raise ValueError("Audited historical bars required for grid binding")
-    last_open = historical_bars[-1]["open_ms"]
+    last_open = historical_bars[-1]["bar_open"]
     expected_open = last_open + ((decision - last_open) // interval + 1) * interval
     if evidence["bars"][0]["open_ms"] != expected_open:
         return OfflineEvaluationResult({**common, "outcome": "UNRESOLVED",
