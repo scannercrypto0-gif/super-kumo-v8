@@ -94,6 +94,12 @@ class TestSyntheticExecution(unittest.TestCase):
         self.assertEqual(result["status"], "UNRESOLVED")
         self.assertNotIn("net_return", result["details"])
 
+    def test_unsupported_ttl_rejected(self):
+        with self.assertRaises(ValueError):
+            execute_synthetic_long(bars(), 0, stop_fraction=.05,
+                target_fraction=.05, ttl_bars=2, holding_bars=1,
+                fee_bps=10, slippage_bps=0)
+
     def test_bad_ohlc_rejected(self):
         data = bars()
         data[1]["high"] = 90
