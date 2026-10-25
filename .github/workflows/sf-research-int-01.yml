@@ -35,7 +35,7 @@ jobs:
       - name: Combined accepted-main and new contract regressions
         run: python -B -m pytest -p no:cacheprovider tests/test_sf_data_01.py tests/test_sf_ind_01.py tests/test_sf_dep_guard.py tests/test_sf_ind_02.py tests/test_sf_strat_01.py integration_tests/test_sf_strat_ind02.py tests/test_sf_research_int_01.py tests/test_sf_content_identity.py tests/test_sf_attempt_ledger.py -v --tb=short --junitxml=sf-research-int-01.xml
       - name: Require all collected tests without skips
-        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('sf-research-int-01.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==461; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
+        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('sf-research-int-01.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==463; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
