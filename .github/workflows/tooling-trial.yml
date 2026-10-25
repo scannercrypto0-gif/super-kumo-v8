@@ -7,6 +7,7 @@ on:
       - "ruff.toml"
       - "pyproject.toml"
       - "tests/test_tooling_properties.py"
+      - "scripts/tooling_ruff_baseline.py"
       - ".github/workflows/tooling-trial.yml"
 
 jobs:
@@ -19,6 +20,8 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -27,6 +30,8 @@ jobs:
       - name: Ruff trial (no automatic fixes)
         continue-on-error: true # Legacy lint baseline must not skip property tests.
         run: python -m ruff check --config ruff.toml src tests
+      - name: Ruff same-config baseline comparison (advisory)
+        run: python scripts/tooling_ruff_baseline.py
       - name: Hypothesis real archive contracts (trial)
         env:
           PYTHONPATH: src
