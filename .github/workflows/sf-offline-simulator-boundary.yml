@@ -5,6 +5,8 @@ on:
     paths:
       - 'research_wp_r0/offline_simulator.py'
       - 'research_wp_r0/retrospective_kline_intake.py'
+      - 'research_wp_r0/ema_first_backtest.py'
+      - 'tests/test_sf_ema_first_backtest.py'
       - 'tests/test_sf_retrospective_kline_intake.py'
       - 'research_wp_r0/future_bar_evidence.py'
       - 'tests/test_sf_offline_simulator_boundary.py'
@@ -34,7 +36,7 @@ jobs:
       - name: Explicit new boundary regressions
         run: python -B -m pytest -p no:cacheprovider tests/test_sf_offline_simulator_boundary.py tests/test_sf_future_bar_evidence.py tests/test_sf_synthetic_execution.py tests/test_sf_offline_real_audit_integration.py -v --tb=short --junitxml=sf-offline-boundary.xml
       - name: P0 retrospective intake regressions
-        run: python -B -m pytest -p no:cacheprovider tests/test_sf_retrospective_kline_intake.py -q --tb=short
+        run: python -B -m pytest -p no:cacheprovider tests/test_sf_retrospective_kline_intake.py tests/test_sf_ema_first_backtest.py -q --tb=short
       - name: Require 27 tests plus 4 subtests without skips
         run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('sf-offline-boundary.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==31; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
       - uses: actions/upload-artifact@v4
