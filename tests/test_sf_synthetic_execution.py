@@ -14,7 +14,7 @@ class SyntheticExecutionTests(unittest.TestCase):
             "protocol": {"data_class": "SYNTHETIC_TEST", "fee_bps": 10,
                          "slippage_bps": 5},
             "protocol_digest": "b" * 64,
-            "binding": {"binding": {"decision_cutoff_ms": 59999}},
+            "binding": {"binding": {"decision_cutoff_ms": 60000}},
             "dataset_manifest": {"symbol": "BTCUSDT", "interval": "1m"},
             "bars": [{"bar_open": 0}],
         })
@@ -23,17 +23,17 @@ class SyntheticExecutionTests(unittest.TestCase):
         value = {
             "schema_version": "research-future-bars-1",
             "inputs_digest": self.inputs.digest,
-            "decision_cutoff_ms": 59999,
+            "decision_cutoff_ms": 60000,
             "symbol": "BTCUSDT",
             "interval_ms": 60000,
             "independent_custody": "NOT_VERIFIED",
             "bars": [
-                {"open_ms": 60000, "close_ms": 119999, "open": 100,
+                {"open_ms": 120000, "close_ms": 179999, "open": 100,
                  "high": 110, "low": 95, "close": 105, "volume": 10,
-                 "observed_at_ms": 120000},
-                {"open_ms": 120000, "close_ms": 179999, "open": 105,
-                 "high": 115, "low": 100, "close": 110, "volume": 10,
                  "observed_at_ms": 180000},
+                {"open_ms": 180000, "close_ms": 239999, "open": 105,
+                 "high": 115, "low": 100, "close": 110, "volume": 10,
+                 "observed_at_ms": 240000},
             ],
         }
         value.update(changes)
