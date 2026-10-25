@@ -1,0 +1,47 @@
+name: Core Offline Custody Restore Kit
+on:
+  pull_request:
+    paths:
+      - 'tools/offline_custody_kit.py'
+      - 'tests/test_offline_custody_kit.py'
+      - 'docs/core/offline_custody_kit*.md'
+      - '.github/workflows/core-offline-custody-kit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.10', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Exact source and environment
+        shell: bash
+        run: |
+          git rev-parse HEAD | tee custody-source.txt
+          git rev-parse 'HEAD^{tree}' | tee -a custody-source.txt
+          python --version | tee -a custody-source.txt
+          git --version | tee -a custody-source.txt
+      - name: Synthetic kit and unchanged merged-contract regressions
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s tests -p 'test_offline_custody_kit.py' -v 2>&1 | tee custody-tests.txt
+          python -B -m unittest discover -s tests -p 'test_factory_custody_*er.py' -v 2>&1 | tee custody-inherited-tests.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: custody-kit-${{ matrix.os }}-${{ matrix.python }}
+          path: |
+            custody-source.txt
+            custody-tests.txt
+            custody-inherited-tests.txt
