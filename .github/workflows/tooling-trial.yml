@@ -8,6 +8,7 @@ on:
       - "pyproject.toml"
       - "tests/test_tooling_properties.py"
       - "scripts/tooling_ruff_baseline.py"
+      - "scripts/tooling_pit_mutation_probe.py"
       - ".github/workflows/tooling-trial.yml"
 
 jobs:
@@ -36,3 +37,5 @@ jobs:
         env:
           PYTHONPATH: src
         run: python -m pytest tests/test_tooling_properties.py -q
+      - name: PIT mutation detection (isolated temp source)
+        run: python scripts/tooling_pit_mutation_probe.py
