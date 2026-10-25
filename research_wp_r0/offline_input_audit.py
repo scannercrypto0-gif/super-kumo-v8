@@ -10,6 +10,16 @@ from .strategy_definition import canonical, keys
 from .historical_evaluation_bridge import OfflineInputs
 
 
+def check_decision_freshness(last_bar_close, decision_cutoff_ms, max_age_ms):
+    """Fail closed on invalid or stale PIT decision-time evidence."""
+    from .strategy_definition import integer
+    integer(last_bar_close, 0, 2**53-1)
+    integer(decision_cutoff_ms, 0, 2**53-1)
+    integer(max_age_ms, 0, 2**53-1)
+    if decision_cutoff_ms <= last_bar_close or decision_cutoff_ms - (last_bar_close + 1) > max_age_ms:
+        raise ValueError("Stale or invalid input receipt at decision cutoff")
+
+
 def audit_offline_inputs(inputs, *, expected_digest):
     """Fail closed on missing/tampered receipts; return reproducible audit hash."""
     if not isinstance(inputs, OfflineInputs):
@@ -94,9 +104,8 @@ def audit_offline_inputs(inputs, *, expected_digest):
     if len(checked) == meta.bar_count and checked[0].bar_open == meta.min_bar_open and checked[-1].bar_open == meta.max_bar_open:
         if not meta.verify_hash(checked):
             raise ValueError("Dataset bar-manifest hash mismatch")
-    if (binding["decision_cutoff_ms"] - (checked[-1].bar_close + 1)
-            > spec["protocol"]["max_age_ms"]):
-        raise ValueError("Stale input receipt at decision cutoff")
+    check_decision_freshness(checked[-1].bar_close, binding["decision_cutoff_ms"],
+                             spec["protocol"]["max_age_ms"])
     if spec["protocol"]["symbol_mapping"] != meta.symbol or spec["protocol"]["timezone"] != meta.timezone:
         raise ValueError("Protocol/dataset identity mismatch")
     if spec["protocol"]["data_class"] == "SYNTHETIC_TEST":
