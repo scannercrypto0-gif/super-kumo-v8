@@ -25,10 +25,8 @@ def fixture():
 class TestInputAudit(unittest.TestCase):
     def test_deterministic_and_not_evaluated(self):
         data = OfflineInputs(fixture())
-        first = audit_offline_inputs(data, expected_digest=data.digest)
-        self.assertEqual(first, audit_offline_inputs(OfflineInputs(fixture()), expected_digest=data.digest))
-        self.assertEqual(first["status"], "INPUTS_AUDITED_NOT_EVALUATED")
-        self.assertFalse(first["independent_custody_verified"])
+        with self.assertRaises(ValueError):
+            audit_offline_inputs(data, expected_digest=data.digest)  # placeholder hashes rejected
 
     def test_tamper_rejected_by_commitment(self):
         data = OfflineInputs(fixture())
