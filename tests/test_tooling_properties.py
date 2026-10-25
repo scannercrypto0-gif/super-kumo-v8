@@ -38,3 +38,28 @@ def test_archive_child_stays_inside_root(parts):
         name = "/".join(parts)
         resolved = child(base, name)
         assert resolved.relative_to(base) == Path(*parts)
+
+
+@settings(max_examples=80, deadline=None)
+@given(
+    decision_ms=st.integers(min_value=1, max_value=253402300799998),
+    future_delta=st.integers(min_value=1, max_value=100000),
+)
+def test_pit_context_rejects_future_available_feature(decision_ms, future_delta):
+    """A real PIT contract must reject evidence first available after decision time."""
+    from aql.archive.contracts import FEATURES, decision_context
+
+    unavailable = {"value": None, "source": None, "version": None,
+                   "event_ms": None, "receipt_ms": None, "available_ms": None,
+                   "freshness_ms": None, "status": "UNAVAILABLE"}
+    features = {name: dict(unavailable) for name in FEATURES}
+    future_ms = decision_ms + future_delta
+    features["btc_regime"] = {
+        "value": "UP", "source": "synthetic", "version": "v1",
+        "event_ms": decision_ms, "receipt_ms": decision_ms,
+        "available_ms": future_ms, "freshness_ms": 0, "status": "AVAILABLE",
+    }
+    with pytest.raises(ValueError):
+        decision_context(context_id="pit-probe", decision_ms=decision_ms,
+                         outcome="REJECTED", strategy_version="v1",
+                         policy_version="v1", features=features)
