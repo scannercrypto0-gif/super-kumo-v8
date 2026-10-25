@@ -13,7 +13,6 @@ jobs:
   tooling-trial:
     name: Tooling trial / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    continue-on-error: true # Trial only: never block unrelated work until baseline is accepted.
     strategy:
       fail-fast: false
       matrix:
