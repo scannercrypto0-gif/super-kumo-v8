@@ -36,6 +36,15 @@ class TestSyntheticSummary(unittest.TestCase):
         with self.assertRaises(ValueError):
             summarize_synthetic_opportunities(modified)
 
+    def test_end_to_end_repeatability(self):
+        first = summarize_synthetic_opportunities(ledger())
+        second = summarize_synthetic_opportunities(ledger())
+        self.assertEqual(first["receipt_hash"], second["receipt_hash"])
+        self.assertEqual(first["counts"]["RESOLVED_TARGET"], 1)
+        self.assertEqual(first["counts"]["UNRESOLVED"], 1)
+        self.assertEqual(first["resolved_trades"], 1)
+        self.assertEqual(first["total_opportunities"], 2)
+
     def test_receipt_tamper_rejected(self):
         modified = copy.deepcopy(ledger())
         modified["records"][0]["status"] = "RESOLVED_STOP"
