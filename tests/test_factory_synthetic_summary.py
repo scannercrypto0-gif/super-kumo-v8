@@ -45,6 +45,16 @@ class TestSyntheticSummary(unittest.TestCase):
         self.assertEqual(first["resolved_trades"], 1)
         self.assertEqual(first["total_opportunities"], 2)
 
+    def test_unresolved_nested_status_mismatch_rejected(self):
+        modified = copy.deepcopy(ledger())
+        modified["records"][1]["execution"]["status"] = "NO_FILL"
+        from research_wp_r0.strategy_definition import digest
+        execution = modified["records"][1]["execution"]
+        execution["receipt_hash"] = digest({k: v for k, v in execution.items() if k != "receipt_hash"})
+        modified["receipt_hash"] = digest({k: v for k, v in modified.items() if k != "receipt_hash"})
+        with self.assertRaises(ValueError):
+            summarize_synthetic_opportunities(modified)
+
     def test_receipt_tamper_rejected(self):
         modified = copy.deepcopy(ledger())
         modified["records"][0]["status"] = "RESOLVED_STOP"
