@@ -25,6 +25,7 @@ class ObservationWorker:
         self.errors: list[str] = []
         self.rejected = 0
         self.committed = 0
+        self._inflight: PositionEvent | None = None
         self._lock = threading.Lock()
         # Fail closed on corrupt historical journal BEFORE admitting any work.
         self.journal = DurablePositionJournal(self.journal_path)
@@ -51,6 +52,8 @@ class ObservationWorker:
                 event = self.jobs.get(timeout=0.05)
             except queue.Empty:
                 continue
+            with self._lock:
+                self._inflight = event
             try:
                 result = self.journal.append(event)
                 if result in ("inserted", "duplicate"):
@@ -63,12 +66,16 @@ class ObservationWorker:
                 # Fail closed: no more writes after an uncommitted event.
                 self.stop_event.set()
             finally:
+                with self._lock:
+                    self._inflight = None
                 self.jobs.task_done()
 
     def snapshot(self) -> dict:
         with self._lock:
             return {
                 "accepted_but_unconfirmed": self.jobs.unfinished_tasks,
+                "unconfirmed_event_ids": ([self._inflight.event_id] if self._inflight else [])
+                    + [event.event_id for event in list(self.jobs.queue)],
                 "committed_or_duplicate": self.committed,
                 "rejected": self.rejected,
                 "errors": list(self.errors),
