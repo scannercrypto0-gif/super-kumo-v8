@@ -1,0 +1,31 @@
+name: Tooling trial (Ruff + Hypothesis)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "ruff.toml"
+      - "pyproject.toml"
+      - "tests/test_tooling_properties.py"
+      - ".github/workflows/tooling-trial.yml"
+
+jobs:
+  tooling-trial:
+    name: Tooling trial / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true # Trial only: never block unrelated work until baseline is accepted.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install trial tools
+        run: python -m pip install "ruff>=0.9,<1" "hypothesis>=6,<7" "pytest>=7.4"
+      - name: Ruff trial (no automatic fixes)
+        run: python -m ruff check --config ruff.toml src tests
+      - name: Property tests
+        run: python -m pytest -q tests/test_tooling_properties.py
