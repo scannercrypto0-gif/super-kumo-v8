@@ -64,3 +64,11 @@ Do not implement placeholder tests that only assert `hashlib`, JSON or Hypothesi
 ### Ruff merge-base comparison — measured 2026-10-25
 
 [Run 40190881662](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40190881662) completed successfully on Ubuntu and Windows at `7ed6026a`. Both runners used `ruff.toml` from the PR head against merge base `c6851bbaf0664d19490e374d6019687d1c234be7` and current PR tree. Both reported **505 baseline vs 505 head**, **zero per-file/rule count increases and zero decreases**. Hypothesis **4 passed** (Ubuntu 1.79s, Windows 3.49s). Ruff itself **exited 1** and remains advisory; the CI job is green because its step is explicitly nonblocking. The counts do not prove individual violations are identical, and the common ancestor is not necessarily the latest main. No mutation-based detection evidence yet; do not merge or promote Ruff to a mandatory gate.
+
+## Owner-approved staged adoption — 2026-10-25
+
+Decision: **adopt Hypothesis incrementally for focused tests of existing immutable/PIT/data-integrity contracts**. Keep its extra dependency development-only. Run the existing focused property suite on Ubuntu and Windows; add future properties only where a changed component benefits from invariants and test count/runtime remain bounded. Mutation evidence from the isolated PIT validation-bypass probe supports the targeted value; do not extrapolate that a broad system is certified. No new production/runtime dependencies, no Factory scope capture, and no heavy-suite expansion by default.
+
+**Ruff stays strictly advisory:** use narrow rules and same-configuration baseline comparison, collect findings/report regressions, do not auto-fix, do not add a blocking required status, and do not mass-clean the 505 baseline findings. Revisit enforcement only after a separate owner decision grounded in stable cross-platform results and no incremental findings.
+
+Implementation safety: the isolated tooling workflow and optional development dependencies are the approved rollout vehicle, **not authority to merge this Draft PR**, activate production, or relax existing G1 acceptance gates. Review conflicts with active Windows AG-F02 test work before any eventual merge; preserve unrelated G1 failures in reporting.
