@@ -7,9 +7,12 @@ input receipt and separately retained digest.
 from .offline_input_audit import audit_offline_inputs
 from .historical_evaluation_bridge import OfflineInputs
 from .offline_evaluation_result import OfflineEvaluationResult
+from .future_bar_evidence import FutureBarEvidence
+from .strategy_definition import number
 
 
-def simulate_single_long(inputs, *, expected_digest, signal, ttl_bars=1):
+def simulate_single_long(inputs, *, expected_digest, signal, ttl_bars=1,
+                         future=None):
     """Evaluate one explicitly supplied long signal, not a strategy signal engine.
 
     Supported: zero-exposure NO_SIGNAL or UNKNOWN when post-decision
@@ -42,6 +45,32 @@ def simulate_single_long(inputs, *, expected_digest, signal, ttl_bars=1):
     if not signal:
         return OfflineEvaluationResult({**common, "outcome": "NO_SIGNAL",
                                         "reason": "NO_SIGNAL"})
-    # Missing post-decision evidence is UNKNOWN, not evidence of NO_FILL.
-    return OfflineEvaluationResult({**common, "outcome": "UNRESOLVED",
-                                    "reason": "UNKNOWN"})
+    if future is None:
+        return OfflineEvaluationResult({**common, "outcome": "UNRESOLVED",
+                                        "reason": "UNKNOWN"})
+    if not isinstance(future, FutureBarEvidence):
+        raise ValueError("Validated future evidence required")
+    evidence = future.spec
+    if (evidence["inputs_digest"] != inputs.digest or
+        evidence["decision_cutoff_ms"] != decision or
+        evidence["symbol"] != spec["dataset_manifest"]["symbol"]):
+        raise ValueError("Future evidence identity mismatch")
+    if len(evidence["bars"]) < 2:
+        return OfflineEvaluationResult({**common, "outcome": "UNRESOLVED",
+                                        "reason": "UNKNOWN"})
+    entry, exit_ = evidence["bars"][:2]
+    if entry["open_ms"] <= decision or exit_["open_ms"] <= entry["open_ms"]:
+        raise ValueError("Invalid execution chronology")
+    # Synthetic market-open entry and next-bar-open exit ONLY.
+    # Protocol costs are per-side bps; both sides are charged.
+    fee = 2 * number(spec["protocol"]["fee_bps"], 0, 10000)
+    slip = 2 * number(spec["protocol"]["slippage_bps"], 0, 10000)
+    gross = (exit_["open"] / entry["open"] - 1) * 10000
+    net = gross - fee - slip
+    return OfflineEvaluationResult({
+        **common, "outcome": "SIMULATED_CLOSED", "reason": "NONE",
+        "entry_bar_open_ms": entry["open_ms"],
+        "exit_bar_open_ms": exit_["open_ms"],
+        "gross_return_bps": gross, "fee_bps": fee,
+        "slippage_bps": slip, "net_return_bps": net,
+    })
