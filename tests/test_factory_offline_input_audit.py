@@ -51,6 +51,12 @@ class TestInputAudit(unittest.TestCase):
         with self.assertRaises(ValueError):
             audit_offline_inputs(data, expected_digest=data.digest)  # placeholder hashes rejected
 
+    def test_noncanonical_digest_rejected(self):
+        data = OfflineInputs(fixture())
+        for invalid in ("z" * 64, "A" * 64, "0" * 63, 123):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                audit_offline_inputs(data, expected_digest=invalid)
+
     def test_real_bar_checksum_is_bound_to_prices(self):
         bar, manifest = valid_receipt()
         self.assertTrue(bar.verify_checksum())
