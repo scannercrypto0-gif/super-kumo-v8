@@ -131,7 +131,7 @@ def preflight_dev(manifest, bars, *, boundary, expected_content_hash,
         "schema": "sf-historical-admission-v1",
         "state": "INPUTS_ONLY_NOT_EVALUATED",
         "tier": tier,
-        "dev_eligible": True,
+        "dev_eligible": False,
         "confirmed_pit_eligible": False,
         "oos_access": "LOCKED",
         "independent_custody": "NOT_VERIFIED",
@@ -144,8 +144,10 @@ def preflight_dev(manifest, bars, *, boundary, expected_content_hash,
         "manifest_integrity_hash": manifest.manifest_integrity_hash,
         "availability": ("RECORDED_NOT_INDEPENDENTLY_AUTHENTICATED"
                          if confirmed else "HISTORICAL_ARRIVAL_UNKNOWN"),
-        "blocked_reasons": (["CUSTODY_NOT_VERIFIED"]
-                            if confirmed else ["SOURCE_AVAILABILITY_UNKNOWN",
+        "blocked_reasons": (["DEV_PARTITION_AUTHORITY_NOT_VERIFIED",
+                             "CUSTODY_NOT_VERIFIED"]
+                            if confirmed else ["DEV_PARTITION_AUTHORITY_NOT_VERIFIED",
+                                               "SOURCE_AVAILABILITY_UNKNOWN",
                                                "CUSTODY_NOT_VERIFIED"]),
     })
 
@@ -172,7 +174,7 @@ def verify_admission_report(report, *, expected_report_digest):
             or report["tier"] not in ("BLOCKED", "RETROSPECTIVE_DEV",
                                      "PIT_METADATA_VALID")
             or type(report["dev_eligible"]) is not bool
-            or report["dev_eligible"] != (report["tier"] != "BLOCKED")
+            or report["dev_eligible"] is not False
             or report["confirmed_pit_eligible"] is not False
             or report["oos_access"] != "LOCKED"
             or report["independent_custody"] != "NOT_VERIFIED"
