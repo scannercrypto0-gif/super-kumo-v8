@@ -36,6 +36,8 @@ def inspect_binance_spot_zip(path, *, expected_sha256, symbol="BTCUSDT",
     if (type(expected_sha256) is not str or len(expected_sha256) != 64 or
         any(ch not in "0123456789abcdef" for ch in expected_sha256)):
         raise ValueError("Independent SHA256 required")
+    if symbol != "BTCUSDT" or interval_ms != 60000:
+        raise ValueError("Only BTCUSDT 1m archive identity supported")
     if type(interval_ms) is not int or interval_ms <= 0:
         raise ValueError("Invalid interval")
     archive_path = Path(path)
@@ -52,6 +54,8 @@ def inspect_binance_spot_zip(path, *, expected_sha256, symbol="BTCUSDT",
             members = [m for m in z.infolist() if not m.is_dir()]
             if len(members) != 1 or not members[0].filename.endswith(".csv"):
                 raise ValueError("Exactly one CSV required")
+            if not members[0].filename.startswith("BTCUSDT-1m-"):
+                raise ValueError("Archive member market identity mismatch")
             if members[0].file_size > 100_000_000:
                 raise ValueError("Archive exceeds bounded CSV size")
             if members[0].compress_size == 0 or members[0].file_size > 100 * members[0].compress_size:

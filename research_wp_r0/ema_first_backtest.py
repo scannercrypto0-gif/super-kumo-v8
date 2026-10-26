@@ -7,6 +7,7 @@ import hashlib
 import json
 import math
 from dataclasses import dataclass
+from .indicator_library_v2 import _ema
 
 
 @dataclass(frozen=True)
@@ -50,14 +51,8 @@ def ema_crossover_decisions(bars, *, fast=8, slow=21, interval_ms=60000):
             raise ValueError("Invalid OHLCV")
         closes.append(close)
         previous_open = opening
-    def series(period):
-        seed = sum(closes[:period]) / period
-        values = [None] * (period - 1) + [seed]
-        alpha = 2 / (period + 1)
-        for price in closes[period:]:
-            values.append(alpha * price + (1 - alpha) * values[-1])
-        return values
-    fast_values, slow_values = series(fast), series(slow)
+    fast_values = [None] * (fast - 1) + _ema(closes, fast)
+    slow_values = [None] * (slow - 1) + _ema(closes, slow)
     output = []
     for i in range(slow, len(records)):
         pf, ps = fast_values[i-1], slow_values[i-1]
@@ -82,6 +77,18 @@ def frozen_ema_plan(*, archive_sha256, source_reference, split_cutoff_ms,
         raise ValueError("Explicit validated frozen research plan required")
     plan = {"schema_version": "sf-ema-first-backtest-plan-1",
             "strategy": "EMA_8_21_CROSS_LONG_ONLY",
+            "indicator_version": "SF-IND-02:2:_ema:fsum",
+            "interval_ms": 60000,
+            "symbol": "BTCUSDT",
+            "benchmark": "BUY_HOLD_SAME_WINDOW_AND_COSTS",
+            "risk": "ONE_BTC_MAX_LONG_NO_LEVERAGE_NO_REINVESTMENT",
+            "initial_capital_usdt": 100000,
+            "stop_target": "NONE_CROSSOVER_EXIT_ONLY",
+            "entry_ttl_bars": 1,
+            "terminal_position": "UNRESOLVED_MARK_TO_MARKET_SEPARATE",
+            "target_regime": "BTC_CLOSE_ABOVE_EMA21_AND_EMA21_RISING_V1",
+            "missing_bar": "REJECT_DATASET",
+            "availability_assumption": "CLOSED_BAR_AVAILABLE_AT_CLOSE_PLUS_1MS_UNVERIFIED",
             "archive_sha256": archive_sha256,
             "source_reference": source_reference,
             "split_cutoff_ms": split_cutoff_ms,

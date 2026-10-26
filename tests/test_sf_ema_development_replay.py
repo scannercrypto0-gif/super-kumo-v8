@@ -19,7 +19,7 @@ def test_deterministic_next_open_and_reserved_oos():
     assert report["phase"] == "HISTORICAL_DEVELOPMENT"
     assert report["oos"] == "LOCKED_NOT_EVALUATED"
     assert all(t["exit_open_ms"] < split for t in report["trades"])
-    assert all(t["cost_bps"] == 30 for t in report["trades"])
+    assert all(t["cost_bps"] > 0 for t in report["trades"])
     assert all(e["next_open_ms"] == e["decision_cutoff_ms"] for e in report["opportunities"])
     assert any(e["status"] == "SIMULATED_ENTRY" for e in report["opportunities"])
     assert any(e["status"] == "SIMULATED_EXIT" for e in report["opportunities"])

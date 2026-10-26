@@ -6,7 +6,12 @@ from zipfile import ZipFile
 
 import pytest
 
-from research_wp_r0.pinned_ema_research import run_pinned_ema_development
+from research_wp_r0.pinned_ema_research import run_pinned_ema_development as _run
+from research_wp_r0.ema_first_backtest import frozen_ema_plan
+
+def run_pinned_ema_development(path, **args):
+    _, pinned = frozen_ema_plan(**args)
+    return _run(path, expected_plan_sha256=pinned, **args)
 
 
 def make_archive(tmp_path):

@@ -1,0 +1,30 @@
+{
+  "plan": {
+    "schema_version": "sf-ema-first-backtest-plan-1",
+    "strategy": "EMA_8_21_CROSS_LONG_ONLY",
+    "indicator_version": "SF-IND-02:2:_ema:fsum",
+    "interval_ms": 60000,
+    "symbol": "BTCUSDT",
+    "benchmark": "BUY_HOLD_SAME_WINDOW_AND_COSTS",
+    "risk": "ONE_BTC_MAX_LONG_NO_LEVERAGE_NO_REINVESTMENT",
+    "initial_capital_usdt": 100000,
+    "stop_target": "NONE_CROSSOVER_EXIT_ONLY",
+    "entry_ttl_bars": 1,
+    "terminal_position": "UNRESOLVED_MARK_TO_MARKET_SEPARATE",
+    "target_regime": "BTC_CLOSE_ABOVE_EMA21_AND_EMA21_RISING_V1",
+    "missing_bar": "REJECT_DATASET",
+    "availability_assumption": "CLOSED_BAR_AVAILABLE_AT_CLOSE_PLUS_1MS_UNVERIFIED",
+    "archive_sha256": "4ec2915e610ab4e9a4d5e86a5ada1c15bbf6b5db343cdb385681d6ac97166a4e",
+    "source_reference": "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2024-01-01.zip",
+    "split_cutoff_ms": 1704153600000,
+    "fee_bps_per_side": 10,
+    "slippage_bps_per_side": 5,
+    "entry": "NEXT_OPEN_AFTER_CLOSED_SIGNAL",
+    "exit": "NEXT_OPEN_AFTER_CLOSED_OPPOSITE_SIGNAL",
+    "availability": "RETROSPECTIVE_NOT_CONFIRMED",
+    "oos_state": "LOCKED_NOT_EVALUATED"
+  },
+  "sha256": "a804e75d43ca0cd57988e7b44873d4179be198fea3c452ec7b38a9a9b9f8ad1b",
+  "frozen_at_utc": "2026-10-26T06:07:34.376369+00:00",
+  "amendment_before_first_replay": "fixed capital 100000 USDT, one BTC max, cash check, no leverage; benchmark first eligible open (bar22) to last close"
+}

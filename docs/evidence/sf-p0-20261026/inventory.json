@@ -1,0 +1,54 @@
+{
+  "receipt": {
+    "archive_sha256": "4ec2915e610ab4e9a4d5e86a5ada1c15bbf6b5db343cdb385681d6ac97166a4e",
+    "symbol": "BTCUSDT",
+    "interval_ms": 60000,
+    "first_open_ms": 1704067200000,
+    "last_open_ms": 1704153540000,
+    "count": 1440,
+    "gap_count": 0,
+    "availability": "RETROSPECTIVE_NOT_CONFIRMED"
+  },
+  "exchange": "BINANCE_SPOT",
+  "source": "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2024-01-01.zip",
+  "source_checksum": "4ec2915e610ab4e9a4d5e86a5ada1c15bbf6b5db343cdb385681d6ac97166a4e",
+  "version": "4ec2915e610ab4e9a4d5e86a5ada1c15bbf6b5db343cdb385681d6ac97166a4e",
+  "utc_range": [
+    "2024-01-01T00:00:00Z",
+    "2024-01-01T23:59:59.999Z"
+  ],
+  "license": "Binance Vision Dataset Terms v1.0 / CC BY-NC-SA 4.0, noncommercial personal research; raw not redistributed",
+  "license_url": "https://github.com/binance/binance-public-data/blob/master/TERMS_AND_CONDITIONS.md",
+  "coverage": "1440/1440 1-minute bars within requested UTC day; no claim outside day",
+  "gaps": 0,
+  "historical_observed_at": null,
+  "historical_available_at": null,
+  "availability_assumption": "close+1ms; hypothetical zero processing latency",
+  "download": {
+    "url": "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2024-01-01.zip",
+    "observed_at_utc": "2026-10-26T06:01:50.743562+00:00",
+    "headers": {
+      "Content-Type": "application/zip",
+      "Content-Length": "68923",
+      "Connection": "close",
+      "Accept-Ranges": "bytes",
+      "Date": "Mon, 26 Oct 2026 06:01:51 GMT",
+      "Server": "AmazonS3",
+      "Last-Modified": "Tue, 02 Jan 2024 03:37:21 GMT",
+      "ETag": "\"3eba18d895e5ad42c4e922626233d893\"",
+      "x-amz-server-side-encryption": "AES256",
+      "X-Cache": "Miss from cloudfront",
+      "Via": "1.1 92524164eb39769dbb84d6dcce9f5b74.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "JED50-P6",
+      "X-Amz-Cf-Id": "SuArGZUR_M_aEFNDo_Gn2pTFIWCL98GrO6wozV2ioorDHrQl0xHNCw=="
+    },
+    "sha256": "4ec2915e610ab4e9a4d5e86a5ada1c15bbf6b5db343cdb385681d6ac97166a4e"
+  },
+  "independent_custody": "NOT_VERIFIED; source checksum retrieved separately over HTTPS, same publisher, no independent time-stamped historical commitment",
+  "limitations": [
+    "OHLCV cannot prove executable liquidity/spread/latency",
+    "exchange archive may be revised; content hash pins downloaded version",
+    "no listing/delisting proof outside requested day",
+    "OOS and final holdout not accessed"
+  ]
+}

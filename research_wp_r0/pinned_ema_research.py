@@ -12,11 +12,13 @@ from .retrospective_kline_intake import inspect_binance_spot_zip
 
 
 def run_pinned_ema_development(path, *, archive_sha256, source_reference,
-                               split_cutoff_ms, fee_bps=10, slippage_bps=5):
+                               split_cutoff_ms, expected_plan_sha256, fee_bps=10, slippage_bps=5):
     plan, plan_digest = frozen_ema_plan(
         archive_sha256=archive_sha256, source_reference=source_reference,
         split_cutoff_ms=split_cutoff_ms, fee_bps=fee_bps,
         slippage_bps=slippage_bps)
+    if plan_digest != expected_plan_sha256:
+        raise ValueError("Frozen plan commitment mismatch")
     receipt, bars = inspect_binance_spot_zip(path,
                                              expected_sha256=archive_sha256)
     if receipt.symbol != "BTCUSDT" or receipt.interval_ms != 60000:
@@ -28,6 +30,19 @@ def run_pinned_ema_development(path, *, archive_sha256, source_reference,
         raise ValueError("Split must be inside or immediately after archive")
     report = replay_ema_development(bars, split_cutoff_ms=split_cutoff_ms,
                                     fee_bps=fee_bps, slippage_bps=slippage_bps)
+    # Bind snapshots to the frozen input/config identity; serialized bytes and
+    # retained report digests are tamper evidence, not external custody.
+    for event in report["opportunities"]:
+        snapshot = event["decision_snapshot"]
+        snapshot["plan_sha256"] = plan_digest
+        snapshot["archive_sha256"] = archive_sha256
+        snapshot["source_reference"] = source_reference
+        event.pop("snapshot_sha256")
+        event["snapshot_sha256"] = hashlib.sha256(json.dumps(snapshot, sort_keys=True,
+            separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+    report.pop("report_sha256")
+    report["report_sha256"] = hashlib.sha256(json.dumps(report, sort_keys=True,
+        separators=(",", ":"), allow_nan=False).encode()).hexdigest()
     payload = {
         "schema_version": "sf-ema-pinned-development-1",
         "plan": plan,

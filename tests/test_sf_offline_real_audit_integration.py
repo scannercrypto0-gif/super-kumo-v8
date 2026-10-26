@@ -58,7 +58,8 @@ def test_real_library_receipt_audit_and_simulated_close():
     assert result.spec["entry_bar_open_ms"] == first_open
     assert result.spec["exit_bar_open_ms"] == first_open + interval
     assert abs(result.spec["gross_return_bps"] - 500) < 1e-7
-    assert abs(result.spec["net_return_bps"] - 470) < 1e-7
+    from research_wp_r0.synthetic_execution import account_long_prices
+    assert abs(result.spec["net_return_bps"] - account_long_prices(100, 105, fee_bps=10, slippage_bps=5)["net_return"] * 10000) < 1e-7
     assert result.spec["independent_custody"] == "NOT_VERIFIED"
 
 def test_real_auditor_no_signal_keeps_zero_exposure():

@@ -9,6 +9,7 @@ from .historical_evaluation_bridge import OfflineInputs
 from .offline_evaluation_result import OfflineEvaluationResult
 from .future_bar_evidence import FutureBarEvidence
 from .strategy_definition import number
+from .synthetic_execution import account_long_prices
 from .historical_library import _interval_to_ms
 import re
 
@@ -91,10 +92,13 @@ def simulate_single_long(inputs, *, expected_digest, signal, ttl_bars=1,
         raise ValueError("Invalid execution chronology")
     # Synthetic market-open entry and next-bar-open exit ONLY.
     # Protocol costs are per-side bps; both sides are charged.
-    fee = 2 * number(spec["protocol"]["fee_bps"], 0, 10000)
-    slip = 2 * number(spec["protocol"]["slippage_bps"], 0, 10000)
-    gross = (exit_["open"] / entry["open"] - 1) * 10000
-    net = gross - fee - slip
+    account = account_long_prices(entry["open"], exit_["open"],
+                                  fee_bps=spec["protocol"]["fee_bps"],
+                                  slippage_bps=spec["protocol"]["slippage_bps"])
+    fee = account["fee_fraction"] * 10000
+    slip = account["slippage_fraction"] * 10000
+    gross = account["raw_gross_return"] * 10000
+    net = account["net_return"] * 10000
     return OfflineEvaluationResult({
         **common, "outcome": "SIMULATED_CLOSED", "reason": "NONE",
         "entry_bar_open_ms": entry["open_ms"],

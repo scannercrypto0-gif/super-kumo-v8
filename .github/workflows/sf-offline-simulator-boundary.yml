@@ -3,6 +3,9 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'research_wp_r0/synthetic_execution.py'
+      - 'tests/test_sf_p0_recovery.py'
+      - 'scripts/sf_ema_development.py'
       - 'research_wp_r0/offline_simulator.py'
       - 'research_wp_r0/retrospective_kline_intake.py'
       - 'research_wp_r0/ema_first_backtest.py'
@@ -40,11 +43,20 @@ jobs:
       - name: Explicit new boundary regressions
         run: python -B -m pytest -p no:cacheprovider tests/test_sf_offline_simulator_boundary.py tests/test_sf_future_bar_evidence.py tests/test_sf_synthetic_execution.py tests/test_sf_offline_real_audit_integration.py -v --tb=short --junitxml=sf-offline-boundary.xml
       - name: P0 retrospective intake regressions
-        run: python -B -m pytest -p no:cacheprovider tests/test_sf_retrospective_kline_intake.py tests/test_sf_ema_first_backtest.py tests/test_sf_ema_development_replay.py tests/test_sf_pinned_ema_research.py -q --tb=short
+        run: python -B -m pytest -p no:cacheprovider tests/test_sf_retrospective_kline_intake.py tests/test_sf_ema_first_backtest.py tests/test_sf_ema_development_replay.py tests/test_sf_pinned_ema_research.py tests/test_sf_p0_recovery.py tests/test_factory_synthetic_execution.py tests/test_factory_synthetic_opportunities.py -v --tb=short --junitxml=sf-p0-recovery.xml
       - name: Require 27 tests plus 4 subtests without skips
         run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('sf-offline-boundary.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==31; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
+      - name: Require 41 P0 and accepted execution cases without skips
+        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('sf-p0-recovery.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==41; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
+      - name: Source and environment identity
+        run: |
+          git rev-parse HEAD
+          python --version
+          python -m pip freeze
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: sf-offline-boundary-${{ matrix.os }}-${{ matrix.python }}
-          path: sf-offline-boundary.xml
+          path: |
+            sf-offline-boundary.xml
+            sf-p0-recovery.xml

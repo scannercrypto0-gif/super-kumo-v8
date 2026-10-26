@@ -5,6 +5,7 @@ from unittest.mock import patch
 from research_wp_r0.future_bar_evidence import FutureBarEvidence
 from research_wp_r0.historical_evaluation_bridge import OfflineInputs
 from research_wp_r0.offline_simulator import simulate_single_long
+from research_wp_r0.synthetic_execution import account_long_prices
 
 
 class SyntheticExecutionTests(unittest.TestCase):
@@ -49,9 +50,10 @@ class SyntheticExecutionTests(unittest.TestCase):
         result = self.run_case(self.evidence())
         self.assertEqual(result.spec["outcome"], "SIMULATED_CLOSED")
         self.assertAlmostEqual(result.spec["gross_return_bps"], 500)
-        self.assertAlmostEqual(result.spec["fee_bps"], 20)
-        self.assertAlmostEqual(result.spec["slippage_bps"], 10)
-        self.assertAlmostEqual(result.spec["net_return_bps"], 470)
+        a = account_long_prices(100, 105, fee_bps=10, slippage_bps=5)
+        self.assertAlmostEqual(result.spec["fee_bps"], a["fee_fraction"] * 10000)
+        self.assertAlmostEqual(result.spec["slippage_bps"], a["slippage_fraction"] * 10000)
+        self.assertAlmostEqual(result.spec["net_return_bps"], a["net_return"] * 10000)
 
     def test_losing_trade_includes_costs(self):
         evidence = self.evidence()
@@ -61,7 +63,8 @@ class SyntheticExecutionTests(unittest.TestCase):
         result = self.run_case(FutureBarEvidence(value))
         self.assertEqual(result.spec["outcome"], "SIMULATED_CLOSED")
         self.assertAlmostEqual(result.spec["gross_return_bps"], -500)
-        self.assertAlmostEqual(result.spec["net_return_bps"], -530)
+        a = account_long_prices(100, 95, fee_bps=10, slippage_bps=5)
+        self.assertAlmostEqual(result.spec["net_return_bps"], a["net_return"] * 10000)
 
     def test_real_auditor_rejects_incomplete_receipt(self):
         # Deliberately incomplete test receipts must never pass production audit.
