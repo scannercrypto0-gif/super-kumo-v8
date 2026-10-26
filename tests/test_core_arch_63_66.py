@@ -169,9 +169,9 @@ def test_R3_operational_reader_has_no_public_sql_or_stage_capability(tmp_path):
 
 
 @pytest.mark.parametrize('op,data',[
-    ('WITHHELD',dict(consumer='sandbox',source_seq=1,key='BTCUSDT:1m:60000',evidence='fake')),
+    ('WITHHELD',dict(consumer='sandbox',source_seq=1,epoch=1,key='BTCUSDT:1m:60000',evidence='fake')),
     ('PUBLISH',dict(consumer='sandbox',source_seq=2,epoch=1,stage='forged')),
-    ('DELIVERED',dict(consumer='sandbox',source_seq=2,receipt='forged')),
+    ('DELIVERED',dict(consumer='sandbox',source_seq=2,epoch=1,receipt='forged')),
 ])
 def test_R4_T13_rehashed_semantic_ledger_forgery_rejected(tmp_path,op,data):
     from aql.delivery.authority import _append
@@ -188,6 +188,18 @@ def test_R4_empty_or_wrong_genesis_rejected(tmp_path):
     with pytest.raises(PublicationDenied): a.rebuild()
 
 
+@pytest.mark.parametrize('op,data',[
+    ('DELIVERED',dict(consumer='sandbox',source_seq=1,epoch=1,receipt=None)),
+    ('PUBLISH',dict(consumer='sandbox',source_seq=1,epoch=None,stage=None)),
+    ('PUBLISH',dict(consumer='sandbox',source_seq=1,epoch=1,stage=None)),
+])
+def test_R4_null_publication_and_null_ack_never_settle(tmp_path,op,data):
+    from aql.delivery.authority import _append
+    j,a,e=setup(tmp_path)
+    with j._connect() as conn: _append(conn,op,data)
+    with pytest.raises(PublicationDenied): a.rebuild()
+
+
 def test_R5_T15_old_snapshot_requires_current_progress_checkpoint(tmp_path):
     j,a,e=setup(tmp_path);sid=a.stage('sandbox',e,1)
     old=sqlite3.connect(tmp_path/'older.sqlite')
@@ -199,6 +211,16 @@ def test_R5_T15_old_snapshot_requires_current_progress_checkpoint(tmp_path):
     saved.close()
     with pytest.raises(PublicationDenied,match='progress checkpoint'):
         Authority(DurableJournal(j.db_path),limits=a.limits,synthetic=True,anchor=a.anchor,checkpoint=current)
+
+
+def test_R5_copied_source_path_cannot_fork_publication_authority(tmp_path):
+    j,a,e=setup(tmp_path);a.stage('sandbox',e,1);head=a.checkpoint()
+    copied=sqlite3.connect(tmp_path/'copy.sqlite')
+    with j._connect() as conn: conn.backup(copied)
+    copied.close()
+    with pytest.raises(PublicationDenied,match='Copied source path'):
+        Authority(DurableJournal(str(tmp_path/'copy.sqlite')),limits=a.limits,synthetic=True,
+                  anchor=a.anchor,checkpoint=head)
 
 
 def test_T08_T16_unproven_settlement_and_pending_stage(tmp_path):

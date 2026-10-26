@@ -108,7 +108,8 @@ def _replay(conn):
     initialized=False
     for index, (seq, raw, hashed) in enumerate(conn.execute("SELECT * FROM core128_events ORDER BY seq"), 1):
         event = json.loads(raw)
-        if (seq != index or event.get("schema") != "aql.core.consumer-disposition.v1"
+        if (canonical(event).decode()!=raw or type(event.get('seq')) is not int
+                or seq != index or event.get("schema") != "aql.core.consumer-disposition.v1"
                 or event.get("seq") != seq or event.get("previous") != previous or digest(event) != hashed):
             raise PublicationDenied("Disposition chain invalid")
         previous = hashed
@@ -121,7 +122,9 @@ def _replay(conn):
             initialized=True
         elif op == "FENCE":
             c = data["consumer"]
-            if data["epoch"] != epochs.get(c, 0)+1: raise PublicationDenied("Epoch sequence invalid")
+            if (not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}",c) or type(data['epoch']) is not int
+                    or data["epoch"] != epochs.get(c, 0)+1):
+                raise PublicationDenied("Epoch sequence invalid")
             epochs[c] = data["epoch"]
         elif op == "BLOCK":
             proof=conn.execute("SELECT stable_key FROM g1_integrity_events WHERE event_id=?",(data.get('evidence'),)).fetchone()
@@ -131,6 +134,9 @@ def _replay(conn):
             c, source_seq = data["consumer"], data["source_seq"]
             if type(source_seq) is not int or not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}",c):
                 raise PublicationDenied("Invalid disposition identity")
+            if (c not in epochs or type(data.get('epoch')) is not int
+                    or data['epoch']!=epochs[c]):
+                raise PublicationDenied("Unfenced disposition event")
             source=conn.execute("SELECT * FROM journal_entries WHERE id=?",(source_seq,)).fetchone()
             if source is None: raise PublicationDenied("Missing disposition source")
             source_key=source['stable_key']
@@ -144,13 +150,16 @@ def _replay(conn):
                 state["stage"] = data["stage"]
             elif op == "PUBLISH":
                 if source_key in blocked: raise PublicationDenied("Publication after block")
-                if state["stage"] != data["stage"] or state["publication"] is not None:
+                if (not isinstance(data.get('stage'),str) or len(data['stage'])!=64
+                        or not state['stage'] or state["stage"] != data["stage"] or state["publication"] is not None):
                     raise PublicationDenied("Unstaged/duplicate publication")
                 if data["epoch"] != epochs.get(c): raise PublicationDenied("Stale publication event")
                 state["publication"] = hashed
             elif op == "DELIVERED":
                 if source_key in blocked: raise PublicationDenied("Delivery ACK after block")
-                if state["publication"] != data["receipt"]: raise PublicationDenied("Unproven delivery ACK")
+                if (not state['stage'] or not state['publication'] or not isinstance(data.get('receipt'),str)
+                        or len(data['receipt'])!=64 or state["publication"] != data["receipt"]):
+                    raise PublicationDenied("Unproven delivery ACK")
                 state["delivered"] = True
             else:
                 proof=conn.execute("SELECT stable_key FROM g1_integrity_events WHERE event_id=?",(data.get('evidence'),)).fetchone()
@@ -264,6 +273,8 @@ class Authority:
         meta = conn.execute("SELECT value FROM core128_meta WHERE singleton=1").fetchone()
         if meta is None or json.loads(meta[0]) != self.anchor:
             raise PublicationDenied("Authority source/anchor mismatch")
+        if str(Path(self.journal.db_path).resolve()) != self.anchor["path"]:
+            raise PublicationDenied("Copied source path requires separate reconciliation")
         if self.journal.instance_id != self.anchor["source"] or digest(_source(conn)) != self.anchor["inventory"]:
             raise PublicationDenied("Full source record inventory changed")
         states, epochs, blocked = _replay(conn)
@@ -338,7 +349,7 @@ class Authority:
                 if used+len(row["payload_json"].encode()) > self.limits.max_bytes:
                     raise PublicationDenied("Private staging byte capacity reached")
                 conn.execute("INSERT INTO core128_stages VALUES (?,?,?,?)",(sid,consumer,seq,row["payload_json"]))
-                _append(conn,"STAGE",dict(consumer=consumer,source_seq=seq,stage=sid))
+                _append(conn,"STAGE",dict(consumer=consumer,source_seq=seq,stage=sid,epoch=epoch))
                 self.fault("after_stage")
         return sid
 
@@ -364,13 +375,13 @@ class Authority:
                 evidence=conn.execute("SELECT event_id FROM g1_integrity_events WHERE stable_key=? LIMIT 1",
                                       (row["stable_key"],)).fetchone()
                 if evidence is None: raise PublicationDenied("No durable withheld evidence")
-                _append(conn,"WITHHELD",dict(consumer=consumer,source_seq=seq,key=row["stable_key"],evidence=evidence[0]))
+                _append(conn,"WITHHELD",dict(consumer=consumer,source_seq=seq,key=row["stable_key"],evidence=evidence[0],epoch=epoch))
             else:
                 require_eligible_db(conn,row["stable_key"])
                 states,_,_=_replay(conn)
                 if not receipt or states.get((consumer,seq),{}).get("publication")!=receipt:
                     raise PublicationDenied("Unproven delivery ACK")
-                _append(conn,"DELIVERED",dict(consumer=consumer,source_seq=seq,receipt=receipt))
+                _append(conn,"DELIVERED",dict(consumer=consumer,source_seq=seq,receipt=receipt,epoch=epoch))
 
     def deliver(self,consumer,epoch,seq):
         try:
