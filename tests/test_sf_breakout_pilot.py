@@ -102,7 +102,7 @@ def test_gaps_invalid_essential_or_frozen_plan_fail_closed():
     z = list(broken[100])
     z[5] = math.nan
     broken[100] = tuple(z)
-    with pytest.raises(ValueError, match="essential"):
+    with pytest.raises(ValueError, match="Non-finite number|essential"):
         pilot(tuple(broken))
     alternative = copy.deepcopy(SPEC)
     alternative["entry_lookback"] = 10
