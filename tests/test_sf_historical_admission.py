@@ -4,6 +4,7 @@ import copy
 import pytest
 
 from research_wp_r0.content_identity import content_hash_v1
+import research_wp_r0.sf_historical_admission as admission_module
 from research_wp_r0.historical_library import (
     HistoricalBar, DataAvailabilityKind, validate_bars, make_test_bar,
 )
@@ -182,3 +183,55 @@ def test_mixed_availability_cannot_be_downgraded():
                            expected_content_hash=expected, **UNIT)
     assert report["tier"] == "BLOCKED"
     assert report["blocked_reasons"] == ["AVAILABILITY_CLASS_MIXED"]
+
+
+def _assert_quality_error_is_typed_blocked(monkeypatch, bars, manifest, grant, expected):
+    """Confirm malformed bars actually enter content_hash_v1, not a preflight shortcut."""
+    actual_hash = admission_module.content_hash_v1
+    calls = []
+
+    def tracked_hash(*args, **kwargs):
+        calls.append(True)
+        return actual_hash(*args, **kwargs)
+
+    monkeypatch.setattr(admission_module, "content_hash_v1", tracked_hash)
+    report = preflight_dev(manifest, bars, boundary=grant,
+                           expected_content_hash=expected, **UNIT)
+    assert calls == [True]
+    assert report["tier"] == "BLOCKED"
+    assert report["blocked_reasons"] == ["QUALITY_BLOCKED"]
+    assert report["dev_eligible"] is False
+    assert report["confirmed_pit_eligible"] is False
+    assert report["independent_custody"] == "NOT_VERIFIED"
+    assert report["oos_access"] == "LOCKED"
+    assert report["content_hash_v1"] is None
+    assert verify_admission_report(report, expected_report_digest=report["report_digest"])
+
+
+@pytest.mark.parametrize("changed_field,new_value", [
+    ("symbol", "ETHUSDT"),
+    ("interval", "5m"),
+])
+def test_manifest_bar_identity_error_returns_blocked(
+        monkeypatch, changed_field, new_value):
+    bars, manifest, grant, expected = fixture()
+    # replace recomputes the bar checksum: this tests semantic identity mismatch,
+    # not the separate corrupt-checksum case.
+    bad_bar = replace(bars[1], **{changed_field: new_value})
+    assert bad_bar.verify_checksum()
+    altered = list(bars)
+    altered[1] = bad_bar
+    _assert_quality_error_is_typed_blocked(
+        monkeypatch, altered, manifest, grant, expected)
+
+
+def test_corrupt_checksum_returns_blocked(monkeypatch):
+    bars, manifest, grant, expected = fixture()
+    altered = list(bars)
+    bad_bar = replace(bars[1])
+    # Adversarial corruption bypasses frozen dataclass protections on purpose.
+    object.__setattr__(bad_bar, "checksum", "0" * 64)
+    assert not bad_bar.verify_checksum()
+    altered[1] = bad_bar
+    _assert_quality_error_is_typed_blocked(
+        monkeypatch, altered, manifest, grant, expected)
