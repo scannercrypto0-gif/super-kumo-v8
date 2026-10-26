@@ -135,3 +135,20 @@ def test_shadow_missing_volume_does_not_change_base():
     assert any(e["kind"] == "BLOCKED_MISSING_REQUIRED_DATA"
                for e in modified["versions"]["SHADOW"]["events"])
     assert modified["paper"] == "NOT_STARTED"
+
+
+def test_rehashed_false_paper_and_changed_version_not_reported(tmp_path):
+    db = tmp_path / "research.sqlite"
+    report = run_workflow(db, expected=frozen())
+    forged = copy.deepcopy(report)
+    forged["paper"] = "RUNNING"
+    forged["report_digest"] = digest({k: v for k, v in forged.items()
+                                      if k != "report_digest"})
+    with pytest.raises(ValueError, match="Invalid synthetic-only report claims"):
+        report_json(forged)
+    forged = copy.deepcopy(report)
+    forged["versions"]["SHADOW"]["version_id"] = "UNFROZEN_v2"
+    forged["report_digest"] = digest({k: v for k, v in forged.items()
+                                      if k != "report_digest"})
+    with pytest.raises(ValueError, match="Invalid synthetic-only version report"):
+        report_json(forged)
