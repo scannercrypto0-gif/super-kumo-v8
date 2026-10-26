@@ -76,8 +76,10 @@ class StrategyDNAV2Tests(unittest.TestCase):
         self.assertEqual(r["core"]["decisions"][1]["signal"],"WAIT")
         self.assertEqual(r["core"]["decisions"][2]["signal"],"NOT_EVALUATED_SCANNER")
     def test_mandatory_overrides_high_score(self):
-        self.assets[0]["features"]["trend"]["values"]["value"]=50
-        d=self.run_report().spec["core"]["decisions"][0]["entry"]
+        spec=self.dna.spec;spec["decision_profile"]["entry"]["mandatory"][0]["value"]=95
+        dna=StrategyDNAV2(spec,v1_definition=self.v1)
+        d=self.run_report(dna=dna).spec["core"]["decisions"][0]["entry"]
+        self.assertGreater(d["score"],d["threshold"])
         self.assertFalse(d["eligible"]);self.assertIn("mandatory_trend:MANDATORY_NOT_SATISFIED",d["reasons"])
     def test_stable_ranking_capacity_and_ties(self):
         spec=self.dna.spec;spec["scanner_profile"]["max_candidates"]=1
