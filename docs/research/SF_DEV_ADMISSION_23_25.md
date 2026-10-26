@@ -38,7 +38,7 @@ and `state=INPUTS_ONLY_NOT_EVALUATED`. Three contemplated proof tiers are:
   verified producer delivery, independent anchor and custody are missing;
   a subsequent architecture decision and separate approval are required.
 
-Bad or unverified DEV partition, wrong expected content identity or quality
+The positive structural tier still records\n\`DEV_PARTITION_AUTHORITY_NOT_VERIFIED\`. A trusted real DEV-only partition\nprovisioner and approved license/source authority remain unimplemented and\nrequire a distinct owner-approved interface and verification evidence.\n\nBad or unverified DEV partition, wrong expected content identity or quality
 produces `BLOCKED` with a stable reason. The `report_digest` is for
 reproducibility and tamper-evidence only; `verify_admission_report` requires a
 caller-retained digest AND rejects semantic promotion even if the malicious
