@@ -38,6 +38,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional
 
+from ..g1_integrity import IntegrityAccess
+
 import logging
 
 logger = logging.getLogger("aql.health")
@@ -183,6 +185,16 @@ def take_snapshot(
     except Exception as exc:
         storage_errors.append(f"journal.replay: {exc}")
 
+    scoped_conflict = False
+    for name,target in (("journal",journal),("store",store)):
+        try:
+            if isinstance(target,IntegrityAccess) and target.quarantined_keys(symbol,interval):
+                scoped_conflict = True
+                storage_errors.append(name+": quarantined content conflict; affected inputs ineligible")
+        except Exception as exc:
+            scoped_conflict = True
+            storage_errors.append(name+": conflict eligibility unreadable: "+str(exc))
+
     journal_keys: set = {b.stable_key() for b in journal_bars}
     journal_final_count = len(journal_bars)
 
@@ -209,7 +221,7 @@ def take_snapshot(
         int(k.split(":")[-1]) for k in journal_not_in_store
     )
     unresolved_backlog = len(missing_bar_opens) > 0
-    integrity_ok = len(store_not_in_journal) == 0  # orphan store rows = integrity breach
+    integrity_ok = len(store_not_in_journal) == 0 and not scoped_conflict
 
     # -----------------------------------------------------------------------
     # 3. Temporal metrics

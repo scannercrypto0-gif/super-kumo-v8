@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import List, Optional
 
 from ..models.bar import BarState, MarketBar
+from ..g1_integrity import (CommitEvidenceError, IntegrityAccess,ContentConflictError,content,fingerprint,
+    init_integrity,post_commit_receipt,record_event,require_eligible_db)
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +51,7 @@ PRAGMAS = [
 ]
 
 
-class OperationalStore:
+class OperationalStore(IntegrityAccess):
     """
     SQLite-backed operational storage.
     - Idempotent: duplicate bar_open for same symbol+interval → no new row.
@@ -75,57 +77,51 @@ class OperationalStore:
         conn = self._connect()
         try:
             conn.executescript(SCHEMA)
+            init_integrity(conn)
             conn.commit()
         finally:
             conn.close()
 
-    def upsert(self, bar: MarketBar) -> bool:
-        """
-        Idempotent upsert. Returns True if new row inserted, False if already exists.
-        Only accepts final bars (is_final=True).
-        Raises ValueError for non-final bars.
-        """
-        if not bar.is_final:
-            raise ValueError(
-                f"Non-final bar rejected: key={bar.stable_key()} "
-                "(only final bars permitted in operational store per TIME-01)"
-            )
+    def _original_bar(self, conn, key):
+        symbol,interval,opened = key.rsplit(":",2)
+        row=conn.execute("SELECT * FROM market_bars WHERE symbol=? AND interval=? AND bar_open=?",
+                         (symbol,interval,int(opened))).fetchone()
+        if row is None: return None
+        fields=dict(row); fields.pop("id")
+        fields["is_final"]=bool(fields["is_final"])
+        return MarketBar.from_dict(fields)
 
-        conn = self._connect()
+    def upsert(self, bar: MarketBar) -> bool:
+        if not bar.is_final:
+            raise ValueError("Non-final bar rejected")
+        material=content(bar)
+        conn=self._connect()
         try:
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO market_bars
-                  (symbol, interval, bar_open, bar_close, open, high, low, close,
-                   volume, is_final, source, ingested_at, committed_at, checksum, state)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """,
-                (
-                    bar.symbol,
-                    bar.interval,
-                    bar.bar_open,
-                    bar.bar_close,
-                    bar.open,
-                    bar.high,
-                    bar.low,
-                    bar.close,
-                    bar.volume,
-                    int(bar.is_final),
-                    bar.source,
-                    bar.ingested_at,
-                    bar.committed_at,
-                    bar.checksum or bar.compute_checksum(),
-                    bar.state.value,
-                ),
-            )
-            changes = conn.execute("SELECT changes()").fetchone()[0]
-            conn.commit()
-            inserted = changes > 0
-            if inserted:
-                logger.debug("Stored: %s", bar.stable_key())
-            else:
-                logger.debug("Duplicate skipped: %s", bar.stable_key())
-            return inserted
+            conn.execute("BEGIN IMMEDIATE")
+            prior=self._original_bar(conn,bar.stable_key())
+            if prior is not None and content(prior)!=material:
+                evidence=record_event(conn,prior,bar)
+                conn.commit()
+                try:
+                    post_commit_receipt(conn,"AUDIT",evidence["event_id"],fingerprint(evidence),evidence["detected_at_ms"])
+                except CommitEvidenceError:
+                    # Quarantine already committed; lack of a timing receipt
+                    # must not conceal the content conflict or enable ACK.
+                    raise ContentConflictError(evidence)
+                raise ContentConflictError(evidence)
+            require_eligible_db(conn,bar.stable_key())
+            if prior is not None:
+                conn.commit(); return False
+            conn.execute("INSERT INTO market_bars "
+                "(symbol,interval,bar_open,bar_close,open,high,low,close,volume,is_final,source,ingested_at,committed_at,checksum,state) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
+                bar.symbol,bar.interval,bar.bar_open,bar.bar_close,bar.open,bar.high,bar.low,bar.close,bar.volume,
+                int(bar.is_final),bar.source,bar.ingested_at,bar.committed_at,
+                bar.checksum or bar.compute_checksum(),bar.state.value))
+            conn.commit(); return True
+        except Exception:
+            if conn.in_transaction: conn.rollback()
+            raise
         finally:
             conn.close()
 

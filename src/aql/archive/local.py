@@ -15,6 +15,7 @@ import time
 import uuid
 
 from .contracts import canonical, digest, market_envelope, parse
+from ..g1_integrity import require_eligible_db
 
 MAX_BYTES = 262144
 MAX_RECORD_BYTES = 16384
@@ -26,7 +27,9 @@ def source_row(conn, sequence):
         return None
     if size[0] > MAX_RECORD_BYTES:
         raise ValueError("Oversized source record denied before materialization")
-    return conn.execute("SELECT id,stable_key,payload_json,checksum FROM journal_entries WHERE id=?", (sequence,)).fetchone()
+    row = conn.execute("SELECT id,stable_key,payload_json,checksum FROM journal_entries WHERE id=?", (sequence,)).fetchone()
+    require_eligible_db(conn,row[1])
+    return row
 
 
 def check_path(path):

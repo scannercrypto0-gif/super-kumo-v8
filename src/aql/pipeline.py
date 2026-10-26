@@ -17,6 +17,7 @@ from pathlib import Path
 from .collector.binance_collector import BinanceCollector
 from .health import take_snapshot
 from .lanes import BackgroundLane, JournalConsumer
+from .g1_integrity import ContentConflictError, propagate_conflict
 from .journal.durable_journal import DurableJournal
 from .recovery.gap_recovery import recover_gap
 from .storage.operational_store import OperationalStore
@@ -63,6 +64,7 @@ def _run_gap_recovery(
         gap_start_ms=gap_start_ms,
         gap_end_ms=gap_end_ms,
         existing_keys=existing_keys,
+        include_existing=True,
     )
 
     inserted = 0
@@ -76,6 +78,10 @@ def _run_gap_recovery(
         # Step 1: Journal commit (durable local record)
         try:
             journal.commit(bar, background=True)
+        except ContentConflictError as exc:
+            propagate_conflict(exc,journal,store)
+            errors += 1
+            continue
         except Exception as exc:
             logger.error(
                 "Journal commit failed for recovered bar %s: %s",
@@ -88,6 +94,10 @@ def _run_gap_recovery(
         upserted = False
         try:
             upserted = store.upsert(bar)
+        except ContentConflictError as exc:
+            propagate_conflict(exc,journal,store)
+            errors += 1
+            continue
         except Exception as exc:
             logger.error(
                 "Store upsert failed for recovered bar %s: %s",
@@ -102,6 +112,10 @@ def _run_gap_recovery(
         # In both cases the data IS in the store, so mark as PERSISTED.
         try:
             journal.mark_persisted(bar.stable_key())
+        except ContentConflictError as exc:
+            propagate_conflict(exc,journal,store)
+            errors += 1
+            continue
         except Exception as exc:
             logger.warning(
                 "mark_persisted failed for %s (non-fatal): %s",
@@ -309,7 +323,12 @@ def run_pipeline(
         "reconnects": metrics.reconnect_count,
         "collector_health": getattr(collector, "health_state", "SYNTHETIC"),
         "source_clock_skew_ms": metrics.source_clock_skew_ms,
-        "avg_latency_ws_to_commit_ms": metrics.avg_latency_ws_to_commit_ms(),
+        "avg_latency_ws_to_commit_ms": metrics.avg_latency_ws_to_commit_ms(),  # legacy, not completion proof
+        "commit_return_timing_version": 1,
+        "last_commit_return_observed_at_ms": metrics.last_commit_return_observed_at,
+        "avg_latency_ws_to_commit_return_ms": (
+            sum(metrics.latency_ws_to_commit_return_samples)/len(metrics.latency_ws_to_commit_return_samples)
+            if metrics.latency_ws_to_commit_return_samples else None),
         "journal_state_counts": journal_counts,
         "bar_range": {
             "min_open_ms": min_open,

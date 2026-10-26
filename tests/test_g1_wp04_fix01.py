@@ -233,6 +233,7 @@ def _synthetic_recover_gap(
     gap_start_ms: int,
     gap_end_ms: int,
     existing_keys,
+    *, include_existing=False,
 ):
     """
     Synthetic REST gap recovery: no bars fetched, FULL report (unresolved=0).
@@ -927,7 +928,7 @@ _PIPELINE_CHILD_SCRIPT = textwrap.dedent(
     FLAG_PATH = "{flag_path}"
     DATA_DIR = "{data_dir}"
 
-    def _noop_recover_gap(symbol, interval, gap_start_ms, gap_end_ms, existing_keys):
+    def _noop_recover_gap(symbol, interval, gap_start_ms, gap_end_ms, existing_keys, *, include_existing=False):
         \"\"\"Synthetic REST gap recovery — no HTTP calls.\"\"\"
         return [], RecoveryReport(
             symbol=symbol,

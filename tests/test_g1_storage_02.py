@@ -65,7 +65,20 @@ def test_real_archive_duplicate_restart_and_ack_independence(tmp_path):
     ("volume",-1),("bar_close",100),("ingested_at",253402300700000)])
 def test_invalid_or_future_candles_never_acked(tmp_path,field,value):
     journal,archive=setup(tmp_path,n=0)
-    item=bar();setattr(item,field,value);item.with_checksum();journal.commit(item)
+    item=bar();setattr(item,field,value);item.with_checksum()
+    if field=="close":  # v1 canonical comparison rejects NaN before data commit
+        with pytest.raises(ValueError): journal.commit(item)
+        assert not journal.replay()
+        assert journal.commit_receipt(item.stable_key())["version"]==0
+        assert archive.drain_once()==0 and watermark(archive)==0
+        return
+    if field=="ingested_at":
+        from aql.g1_integrity import CommitEvidenceError
+        # Data can be durable, but a future receipt cannot get a false v1 time.
+        with pytest.raises(CommitEvidenceError): journal.commit(item)
+        assert journal.commit_receipt(item.stable_key())["version"]==0
+    else:
+        journal.commit(item)
     with pytest.raises(ValueError):archive.drain_once()
     assert watermark(archive)==0 and archive.health()["status"]=="UNHEALTHY"
 

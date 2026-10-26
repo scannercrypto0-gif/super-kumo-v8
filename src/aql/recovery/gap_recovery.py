@@ -147,6 +147,7 @@ def recover_gap(
     gap_start_ms: int,
     gap_end_ms: int,
     existing_keys: set,
+    *, include_existing: bool = False,
 ) -> tuple[List[MarketBar], RecoveryReport]:
     """
     Fetch all final bars in [gap_start_ms, gap_end_ms] from Binance REST.
@@ -157,6 +158,8 @@ def recover_gap(
 
     Returns (bars_to_insert, report).
     bars_to_insert excludes bars already in existing_keys (idempotent).
+    include_existing=True returns fetched existing bars too for content validation;
+    report coverage/new-versus-existing accounting remains unchanged.
 
     Weight accounting: cost tracked as requests_made * KLINES_WEIGHT_PER_REQUEST.
     The header X-MBX-USED-WEIGHT-1M (cumulative window weight) is recorded
@@ -318,4 +321,4 @@ def recover_gap(
         weight_cost, last_seen_window_weight, http_error,
     )
 
-    return recovered_new, report
+    return (all_bars if include_existing else recovered_new), report

@@ -29,6 +29,7 @@ import websocket  # websocket-client
 from ..journal.durable_journal import DurableJournal
 from ..models.bar import BarState, MarketBar
 from ..storage.operational_store import OperationalStore
+from ..g1_integrity import ContentConflictError, propagate_conflict
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,9 @@ class CollectorMetrics:
     reconnect_count: int = 0
     last_bar_open: Optional[int] = None
     last_ingested_at: Optional[int] = None
-    last_committed_at: Optional[int] = None
+    last_committed_at: Optional[int] = None  # legacy pre-COMMIT marker
+    last_commit_return_observed_at: Optional[int] = None
+    latency_ws_to_commit_return_samples: list = field(default_factory=list)
     source_clock_skew_ms: Optional[int] = None
     first_connect_at: Optional[int] = None
     disconnect_at: Optional[int] = None
@@ -148,6 +151,12 @@ class BinanceCollector:
                 self.metrics.journal_commit_count += 1
                 committed_at = bar.committed_at
                 self.metrics.last_committed_at = committed_at
+                proof = self.journal.commit_receipt(bar.stable_key())
+                if type(proof) is dict and proof.get("version") == 1:
+                    observed = proof["commit_return_observed_at_ms"]
+                    self.metrics.last_commit_return_observed_at = observed
+                    self.metrics.latency_ws_to_commit_return_samples.append(observed-bar.ingested_at)
+                    self.metrics.latency_ws_to_commit_return_samples[:] = self.metrics.latency_ws_to_commit_return_samples[-1000:]
 
                 # Latency: ingested_at → committed_at
                 if committed_at and bar.ingested_at:
@@ -171,6 +180,14 @@ class BinanceCollector:
                 self._stop_event.set()
                 ws.close()
 
+        except ContentConflictError as exc:
+            self.metrics.error_count += 1
+            self.health_state = "CONTENT_CONFLICT"
+            try:
+                propagate_conflict(exc,self.journal,self.store)
+            except Exception:
+                logger.exception("Conflict mirror failed; journal/stream remains ineligible")
+            logger.error("Conflicting candle quarantined: %s",exc.stable_key)
         except Exception as exc:
             self.metrics.error_count += 1
             logger.error("on_message error: %s", exc, exc_info=True)

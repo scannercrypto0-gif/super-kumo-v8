@@ -141,13 +141,16 @@ class TestT2_Durability(unittest.TestCase):
         self.assertEqual(bars[0].bar_open, 1_700_000_000_000)
         self.assertEqual(bars[0].state, BarState.LOCAL_COMMITTED)
 
-    def test_committed_at_set_after_fsync(self):
+    def test_legacy_marker_and_versioned_commit_return_receipt(self):
         bar = _make_bar()
         j = DurableJournal(self.db_path)
         j.commit(bar)
         bars = j.replay()
         self.assertIsNotNone(bars[0].committed_at)
         self.assertGreater(bars[0].committed_at, bars[0].ingested_at - 1000)
+        proof = j.commit_receipt(bars[0].stable_key())
+        self.assertEqual(proof["version"], 1)
+        self.assertGreaterEqual(proof["commit_return_observed_at_ms"], bars[0].committed_at)
 
 
 class TestT3_DuplicateReplay(unittest.TestCase):

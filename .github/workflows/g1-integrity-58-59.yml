@@ -1,0 +1,42 @@
+name: G1 Integrity 58-59 Focused Acceptance
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/aql/**'
+      - 'tests/test_g1_integrity_58_59.py'
+      - '.github/workflows/g1-integrity-58-59.yml'
+permissions:
+  contents: read
+concurrency:
+  group: g1-integrity-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  integrity:
+    name: Integrity (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -e ".[dev]"
+      - name: Source and environment
+        shell: bash
+        run: |
+          git rev-parse HEAD
+          python --version
+      - name: New focused cases only (existing G1/archive workflows cover regressions)
+        run: python -B -m pytest tests/test_g1_integrity_58_59.py -v --tb=short --junitxml=integrity.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: g1-integrity-${{ matrix.os }}
+          path: integrity.xml
