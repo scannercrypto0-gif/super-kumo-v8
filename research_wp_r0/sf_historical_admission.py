@@ -119,14 +119,23 @@ def preflight_dev(manifest, bars, *, boundary, expected_content_hash,
             or any(b.quality != BarQuality.FINAL for b in records)):
         return _blocked("QUALITY_BLOCKED", boundary)
 
-    confirmed = all(b.availability_kind == DataAvailabilityKind.CONFIRMED
-                    and type(b.ingest_time_ms) is int
-                    and b.ingest_time_ms > b.bar_close
-                    and b.ingest_time_ms <= b.observation_cutoff_ms
-                    and (decision_cutoff_ms is not None
-                         and b.observation_cutoff_ms <= decision_cutoff_ms)
-                    for b in records)
-    tier = "PIT_METADATA_VALID" if confirmed else "RETROSPECTIVE_DEV"
+    # Never silently relabel internally CONFIRMED or mixed-source bars as
+    # retrospective simply because the decision cutoff or receipts are bad.
+    kinds = {b.availability_kind for b in records}
+    if kinds == {DataAvailabilityKind.RETROSPECTIVE}:
+        tier = "RETROSPECTIVE_DEV"
+    elif kinds == {DataAvailabilityKind.CONFIRMED}:
+        if (decision_cutoff_ms is None
+                or any(type(b.ingest_time_ms) is not int
+                       or b.ingest_time_ms <= b.bar_close
+                       or b.ingest_time_ms > b.observation_cutoff_ms
+                       or b.observation_cutoff_ms > decision_cutoff_ms
+                       for b in records)):
+            return _blocked("PIT_METADATA_INVALID", boundary)
+        tier = "PIT_METADATA_VALID"
+    else:
+        return _blocked("AVAILABILITY_CLASS_MIXED", boundary)
+    confirmed = tier == "PIT_METADATA_VALID"
     return _seal({
         "schema": "sf-historical-admission-v1",
         "state": "INPUTS_ONLY_NOT_EVALUATED",
