@@ -44,15 +44,15 @@ def synthetic_fixture():
     previous = 100.0
     for i in range(500):
         j = i % 100
-        if j < 20:
+        if j < 24:
             close = 100.0
         elif j < 45:
-            close = 100.0 + (j - 19) * 1.4
+            close = 100.0 + (j - 23) * 1.4
         elif j < 70:
-            close = 135.0 - (j - 44) * 1.7
+            close = 129.4 - (j - 44) * 1.7
         else:
             close = 92.5 + (j - 69) * .25
-        vol = 150.0 if j == 20 and (i // 100) % 2 == 0 else 80.0
+        vol = 150.0 if j == 24 and (i // 100) % 2 == 0 else 80.0
         start = 1704067200000 + i * DELTA_MS
         rows.append((start, start + DELTA_MS - 1, previous,
                      max(previous, close) + .2,
