@@ -83,7 +83,7 @@ def test_changed_data_or_plan_or_result_is_rejected(tmp_path):
         record(ctx, result=bad_result)
     with pytest.raises(ValueError, match="Research plan commitment mismatch|family"):
         record(ctx, expected_family_digest="0"*64)
-    with pytest.raises(ValueError, match="fixture|data"):
+    with pytest.raises(ValueError, match="immutable synthetic family|fixture|data"):
         record(ctx, expected_data_digest="f"*64)
     assert read_synthetic_evidence(ctx[1])[0] == ()
 
