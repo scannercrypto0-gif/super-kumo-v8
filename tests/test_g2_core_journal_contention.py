@@ -148,13 +148,16 @@ def causal_background(root, mode, stop_path, ready_path, output, stop_event=None
     """One matched work implementation for thread/process; test-only IO quotas."""
     root = Path(root)
     path = root/'fixture.jsonl'
-    raw = path.read_bytes() if mode != 'cpu' else None
+    is_cpu = mode in ('cpu', 'cpu_bounded')
+    raw = path.read_bytes() if not is_cpu else None
     result = dict(pid=os.getpid(), thread=threading.get_ident(), completed=0,
-                  logical_read_bytes=0, write_bytes=0, fsync_calls=0, errors=[])
+                  logical_read_bytes=0, write_bytes=0, fsync_calls=0, errors=[],
+                  work_unit_wall_samples_s=[])
     clock = time.thread_time if hasattr(time, 'thread_time') else time.process_time
     cpu_start = clock()
+    process_cpu_start = time.process_time()
     started = time.monotonic()
-    if mode == 'cpu' and stop_event is None:
+    if is_cpu and stop_event is None:
         # Process control uses a pipe, not filesystem polling in CPU-only load.
         stop_event = threading.Event()
         def control():
@@ -162,12 +165,31 @@ def causal_background(root, mode, stop_path, ready_path, output, stop_event=None
             stop_event.set()
         threading.Thread(target=control, daemon=True).start()
     def stopping():
-        return stop_event.is_set() if mode == 'cpu' else Path(stop_path).exists()
+        return stop_event.is_set() if is_cpu else Path(stop_path).exists()
     Path(ready_path).touch()
     try:
         while not stopping() and time.monotonic()-started < 58:
             before = time.monotonic()
-            if mode == 'cpu':
+            if mode == 'cpu_bounded':
+                # B2 is a NEW 20%-nominal CPU profile, not saturated B1.
+                # One ~5ms busy-wall burst each25ms wall period, <=2000
+                # bursts. A Windows thread CPU clock can tick in ~15ms units;
+                # use perf_counter to bound work, CPU clock for aggregate telemetry.
+                # Scheduling/preemption can cause wall-period differences;
+                # observed CPU/wall and completed bursts are retained below.
+                if result['completed'] >= 2000:
+                    stop_event.wait(.01)
+                    continue
+                burst_start = time.perf_counter()
+                x = 1
+                while time.perf_counter()-burst_start < .005 and not stopping():
+                    for _ in range(256):
+                        x = (x*1664525+1013904223)&0xffffffff
+                result['work_unit_wall_samples_s'].append(time.monotonic()-before)
+                result['completed'] += 1
+                stop_event.wait(max(0,.025-(time.monotonic()-before)))
+                continue
+            elif mode == 'cpu':
                 x = 1
                 for _ in range(50000):
                     x = (x*1664525+1013904223)&0xffffffff
@@ -197,8 +219,9 @@ def causal_background(root, mode, stop_path, ready_path, output, stop_event=None
                             raise AssertionError('copy changed')
                         DurablePositionJournal(copy)
                         result['logical_read_bytes'] += 2*len(raw)
+            result['work_unit_wall_samples_s'].append(time.monotonic()-before)
             result['completed'] += 1
-            if mode != 'cpu':
+            if not is_cpu:
                 period = 2 if mode == 'throttled' else 1
                 while (not stopping()
                        and time.monotonic()-before < period
@@ -208,9 +231,17 @@ def causal_background(root, mode, stop_path, ready_path, output, stop_event=None
         result['errors'].append(repr(error))
     finally:
         result['cpu_s'] = clock()-cpu_start
+        result['whole_process_cpu_s'] = time.process_time()-process_cpu_start
+        result['cpu_clock'] = 'thread_time' if hasattr(time,'thread_time') else 'process_time'
         result['wall_s'] = time.monotonic()-started
-        result['offered_units'] = None if mode == 'cpu' else 20
-        result['unfinished_offered_units'] = None if mode == 'cpu' else 20-result['completed']
+        result['offered_units'] = (2000 if mode == 'cpu_bounded' else None) if is_cpu else 20
+        result['unfinished_offered_units'] = (2000-result['completed'] if mode == 'cpu_bounded' else None) if is_cpu else 20-result['completed']
+        result['profile'] = ('B2:5ms busy-wall/25ms wall, nominal20%, <=40bursts/s, <=2000bursts'
+                             if mode == 'cpu_bounded' else mode)
+        result['observed_cpu_wall_fraction'] = result['cpu_s']/result['wall_s']
+        result['active_work_wall_s'] = sum(result['work_unit_wall_samples_s'])
+        result['observed_busy_wall_fraction'] = result['active_work_wall_s']/result['wall_s']
+        result['completed_units_per_s'] = result['completed']/result['wall_s']
         Path(output).write_text(json.dumps(result)+'\n')
 
 
@@ -225,16 +256,22 @@ def causal_trial(root, mode, output):
     stop_path, ready_path = root/(token+'.stop'), root/(token+'.ready')
     bg_output = root/(token+'-background.json')
     commit_done, ack, queue_age, ingest_start, samples = {}, {}, {}, {}, []
+    observation_lock = threading.Lock()
+    peak_pending = 0
+    def backlog():
+        return len(commit_done.keys()-ack.keys())
     upsert, mark = store.upsert, journal.mark_persisted
     def observed_upsert(bar):
         key = bar.stable_key()
         entered = time.perf_counter()
-        if key in commit_done:
-            queue_age[key] = entered-commit_done[key]
+        with observation_lock:
+            if key in commit_done:
+                queue_age[key] = entered-commit_done[key]
         return upsert(bar)
     def observed_ack(key):
         mark(key)
-        ack[key] = time.perf_counter()
+        with observation_lock:
+            ack[key] = time.perf_counter()
     store.upsert, journal.mark_persisted = observed_upsert, observed_ack
     consumer = JournalConsumer(journal, store, 'BTCUSDT', '1m')
     consumer.start()
@@ -246,6 +283,7 @@ def causal_trial(root, mode, output):
                   python=sys.version.split()[0], rejected='NOT APPLICABLE: direct durable admission')
     keys = []
     def commit_one(i):
+        nonlocal peak_pending
         bar = MarketBar('BTCUSDT','1m',i*60000,(i+1)*60000-1,
                         100.,101.,99.,100.,1.,True,'synthetic-offline',(i+1)*60000)
         key = bar.stable_key()
@@ -253,7 +291,10 @@ def causal_trial(root, mode, output):
         result['accepted'] += 1
         if not journal.commit(bar):
             raise AssertionError('unexpected duplicate')
-        end = time.perf_counter(); commit_done[key] = end
+        end = time.perf_counter()
+        with observation_lock:
+            commit_done[key] = end
+            peak_pending = max(peak_pending,backlog())
         result['committed'] += 1
         return key, end-before
     try:
@@ -263,8 +304,9 @@ def causal_trial(root, mode, output):
             if time.monotonic()-started > 55:
                 raise TimeoutError('warmup/ACK bound')
             time.sleep(.001)
+        peak_pending = 0
         if mode != 'idle':
-            bg_mode = {'cpu_thread':'cpu','cpu_process':'cpu','copy':'copy',
+            bg_mode = {'cpu_thread':'cpu_bounded','cpu_process':'cpu_bounded','copy':'copy',
                        'replay':'replay','combined_thread':'combined',
                        'combined_process':'combined','throttled_process':'throttled'}[mode]
             args = (str(root), bg_mode, str(stop_path), str(ready_path), str(bg_output))
@@ -279,17 +321,22 @@ def causal_trial(root, mode, output):
                 if time.monotonic()-started > 55:
                     raise TimeoutError('background startup bound')
                 time.sleep(.001)
+        measured_start = time.perf_counter()
         for i in range(30,230):
             if time.monotonic()-started > 55:
                 raise TimeoutError('foreground trial bound')
             key, elapsed = commit_one(i)
             keys.append(key); samples.append(elapsed)
+        ingestion_end = time.perf_counter()
         while len(ack) < 230:
             if time.monotonic()-started > 55:
                 raise TimeoutError('consumer ACK bound')
             time.sleep(.001)
         result['status'] = 'COMPLETE'
     except Exception as error:
+        with observation_lock:
+            result['at_guard_observed_pending'] = backlog()
+            result['at_guard_observed_acked'] = len(ack)
         result['errors'].append(repr(error))
     finally:
         stop_path.touch()
@@ -322,6 +369,15 @@ def causal_trial(root, mode, output):
         result['ack_samples_ms'] = [s*1000 for s in ages]
         result['queue_samples_ms'] = [s*1000 for s in queues]
         result['queue_age_unobserved'] = len(keys)-len(queues)
+        result['peak_observed_pending'] = peak_pending
+        result.setdefault('at_guard_observed_pending','NOT APPLICABLE: no guard fired')
+        result.setdefault('at_guard_observed_acked','NOT APPLICABLE: no guard fired')
+        # Receipt-level backlog is sampled at commit/ACK RETURN boundaries,
+        # not kernel fsync completion or an unsampled DB peak.
+        result['backlog_provenance'] = 'commit RETURN minus ACK RETURN; measured phase peak'
+        if keys and 'measured_start' in locals():
+            result['commit_throughput_per_s'] = len(keys)/(ingestion_end-measured_start) if 'ingestion_end' in locals() else 'INCOMPLETE'
+            result['ack_throughput_per_s'] = len(ages)/(max(ack[k] for k in keys if k in ack)-measured_start) if ages else 'NOT MEASURED'
         result['replayed'] = len(journal.replay())
         result['pending'] = journal.count_by_state().get('LOCAL_COMMITTED',0)
         result['background'] = json.loads(bg_output.read_text()) if bg_output.exists() else ('NONE' if mode=='idle' else 'NOT MEASURED')
@@ -365,7 +421,10 @@ def causal_matrix():
                                   trials_per_load=3, trial_timeout_s=60,
                                   job_timeout_s=1500, background_write_cap=64*1024*1024,
                                   io_work_units=20, io_period_s=1, throttled_period_s=2,
-                                  sqlite='WAL/FULL', acknowledged_by='existing JournalConsumer')
+                                  sqlite='WAL/FULL', acknowledged_by='existing JournalConsumer',
+                                  cpu_profile='B2:5ms busy-wall/25ms wall, nominal20%, <=40bursts/s, <=2000bursts',
+                                  B1_retained_run=40278088682,
+                                  receipt_time='observed commit RETURN, not physical fsync timestamp')
         record(dict(kind='metadata',**{k:v for k,v in result.items() if k!='trials'}))
         modes=['cpu_thread','copy','replay','combined_thread','combined_process','cpu_process','throttled_process']
         try:
@@ -389,7 +448,7 @@ def causal_matrix():
                         trial=json.loads(child_output.read_text())
                         trial.update(repeat=repeat, paired_load=mode, label=label)
                         result['trials'].append(trial);record(dict(kind='trial',**trial))
-                        print('G2_CAUSAL_TRIAL '+json.dumps({k:trial[k] for k in ('label','status','commit','ack_age','queue_age','pending','errors')}),flush=True)
+                        print('G2_CAUSAL_TRIAL '+json.dumps({k:trial[k] for k in ('label','status','commit','ack_age','queue_age','pending','peak_observed_pending','errors')}),flush=True)
                         if trial['status']!='COMPLETE' or trial['pending'] or trial['replayed']!=230:
                             raise RuntimeError('incomplete trial: '+label)
                         if isinstance(trial['background'],dict) and trial['background']['errors']:

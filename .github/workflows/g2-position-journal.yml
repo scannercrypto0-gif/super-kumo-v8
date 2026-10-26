@@ -14,7 +14,7 @@ on:
         type: boolean
         default: false
       causal_matrix:
-        description: 'Owner6409357112: bounded seven-cell causal diagnostic ONLY'
+        description: 'Owner6409676314: B2 bounded-duty causal diagnostic ONLY; B1 retained'
         type: boolean
         default: false
 permissions:
