@@ -87,6 +87,7 @@ The first author run was 8 PASS/1.01s: those green fixtures did NOT establish D1
 | R3 | Public connection()/transaction() returned SQL access to private stages | Removed public contexts; separate reader-only facade; source/API introspection scope explicit. Final re-review required. |
 | R4 | Correctly hashed WITHHELD used B evidence for A and advanced S; invalid INIT/order accepted | Replay now checks genesis, source-seq/key/evidence bindings, stage identity and publication/ACK conflict ordering; forgery tests. Final re-review required. |
 | R5 | Restore after epoch1 and reopen using source-only anchor resurrected old fence after epoch2 | Exact separately retained progress checkpoint and source path required; old-snapshot fixture rejects. External current-anchor trust remains **NOT IMPLEMENTED**. |
+| R6 | Reopen with larger runtime Limits bypassed the frozen capacity | Actual runtime limits must equal the retained source configuration; new reopen drift test. Final exact-source re-review required. |
 
 ## Acceptance coverage and unexecuted work
 

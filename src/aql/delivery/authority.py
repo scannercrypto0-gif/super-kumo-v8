@@ -273,6 +273,8 @@ class Authority:
         meta = conn.execute("SELECT value FROM core128_meta WHERE singleton=1").fetchone()
         if meta is None or json.loads(meta[0]) != self.anchor:
             raise PublicationDenied("Authority source/anchor mismatch")
+        if self.limits.__dict__ != self.anchor["limits"]:
+            raise PublicationDenied("Runtime limits differ from frozen source configuration")
         if str(Path(self.journal.db_path).resolve()) != self.anchor["path"]:
             raise PublicationDenied("Copied source path requires separate reconciliation")
         if self.journal.instance_id != self.anchor["source"] or digest(_source(conn)) != self.anchor["inventory"]:

@@ -340,3 +340,12 @@ def test_T31_event_capacity_is_fail_closed_without_eviction(tmp_path):
     sid=a.stage('sandbox',e,1);receipt=a.publish('sandbox',e,1,sid)
     with pytest.raises(PublicationDenied,match='ledger full'): a.settle('sandbox',e,1,receipt=receipt)
     assert a.view('sandbox')==dict(D=[],W=[],V=[1],S=0)
+
+
+def test_R6_reopen_cannot_raise_frozen_capacity(tmp_path):
+    j=DurableJournal(str(tmp_path/'source.sqlite'));j.commit(bar())
+    a=Authority(j,limits=Limits(1,8192,2,32),synthetic=True)
+    e=a.fence('sandbox');a.stage('sandbox',e,1)
+    with pytest.raises(PublicationDenied,match='Runtime limits'):
+        Authority(DurableJournal(j.db_path),limits=Limits(32,8192,2,32),synthetic=True,
+                  anchor=a.anchor,checkpoint=a.checkpoint())
