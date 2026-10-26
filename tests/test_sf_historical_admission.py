@@ -148,7 +148,8 @@ def test_future_or_missing_cutoff_prevents_metadata_tier():
     bars, manifest, grant, expected = fixture(confirmed=True)
     report = preflight_dev(manifest, bars, boundary=grant,
                            expected_content_hash=expected, **UNIT)
-    assert report["tier"] == "RETROSPECTIVE_DEV"
+    assert report["tier"] == "BLOCKED"
+    assert report["blocked_reasons"] == ["PIT_METADATA_INVALID"]
     report = preflight_dev(manifest, bars, boundary=grant,
                            expected_content_hash=expected,
                            decision_cutoff_ms=grant.dev_end_ms, **UNIT)
@@ -162,3 +163,22 @@ def test_stable_replay_same_inputs():
     two = preflight_dev(manifest, bars, boundary=grant,
                         expected_content_hash=expected, **UNIT)
     assert one == two
+
+
+def test_mixed_availability_cannot_be_downgraded():
+    bars, _, _, _ = fixture()
+    bars = list(bars)
+    bars[0] = replace(bars[0], availability_kind=DataAvailabilityKind.CONFIRMED,
+                      ingest_time_ms=bars[0].bar_close + 1,
+                      observation_cutoff_ms=bars[0].bar_close + 1)
+    bars, manifest = validate_bars(bars, "BTCUSDT", "1m")
+    manifest = replace(manifest, dataset_id="synthetic-dev",
+                       exchange="fixture", market="spot")
+    grant = DevBoundary(manifest.dataset_id, manifest.version,
+                        bars[0].bar_open, bars[-1].bar_open,
+                        manifest.manifest_integrity_hash, "synthetic:dev-only")
+    expected = content_hash_v1(manifest, bars, **UNIT)
+    report = preflight_dev(manifest, bars, boundary=grant,
+                           expected_content_hash=expected, **UNIT)
+    assert report["tier"] == "BLOCKED"
+    assert report["blocked_reasons"] == ["AVAILABILITY_CLASS_MIXED"]
