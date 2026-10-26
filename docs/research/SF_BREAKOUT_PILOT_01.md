@@ -1,0 +1,15 @@
+# SF-BREAKOUT-PILOT-01 — synthetic integration proof (provisional)
+
+Owner authority: approved **one bounded Draft implementation PR with synthetic tests only** following SF-DEC-15/16/17/18/19. This deliverable is NOT a research candidate promotion or empirical historical backtest.
+
+**Scope:** 500 explicitly synthetic 15-minute OHLCV bars; BTCUSDT Spot label only (no market calls). Long-only, 1 BTC maximum, 100,000 USDT fixed independent starting capital per version, no leverage/reinvestment. BASE entry when completed close is strictly above the maximum high of the *20 previous complete bars* on rising crossing; exit when completed close is strictly below minimum low of 10 previous complete bars. SHADOW is a separate immutable version with an extra **required entry-only** candle volume >1.2 × prior-20-bar mean, no added exit veto. Missing SHADOW entry volume blocks only SHADOW; missing candle/grid data fails closed. One position per version.
+
+**Timing/costs:** For assumed retrospective closed candles with unverified receipt, L=Delta=15m and first candidate is index i+2, not same close/next immediate 15m open. The first missing eligible bar and sample-boundary candidate are UNRESOLVED; no invented price. Separate per-version event streams and two fixed cost reports: fee/slippage 10/5 bps and 20/10 bps *each side*, reusing the accepted #108 `account_long_prices` function. Opportunity selection uses one common stress-cost capital envelope, preventing cost-conditioned selection; terminal open position separately marked with hypothetical last close, not booked as a realized exit.
+
+**Provenance:** `PilotPlan` accepts precisely the immutable specification `SPEC`; its digest and the 500-bar fixture digest must be passed as expected independent commitments. The returned report is canonical-digested for reproducibility. Passing a digest computed from mutable inputs at runtime alone does **not prove an earlier independently retained freeze**. No posthoc parameter search or actual market evidence.
+
+**Acceptance:** One focused synthetic CI job plus eight test methods exercise deterministic replay/hash, independent close-only high/low reference checks and 15m conservative grid, SHADOW veto/independent state, missing volume, both-sided cost arithmetic, gap/numeric-plan/data guards, terminal open exposure and prefix-only causality. A successful CI result proves *this bounded simulated path only*, not a generic StrategyDefinition V1/AST engine, realtime feed or PAPER engine.
+
+**Known boundaries:** No actual fills, PIT/verified consumer receipt, true clock-latency binding, protective stop, OOS/holdout, PAPER virtual replenishment (SF-DEC-13), true regime gating (09/10), outcome significance (11), version mutation lifecycle (12), paper simultaneous running (14), Strategy Factory full production workflow or live mode. Real/active position management remains separately gated. No changes to old P0/EMA results, Core, G1, Scanner, Secretariat or realtime routes. #77/#120 stay OPEN/BLOCKED.
+
+No merge or any subsequent historical-real-data test is authorized by this PR; obtain owner permission first.
