@@ -96,6 +96,23 @@ def _evidence_rows(db):
                 or data.get("schema") != "sf-synthetic-evidence-1"
                 or data.get("status") != "SYNTHETIC_INTEGRATION_RESULT_NOT_RESEARCH_COMPLETE"):
             raise ValueError("Corrupt synthetic evidence")
+        required = {"schema", "status", "family_id", "family_digest",
+                    "pilot_plan_digest", "fixture_digest", "pilot_result_digest",
+                    "version_digests", "version_result_digests", "costs_digest",
+                    "attempt_checkpoint", "custody", "oos", "paper"}
+        if (set(data) != required or data["family_id"] != FAMILY
+                or data["custody"] != "NOT_INDEPENDENTLY_VERIFIED"
+                or data["oos"] != "NOT_OPENED" or data["paper"] != "NOT_STARTED"
+                or data["version_digests"] != {v: version_digest(v) for v in VERSIONS}
+                or type(data["version_result_digests"]) is not dict
+                or set(data["version_result_digests"]) != set(VERSIONS)
+                or data["costs_digest"] != digest(COSTS)):
+            raise ValueError("Invalid synthetic evidence fields or claims")
+        for field in ("family_digest", "pilot_plan_digest", "fixture_digest",
+                      "pilot_result_digest", "costs_digest"):
+            _digest(data[field])
+        for value in data["version_result_digests"].values():
+            _digest(value)
         if eid != _sha(b"AQL:SYNTHETIC-EVIDENCE:1\0" + canonical({
                 "family_id": data.get("family_id"),
                 "pilot_result_digest": data.get("pilot_result_digest")})):
@@ -215,6 +232,26 @@ def read_synthetic_evidence(ledger, *, expected_evidence_checkpoint=None):
         rows, head = _evidence_rows(db)
         if expected_evidence_checkpoint is not None and head != expected_evidence_checkpoint:
             raise ValueError("External synthetic evidence anchor mismatch/rollback")
+        frozen = db.execute("SELECT plan_digest,plan_bytes FROM frozen_plan_policy WHERE id=1").fetchone()
+        if rows and frozen is None:
+            raise ValueError("Synthetic evidence requires sealed frozen plan")
+        if rows:
+            sealed = verify_research_plan(bytes(frozen[1]), frozen[0])
+            if (sealed["family_id"] != FAMILY
+                    or sealed["candidates"] != [
+                        {"candidate_id": v, "strategy_digest": version_digest(v)}
+                        for v in VERSIONS]
+                    or sealed["split_digest"] != digest({
+                        "scope": "500_SYNTHETIC_BARS_ONLY", "oos": "NOT_OPENED"})
+                    or sealed["selection_rule"] != {"kind": "NO_SELECTION_SYNTHETIC_ONLY"}
+                    or sealed["cost_model"] != COSTS):
+                raise ValueError("Synthetic evidence frozen family mismatch")
+            for row in rows:
+                evidence = json.loads(bytes(row[2]))
+                if (evidence["family_digest"] != frozen[0]
+                        or evidence["pilot_plan_digest"] != sealed["protocol_digest"]
+                        or evidence["fixture_digest"] != sealed["dataset_digest"]):
+                    raise ValueError("Synthetic evidence and sealed plan mismatch")
         all_main_rows = db.execute("SELECT seq,chain_hash FROM receipts ORDER BY seq").fetchall()
         anchors = dict(all_main_rows)
         anchors[0] = ZERO
