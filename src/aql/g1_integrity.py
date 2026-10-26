@@ -128,6 +128,8 @@ def record_event(conn, original, incoming, *, kind="DUPLICATE_CONFLICT", reason=
     conn.execute("INSERT OR IGNORE INTO g1_integrity_events VALUES (?,?,?,?,?)",
                  (event_id, original.stable_key(), original.symbol, original.interval, canonical(evidence)))
     stored = conn.execute("SELECT evidence_json FROM g1_integrity_events WHERE event_id=?", (event_id,)).fetchone()
+    from .delivery.authority import conflict_in_transaction
+    conflict_in_transaction(conn, original.stable_key())
     return json.loads(stored[0])
 
 
@@ -186,6 +188,8 @@ class IntegrityAccess:
         return self._record_integrity_event(original,corrected,kind="CORRECTION_PROPOSAL",reason=reason)
 
     def _record_integrity_event(self, original, incoming, **kwargs):
+        from .delivery.authority import prepare_candidate
+        prepare_candidate(self,incoming,force=True)
         conn = self._connect()
         try:
             conn.execute("BEGIN IMMEDIATE")

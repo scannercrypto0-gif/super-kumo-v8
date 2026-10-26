@@ -129,6 +129,8 @@ class SandboxReplicator:
                                         (self.consumer_id,)).fetchone()[0]
         conn = self.journal._connect()
         try:
+            from ..delivery.authority import deny_legacy
+            deny_legacy(conn)
             maximum = conn.execute("SELECT COALESCE(MAX(id),0) FROM journal_entries").fetchone()[0]
             if cursor > maximum:
                 raise ValueError("Journal rollback behind delivery cursor")

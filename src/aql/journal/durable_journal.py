@@ -158,9 +158,17 @@ class DurableJournal(IntegrityAccess):
         bar.committed_at = now_ms
         bar.state = BarState.LOCAL_COMMITTED
         conn = self._connect()
+        from ..delivery.authority import enabled, prepare_candidate
+        if enabled(conn):
+            conn.close()
+            prepare_candidate(self,bar)
+            conn = self._connect()
         try:
             conn.execute("BEGIN IMMEDIATE")
             prior = self._original_bar(conn,bar.stable_key())
+            from ..delivery.authority import enabled, PublicationDenied
+            if prior is None and enabled(conn):
+                raise PublicationDenied("Finite v2 source is frozen; no legacy appends")
             if prior is not None and content(prior) != material:
                 evidence = record_event(conn,prior,bar)
                 conn.execute("COMMIT")  # conflict evidence survives raised error
@@ -210,6 +218,8 @@ class DurableJournal(IntegrityAccess):
         conn = self._connect()
         try:
             query = "SELECT * FROM journal_entries WHERE 1=1"
+            from ..delivery.authority import deny_legacy
+            deny_legacy(conn)
             params: list = []
             if symbol:
                 query += " AND symbol = ?"
@@ -265,6 +275,8 @@ class DurableJournal(IntegrityAccess):
         """Mark a journal entry as PERSISTED after successful operational storage write."""
         conn = self._connect()
         try:
+            from ..delivery.authority import deny_legacy
+            deny_legacy(conn)
             try:
                 conn.execute("BEGIN IMMEDIATE")
                 require_eligible_db(conn,stable_key)

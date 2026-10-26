@@ -1,0 +1,45 @@
+name: Core 128 D1 gate and legacy compatibility
+on:
+  pull_request:
+    branches: [fix/core-g1-integrity-58-59]
+    paths: ['src/aql/**', 'tests/test_core_arch_63_66.py', '.github/workflows/core-63-66.yml']
+permissions:
+  contents: read
+jobs:
+  gate:
+    name: Core128 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -e ".[dev]"
+      - name: Exact source
+        run: git rev-parse HEAD
+      - name: Independent-review acceptance gate (known R2 MUST stay red until fixed)
+        run: python -B -m pytest tests/test_core_arch_63_66.py -v --tb=short --junitxml=core128.xml
+      - name: Existing exact-head compatibility
+        if: always()
+        run: >-
+          python -B -m pytest tests/test_g1_integrity_58_59.py
+          tests/test_g1_storage_02.py tests/test_g1_storage_02_followup.py
+          tests/test_g1_wp01.py tests/test_g1_wp02.py tests/test_g1_wp03.py
+          tests/test_g1_wp04.py tests/test_g1_wp04_fix01.py tests/test_g1_completion.py
+          -v --tb=short --junitxml=legacy.xml
+        env:
+          BINANCE_LIVE_TEST: '0'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core128-${{ matrix.os }}
+          path: |
+            core128.xml
+            legacy.xml
