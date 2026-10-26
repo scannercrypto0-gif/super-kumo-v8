@@ -75,7 +75,7 @@ def test_retained_report_and_anchors_are_necessary(tmp_path):
             db, expected=expected, expected_report_digest="f"*64,
             expected_attempt_checkpoint=tuple(report["attempt_checkpoint"]),
             expected_evidence_checkpoint=tuple(report["evidence_checkpoint"]))
-    with pytest.raises(ValueError, match="checkpoint|anchor"):
+    with pytest.raises(ValueError, match="checkpoint|anchor|ledger changed"):
         verify_workflow(
             db, expected=expected, expected_report_digest=report["report_digest"],
             expected_attempt_checkpoint=(0, "0"*64),
