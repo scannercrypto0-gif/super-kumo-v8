@@ -1,0 +1,27 @@
+name: SF DEV historical admission focused
+
+on:
+  pull_request:
+    paths:
+      - 'research_wp_r0/sf_historical_admission.py'
+      - 'tests/test_sf_historical_admission.py'
+      - 'docs/research/SF_DEV_ADMISSION_23_25.md'
+      - '.github/workflows/sf-dev-admission.yml'
+  workflow_dispatch:
+
+jobs:
+  dev-only-preflight:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install focused test runner
+        run: python -m pip install pytest
+      - name: Focused isolated synthetic research tests
+        run: python -m pytest -q tests/test_sf_historical_admission.py
