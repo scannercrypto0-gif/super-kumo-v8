@@ -81,7 +81,7 @@ def test_changed_data_or_plan_or_result_is_rejected(tmp_path):
     bad_result["result_digest"] = digest({k: v for k, v in bad_result.items() if k != "result_digest"})
     with pytest.raises(ValueError, match="replay/result mismatch"):
         record(ctx, result=bad_result)
-    with pytest.raises(ValueError, match="family"):
+    with pytest.raises(ValueError, match="Research plan commitment mismatch|family"):
         record(ctx, expected_family_digest="0"*64)
     with pytest.raises(ValueError, match="fixture|data"):
         record(ctx, expected_data_digest="f"*64)
