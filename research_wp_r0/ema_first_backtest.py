@@ -21,6 +21,30 @@ class EmaDecision:
     signal: str
 
 
+def _validated_closes(records, interval_ms, *, allow_gaps=False):
+    closes = []
+    previous_open = None
+    for record in records:
+        if len(record) != 7:
+            raise ValueError("Expected canonical OHLCV")
+        opening, closing = record[:2]
+        if (type(opening) is not int or type(closing) is not int or
+            closing != opening + interval_ms - 1 or opening % interval_ms or
+            (previous_open is not None and (opening <= previous_open or
+                (opening - previous_open) % interval_ms or
+                (not allow_gaps and opening != previous_open + interval_ms)))):
+            raise ValueError("Noncontiguous or invalid candle grid")
+        values = [float(v) for v in record[2:]]
+        op, high, low, close, volume = values
+        if (not all(math.isfinite(v) for v in values) or
+            min(op, high, low, close) <= 0 or volume < 0 or
+            high < max(op, low, close) or low > min(op, close)):
+            raise ValueError("Invalid OHLCV")
+        closes.append(close)
+        previous_open = opening
+    return closes
+
+
 def ema_crossover_decisions(bars, *, fast=8, slow=21, interval_ms=60000):
     """Return causal decisions after slow+1 closed candles.
 
@@ -33,24 +57,7 @@ def ema_crossover_decisions(bars, *, fast=8, slow=21, interval_ms=60000):
     records = tuple(bars)
     if len(records) < slow + 1:
         raise ValueError("Insufficient EMA warmup; do not fabricate signals")
-    closes = []
-    previous_open = None
-    for record in records:
-        if len(record) != 7:
-            raise ValueError("Expected canonical OHLCV")
-        opening, closing = record[:2]
-        if (type(opening) is not int or type(closing) is not int or
-            closing != opening + interval_ms - 1 or opening % interval_ms or
-            (previous_open is not None and opening != previous_open + interval_ms)):
-            raise ValueError("Noncontiguous or invalid candle grid")
-        values = [float(v) for v in record[2:]]
-        op, high, low, close, volume = values
-        if (not all(math.isfinite(v) for v in values) or
-            min(op, high, low, close) <= 0 or volume < 0 or
-            high < max(op, low, close) or low > min(op, close)):
-            raise ValueError("Invalid OHLCV")
-        closes.append(close)
-        previous_open = opening
+    closes = _validated_closes(records, interval_ms)
     fast_values = [None] * (fast - 1) + _ema(closes, fast)
     slow_values = [None] * (slow - 1) + _ema(closes, slow)
     output = []

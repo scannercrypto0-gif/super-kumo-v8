@@ -3,6 +3,8 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'research_wp_r0/research_guards.py'
+      - 'tests/test_sf_research_guards.py'
       - 'research_wp_r0/synthetic_execution.py'
       - 'tests/test_sf_p0_recovery.py'
       - 'scripts/sf_ema_development.py'
@@ -48,6 +50,12 @@ jobs:
         run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('sf-offline-boundary.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==31; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
       - name: Require 41 P0 and accepted execution cases without skips
         run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('sf-p0-recovery.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==41; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
+      - name: Versioned research guards (synthetic only)
+        run: python -B -m pytest -p no:cacheprovider tests/test_sf_research_guards.py -v --tb=short --junitxml=sf-research-guards.xml
+      - name: Require 24 guard cases without skips
+        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('sf-research-guards.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==24; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
+      - name: Guard dependencies
+        run: python -B research_wp_r0/_dep_guard.py research_wp_r0/research_guards.py research_wp_r0/ema_development_replay.py research_wp_r0/ema_first_backtest.py
       - name: Source and environment identity
         run: |
           git rev-parse HEAD
@@ -60,3 +68,4 @@ jobs:
           path: |
             sf-offline-boundary.xml
             sf-p0-recovery.xml
+            sf-research-guards.xml
