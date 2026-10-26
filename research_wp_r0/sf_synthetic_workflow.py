@@ -206,6 +206,37 @@ def report_json(report):
     """Canonical machine-readable bytes. No claim of trusted prior publication."""
     if type(report) is not dict or report.get("schema") != "sf-synthetic-workflow-report-1":
         raise ValueError("Validated synthetic workflow report required")
+    allowed = {"schema", "status", "source", "plan_kind", "frozen",
+               "family_id", "attempt_states", "attempt_checkpoint",
+               "evidence_checkpoint", "pilot_result_digest",
+               "cost_assumptions", "versions", "selection", "promotion",
+               "independent_custody", "oos", "paper", "actual_fills",
+               "warnings", "report_digest"}
+    if (set(report) != allowed
+            or report["status"] != "SYNTHETIC_INTEGRATION_ONLY_NOT_RESEARCH_COMPLETE"
+            or report["source"] != "SYNTHETIC_500_BARS"
+            or report["plan_kind"] != "PilotPlan_NOT_StrategyDefinition"
+            or report["family_id"] != FAMILY
+            or report["attempt_states"] != {v: "PENDING" for v in VERSIONS}
+            or report["cost_assumptions"] != COSTS
+            or report["selection"] != "NONE" or report["promotion"] != "NONE"
+            or report["independent_custody"] != "NOT_VERIFIED"
+            or report["oos"] != "NOT_OPENED" or report["paper"] != "NOT_STARTED"
+            or report["actual_fills"] != "NOT_OBSERVED"
+            or type(report["versions"]) is not dict
+            or set(report["versions"]) != set(VERSIONS)
+            or type(report["warnings"]) is not list
+            or not report["warnings"]):
+        raise ValueError("Invalid synthetic-only report claims")
+    _verify_frozen(report["frozen"])
+    for name in VERSIONS:
+        details = report["versions"][name]
+        if (type(details) is not dict
+                or details.get("version_id") != "BREAKOUT_20_10_" + name + "_v1"
+                or details.get("strategy_digest") != version_digest(name)
+                or type(details.get("accounting")) is not dict
+                or set(details["accounting"]) != set(COSTS)):
+            raise ValueError("Invalid synthetic-only version report")
     if digest({k: v for k, v in report.items() if k != "report_digest"}) != report.get("report_digest"):
         raise ValueError("Report digest mismatch")
     return canonical(report)
