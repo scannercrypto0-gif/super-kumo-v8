@@ -156,7 +156,9 @@ def causal_background(root, mode, stop_path, ready_path, output, stop_event=None
     clock = time.thread_time if hasattr(time, 'thread_time') else time.process_time
     cpu_start = clock()
     process_cpu_start = time.process_time()
-    started = time.monotonic()
+    # perf_counter is high resolution on Windows; monotonic on Python3.11
+    # may quantize5ms work bursts/25ms periods to15.6ms ticks.
+    started = time.perf_counter()
     if is_cpu and stop_event is None:
         # Process control uses a pipe, not filesystem polling in CPU-only load.
         stop_event = threading.Event()
@@ -168,8 +170,8 @@ def causal_background(root, mode, stop_path, ready_path, output, stop_event=None
         return stop_event.is_set() if is_cpu else Path(stop_path).exists()
     Path(ready_path).touch()
     try:
-        while not stopping() and time.monotonic()-started < 58:
-            before = time.monotonic()
+        while not stopping() and time.perf_counter()-started < 58:
+            before = time.perf_counter()
             if mode == 'cpu_bounded':
                 # B2 is a NEW 20%-nominal CPU profile, not saturated B1.
                 # One ~5ms busy-wall burst each25ms wall period, <=2000
@@ -185,9 +187,9 @@ def causal_background(root, mode, stop_path, ready_path, output, stop_event=None
                 while time.perf_counter()-burst_start < .005 and not stopping():
                     for _ in range(256):
                         x = (x*1664525+1013904223)&0xffffffff
-                result['work_unit_wall_samples_s'].append(time.monotonic()-before)
+                result['work_unit_wall_samples_s'].append(time.perf_counter()-before)
                 result['completed'] += 1
-                stop_event.wait(max(0,.025-(time.monotonic()-before)))
+                stop_event.wait(max(0,.025-(time.perf_counter()-before)))
                 continue
             elif mode == 'cpu':
                 x = 1
@@ -219,13 +221,13 @@ def causal_background(root, mode, stop_path, ready_path, output, stop_event=None
                             raise AssertionError('copy changed')
                         DurablePositionJournal(copy)
                         result['logical_read_bytes'] += 2*len(raw)
-            result['work_unit_wall_samples_s'].append(time.monotonic()-before)
+            result['work_unit_wall_samples_s'].append(time.perf_counter()-before)
             result['completed'] += 1
             if not is_cpu:
                 period = 2 if mode == 'throttled' else 1
                 while (not stopping()
-                       and time.monotonic()-before < period
-                       and time.monotonic()-started < 58):
+                       and time.perf_counter()-before < period
+                       and time.perf_counter()-started < 58):
                     time.sleep(.005)
     except Exception as error:
         result['errors'].append(repr(error))
@@ -233,7 +235,7 @@ def causal_background(root, mode, stop_path, ready_path, output, stop_event=None
         result['cpu_s'] = clock()-cpu_start
         result['whole_process_cpu_s'] = time.process_time()-process_cpu_start
         result['cpu_clock'] = 'thread_time' if hasattr(time,'thread_time') else 'process_time'
-        result['wall_s'] = time.monotonic()-started
+        result['wall_s'] = time.perf_counter()-started
         result['offered_units'] = (2000 if mode == 'cpu_bounded' else None) if is_cpu else 20
         result['unfinished_offered_units'] = (2000-result['completed'] if mode == 'cpu_bounded' else None) if is_cpu else 20-result['completed']
         result['profile'] = ('B2:5ms busy-wall/25ms wall, nominal20%, <=40bursts/s, <=2000bursts'
