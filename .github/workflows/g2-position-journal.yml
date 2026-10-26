@@ -17,6 +17,10 @@ on:
         description: 'Owner6409676314: B2 bounded-duty causal diagnostic ONLY; B1 retained'
         type: boolean
         default: false
+      matched_work:
+        description: 'Owner6409973168: fixed-work/common-window E/F/G only'
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -30,7 +34,7 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     steps:
       - name: Capture causal job budget start
-        if: github.event_name == 'workflow_dispatch' && inputs.causal_matrix
+        if: github.event_name == 'workflow_dispatch' && (inputs.causal_matrix || inputs.matched_work)
         shell: bash
         run: echo "AQL_G2_JOB_START=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
@@ -46,14 +50,14 @@ jobs:
           git rev-parse 'HEAD^{tree}' | tee -a g2-source.txt
           python --version | tee -a g2-source.txt
       - name: Focused regression (two manual diagnostics intentionally skipped)
-        if: github.event_name != 'workflow_dispatch' || (!inputs.benchmark && !inputs.causal_matrix)
+        if: github.event_name != 'workflow_dispatch' || (!inputs.benchmark && !inputs.causal_matrix && !inputs.matched_work)
         shell: bash
         run: |
           set -o pipefail
           python -B -m unittest discover -s tests -p "test_g2_*journal*.py" -v 2>&1 | tee g2-journal-tests.txt
           python -B -m unittest discover -s tests -p "test_g2_position_lifecycle.py" -v 2>&1 | tee g2-lifecycle-tests.txt
       - name: Manual bounded diagnostics (both platforms)
-        if: github.event_name == 'workflow_dispatch' && inputs.benchmark && !inputs.causal_matrix
+        if: github.event_name == 'workflow_dispatch' && inputs.benchmark && !inputs.causal_matrix && !inputs.matched_work
         env:
           AQL_G2_BENCHMARK: '1'
           AQL_G2_BENCHMARK_OUTPUT: g2-replay.json
@@ -65,13 +69,21 @@ jobs:
           python -B -m unittest discover -s tests -p "test_g2_journal_replay_benchmark.py" -v 2>&1 | tee g2-replay.txt
           python -B -m unittest discover -s tests -p "test_g2_core_journal_contention.py" -v 2>&1 | tee g2-contention.txt
       - name: Owner-authorized bounded causal matrix only
-        if: github.event_name == 'workflow_dispatch' && inputs.causal_matrix
+        if: github.event_name == 'workflow_dispatch' && inputs.causal_matrix && !inputs.matched_work
         env:
           AQL_G2_MATRIX_OUTPUT: g2-causal-matrix.jsonl
         shell: bash
         run: |
           set -o pipefail
           python -B tests/test_g2_core_journal_contention.py --causal-matrix 2>&1 | tee g2-causal-matrix.txt
+      - name: Matched work and common window comparison only
+        if: github.event_name == 'workflow_dispatch' && inputs.matched_work
+        env:
+          AQL_G2_MATRIX_OUTPUT: g2-matched-matrix.jsonl
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B tests/test_g2_core_journal_contention.py --matched-matrix 2>&1 | tee g2-matched-matrix.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -85,5 +97,7 @@ jobs:
             g2-contention-cpu.json
             g2-causal-matrix.jsonl
             g2-causal-matrix.txt
+            g2-matched-matrix.jsonl
+            g2-matched-matrix.txt
             g2-replay.txt
             g2-contention.txt

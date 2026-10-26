@@ -144,7 +144,8 @@ class CoreJournalContentionDiagnostic(unittest.TestCase):
                 Path(os.environ['AQL_G2_CONTENTION_OUTPUT']).write_text(json.dumps(result,indent=2)+'\n')
 
 
-def causal_background(root, mode, stop_path, ready_path, output, stop_event=None):
+def causal_background(root, mode, stop_path, ready_path, output, stop_event=None,
+                      schedule_path=None):
     """One matched work implementation for thread/process; test-only IO quotas."""
     root = Path(root)
     path = root/'fixture.jsonl'
@@ -152,7 +153,7 @@ def causal_background(root, mode, stop_path, ready_path, output, stop_event=None
     raw = path.read_bytes() if not is_cpu else None
     result = dict(pid=os.getpid(), thread=threading.get_ident(), completed=0,
                   logical_read_bytes=0, write_bytes=0, fsync_calls=0, errors=[],
-                  work_unit_wall_samples_s=[])
+                  work_unit_wall_samples_s=[], unit_schedule=[])
     clock = time.thread_time if hasattr(time, 'thread_time') else time.process_time
     cpu_start = clock()
     process_cpu_start = time.process_time()
@@ -170,8 +171,32 @@ def causal_background(root, mode, stop_path, ready_path, output, stop_event=None
         return stop_event.is_set() if is_cpu else Path(stop_path).exists()
     Path(ready_path).touch()
     try:
+        schedule = None
+        if schedule_path:
+            while not Path(schedule_path).exists():
+                if stopping() or time.perf_counter()-started > 50:
+                    raise TimeoutError('matched start barrier missing')
+                time.sleep(.001)
+            schedule = json.loads(Path(schedule_path).read_text())
+            while time.perf_counter_ns() < schedule['start_ns']:
+                time.sleep(.001)
+            started = schedule['start_ns']/1e9
+            cpu_start, process_cpu_start = clock(),time.process_time()
         while not stopping() and time.perf_counter()-started < 58:
+            if schedule:
+                if result['completed'] == schedule['units']:
+                    # Completion is NOT permission to end the common window.
+                    while time.perf_counter_ns() < schedule['end_ns'] and not stopping():
+                        time.sleep(.001)
+                    break
+                target = schedule['start_ns'] + int(result['completed']*schedule['period_s']*1e9)
+                while time.perf_counter_ns() < target and not stopping():
+                    time.sleep(.001)
+                if time.perf_counter_ns() >= schedule['end_ns']:
+                    raise TimeoutError('matched unit cannot fit observation window')
             before = time.perf_counter()
+            if schedule:
+                unit_start_ns = time.perf_counter_ns()
             if mode == 'cpu_bounded':
                 # B2 is a NEW 20%-nominal CPU profile, not saturated B1.
                 # One ~5ms busy-wall burst each25ms wall period, <=2000
@@ -217,13 +242,23 @@ def causal_background(root, mode, stop_path, ready_path, output, stop_event=None
                     result['write_bytes'] += len(raw)
                     result['fsync_calls'] += 1
                     if mode in ('combined', 'throttled'):
-                        if hashlib.sha256(copy.read_bytes()).digest() != hashlib.sha256(raw).digest():
+                        copy_hash = hashlib.sha256(copy.read_bytes()).hexdigest()
+                        if copy_hash != hashlib.sha256(raw).hexdigest():
                             raise AssertionError('copy changed')
                         DurablePositionJournal(copy)
+                        result['copy_sha256'] = copy_hash
                         result['logical_read_bytes'] += 2*len(raw)
             result['work_unit_wall_samples_s'].append(time.perf_counter()-before)
+            if schedule:
+                unit_end_ns = time.perf_counter_ns()
+                result['unit_schedule'].append(dict(
+                    scheduled_offset_s=(target-schedule['start_ns'])/1e9,
+                    start_offset_s=(unit_start_ns-schedule['start_ns'])/1e9,
+                    end_offset_s=(unit_end_ns-schedule['start_ns'])/1e9))
+                if unit_end_ns > schedule['end_ns']:
+                    raise TimeoutError('matched unit exceeded common window')
             result['completed'] += 1
-            if not is_cpu:
+            if not is_cpu and not schedule:
                 period = 2 if mode == 'throttled' else 1
                 while (not stopping()
                        and time.perf_counter()-before < period
@@ -237,7 +272,13 @@ def causal_background(root, mode, stop_path, ready_path, output, stop_event=None
         result['cpu_clock'] = 'thread_time' if hasattr(time,'thread_time') else 'process_time'
         result['wall_s'] = time.perf_counter()-started
         result['offered_units'] = (2000 if mode == 'cpu_bounded' else None) if is_cpu else 20
-        result['unfinished_offered_units'] = (2000-result['completed'] if mode == 'cpu_bounded' else None) if is_cpu else 20-result['completed']
+        if schedule_path and 'schedule' in locals() and schedule:
+            result['offered_units'] = schedule['units']
+            result['common_window'] = schedule
+            if result['completed'] != schedule['units']:
+                result['errors'].append('fixed offered units not completed')
+        result['unfinished_offered_units'] = (result['offered_units']-result['completed']
+                                             if result['offered_units'] is not None else None)
         result['profile'] = ('B2:5ms busy-wall/25ms wall, nominal20%, <=40bursts/s, <=2000bursts'
                              if mode == 'cpu_bounded' else mode)
         result['observed_cpu_wall_fraction'] = result['cpu_s']/result['wall_s']
@@ -247,7 +288,7 @@ def causal_background(root, mode, stop_path, ready_path, output, stop_event=None
         Path(output).write_text(json.dumps(result)+'\n')
 
 
-def causal_trial(root, mode, output):
+def causal_trial(root, mode, output, fixed_window=False):
     """230 real G1 commits plus an independent existing JournalConsumer."""
     from aql.lanes import JournalConsumer
     from aql.storage.operational_store import OperationalStore
@@ -257,6 +298,7 @@ def causal_trial(root, mode, output):
     store = OperationalStore(str(root/(token+'-store.sqlite')))
     stop_path, ready_path = root/(token+'.stop'), root/(token+'.ready')
     bg_output = root/(token+'-background.json')
+    schedule_path = root/(token+'-start.json')
     commit_done, ack, queue_age, ingest_start, samples = {}, {}, {}, {}, []
     observation_lock = threading.Lock()
     peak_pending = 0
@@ -284,6 +326,7 @@ def causal_trial(root, mode, output):
                   errors=[], pid=os.getpid(), sqlite_version=__import__('sqlite3').sqlite_version,
                   python=sys.version.split()[0], rejected='NOT APPLICABLE: direct durable admission')
     keys = []
+    offer_lateness_ms = []
     def commit_one(i):
         nonlocal peak_pending
         bar = MarketBar('BTCUSDT','1m',i*60000,(i+1)*60000-1,
@@ -313,27 +356,55 @@ def causal_trial(root, mode, output):
                        'combined_process':'combined','throttled_process':'throttled'}[mode]
             args = (str(root), bg_mode, str(stop_path), str(ready_path), str(bg_output))
             if mode.endswith('process'):
-                bg = subprocess.Popen([sys.executable,'-B',__file__,'--causal-background',*args],
+                command = [sys.executable,'-B',__file__,
+                           '--matched-background' if fixed_window else '--causal-background',*args]
+                if fixed_window:
+                    command.append(str(schedule_path))
+                bg = subprocess.Popen(command,
                                       stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             else:
                 bg = threading.Thread(target=causal_background, args=args,
-                                      kwargs={'stop_event':bg_stop}, daemon=True)
+                                      kwargs={'stop_event':bg_stop,
+                                              'schedule_path':schedule_path if fixed_window else None}, daemon=True)
                 bg.start()
             while not ready_path.exists():
                 if time.monotonic()-started > 55:
                     raise TimeoutError('background startup bound')
                 time.sleep(.001)
-        measured_start = time.perf_counter()
+        if fixed_window:
+            if 55-(time.monotonic()-started) < 10.25:
+                raise TimeoutError('cannot fit common window in active budget')
+            start_ns = time.perf_counter_ns()+250_000_000
+            window = dict(start_ns=start_ns, end_ns=start_ns+10_000_000_000,
+                          units=4, period_s=2 if mode=='throttled_process' else 1)
+            # Atomic barrier publication, outside the measured observation window.
+            temporary = schedule_path.with_suffix('.partial')
+            temporary.write_text(json.dumps(window))
+            os.replace(temporary,schedule_path)
+            while time.perf_counter_ns() < start_ns:
+                time.sleep(.001)
+            result['common_window'] = window
+        measured_start = start_ns/1e9 if fixed_window else time.perf_counter()
         for i in range(30,230):
             if time.monotonic()-started > 55:
                 raise TimeoutError('foreground trial bound')
+            if fixed_window:
+                offered_ns = start_ns+(i-30)*40_000_000
+                while time.perf_counter_ns() < offered_ns:
+                    time.sleep(.001)
+                offer_lateness_ms.append((time.perf_counter_ns()-offered_ns)/1e6)
             key, elapsed = commit_one(i)
             keys.append(key); samples.append(elapsed)
         ingestion_end = time.perf_counter()
         while len(ack) < 230:
-            if time.monotonic()-started > 55:
+            if (time.monotonic()-started > 55
+                    or (fixed_window and time.perf_counter_ns() >= window['end_ns'])):
                 raise TimeoutError('consumer ACK bound')
             time.sleep(.001)
+        if fixed_window:
+            while time.perf_counter_ns() < window['end_ns']:
+                time.sleep(.001)
+            result['observation_end_ns'] = time.perf_counter_ns()
         result['status'] = 'COMPLETE'
     except Exception as error:
         with observation_lock:
@@ -370,6 +441,7 @@ def causal_trial(root, mode, output):
         result['queue_age'] = summarize(queues)
         result['ack_samples_ms'] = [s*1000 for s in ages]
         result['queue_samples_ms'] = [s*1000 for s in queues]
+        result['offer_lateness_ms'] = offer_lateness_ms
         result['queue_age_unobserved'] = len(keys)-len(queues)
         result['peak_observed_pending'] = peak_pending
         result.setdefault('at_guard_observed_pending','NOT APPLICABLE: no guard fired')
@@ -389,7 +461,7 @@ def causal_trial(root, mode, output):
         Path(output).write_text(json.dumps(result)+'\n')
 
 
-def causal_matrix():
+def causal_matrix(matched=False):
     """Owner6409357112; opt-in only, capped globally and per child process."""
     import platform
     import sqlite3
@@ -427,9 +499,17 @@ def causal_matrix():
                                   cpu_profile='B2:5ms busy-wall/25ms wall, nominal20%, <=40bursts/s, <=2000bursts',
                                   B1_retained_run=40278088682,
                                   receipt_time='observed commit RETURN, not physical fsync timestamp')
+        if matched:
+            result['schema'] = 'aql.g2-matched.v1'
+            result['settings'].update(observation_window_s=10, foreground_period_s=.04,
+                                      io_work_units=4, start_barrier_lead_s=.25,
+                                      purpose='fixed-work E/F; G is a different offered rate')
+            result['settings'].pop('cpu_profile')
         record(dict(kind='metadata',**{k:v for k,v in result.items() if k!='trials'}))
-        modes=['cpu_thread','copy','replay','combined_thread','combined_process','cpu_process','throttled_process']
+        modes=(['combined_thread','combined_process','throttled_process'] if matched else
+               ['cpu_thread','copy','replay','combined_thread','combined_process','cpu_process','throttled_process'])
         try:
+            verified_repeats = set()
             for repeat in range(3):
                 # Rotate order while retaining an immediate baseline for each load.
                 order=modes[repeat:]+modes[:repeat]
@@ -441,7 +521,9 @@ def causal_matrix():
                         label=f'{repeat}-{mode}-{condition}'
                         child_output=root/(label+'.json')
                         try:
-                            child=subprocess.run([sys.executable,'-B',__file__,'--causal-trial',d,condition,str(child_output)],
+                            child=subprocess.run([sys.executable,'-B',__file__,
+                                                  '--matched-trial' if matched else '--causal-trial',
+                                                  d,condition,str(child_output)],
                                                  capture_output=True,text=True,timeout=60)
                         except subprocess.TimeoutExpired as error:
                             raise TimeoutError('trial hard60s bound: '+label) from error
@@ -455,6 +537,27 @@ def causal_matrix():
                             raise RuntimeError('incomplete trial: '+label)
                         if isinstance(trial['background'],dict) and trial['background']['errors']:
                             raise RuntimeError('background errors: '+label)
+                        if matched and condition != 'idle':
+                            b = trial['background']
+                            if (b['completed']!=4 or b['offered_units']!=4
+                                    or b['write_bytes']!=4*path.stat().st_size
+                                    or b['logical_read_bytes']!=12*path.stat().st_size
+                                    or b['fsync_calls']!=4 or b['copy_sha256']!=expected
+                                    or b['unfinished_offered_units']!=0):
+                                raise RuntimeError('INCONCLUSIVE: unmatched completed work '+label)
+                            pair = {t['mode']:t for t in result['trials'] if t['repeat']==repeat}
+                            if ('combined_thread' in pair and 'combined_process' in pair
+                                    and repeat not in verified_repeats):
+                                e,f = pair['combined_thread']['background'],pair['combined_process']['background']
+                                fields=['completed','offered_units','write_bytes','logical_read_bytes','fsync_calls','copy_sha256']
+                                equivalent = all(e[k]==f[k] for k in fields)
+                                equivalent &= e['common_window']['period_s']==f['common_window']['period_s']==1
+                                record(dict(kind='matched_equivalence',repeat=repeat,
+                                            status='VERIFIED' if equivalent else 'INCONCLUSIVE',
+                                            fields={k:e[k] for k in fields}))
+                                if not equivalent:
+                                    raise RuntimeError('INCONCLUSIVE: E/F work equivalence')
+                                verified_repeats.add(repeat)
             if hashlib.sha256(path.read_bytes()).hexdigest()!=expected:
                 raise AssertionError('fixture mutated')
             result['status']='COMPLETE'
@@ -468,7 +571,13 @@ def causal_matrix():
 
 
 if __name__=='__main__':
-    if '--causal-background' in sys.argv:
+    if '--matched-background' in sys.argv:
+        causal_background(*sys.argv[2:7],schedule_path=sys.argv[7])
+    elif '--matched-trial' in sys.argv:
+        causal_trial(*sys.argv[2:],fixed_window=True)
+    elif '--matched-matrix' in sys.argv:
+        raise SystemExit(causal_matrix(matched=True))
+    elif '--causal-background' in sys.argv:
         causal_background(*sys.argv[2:])
     elif '--causal-trial' in sys.argv:
         causal_trial(*sys.argv[2:])
