@@ -17,7 +17,8 @@ UNIT = dict(price_unit="USDT", volume_unit="BTC", session="24X7",
 
 
 def fixture(*, confirmed=False):
-    bars = [make_test_bar(i) for i in range(4)]
+    bars = [make_test_bar(i, availability_kind=DataAvailabilityKind.RETROSPECTIVE)
+            for i in range(4)]
     if confirmed:
         bars = [replace(b, availability_kind=DataAvailabilityKind.CONFIRMED,
                         ingest_time_ms=b.bar_close + 1,
@@ -151,6 +152,9 @@ def test_future_or_missing_cutoff_prevents_metadata_tier():
 
 
 def test_stable_replay_same_inputs():
-    one = execute()
-    two = execute()
+    bars, manifest, grant, expected = fixture()
+    one = preflight_dev(manifest, bars, boundary=grant,
+                        expected_content_hash=expected, **UNIT)
+    two = preflight_dev(manifest, bars, boundary=grant,
+                        expected_content_hash=expected, **UNIT)
     assert one == two
