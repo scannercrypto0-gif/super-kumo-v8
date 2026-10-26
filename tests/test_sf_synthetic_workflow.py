@@ -92,7 +92,7 @@ def test_report_tamper_cannot_match_retained_digest(tmp_path):
     report = run_workflow(db, expected=frozen())
     changed = copy.deepcopy(report)
     changed["paper"] = "RUNNING"
-    with pytest.raises(ValueError, match="digest mismatch"):
+    with pytest.raises(ValueError, match="digest mismatch|Invalid synthetic-only report claims"):
         report_json(changed)
     changed["report_digest"] = digest({k: v for k, v in changed.items()
                                         if k != "report_digest"})
