@@ -33,7 +33,7 @@ and `state=INPUTS_ONLY_NOT_EVALUATED`. Three contemplated proof tiers are:
   historical arrival unknown. Only eligibility for later separately authorized
   exploratory DEV; it is not a proof of source receipt or OOS readiness.
 * `PIT_METADATA_VALID`: internally consistent locally marked CONFIRMED
-  receipt/cutoff data, **not externally authenticated PIT**.
+  receipt/cutoff data, **not externally authenticated PIT**. Missing or invalid\n  decision cutoff in CONFIRMED-labelled data is BLOCKED, not silently\n  reclassified as retrospective. Mixed RETROSPECTIVE/CONFIRMED bars are BLOCKED.
 * `CONFIRMED_PIT_VERIFIED`: **never emitted by this version**. External
   verified producer delivery, independent anchor and custody are missing;
   a subsequent architecture decision and separate approval are required.
