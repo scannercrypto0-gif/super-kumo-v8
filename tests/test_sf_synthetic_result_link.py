@@ -1,5 +1,7 @@
 """SF-LEDGER-LINK-01: bounded synthetic evidence/Factory-ledger integration."""
 import copy
+import hashlib
+import json
 import sqlite3
 
 import pytest
@@ -10,7 +12,7 @@ from research_wp_r0.sf_breakout_pilot import PilotPlan, SPEC, synthetic_fixture,
 from research_wp_r0.sf_synthetic_result_link import (
     FAMILY, VERSIONS, frozen_pilot_family, version_digest,
     read_synthetic_evidence, record_synthetic_result)
-from research_wp_r0.strategy_definition import digest
+from research_wp_r0.strategy_definition import digest, canonical
 
 
 def prepared(tmp_path):
@@ -126,3 +128,34 @@ def test_reject_malformed_synthetic_lifecycle_payload(tmp_path):
         with pytest.raises(ValueError, match="only|fills"):
             record(ctx, result=bad)
     assert read_synthetic_evidence(ctx[1])[0] == ()
+
+
+def test_replay_rejects_self_consistent_but_false_paper_claim(tmp_path):
+    """A recalculated local chain cannot turn a synthetic receipt into PAPER."""
+    ctx = prepared(tmp_path)
+    record(ctx)
+    with sqlite3.connect(ctx[0]) as conn:
+        raw = conn.execute("SELECT payload FROM synthetic_result_evidence WHERE seq=1").fetchone()[0]
+        changed = json.loads(raw)
+        changed["paper"] = "RUNNING"
+        replacement = canonical(changed)
+        locally_rehashed = hashlib.sha256(bytes.fromhex("0"*64) + replacement).hexdigest()
+        conn.execute("UPDATE synthetic_result_evidence SET payload=?,chain_hash=? WHERE seq=1",
+                     (replacement, locally_rehashed))
+    with pytest.raises(ValueError, match="Invalid synthetic evidence fields"):
+        read_synthetic_evidence(ctx[1])
+
+
+def test_replay_rejects_corrupted_frozen_family_link(tmp_path):
+    ctx = prepared(tmp_path)
+    record(ctx)
+    with sqlite3.connect(ctx[0]) as conn:
+        raw = conn.execute("SELECT payload FROM synthetic_result_evidence WHERE seq=1").fetchone()[0]
+        changed = json.loads(raw)
+        changed["family_digest"] = "f" * 64
+        replacement = canonical(changed)
+        locally_rehashed = hashlib.sha256(bytes.fromhex("0"*64) + replacement).hexdigest()
+        conn.execute("UPDATE synthetic_result_evidence SET payload=?,chain_hash=? WHERE seq=1",
+                     (replacement, locally_rehashed))
+    with pytest.raises(ValueError, match="sealed plan mismatch"):
+        read_synthetic_evidence(ctx[1])
