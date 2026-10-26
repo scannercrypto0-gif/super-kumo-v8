@@ -10,6 +10,7 @@ import re
 from .content_identity import content_hash_v1
 from .historical_library import (
     BarQuality, DataAvailabilityKind, DatasetManifest, HistoricalBar,
+    HistoricalDataError,
 )
 from .strategy_definition import canonical, digest
 
@@ -109,7 +110,9 @@ def preflight_dev(manifest, bars, *, boundary, expected_content_hash,
             manifest, records, price_unit=price_unit, volume_unit=volume_unit,
             session=session, normalization=normalization,
             adjustment=adjustment)
-    except (ValueError, TypeError):
+    except (HistoricalDataError, ValueError, TypeError):
+        # Known invalid DEV content must produce a typed fail-closed report.
+        # Do not suppress unrelated programming or infrastructure failures.
         return _blocked("QUALITY_BLOCKED", boundary)
     if actual_content_hash != expected_content_hash:
         return _blocked("CONTENT_IDENTITY_MISMATCH", boundary)
