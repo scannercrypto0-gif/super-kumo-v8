@@ -81,6 +81,7 @@ class JournalConsumer:
             if self.stop_event.is_set():
                 break
             try:
+                self.journal.require_eligible(bar.stable_key())
                 self.store.upsert(bar)
                 self.journal.mark_persisted(bar.stable_key())
             except ContentConflictError as exc:

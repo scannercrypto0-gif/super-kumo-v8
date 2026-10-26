@@ -281,3 +281,124 @@ def test_conflict_receipt_failure_still_reports_persisted_quarantine(tmp_path):
         with pytest.raises(ContentConflictError): j.commit(bar(close=100.5))
     assert j.quarantined_keys()=={bar().stable_key()}
     assert j.conflict_evidence(bar().stable_key())[0]["audit_availability_receipt"]["version"]==0
+
+
+def test_archive_source_row_missing_valid_and_quarantined(tmp_path):
+    from aql.archive.local import source_row
+    j,_=pair(tmp_path)
+    j.commit(bar())
+    with j._connect() as conn:
+        assert source_row(conn,999) is None
+        row=source_row(conn,1)
+        assert row[0]==1 and row[1]==bar().stable_key()
+        assert MarketBar.from_dict(json.loads(row[2])).close==100.
+        assert row[3]==MarketBar.from_dict(json.loads(row[2])).compute_checksum()
+    with pytest.raises(ContentConflictError): j.commit(bar(close=100.5))
+    with j._connect() as conn:
+        with pytest.raises(ContentConflictError): source_row(conn,1)
+        assert source_row(conn,999) is None
+
+
+def test_archive_source_row_disappears_after_size_probe(tmp_path):
+    from aql.archive.local import source_row
+    j,_=pair(tmp_path);j.commit(bar())
+    conn=j._connect()
+    class DisappearingRow:
+        def execute(self,sql,args=()):
+            if sql.startswith("SELECT id,stable_key"):
+                conn.execute("DELETE FROM journal_entries WHERE id=?",args)
+                conn.commit()
+            return conn.execute(sql,args)
+    try:
+        assert source_row(DisappearingRow(),1) is None
+    finally:
+        conn.close()
+
+
+def test_coverage_reads_exclude_quarantine_preserve_physical_originals(tmp_path):
+    j,s=pair(tmp_path)
+    for target,write in ((j,j.commit),(s,s.upsert)):
+        for value in (bar(),bar(1),bar(symbol="ETHUSDT")): write(value)
+        with pytest.raises(ContentConflictError): write(bar(1,close=100.5))
+    assert s.get_stored_keys("BTCUSDT","1m")=={0}
+    assert s.get_range("BTCUSDT","1m")==j.get_committed_range("BTCUSDT","1m")== (0,0)
+    assert s.get_stored_keys("ETHUSDT","1m")=={0}
+    assert s.count()==3  # physical retention is an audit count, not eligibility
+    assert j.count_by_state()=={"LOCAL_COMMITTED":3}
+    assert len(j.replay(include_quarantined=True))==3
+    for write in (j.commit,s.upsert):
+        with pytest.raises(ContentConflictError): write(bar(close=100.5))
+    assert s.get_stored_keys("BTCUSDT","1m")==set()
+    assert s.get_range("BTCUSDT","1m")==j.get_committed_range("BTCUSDT","1m")== (None,None)
+
+
+@pytest.mark.parametrize("route",["consumer","startup"])
+def test_quarantine_after_replay_denies_store_delivery_and_ack(tmp_path,route):
+    j,s=pair(tmp_path);j.commit(bar());j.commit(bar(1))
+    real_replay=j.replay
+    def replay_then_quarantine(*args,**kwargs):
+        batch=real_replay(*args,**kwargs)
+        with pytest.raises(ContentConflictError): j.commit(bar(close=100.5))
+        return batch
+    with patch.object(j,"replay",side_effect=replay_then_quarantine),patch.object(s,"upsert",wraps=s.upsert) as upsert:
+        if route=="consumer":
+            consumer=JournalConsumer(j,s,"BTCUSDT","1m")
+            consumer.drain_once()
+            assert consumer.errors==1
+        else:
+            assert j.startup_reconcile(s,"BTCUSDT","1m")[2]==1
+        assert [call.args[0].bar_open for call in upsert.call_args_list]==[60000]
+    assert s.get_stored_keys("BTCUSDT","1m")=={60000}
+    assert j.count_by_state()=={"LOCAL_COMMITTED":1,"PERSISTED":1}
+    assert j.quarantined_keys()==s.quarantined_keys()=={bar().stable_key()}
+
+
+def test_reconcile_new_conflict_not_used_as_gap_boundary(tmp_path):
+    j,s=pair(tmp_path)
+    j.commit(bar());j.commit(bar(1));s.upsert(bar());s.upsert(bar(1,close=100.5))
+    with patch("time.time",return_value=180.):
+        result=j.startup_reconcile(s,"BTCUSDT","1m")
+    assert result[2]==1
+    assert result[3]==[(60000,180000)]  # quarantined newest row cannot mask this gap
+
+
+def test_sandbox_preexisting_quarantine_denies_delivery_and_cursor(tmp_path):
+    j,_=pair(tmp_path);j.commit(bar());j.commit(bar(1))
+    with pytest.raises(ContentConflictError): j.commit(bar(close=100.5))
+    remote=Mock()
+    replicator=SandboxReplicator(j,remote,str(tmp_path/"cursor.sqlite"))
+    with pytest.raises(ContentConflictError): replicator.deliver_once()
+    remote.upsert.assert_not_called()
+    with sqlite3.connect(replicator.path) as conn:
+        assert conn.execute("SELECT seq FROM delivery_cursor").fetchone()[0]==0
+    # This ordered consumer stops at the conflict; independent local work continues.
+    s=OperationalStore(str(tmp_path/"local.sqlite"))
+    JournalConsumer(j,s,"BTCUSDT","1m").drain_once()
+    assert s.get_stored_keys("BTCUSDT","1m")=={60000}
+
+
+@pytest.mark.parametrize("stage",["after_rename","before_ack"])
+def test_archive_adoption_rechecks_quarantine_before_ack(tmp_path,stage):
+    from aql.archive.local import LocalArchive
+    j,_=pair(tmp_path);j.commit(bar())
+    def conflict(point):
+        if point==stage:
+            with pytest.raises(ContentConflictError): j.commit(bar(close=100.5))
+    archive=LocalArchive(j.db_path,tmp_path/"archive",market="spot",build="test",policy="v1",
+                         reserve_bytes=0,fault=conflict)
+    with pytest.raises(ContentConflictError): archive.drain_once()
+    with archive.catalog() as conn:
+        assert conn.execute("SELECT value FROM meta WHERE key='cursor'").fetchone()[0]=="0"
+        assert conn.execute("SELECT COUNT(*) FROM records").fetchone()[0]==0
+
+
+def test_backup_refuses_quarantine_in_source_snapshot(tmp_path):
+    from aql.archive.local import LocalArchive
+    from aql.archive.backup import create_backup
+    j,_=pair(tmp_path);j.commit(bar());j.commit(bar(1))
+    archive=LocalArchive(j.db_path,tmp_path/"archive",market="spot",build="test",policy="v1",reserve_bytes=0)
+    assert archive.drain_once()==2
+    # Non-anchor conflict: guard alone does not see it; full backup verification must.
+    with pytest.raises(ContentConflictError): j.commit(bar(close=100.5))
+    with pytest.raises(ContentConflictError): create_backup(archive,tmp_path/"backups")
+    assert not [p for p in (tmp_path/"backups").iterdir() if not p.name.endswith(".partial")]

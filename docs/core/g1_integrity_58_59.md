@@ -178,3 +178,85 @@ Remaining risks: two-transaction crash window is explicit, extra FULL I/O,
 legacy/unconfirmed timing, pending manual correction review, local-only audit
 immutability, shared-interface adoption and real operating capacity/security
 acceptance. All existing provisional governance/activation restrictions remain.
+## PR #127 bounded follow-up review (2026-10-26)
+
+Authority: the owner's explicit instruction to review/fix this same Draft PR,
+not a new implementation mandate for CORE-ARCH-60/61. Starting delivery is
+`19756ad377170e417faed8381815349e282c4339`; observed main is
+`10924f0f463b28559711f6384c87f308ee67d335`. Both refs were refreshed before
+editing. Main's native G1 run 40316583530 was successful; prior PR runs
+40320567813/40320567774/40320567896 were successful. These are baseline
+observations, not evidence for the follow-up commit.
+
+Reviewed PR description/comments (no inline review threads), Core #92 decisions
+58/59 and 60/61 and delivery 6415859592, and Factory #77 through synchronization
+6415886277. Factory #126's later `c3a50819...` correction is separate, unmerged
+work. No unavailable Work conversation was reviewed; PR #127 is the latest
+confirmed code delivery for this task, not proof that its original Work chat
+completed. No AGENTS.md was present in this checkout.
+
+### Existing G1 read/delivery inventory
+
+“Denied” below means known quarantine at the corresponding check. Separate
+SQLite files and a remote sink do not form one atomic transaction. Already
+returned bytes/previous ACKs are not retroactively revoked; this patch does not
+claim linearizable global eligibility, hardware durability or independent custody.
+
+| Existing path | Can inspect isolated data? | Operational delivery / ACK | Unrelated progress / disposition |
+|---|---|---|---|
+| `DurableJournal.replay` | Default excludes; explicit `include_quarantined=True` retains forensic access | Forensic flag is never permission; checksum verified, no ACK | Other keys/streams returned; pre-delivery gate also needed for a fetched batch |
+| `JournalConsumer.drain_once` | Fetched batch may predate quarantine | Added check immediately before store upsert; store compare/check and journal ACK gate retained | Conflict mirrored; next healthy key processed; regression covers quarantine after replay |
+| `startup_reconcile` | Same batch window | Added pre-upsert check; matching existing contents still verified before ACK | Re-read quarantine after loop; conflict no longer masks gap boundaries; healthy keys continue |
+| `OperationalStore.upsert/bulk_upsert` | Private `_original_bar` intentionally retains original for comparison/audit | Transactional compare and eligibility check deny conflict, no replacement; bulk records error | Other rows continue; no public bar-payload reader found in this G1 store |
+| Store `get_stored_keys/get_range`; journal `get_committed_range` | Formerly included retained quarantined rows as coverage | Fixed eligible metadata queries; cannot use isolated bounds as healthy freshness/coverage | Same-stream healthy rows and other streams preserved |
+| Store `count`, journal `count_by_state`, `commit_receipt`, conflict evidence/private original reads | Physical/audit metadata and originals remain inspectable | No operational bar delivery or new ACK; counts/receipt are not eligibility proof | Intentionally not filtered; retained evidence and legacy receipt contract unchanged |
+| Collector synchronous store route | Commit detects quarantine before store; store compares existing content | Conflict mirrors to both DBs; no conflict ACK; existing focused collector test | Other incoming keys continue; background route uses JournalConsumer |
+| `_run_gap_recovery` / `recover_gap` | REST rows are candidates; `include_existing=True` compares even existing keys | Journal commit then store compare then gated ACK; conflict errors are explicit | Per-key continuation; no additional provider requests or new transport |
+| `SandboxReplicator.deliver_once` | Materializes batch internally; pre/post-remote quarantine checks | Known conflict denied before sink and before cursor advance; remote side effects cannot be rolled back | **Ordered prefix stops at conflict**; independent local consumer/ingest proceeds. See owner gate below |
+| `LocalArchive.source_row`, drain/adopt | Missing row returns None at both probes; known isolated row raises | Added second missing-row guard and whole-batch eligibility/content recheck immediately before watermark update | **Atomic archive batch/prefix stops**; other independent lanes continue; sealed originals unchanged |
+| Backup create/verify/restore | Copies source forensic bytes to incomplete temporary generation | Full source/segment validation calls guarded source_row; isolated source cannot become verified backup/restore | Whole-generation rejection is intentional; no partial-success/custody claim |
+| Offline archive snapshot | Sealed retrospective bytes only, not current live eligibility | Full backup verification before and after query; guarded source denies known isolated record in that generation | Whole-generation verification rejects even unselected defects; no Core operational ACK |
+| `verify_segment` / envelope parsing | Pure hash/schema verification can inspect a sealed old record | No source/quarantine authority or operational ACK; adopt/backup/offline wrappers supply source checks | Do not treat a valid hash or old backup as current eligibility |
+| Health snapshot / archive health | Audit counts and conflict inventory visible | Scoped quarantine/read error denies healthy/integrity claim | Healthy unrelated symbol remains independently reportable |
+
+Repository search covered all `journal_entries`/`market_bars` SQL and callers of
+replay, range/key readers, source_row and segment verification under `src/aql`.
+PositionEvent/G2 journals have different identities and no MarketBar delivery
+path; open PRs #93/#115/#118/#119 were neither imported nor modified. Factory
+historical library is not a Core operational reader and remains out of scope.
+
+### Owner decision boundary — BLOCKED — OWNER DECISION REQUIRED
+
+The existing Sandbox cursor acknowledges a contiguous sequence prefix; the
+archive catalog and backup verifier likewise require complete prefix/segment
+reconciliation. A quarantined key therefore stalls subsequent healthy keys in
+that **same ordered consumer**, although ingest and independent local consumers
+continue. Advancing past it would falsely ACK it, and dropping it or silently
+filtering segments would change archive coverage/restore contracts. No such
+change was made.
+
+If acceptance requires unrelated records to continue **within these same ordered
+consumers**, authorize a separate bounded design for durable per-record withheld
+dispositions/independent progress and matching archive/restore semantics. Until
+then that requirement is BLOCKED, rather than claimed satisfied by green tests.
+This does not authorize the full 60 eligibility gate or 61 shared WebSocket.
+
+Existing provenance, legacy committed_at, MarketBar serialization/checksum,
+stable identity, preserve-original policy and Core/Factory evidence separation
+are unchanged. Cross-DB quarantine propagation can fail on unavailable storage;
+failures do not grant ACK. Old/mixed writers and direct SQL consumers are not
+approved operational paths. A sealed snapshot cannot learn about conflicts
+detected later in its live source; it remains retrospective, never current
+decision permission.
+
+### Focused follow-up acceptance
+
+Local Python 3.12 run: **31 passed**, no failures/skips (4.05s). Ten added cases
+(including parameterized scenarios) cover missing/valid/isolated source rows,
+row disappearance between probes, eligible metadata with physical retention,
+quarantine after replay for consumer/startup, newly isolated gap boundary,
+Sandbox preexisting conflict/no sink call/no cursor ACK plus independent local
+progress, archive conflict after rename and immediately before ACK, and backup
+non-anchor conflict refusal. The original 21 cases remain enabled. Exact final
+remote SHA and Ubuntu/Windows CI results are recorded on PR #127 after upload;
+this pre-upload document does not predeclare them successful.

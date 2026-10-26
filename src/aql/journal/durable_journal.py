@@ -336,6 +336,7 @@ class DurableJournal(IntegrityAccess):
             missing = bar.bar_open not in stored_keys
             bars_replayed += int(missing)
             try:
+                self.require_eligible(bar.stable_key())
                 store.upsert(bar)  # validates matching content even for existing keys
                 self.mark_persisted(bar.stable_key())
                 replay_inserted += int(missing)
@@ -350,7 +351,10 @@ class DurableJournal(IntegrityAccess):
         # Step 2: detect ALL gaps (internal + trailing) in the known bar sequence.
         # Re-read store keys to include any bars just upserted in the replay above.
         store_opens_after: set = store.get_stored_keys(symbol, interval)
-        journal_opens: set = {b.bar_open for b in journal_bars}
+        # A replayed key may have become quarantined during reconciliation.
+        quarantined = self.quarantined_keys(symbol, interval)
+        journal_opens: set = {b.bar_open for b in journal_bars if b.stable_key() not in quarantined}
+        store_opens_after -= {int(key.rsplit(':', 1)[1]) for key in quarantined}
 
         all_known_opens: List[int] = sorted(journal_opens | store_opens_after)
         gaps: List[Tuple[int, int]] = []
@@ -400,7 +404,7 @@ class DurableJournal(IntegrityAccess):
     def get_committed_range(
         self, symbol: str, interval: str
     ) -> Tuple[Optional[int], Optional[int]]:
-        """Return (min_bar_open, max_bar_open) for final bars in the journal."""
+        """Return eligible final-bar bounds; physical rows remain available for audit."""
         conn = self._connect()
         try:
             row = conn.execute(
@@ -408,6 +412,7 @@ class DurableJournal(IntegrityAccess):
                 SELECT MIN(bar_open) as mn, MAX(bar_open) as mx
                 FROM journal_entries
                 WHERE symbol=? AND interval=? AND is_final=1
+                AND stable_key NOT IN (SELECT stable_key FROM g1_integrity_events)
                 """,
                 (symbol, interval),
             ).fetchone()

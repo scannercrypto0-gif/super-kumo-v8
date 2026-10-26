@@ -157,11 +157,13 @@ class OperationalStore(IntegrityAccess):
             conn.close()
 
     def get_stored_keys(self, symbol: str, interval: str) -> set:
-        """Return set of bar_open values already in the store."""
+        """Return eligible stored opens; retained quarantined rows are not coverage."""
         conn = self._connect()
         try:
             rows = conn.execute(
-                "SELECT bar_open FROM market_bars WHERE symbol=? AND interval=?",
+                "SELECT bar_open FROM market_bars WHERE symbol=? AND interval=? "
+                "AND NOT EXISTS (SELECT 1 FROM g1_integrity_events e "
+                "WHERE e.stable_key=market_bars.symbol || ':' || market_bars.interval || ':' || market_bars.bar_open)",
                 (symbol, interval),
             ).fetchall()
             return {r["bar_open"] for r in rows}
@@ -169,11 +171,13 @@ class OperationalStore(IntegrityAccess):
             conn.close()
 
     def get_range(self, symbol: str, interval: str):
-        """Return (min_bar_open, max_bar_open) stored."""
+        """Return eligible stored bounds, excluding retained quarantined rows."""
         conn = self._connect()
         try:
             row = conn.execute(
-                "SELECT MIN(bar_open) as mn, MAX(bar_open) as mx FROM market_bars WHERE symbol=? AND interval=?",
+                "SELECT MIN(bar_open) as mn, MAX(bar_open) as mx FROM market_bars WHERE symbol=? AND interval=? "
+                "AND NOT EXISTS (SELECT 1 FROM g1_integrity_events e "
+                "WHERE e.stable_key=market_bars.symbol || ':' || market_bars.interval || ':' || market_bars.bar_open)",
                 (symbol, interval),
             ).fetchone()
             return row["mn"], row["mx"]
