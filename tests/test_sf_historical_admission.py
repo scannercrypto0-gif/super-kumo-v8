@@ -25,6 +25,8 @@ def fixture(*, confirmed=False):
                         observation_cutoff_ms=b.bar_close + 1)
                 for b in bars]
     bars, manifest = validate_bars(bars, "BTCUSDT", "1m")
+    manifest = replace(manifest, dataset_id="synthetic-dev",
+                       exchange="fixture", market="spot")
     grant = DevBoundary(manifest.dataset_id, manifest.version,
                         bars[0].bar_open, bars[-1].bar_open,
                         manifest.manifest_integrity_hash, "synthetic:dev-only")
