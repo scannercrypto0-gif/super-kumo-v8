@@ -144,4 +144,274 @@ class CoreJournalContentionDiagnostic(unittest.TestCase):
                 Path(os.environ['AQL_G2_CONTENTION_OUTPUT']).write_text(json.dumps(result,indent=2)+'\n')
 
 
-if __name__=='__main__':unittest.main()
+def causal_background(root, mode, stop_path, ready_path, output, stop_event=None):
+    """One matched work implementation for thread/process; test-only IO quotas."""
+    root = Path(root)
+    path = root/'fixture.jsonl'
+    raw = path.read_bytes() if mode != 'cpu' else None
+    result = dict(pid=os.getpid(), thread=threading.get_ident(), completed=0,
+                  logical_read_bytes=0, write_bytes=0, fsync_calls=0, errors=[])
+    clock = time.thread_time if hasattr(time, 'thread_time') else time.process_time
+    cpu_start = clock()
+    started = time.monotonic()
+    if mode == 'cpu' and stop_event is None:
+        # Process control uses a pipe, not filesystem polling in CPU-only load.
+        stop_event = threading.Event()
+        def control():
+            sys.stdin.buffer.read(1)
+            stop_event.set()
+        threading.Thread(target=control, daemon=True).start()
+    def stopping():
+        return stop_event.is_set() if mode == 'cpu' else Path(stop_path).exists()
+    Path(ready_path).touch()
+    try:
+        while not stopping() and time.monotonic()-started < 58:
+            before = time.monotonic()
+            if mode == 'cpu':
+                x = 1
+                for _ in range(50000):
+                    x = (x*1664525+1013904223)&0xffffffff
+            else:
+                # Same one-second offered work rate for C/D/E/F. G deliberately
+                # halves this rate. No writes beyond 20 <=64MiB units.
+                if result['completed'] >= 20:
+                    time.sleep(.01)
+                    continue
+                if mode in ('replay', 'combined', 'throttled'):
+                    journal = DurablePositionJournal(path)
+                    if len(journal.ledger.events) != 10000:
+                        raise AssertionError('fixture count changed')
+                    result['logical_read_bytes'] += path.stat().st_size
+                if mode in ('copy', 'combined', 'throttled'):
+                    if result['write_bytes'] + len(raw) > 64*1024*1024:
+                        raise AssertionError('background byte ceiling')
+                    copy = root/'trial-copy'
+                    with copy.open('wb') as handle:
+                        if handle.write(raw) != len(raw):
+                            raise OSError('short diagnostic write')
+                        handle.flush(); os.fsync(handle.fileno())
+                    result['write_bytes'] += len(raw)
+                    result['fsync_calls'] += 1
+                    if mode in ('combined', 'throttled'):
+                        if hashlib.sha256(copy.read_bytes()).digest() != hashlib.sha256(raw).digest():
+                            raise AssertionError('copy changed')
+                        DurablePositionJournal(copy)
+                        result['logical_read_bytes'] += 2*len(raw)
+            result['completed'] += 1
+            if mode != 'cpu':
+                period = 2 if mode == 'throttled' else 1
+                while (not stopping()
+                       and time.monotonic()-before < period
+                       and time.monotonic()-started < 58):
+                    time.sleep(.005)
+    except Exception as error:
+        result['errors'].append(repr(error))
+    finally:
+        result['cpu_s'] = clock()-cpu_start
+        result['wall_s'] = time.monotonic()-started
+        result['offered_units'] = None if mode == 'cpu' else 20
+        result['unfinished_offered_units'] = None if mode == 'cpu' else 20-result['completed']
+        Path(output).write_text(json.dumps(result)+'\n')
+
+
+def causal_trial(root, mode, output):
+    """230 real G1 commits plus an independent existing JournalConsumer."""
+    from aql.lanes import JournalConsumer
+    from aql.storage.operational_store import OperationalStore
+    root = Path(root)
+    token = Path(output).stem
+    journal = DurableJournal(str(root/(token+'.sqlite')))
+    store = OperationalStore(str(root/(token+'-store.sqlite')))
+    stop_path, ready_path = root/(token+'.stop'), root/(token+'.ready')
+    bg_output = root/(token+'-background.json')
+    commit_done, ack, queue_age, ingest_start, samples = {}, {}, {}, {}, []
+    upsert, mark = store.upsert, journal.mark_persisted
+    def observed_upsert(bar):
+        key = bar.stable_key()
+        entered = time.perf_counter()
+        if key in commit_done:
+            queue_age[key] = entered-commit_done[key]
+        return upsert(bar)
+    def observed_ack(key):
+        mark(key)
+        ack[key] = time.perf_counter()
+    store.upsert, journal.mark_persisted = observed_upsert, observed_ack
+    consumer = JournalConsumer(journal, store, 'BTCUSDT', '1m')
+    consumer.start()
+    bg = None
+    bg_stop = threading.Event()
+    started, cpu_start = time.monotonic(), time.process_time()
+    result = dict(mode=mode, status='INCOMPLETE', accepted=0, committed=0,
+                  errors=[], pid=os.getpid(), sqlite_version=__import__('sqlite3').sqlite_version,
+                  python=sys.version.split()[0], rejected='NOT APPLICABLE: direct durable admission')
+    keys = []
+    def commit_one(i):
+        bar = MarketBar('BTCUSDT','1m',i*60000,(i+1)*60000-1,
+                        100.,101.,99.,100.,1.,True,'synthetic-offline',(i+1)*60000)
+        key = bar.stable_key()
+        before = time.perf_counter(); ingest_start[key] = before
+        result['accepted'] += 1
+        if not journal.commit(bar):
+            raise AssertionError('unexpected duplicate')
+        end = time.perf_counter(); commit_done[key] = end
+        result['committed'] += 1
+        return key, end-before
+    try:
+        for i in range(30):
+            commit_one(i)
+        while len(ack) < 30:
+            if time.monotonic()-started > 55:
+                raise TimeoutError('warmup/ACK bound')
+            time.sleep(.001)
+        if mode != 'idle':
+            bg_mode = {'cpu_thread':'cpu','cpu_process':'cpu','copy':'copy',
+                       'replay':'replay','combined_thread':'combined',
+                       'combined_process':'combined','throttled_process':'throttled'}[mode]
+            args = (str(root), bg_mode, str(stop_path), str(ready_path), str(bg_output))
+            if mode.endswith('process'):
+                bg = subprocess.Popen([sys.executable,'-B',__file__,'--causal-background',*args],
+                                      stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                bg = threading.Thread(target=causal_background, args=args,
+                                      kwargs={'stop_event':bg_stop}, daemon=True)
+                bg.start()
+            while not ready_path.exists():
+                if time.monotonic()-started > 55:
+                    raise TimeoutError('background startup bound')
+                time.sleep(.001)
+        for i in range(30,230):
+            if time.monotonic()-started > 55:
+                raise TimeoutError('foreground trial bound')
+            key, elapsed = commit_one(i)
+            keys.append(key); samples.append(elapsed)
+        while len(ack) < 230:
+            if time.monotonic()-started > 55:
+                raise TimeoutError('consumer ACK bound')
+            time.sleep(.001)
+        result['status'] = 'COMPLETE'
+    except Exception as error:
+        result['errors'].append(repr(error))
+    finally:
+        stop_path.touch()
+        bg_stop.set()
+        if isinstance(bg, subprocess.Popen):
+            try:
+                bg.stdin.write(b'x'); bg.stdin.flush(); bg.stdin.close()
+            except (BrokenPipeError,OSError):
+                pass
+            try: bg.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                bg.kill(); bg.wait(timeout=1)
+                result['errors'].append('background process killed: cleanup bound')
+        elif bg is not None:
+            bg.join(2)
+            if bg.is_alive(): result['errors'].append('background thread still alive')
+        consumer_result = consumer.finish(timeout=1)
+        result['consumer'] = consumer_result
+        result['foreground_process_cpu_s'] = time.process_time()-cpu_start
+        result['wall_s'] = time.monotonic()-started
+        result['samples_ms'] = [s*1000 for s in samples]
+        def summarize(values):
+            return {**pct(values), 'max_ms':max(values)*1000, 'count':len(values)} if values else 'NOT MEASURED'
+        result['commit'] = summarize(samples)
+        # ACK age starts at observed durable commit RETURN, not committed_at.
+        ages = [ack[k]-commit_done[k] for k in keys if k in ack and ack[k]>=commit_done[k]]
+        queues = [queue_age[k] for k in keys if k in queue_age and queue_age[k]>=0]
+        result['ack_age'] = summarize(ages)
+        result['queue_age'] = summarize(queues)
+        result['ack_samples_ms'] = [s*1000 for s in ages]
+        result['queue_samples_ms'] = [s*1000 for s in queues]
+        result['queue_age_unobserved'] = len(keys)-len(queues)
+        result['replayed'] = len(journal.replay())
+        result['pending'] = journal.count_by_state().get('LOCAL_COMMITTED',0)
+        result['background'] = json.loads(bg_output.read_text()) if bg_output.exists() else ('NONE' if mode=='idle' else 'NOT MEASURED')
+        result['kernel_io_bytes'] = 'NOT MEASURED; logical work counters only'
+        if result['errors'] or consumer_result['errors'] or consumer_result['worker_alive']:
+            result['status'] = 'INCOMPLETE'
+        Path(output).write_text(json.dumps(result)+'\n')
+
+
+def causal_matrix():
+    """Owner6409357112; opt-in only, capped globally and per child process."""
+    import platform
+    import sqlite3
+    output = Path(os.environ.get('AQL_G2_MATRIX_OUTPUT','g2-causal-matrix.jsonl'))
+    # First CI step timestamps job start, including checkout/Python setup.
+    job_start = float(os.environ.get('AQL_G2_JOB_START',time.time()))
+    deadline = time.monotonic()+max(0,1500-(time.time()-job_start))
+    result = dict(schema='aql.g2-causal.v1', status='INCOMPLETE',
+                  sha=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+                  tree=subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),
+                  platform=platform.platform(), python=sys.version, sqlite=sqlite3.sqlite_version,
+                  trials=[], errors=[], setup_started_epoch=job_start)
+    paths = ['src/aql/journal/durable_journal.py','src/aql/lanes.py',
+             'src/aql/storage/operational_store.py','src/aql/observation/position_journal.py',
+             'tests/test_g2_core_journal_contention.py']
+    result['source_blobs'] = {p:subprocess.check_output(['git','rev-parse','HEAD:'+p],text=True).strip() for p in paths}
+    with output.open('x',encoding='utf-8') as log, tempfile.TemporaryDirectory(prefix='g2-causal-',dir=Path.cwd()) as d:
+        def record(value):
+            log.write(json.dumps(value,sort_keys=True)+'\n'); log.flush();os.fsync(log.fileno())
+        root = Path(d); path=root/'fixture.jsonl';seed(path,10000)
+        expected = hashlib.sha256(path.read_bytes()).hexdigest()
+        result['fixture_sha256'], result['fixture_bytes'] = expected,path.stat().st_size
+        result['filesystem'] = filesystem(root)
+        result['storage'] = 'physical medium UNKNOWN; workspace temporary directory'
+        if os.name != 'nt':
+            try:
+                result['mount'] = subprocess.check_output(['findmnt','-T',str(root),'-o','SOURCE,FSTYPE,TARGET','-n'],text=True,timeout=2).strip()
+            except Exception: result['mount']='NOT MEASURED'
+        else: result['mount'] = str(root.anchor)
+        result['settings'] = dict(seed_events=10000, warmup=30, measured=200,
+                                  trials_per_load=3, trial_timeout_s=60,
+                                  job_timeout_s=1500, background_write_cap=64*1024*1024,
+                                  io_work_units=20, io_period_s=1, throttled_period_s=2,
+                                  sqlite='WAL/FULL', acknowledged_by='existing JournalConsumer')
+        record(dict(kind='metadata',**{k:v for k,v in result.items() if k!='trials'}))
+        modes=['cpu_thread','copy','replay','combined_thread','combined_process','cpu_process','throttled_process']
+        try:
+            for repeat in range(3):
+                # Rotate order while retaining an immediate baseline for each load.
+                order=modes[repeat:]+modes[:repeat]
+                for mode in order:
+                    for condition in ('idle',mode):
+                        remaining=deadline-time.monotonic()
+                        if remaining < 62:
+                            raise TimeoutError('cannot fit next bounded trial in25min')
+                        label=f'{repeat}-{mode}-{condition}'
+                        child_output=root/(label+'.json')
+                        try:
+                            child=subprocess.run([sys.executable,'-B',__file__,'--causal-trial',d,condition,str(child_output)],
+                                                 capture_output=True,text=True,timeout=60)
+                        except subprocess.TimeoutExpired as error:
+                            raise TimeoutError('trial hard60s bound: '+label) from error
+                        if child.returncode or not child_output.exists():
+                            raise RuntimeError('trial failed: '+label+' '+child.stderr[-1500:])
+                        trial=json.loads(child_output.read_text())
+                        trial.update(repeat=repeat, paired_load=mode, label=label)
+                        result['trials'].append(trial);record(dict(kind='trial',**trial))
+                        print('G2_CAUSAL_TRIAL '+json.dumps({k:trial[k] for k in ('label','status','commit','ack_age','queue_age','pending','errors')}),flush=True)
+                        if trial['status']!='COMPLETE' or trial['pending'] or trial['replayed']!=230:
+                            raise RuntimeError('incomplete trial: '+label)
+                        if isinstance(trial['background'],dict) and trial['background']['errors']:
+                            raise RuntimeError('background errors: '+label)
+            if hashlib.sha256(path.read_bytes()).hexdigest()!=expected:
+                raise AssertionError('fixture mutated')
+            result['status']='COMPLETE'
+        except Exception as error:
+            result['errors'].append(repr(error))
+        result['elapsed_s']=time.time()-job_start
+        record(dict(kind='summary',status=result['status'],errors=result['errors'],
+                    elapsed_s=result['elapsed_s'],trials=len(result['trials'])))
+    print('G2_CAUSAL_SUMMARY '+json.dumps({k:result[k] for k in ('sha','status','elapsed_s','errors','filesystem','fixture_sha256')}),flush=True)
+    return 0 if result['status']=='COMPLETE' else 1
+
+
+if __name__=='__main__':
+    if '--causal-background' in sys.argv:
+        causal_background(*sys.argv[2:])
+    elif '--causal-trial' in sys.argv:
+        causal_trial(*sys.argv[2:])
+    elif '--causal-matrix' in sys.argv:
+        raise SystemExit(causal_matrix())
+    else:
+        unittest.main()
