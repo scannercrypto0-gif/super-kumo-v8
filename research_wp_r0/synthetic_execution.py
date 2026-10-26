@@ -6,6 +6,29 @@ Ambiguous fills/exits are UNRESOLVED, never scored as losses or wins.
 from .strategy_definition import integer, number, digest, keys
 
 
+def account_long_prices(entry_open, exit_open, *, fee_bps, slippage_bps):
+    """Accepted #108 arithmetic, shared by synthetic and retrospective adapters.
+
+    Fractions are relative to slipped entry notional. Raw gross minus execution
+    slippage drag minus both-side notional fees equals net.
+    """
+    number(entry_open, 0.0000000001)
+    number(exit_open, 0.0000000001)
+    number(fee_bps, 0, 10000)
+    number(slippage_bps, 0, 10000)
+    if slippage_bps >= 10000:
+        raise ValueError("Exit slippage must leave a positive price")
+    entry = entry_open * (1 + slippage_bps / 10000)
+    exit_price = exit_open * (1 - slippage_bps / 10000)
+    raw_gross = exit_open / entry_open - 1
+    gross = exit_price / entry - 1
+    fees = fee_bps / 10000 * (1 + exit_price / entry)
+    return {"entry_execution_price": entry, "exit_execution_price": exit_price,
+            "raw_gross_return": raw_gross, "gross_return": gross,
+            "slippage_fraction": raw_gross - gross, "fee_fraction": fees,
+            "net_return": gross - fees}
+
+
 def execute_synthetic_long(bars, decision_bar_index, *, stop_fraction,
                            target_fraction, ttl_bars, holding_bars,
                            fee_bps, slippage_bps):
@@ -61,8 +84,8 @@ def execute_synthetic_long(bars, decision_bar_index, *, stop_fraction,
             # Handle known opening gaps before ambiguous high/low ordering.
             if idx > entry_idx and bar["open"] <= stop:
                 exit_price = bar["open"] * (1 - slippage_bps / 10000)
-                gross = exit_price / entry - 1
-                fees = (fee_bps / 10000) * (1 + exit_price / entry)
+                account = account_long_prices(entry, exit_price, fee_bps=fee_bps, slippage_bps=0)
+                gross, fees = account["gross_return"], account["fee_fraction"]
                 status = "RESOLVED_STOP"
                 details = {"entry_bar_index": entry_idx, "exit_bar_index": idx,
                            "gross_return": gross, "fee_fraction": fees,
@@ -78,8 +101,8 @@ def execute_synthetic_long(bars, decision_bar_index, *, stop_fraction,
             if stop_hit or target_hit:
                 exit_price = (min(bar["open"], stop) if stop_hit else target)
                 exit_price *= 1 - slippage_bps / 10000
-                gross = exit_price / entry - 1
-                fees = (fee_bps / 10000) * (1 + exit_price / entry)
+                account = account_long_prices(entry, exit_price, fee_bps=fee_bps, slippage_bps=0)
+                gross, fees = account["gross_return"], account["fee_fraction"]
                 status = "RESOLVED_STOP" if stop_hit else "RESOLVED_TARGET"
                 details = {"entry_bar_index": entry_idx, "exit_bar_index": idx,
                            "gross_return": gross, "fee_fraction": fees,

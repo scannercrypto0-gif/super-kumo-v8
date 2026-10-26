@@ -1,0 +1,7 @@
+{
+  "archive_sha256": "4ec2915e610ab4e9a4d5e86a5ada1c15bbf6b5db343cdb385681d6ac97166a4e",
+  "source_reference": "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2024-01-01.zip",
+  "split_cutoff_ms": 1704153600000,
+  "fee_bps": 10,
+  "slippage_bps": 5
+}

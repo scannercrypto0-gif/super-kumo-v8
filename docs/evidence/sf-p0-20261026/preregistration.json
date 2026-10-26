@@ -1,0 +1,15 @@
+{
+  "registered_at_utc": "2026-10-26T06:01:48.501853+00:00",
+  "dataset": "BTCUSDT-1m-2024-01-01.zip",
+  "source": "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2024-01-01.zip",
+  "development_start_ms": 1704067200000,
+  "split_cutoff_ms": 1704153600000,
+  "oos": "2024-01-02 onward NOT_DOWNLOADED_NOT_EVALUATED",
+  "final_holdout": "UNIDENTIFIED_NOT_ACCESSED",
+  "strategy": "EMA8/21 long-only close crossover, next open entry/exit; one BTC max; no leverage/reinvestment; no stop/target; terminal unresolved MTM separate",
+  "fee_bps": 10,
+  "slippage_bps": 5,
+  "benchmark": "buy hold from first eligible decision execution open to last development close, same two-sided costs",
+  "regime": "target iff close>EMA21 and EMA21 rising, otherwise off-target; entry regime groups trades",
+  "selection": "one day chosen for minimal engineering demonstration, not representative or statistically adequate; no search or parameter optimization"
+}
