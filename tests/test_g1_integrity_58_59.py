@@ -103,8 +103,9 @@ b=MarketBar('BTCUSDT','1m',0,59999,100.,101.,99.,100.,1.,True,'synthetic',60000)
 j.commit(b)
 os._exit(24)
 '''
-    result=subprocess.run([sys.executable,'-B','-c',script,path,stage],timeout=20,
-                          env={"PATH":os.environ.get("PATH",""),"PYTHONPATH":str(Path(__file__).resolve().parents[1]/"src")})
+    child_env={key:os.environ[key] for key in ("PATH","SYSTEMROOT","WINDIR","TEMP","TMP") if key in os.environ}
+    child_env["PYTHONPATH"]=str(Path(__file__).resolve().parents[1]/"src")
+    result=subprocess.run([sys.executable,'-B','-c',script,path,stage],timeout=20,env=child_env)
     assert result.returncode==(23 if stage=="after_data" else 24)
     journal=DurableJournal(path)
     assert len(journal.replay())==1
