@@ -45,7 +45,8 @@ def execute(*, confirmed=False):
 def test_retrospective_only_development_and_digest():
     report = execute()
     assert report["tier"] == "RETROSPECTIVE_DEV"
-    assert report["dev_eligible"] is True
+    assert report["dev_eligible"] is False
+    assert "DEV_PARTITION_AUTHORITY_NOT_VERIFIED" in report["blocked_reasons"]
     assert report["confirmed_pit_eligible"] is False
     assert report["availability"] == "HISTORICAL_ARRIVAL_UNKNOWN"
     assert "OOS LOCKED" in human_summary(report)
@@ -56,6 +57,7 @@ def test_confirmed_metadata_never_promoted():
     report = execute(confirmed=True)
     assert report["tier"] == "PIT_METADATA_VALID"
     assert report["confirmed_pit_eligible"] is False
+    assert report["dev_eligible"] is False
     assert report["independent_custody"] == "NOT_VERIFIED"
 
 
