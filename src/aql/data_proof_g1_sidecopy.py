@@ -36,6 +36,9 @@ class G1ProofSidecopy:
         except ProofError:
             self.rejected += 1
             return ProofSidecopyAdmission(False, "PROOF_EXPORT_UNAVAILABLE_OR_FULL")
+        if future.done() and future.exception() is not None:
+            self.rejected += 1
+            return ProofSidecopyAdmission(False, "PROOF_EXPORT_UNAVAILABLE_OR_FULL", future)
         return ProofSidecopyAdmission(True, "QUEUED_NOT_DURABLE", future)
 
     @staticmethod
