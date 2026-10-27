@@ -26,7 +26,7 @@ def publish_generation(directory: Path, catalog: Mapping[str, object]) -> Path:
         raise D3IntegrityError("unsafe generation")
     destination = root / (name + ".json")
     pending = root / (name + ".pending")
-    data = _canonical(dict(catalog)) + b"\n"
+    # Validate manifest shape and self-consistency before any local publication.\n    from .d3_synthetic_archive import VERSION, _digest, SparseRecord, _validate, _records\n    raw = dict(catalog)\n    claimed = raw.pop("catalog_digest", None)\n    if set(raw) != {"version", "generation", "consumer", "epoch", "inventory", "inventory_digest"} or raw["version"] != VERSION:\n        raise D3IntegrityError("invalid catalog schema")\n    if raw["generation"] != name or type(raw["epoch"]) is not int or raw["epoch"] < 0:\n        raise D3IntegrityError("invalid generation or epoch")\n    try:\n        rows = tuple(SparseRecord(**row) for row in raw["inventory"])\n        _validate(rows)\n        if _records(tuple(sorted(rows, key=lambda r: r.sequence))) != raw["inventory"]:\n            raise D3IntegrityError("noncanonical archive inventory")\n        if raw["inventory_digest"] != _digest(raw["inventory"]) or claimed != _digest(raw):\n            raise D3IntegrityError("archive manifest checksum mismatch")\n        data = _canonical(dict(catalog)) + b"\\n"\n    except (KeyError, TypeError, ValueError, AttributeError) as exc:\n        raise D3IntegrityError("invalid archive manifest") from exc
     # O_EXCL prevents overwrite, including stale pending generations.
     fd = None
     try:
