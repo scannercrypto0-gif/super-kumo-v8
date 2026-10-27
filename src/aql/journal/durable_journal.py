@@ -208,6 +208,21 @@ class DurableJournal(IntegrityAccess):
         finally:
             conn.close()
 
+    def startup_entry_boundary(self) -> int:
+        """Last journal row ID committed before collection starts.
+
+        AUTOINCREMENT journal IDs form a durable insertion-order boundary;
+        this is not a market-time timestamp or a row-count assumption.
+        """
+        conn = self._connect()
+        try:
+            from ..delivery.authority import deny_legacy
+            deny_legacy(conn)
+            row = conn.execute("SELECT COALESCE(MAX(id), 0) FROM journal_entries").fetchone()
+            return int(row[0])
+        finally:
+            conn.close()
+
     def replay(
         self,
         symbol: Optional[str] = None,
@@ -215,6 +230,7 @@ class DurableJournal(IntegrityAccess):
         final_only: bool = True,
         *, pending_only: bool = False, limit: int | None = None,
         include_quarantined: bool = False,
+        max_entry_id: int | None = None,
     ) -> List[MarketBar]:
         """
         Return eligible committed entries in bar_open order.
@@ -227,6 +243,11 @@ class DurableJournal(IntegrityAccess):
             from ..delivery.authority import deny_legacy
             deny_legacy(conn)
             params: list = []
+            if max_entry_id is not None:
+                if type(max_entry_id) is not int or max_entry_id < 0:
+                    raise ValueError("Non-negative journal entry boundary required")
+                query += " AND id <= ?"
+                params.append(max_entry_id)
             if symbol:
                 query += " AND symbol = ?"
                 params.append(symbol)
@@ -305,6 +326,8 @@ class DurableJournal(IntegrityAccess):
         store,
         symbol: str,
         interval: str,
+        *,
+        startup_max_entry_id: int | None = None,
     ) -> Tuple[int, int, int, List[Tuple[int, int]]]:
         """
         On process restart (including after SIGKILL):
@@ -345,7 +368,8 @@ class DurableJournal(IntegrityAccess):
         interval_ms = _binance_interval_ms(interval)
 
         # Step 1: replay journal — find bars committed locally but absent from store
-        journal_bars = self.replay(symbol=symbol, interval=interval, final_only=True)
+        journal_bars = self.replay(symbol=symbol, interval=interval, final_only=True,
+                                   max_entry_id=startup_max_entry_id)
         stored_keys = store.get_stored_keys(symbol, interval)
 
         bars_replayed = 0
