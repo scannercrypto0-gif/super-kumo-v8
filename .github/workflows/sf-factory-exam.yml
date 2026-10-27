@@ -1,0 +1,48 @@
+name: SF Factory R0 Exam
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "research_wp_r0/factory_exam*.py"
+      - "tests/test_sf_factory_exam.py"
+      - ".github/workflows/sf-factory-exam.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exam:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install pytest pytest-timeout
+      - name: Source and environment
+        shell: bash
+        run: |
+          git rev-parse HEAD | tee exam-source.txt
+          python --version | tee -a exam-source.txt
+          python -m pip freeze | tee -a exam-source.txt
+      - name: Dependency isolation
+        run: python -B research_wp_r0/_dep_guard.py research_wp_r0/factory_exam.py research_wp_r0/factory_exam_example.py
+      - name: Focused falsification
+        run: python -B -m pytest -p no:cacheprovider tests/test_sf_factory_exam.py -v --tb=short --junitxml=exam-tests.xml
+      - name: Require collected tests without skips
+        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('exam-tests.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==27; assert all(int(s.get(k,0))==0 for k in ('errors','failures','skipped'))"
+      - name: Reproduce frozen fixture twice
+        run: python -B -c "import json; from research_wp_r0.factory_exam_example import run_fixture; from research_wp_r0.strategy_definition import digest; a=run_fixture(); assert a==run_fixture(); print(digest(a)); open('exam-example.json','w',encoding='utf-8').write(json.dumps(a,sort_keys=True,indent=2))"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: factory-exam-${{ matrix.os }}
+          path: |
+            exam-source.txt
+            exam-tests.xml
+            exam-example.json
