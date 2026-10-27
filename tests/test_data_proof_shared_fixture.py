@@ -11,6 +11,8 @@ def test_shared_factory_fixture_is_pinned_and_fail_closed():
     for version in versions:
         assert version.eligibility(fixture["decision_cutoff_ms"]) == (
             fixture["expected_local_status"][version.version_id])
+    assert envelope["gap_states"]["BTCUSDT:1m:0"] == "CONFIRMED"
+    assert envelope["gap_states"]["ETHUSDT:1m:0"] == "IN_DOUBT"
     assert envelope["gap_states"]["gap:unknown"] == fixture["expected_gap"]
     assert envelope["provenance_scope"] == "LOCAL_ONLY_UNATTESTED"
     assert fixture["expected_real_pit_admission"] == "REFUSE_UNATTESTED_SOURCE"
