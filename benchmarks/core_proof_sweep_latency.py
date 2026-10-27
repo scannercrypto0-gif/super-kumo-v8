@@ -91,17 +91,26 @@ def trial(root: Path, with_sweep: bool, *, warmup: int = 100,
 
 
 def main() -> None:
+    # Counterbalance warm-cache/order effects: AB then BA, separate databases.
+    runs = []
     with tempfile.TemporaryDirectory(prefix="aql-proof-perf-") as tmp:
         root = Path(tmp)
-        baseline = trial(root / "baseline", False)
-        sweep = trial(root / "sweep", True)
-        ratios = {k: round(sweep[k] / baseline[k], 3)
-                  for k in ("p50_ms", "p95_ms", "p99_ms")
-                  if baseline[k] > 0}
-        print(json.dumps({"baseline": baseline, "with_sweep": sweep,
-                          "ratios": ratios,
-                          "status": "observational_only_not_acceptance"},
-                         indent=2))
+        for repeat, order in enumerate(((False, True), (True, False)), start=1):
+            pair = {}
+            for position, with_sweep in enumerate(order):
+                label = "with_sweep" if with_sweep else "baseline"
+                pair[label] = trial(root / f"r{repeat}_p{position}_{label}",
+                                    with_sweep)
+            ratios = {k: round(pair["with_sweep"][k] / pair["baseline"][k], 3)
+                      for k in ("p50_ms", "p95_ms", "p99_ms")
+                      if pair["baseline"][k] > 0}
+            runs.append({"order": ["with_sweep" if x else "baseline"
+                                    for x in order],
+                         **pair, "ratios": ratios})
+    print(json.dumps({"runs": runs,
+                      "status": "observational_only_not_acceptance",
+                      "caution": "two sequential matched pairs; no SLO inference"},
+                     indent=2))
 
 
 if __name__ == "__main__":
