@@ -616,3 +616,88 @@ def test_R2_original_acceptance_function_is_text_unchanged():
     node=next(n for n in ast.parse(text).body if isinstance(n,ast.FunctionDef)
               and n.name=='test_R2_unbound_operational_store_conflict_must_deny_read')
     assert hashlib.sha256(ast.get_source_segment(text,node).encode()).hexdigest()=='ab467cdba1339ae499d5acad4a6097012ec9d1728b0650de2c5030a9e46c7a5d'
+
+
+def test_R2_configured_legacy_collector_and_recovery_refused_before_effect(tmp_path):
+    from aql.collector.binance_collector import BinanceCollector
+    from aql.pipeline import _run_gap_recovery
+    j,a,e=setup(tmp_path);a.deliver('sandbox',e,2)
+    unrelated=OperationalStore(str(tmp_path/'unrelated.sqlite'))
+    with pytest.raises(PublicationDenied): BinanceCollector('BTCUSDT','1m',j,unrelated)
+    with patch('aql.pipeline.recover_gap') as rest:
+        with pytest.raises(PublicationDenied): _run_gap_recovery(j,unrelated,'BTCUSDT','1m',0,180000)
+        rest.assert_not_called()
+    assert unrelated.count()==0
+    with pytest.raises(PublicationDenied,match='legacy writer retries'): j.commit(bar(1))
+    assert a.read('sandbox',2)['bar_open']==60000
+
+
+def test_R2_collector_constructed_before_activation_prevents_activation(tmp_path):
+    from aql.collector.binance_collector import BinanceCollector
+    j=DurableJournal(str(tmp_path/'source.sqlite'));j.commit(bar())
+    unrelated=OperationalStore(str(tmp_path/'unrelated.sqlite'))
+    collector=BinanceCollector('BTCUSDT','1m',j,unrelated)
+    registered=OperationalStore(str(tmp_path/'registered.sqlite'))
+    with pytest.raises(PublicationDenied,match='configured legacy writers'):
+        Authority(j,limits=Limits(4,8192,2,64),synthetic=True,stores=[registered])
+    # Refuse source conversion, rather than pretending to recall already
+    # prefetched legacy records or auto-enroll the old collector's target.
+    assert unrelated.count()==0
+    assert len(j.replay())==1
+
+
+@pytest.mark.parametrize('client',['consumer','sandbox','startup','recovery'])
+def test_R2_supported_legacy_clients_prevent_later_activation(tmp_path,client):
+    from aql.lanes import JournalConsumer
+    from aql.pipeline import _run_gap_recovery
+    from aql.storage.sandbox_store import SandboxReplicator
+    j=DurableJournal(str(tmp_path/'source.sqlite'));j.commit(bar())
+    target=OperationalStore(str(tmp_path/'legacy.sqlite'))
+    if client=='consumer': JournalConsumer(j,target,'BTCUSDT','1m')
+    elif client=='sandbox': SandboxReplicator(j,Mock(),str(tmp_path/'cursor.sqlite'))
+    elif client=='startup':
+        with patch('aql.journal.durable_journal.time.time',return_value=60):
+            j.startup_reconcile(target,'BTCUSDT','1m')
+    else:
+        with patch('aql.pipeline.recover_gap',return_value=([],None)):
+            _run_gap_recovery(j,target,'BTCUSDT','1m',0,60000)
+    fresh=OperationalStore(str(tmp_path/'new.sqlite'))
+    with pytest.raises(PublicationDenied,match='configured legacy writers'):
+        Authority(j,limits=Limits(4,8192,2,64),synthetic=True,stores=[fresh])
+
+
+def test_R2_activation_reservation_refuses_concurrent_legacy_registration(tmp_path):
+    import aql.delivery.store_binding as module
+    from aql.delivery.authority import register_legacy_writer
+    j=DurableJournal(str(tmp_path/'source.sqlite'));j.commit(bar())
+    store=OperationalStore(str(tmp_path/'store.sqlite'))
+    entered,release=threading.Event(),threading.Event()
+    original=module.freeze_stores
+    def pause(*args):
+        entered.set();assert release.wait(10)
+        return original(*args)
+    with patch.object(module,'freeze_stores',side_effect=pause),ThreadPoolExecutor(1) as pool:
+        activation=pool.submit(Authority,j,limits=Limits(4,8192,2,64),synthetic=True,stores=[store])
+        assert entered.wait(10)
+        try:
+            with pytest.raises(PublicationDenied): register_legacy_writer(j,'collector')
+            with pytest.raises(PublicationDenied): j.commit(bar())
+            with pytest.raises(PublicationDenied): j.replay()
+        finally: release.set()
+        a=activation.result(10)
+    e=a.fence('sandbox');a.deliver('sandbox',e,1)
+    assert a.read('sandbox',1)['bar_open']==0
+
+
+def test_R2_failed_activation_reservation_survives_restart(tmp_path):
+    from aql.delivery.authority import register_legacy_writer
+    j=DurableJournal(str(tmp_path/'source.sqlite'));j.commit(bar())
+    store=OperationalStore(str(tmp_path/'store.sqlite'))
+    with patch('aql.delivery.store_binding.freeze_stores',side_effect=OSError('enrollment interrupted')):
+        with pytest.raises(OSError): Authority(j,limits=Limits(4,8192,2,64),synthetic=True,stores=[store])
+    reopened=DurableJournal(j.db_path)
+    with pytest.raises(PublicationDenied): reopened.commit(bar())
+    with pytest.raises(PublicationDenied): reopened.replay()
+    with pytest.raises(PublicationDenied): register_legacy_writer(reopened,'collector')
+    with pytest.raises(PublicationDenied):
+        Authority(reopened,limits=Limits(4,8192,2,64),synthetic=True,stores=[store])

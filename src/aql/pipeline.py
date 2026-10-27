@@ -52,6 +52,10 @@ def _run_gap_recovery(
     are already in the store; we still mark those persisted since the data
     IS durably stored — we just didn't add a new row.)
     """
+    # Legacy recovery is not a registered v2 writer. Refuse before reading
+    # unrelated store coverage or issuing REST, even for matching source rows.
+    from .delivery.authority import register_legacy_writer
+    register_legacy_writer(journal, 'gap-recovery')
     logger.info(
         "Running gap recovery: %s %s gap=[%d, %d] duration_s=%.0f",
         symbol, interval, gap_start_ms, gap_end_ms,

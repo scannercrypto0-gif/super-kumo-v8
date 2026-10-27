@@ -166,7 +166,9 @@ class DurableJournal(IntegrityAccess):
         try:
             conn.execute("BEGIN IMMEDIATE")
             prior = self._original_bar(conn,bar.stable_key())
-            from ..delivery.authority import enabled, PublicationDenied
+            from ..delivery.authority import enabled, activation_reserved, PublicationDenied
+            if activation_reserved(conn) and not enabled(conn):
+                raise PublicationDenied("Incomplete v2 activation; legacy writes denied")
             if prior is None and enabled(conn):
                 raise PublicationDenied("Finite v2 source is frozen; no legacy appends")
             if prior is not None and content(prior) != material:
@@ -181,6 +183,10 @@ class DurableJournal(IntegrityAccess):
                 raise ContentConflictError(evidence)
             require_eligible_db(conn,bar.stable_key())
             if prior is not None:
+                if enabled(conn):
+                    # A legacy collector created before activation must not
+                    # treat a matching retry as authority to write another DB.
+                    raise PublicationDenied("Activated source refuses legacy writer retries")
                 conn.execute("COMMIT")
                 return False  # identical retry; no fabricated new/legacy timestamp
             conn.execute("INSERT INTO journal_entries "
@@ -333,6 +339,8 @@ class DurableJournal(IntegrityAccess):
         (pipeline) uses the returned gap list to invoke recover_gap().
         """
         from ..recovery.gap_recovery import _binance_interval_ms
+        from ..delivery.authority import register_legacy_writer
+        register_legacy_writer(self, 'startup-reconcile')
 
         interval_ms = _binance_interval_ms(interval)
 

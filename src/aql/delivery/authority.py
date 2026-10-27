@@ -27,8 +27,31 @@ def enabled(conn):
 
 
 def deny_legacy(conn):
-    if enabled(conn):
+    if enabled(conn) or activation_reserved(conn):
         raise PublicationDenied("v2 synthetic source requires protected authority reader")
+
+
+def activation_reserved(conn):
+    return bool(conn.execute("SELECT 1 FROM journal_meta WHERE key='core128_activation_reserved'").fetchone()) if conn.execute("SELECT 1 FROM sqlite_master WHERE name='journal_meta'").fetchone() else False
+
+
+def register_legacy_writer(journal, kind):
+    """One-way offline precondition; never migrate a configured v1 pipeline.
+
+    A persisted marker protects already-prefetched batches too: subsequent v2
+    activation refuses this source instead of guessing whether old clients died.
+    """
+    from ..journal.durable_journal import DurableJournal
+    if not isinstance(journal, DurableJournal):
+        return  # Existing test/protocol doubles are not SQLite v2 sources.
+    conn = journal._connect()
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+        deny_legacy(conn)
+        conn.execute("INSERT OR IGNORE INTO journal_meta VALUES('core128_legacy_writer_seen',?)", (kind,))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def fault_path(conn):
@@ -220,6 +243,9 @@ class Authority:
                 if anchor is not None: raise PublicationDenied("Missing authority generation")
                 if not stores:
                     raise PublicationDenied("Explicit OperationalStore writer binding required")
+                conn.execute('BEGIN IMMEDIATE')
+                if activation_reserved(conn) or conn.execute("SELECT 1 FROM journal_meta WHERE key='core128_legacy_writer_seen'").fetchone():
+                    raise PublicationDenied("Source has configured legacy writers or incomplete activation; fresh offline source required")
                 rows = _source(conn)
                 if len(rows) > limits.max_records or len(canonical(rows)) > limits.max_bytes:
                     raise PublicationDenied("Source exceeds finite synthetic admission")
@@ -230,6 +256,10 @@ class Authority:
                                     policy="synthetic-v2", cutoff_ms=int(time.time()*1000))
                 self.anchor = dict(source=journal.instance_id,path=str(Path(journal.db_path).resolve()),
                                    inventory=digest(rows), limits=limits.__dict__)
+                # Reservation survives any later cross-file enrollment failure.
+                # It prevents new legacy registrations during activation.
+                conn.execute("INSERT INTO journal_meta VALUES('core128_activation_reserved','1')")
+                conn.commit()
                 from .store_binding import freeze_stores
                 self.anchor.update(freeze_stores(self, stores))
                 conn.executescript("""

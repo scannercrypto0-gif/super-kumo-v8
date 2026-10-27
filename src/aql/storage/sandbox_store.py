@@ -93,6 +93,8 @@ class SandboxReplicator:
     """
     def __init__(self, journal, remote: BarStore, checkpoint_path: str,
                  *, consumer_id="supabase-sandbox", batch_size=64):
+        from ..delivery.authority import register_legacy_writer
+        register_legacy_writer(journal, 'sandbox-replicator')
         if type(batch_size) is not int or not 1 <= batch_size <= 1000:
             raise ValueError("Invalid batch size")
         self.journal, self.remote = journal, remote

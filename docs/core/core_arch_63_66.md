@@ -1,4 +1,4 @@
-# CORE-128: R2 source/store binding candidate — independent acceptance pending
+# CORE-128: R2 source/store binding candidate â€” independent acceptance pending
 
 Project AQL-CRYPTO-RESEARCH-001. Owner repair handoff: PR #129 comment
 6417847879, followed by continuation 6417931579 and the current direct repair
@@ -17,7 +17,7 @@ merge by another actor. Subsequent Factory #130 is a separate open Draft;
 its delivery and latest #77/#92 design/review records were consulted for scope.
 Unavailable originating Work chats/Library DESIGN-2 artifact were not reread or
 claimed accessible in this repair. Prior handoff records DESIGN-2 as preparation,
-not executed T01–T32. Architectural approvals remain provisional until G0.
+not executed T01â€“T32. Architectural approvals remain provisional until G0.
 
 ## Explicit activation contract
 
@@ -45,6 +45,18 @@ remains independent. Missing binding refuses Authority activation altogether.
 Reopen requires the separately retained source anchor and current progress head.
 Existing pre-binding v2 sources are not silently migrated; missing registrations
 fail closed. No existing pipeline is activated by this repair.
+
+Activation is OFFLINE/FRESH-SOURCE ONLY. Supported legacy Collector (including
+run), JournalConsumer, startup reconciliation, gap recovery and sandbox replicator
+record a one-way durable source registration before operational work. Activation
+refuses a source ever configured to those clients, covering already-prefetched
+batches without guessing whether a client has exited. No deregistration/conversion
+is supplied. Conversely activation durably reserves the source under the same
+BEGIN IMMEDIATE discipline BEFORE cross-file enrollment; later legacy client
+registration, raw appends/retries and reads are refused even if enrollment crashes
+before core128_meta exists. A failed reservation needs maintenance reconciliation,
+not automatic legacy fallback. This is conservative refusal, not in-flight recall.
+The Collector/Recovery entry guards perform no network operation in tests.
 
 ## Ordering, denial, and restart
 
@@ -129,7 +141,7 @@ legacy delivery cursor, archive v1 schemas/verifiers and Factory remain unchange
 D1-C/R2 is a CANDIDATE until independent adversarial verification and exact-head
 Ubuntu/Windows gate+compatibility pass. Keep #128 OPEN, #129 Draft/unmerged.
 D2 full external-effect/receipt protocol, partial archive/coverage/backup/restore v2,
-full T01–T32 acceptance and real expected-inventory authority are NOT delivered by
+full T01â€“T32 acceptance and real expected-inventory authority are NOT delivered by
 this R2 repair. D4-C remains an unconfirmed recommendation; no COMPLETE is emitted.
 Only after independently accepted D1 may the remaining staged work resume.
 
@@ -151,5 +163,25 @@ Only after independently accepted D1 may the remaining staged work resume.
 
 Prior R1/R3/R4/R5/R6 regression tests are retained. Prior independent review at
 #129/6417641355 is historical evidence, not approval of this new candidate.
-A separate review agent is requested on a pinned revision; no GitHub APPROVED
+A separate review agent is requested on every revised pinned source; no GitHub APPROVED
 review, owner merge consent or phase closure is implied by an author test run.
+
+
+## Subsequent self-review: configured legacy pipeline edge
+
+Source83cd49d passed native gate56 and compatibility Ubuntu264/2skip,
+Windows256/10skip, plus independent adapter review. It was NOT used as final
+phase acceptance. Subsequent self-review found a legacy Collector could accept a
+matching journal retry then write an unbound store before its legacy ACK failed.
+The new offline source-registration/reservation rule and matching-retry refusal
+close that admission route. Extra tests cover configured Collector/Consumer/
+Recovery/Sandbox rejection, preconfigured-source activation refusal, concurrent
+registration versus activation reservation and failed-reservation restart denial.
+The latest source requires NEW independent review and exact-head native CI.
+
+Repair-specific Core allowlist includes delivery authority/store_binding,
+storage operational_store/sandbox_store, g1_integrity, journal durable_journal,
+collector binance_collector, pipeline recovery entry, lanes consumer entry,
+the acceptance tests and this document. Those extra entry guards are necessary
+source-writer admission checks, not new pipeline activation or Factory work.
+No GitHub workflow was weakened or changed in the net repair diff.
