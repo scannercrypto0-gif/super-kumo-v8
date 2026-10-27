@@ -104,6 +104,7 @@ def prepare_candidate(target, incoming, *, force=False):
 
 def _replay(conn):
     states, epochs, blocked = {}, {}, set()
+    store_state = None
     previous = "0"*64
     initialized=False
     for index, (seq, raw, hashed) in enumerate(conn.execute("SELECT * FROM core128_events ORDER BY seq"), 1):
@@ -120,6 +121,11 @@ def _replay(conn):
             meta=conn.execute("SELECT value FROM core128_meta WHERE singleton=1").fetchone()
             if meta is None or data!=json.loads(meta[0]): raise PublicationDenied("Genesis anchor mismatch")
             initialized=True
+            from .store_binding import initial_state
+            store_state = initial_state(data)
+        elif op.startswith("STORE_"):
+            from .store_binding import apply_store_event
+            apply_store_event(store_state, op, data)
         elif op == "FENCE":
             c = data["consumer"]
             if (not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}",c) or type(data['epoch']) is not int
@@ -202,7 +208,8 @@ class Limits:
 
 
 class Authority:
-    def __init__(self, journal, *, limits, synthetic=False, anchor=None, checkpoint=None):
+    def __init__(self, journal, *, limits, synthetic=False, anchor=None, checkpoint=None,
+                 stores=()):
         if synthetic is not True:
             raise PublicationDenied("No real-mode authority implementation")
         limits.validate()
@@ -211,6 +218,8 @@ class Authority:
         with self._connection() as conn:
             if not enabled(conn):
                 if anchor is not None: raise PublicationDenied("Missing authority generation")
+                if not stores:
+                    raise PublicationDenied("Explicit OperationalStore writer binding required")
                 rows = _source(conn)
                 if len(rows) > limits.max_records or len(canonical(rows)) > limits.max_bytes:
                     raise PublicationDenied("Source exceeds finite synthetic admission")
@@ -221,6 +230,8 @@ class Authority:
                                     policy="synthetic-v2", cutoff_ms=int(time.time()*1000))
                 self.anchor = dict(source=journal.instance_id,path=str(Path(journal.db_path).resolve()),
                                    inventory=digest(rows), limits=limits.__dict__)
+                from .store_binding import freeze_stores
+                self.anchor.update(freeze_stores(self, stores))
                 conn.executescript("""
                 CREATE TABLE core128_meta(singleton INTEGER PRIMARY KEY CHECK(singleton=1),value TEXT NOT NULL);
                 CREATE TABLE core128_events(seq INTEGER PRIMARY KEY,body TEXT NOT NULL,hash TEXT NOT NULL);
@@ -267,7 +278,7 @@ class Authority:
         finally:
             conn.close()
 
-    def _verify(self, conn):
+    def _verify(self, conn, *, pending_store_intent=None):
         if str(fault_path(conn)) in _PROCESS_FAULTS or fault_path(conn).exists():
             raise PublicationDenied("BOOTSTRAP_BLOCKED: failed conflict write")
         meta = conn.execute("SELECT value FROM core128_meta WHERE singleton=1").fetchone()
@@ -280,6 +291,8 @@ class Authority:
         if self.journal.instance_id != self.anchor["source"] or digest(_source(conn)) != self.anchor["inventory"]:
             raise PublicationDenied("Full source record inventory changed")
         states, epochs, blocked = _replay(conn)
+        from .store_binding import verify_bindings
+        verify_bindings(conn, self.anchor, pending_store_intent=pending_store_intent)
         projected = {"states": [[c,s,v] for (c,s),v in sorted(states.items())],
                      "epochs": epochs, "blocked": sorted(blocked)}
         p = conn.execute("SELECT value FROM core128_projection WHERE singleton=1").fetchone()
@@ -436,6 +449,20 @@ class Authority:
 
     def reader(self, consumer):
         return ProtectedReader(lambda seq:self.read(consumer,seq))
+
+    def store_writer(self, store):
+        """Validate a configured writer; never enroll it implicitly on reopen."""
+        from .store_binding import store_state
+        with self._transaction() as conn:
+            token = getattr(store, '_core128_token', None)
+            if not token or token[0] not in [i['binding'] for i in self.anchor['stores']]:
+                raise PublicationDenied("Unbound configured store writer")
+            binding, epoch = token
+            if str(Path(store.db_path).resolve()) != binding['path']:
+                raise PublicationDenied("Store writer path changed")
+            if store_state(conn, self.anchor)[binding['store']]['epoch'] != epoch:
+                raise PublicationDenied("Stale store writer fence")
+        return store
 
 
 class ProtectedReader:

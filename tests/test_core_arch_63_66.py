@@ -12,6 +12,7 @@ from aql.delivery.authority import Authority, Limits, PublicationDenied
 from aql.g1_integrity import ContentConflictError
 from aql.journal.durable_journal import DurableJournal
 from aql.models.bar import MarketBar
+from aql.storage.operational_store import OperationalStore
 
 
 def bar(i=0, **kwargs):
@@ -23,7 +24,10 @@ def setup(root,n=3,**kwargs):
     j=DurableJournal(str(root/'source.sqlite'))
     for i in range(n): j.commit(bar(i))
     limits=Limits(max_records=32,max_bytes=131072,timeout_seconds=2,max_events=256)
-    a=Authority(j,limits=limits,synthetic=True,**kwargs)
+    # Activation now explicitly enrolls a fresh store. The historical R2 test
+    # body is unchanged; separate tests preserve the genuinely-unbound premise.
+    store=OperationalStore(str(root/'store.sqlite'))
+    a=Authority(j,limits=limits,synthetic=True,stores=[store],**kwargs)
     return j,a,a.fence('sandbox')
 
 
@@ -336,7 +340,8 @@ def test_E07_concurrent_publication_has_one_receipt(tmp_path):
 
 def test_T31_event_capacity_is_fail_closed_without_eviction(tmp_path):
     j=DurableJournal(str(tmp_path/'source.sqlite'));j.commit(bar())
-    a=Authority(j,limits=Limits(4,8192,2,4),synthetic=True);e=a.fence('sandbox')
+    a=Authority(j,limits=Limits(4,8192,2,4),synthetic=True,
+                stores=[OperationalStore(str(tmp_path/'store.sqlite'))]);e=a.fence('sandbox')
     sid=a.stage('sandbox',e,1);receipt=a.publish('sandbox',e,1,sid)
     with pytest.raises(PublicationDenied,match='ledger full'): a.settle('sandbox',e,1,receipt=receipt)
     assert a.view('sandbox')==dict(D=[],W=[],V=[1],S=0)
@@ -344,8 +349,205 @@ def test_T31_event_capacity_is_fail_closed_without_eviction(tmp_path):
 
 def test_R6_reopen_cannot_raise_frozen_capacity(tmp_path):
     j=DurableJournal(str(tmp_path/'source.sqlite'));j.commit(bar())
-    a=Authority(j,limits=Limits(1,8192,2,32),synthetic=True)
+    a=Authority(j,limits=Limits(1,8192,2,32),synthetic=True,
+                stores=[OperationalStore(str(tmp_path/'store.sqlite'))])
     e=a.fence('sandbox');a.stage('sandbox',e,1)
     with pytest.raises(PublicationDenied,match='Runtime limits'):
         Authority(DurableJournal(j.db_path),limits=Limits(32,8192,2,32),synthetic=True,
                   anchor=a.anchor,checkpoint=a.checkpoint())
+
+
+def test_R2_no_binding_activation_is_refused_not_guessed(tmp_path):
+    j=DurableJournal(str(tmp_path/'source.sqlite'));j.commit(bar())
+    unrelated=OperationalStore(str(tmp_path/'unrelated.sqlite'))
+    unrelated.upsert(bar())
+    with pytest.raises(PublicationDenied,match='Explicit OperationalStore'):
+        Authority(j,limits=Limits(4,8192,2,32),synthetic=True)
+    # No successful activation/ProtectedReader exists. The unrelated v1 DB is
+    # not magically enrolled by matching market keys, and v1 remains intact.
+    assert len(j.replay())==1 and unrelated.count()==1
+
+
+def test_R2_unbound_configured_writer_rejected_before_effect(tmp_path):
+    j,a,e=setup(tmp_path);a.deliver('sandbox',e,2)
+    unrelated=OperationalStore(str(tmp_path/'unrelated.sqlite'))
+    with pytest.raises(PublicationDenied,match='Unbound configured'):
+        a.store_writer(unrelated)
+    assert unrelated.count()==0
+    # A truly unrelated legacy store has no source authority to contaminate.
+    unrelated.upsert(bar(1))
+    with pytest.raises(ContentConflictError): unrelated.upsert(bar(1,close=100.5))
+    assert a.read('sandbox',2)['bar_open']==60000
+
+
+def test_R2_writer_created_before_registration_cannot_bypass(tmp_path):
+    j=DurableJournal(str(tmp_path/'source.sqlite'));j.commit(bar())
+    path=str(tmp_path/'store.sqlite')
+    preexisting=OperationalStore(path);registered=OperationalStore(path)
+    a=Authority(j,limits=Limits(4,8192,2,64),synthetic=True,stores=[registered])
+    with pytest.raises(PublicationDenied,match='Unbound configured'):
+        preexisting.upsert(bar())
+    assert preexisting.count()==0
+    assert a.store_writer(registered).upsert(bar())
+
+
+def test_R2_registered_reopen_propagates_conflict_and_preserves_other_key(tmp_path):
+    j,a,e=setup(tmp_path)
+    for seq in (1,2,3): a.deliver('sandbox',e,seq)
+    store=a.store_writer(OperationalStore(str(tmp_path/'store.sqlite')))
+    store.upsert(bar(1))
+    with pytest.raises(ContentConflictError): store.upsert(bar(1,close=100.5))
+    with pytest.raises(ContentConflictError): reopen(a).reader('sandbox').read(2)
+    assert reopen(a).view('sandbox')==dict(D=[1,2,3],W=[],V=[1,3],S=3)
+    assert a.read('sandbox',1)['bar_open']==0
+    assert a.read('sandbox',3)['bar_open']==120000
+    # Repeated quarantine remains blocked; it cannot reinstate eligibility.
+    with pytest.raises(ContentConflictError): store.upsert(bar(1))
+    with pytest.raises(ContentConflictError): a.read('sandbox',2)
+
+
+@pytest.mark.parametrize('mode',['missing','new_db','old_snapshot','changed_path'])
+def test_R2_store_identity_or_state_replacement_denies(tmp_path,mode):
+    from pathlib import Path
+    j,a,e=setup(tmp_path);a.deliver('sandbox',e,2)
+    path=tmp_path/'store.sqlite'
+    store=OperationalStore(str(path))
+    backup=sqlite3.connect(tmp_path/'old.sqlite')
+    with store._connect() as conn: conn.backup(backup)
+    conn.close()
+    backup.close()
+    store.upsert(bar(1))
+    if mode=='missing':
+        # All managed handles are closed; disposable fixture file only.
+        path.rename(tmp_path/'removed.sqlite')
+    elif mode=='new_db':
+        with sqlite3.connect(tmp_path/'replacement.sqlite') as replacement:
+            with sqlite3.connect(path) as target: replacement.backup(target)
+    elif mode=='old_snapshot':
+        with sqlite3.connect(tmp_path/'old.sqlite') as old:
+            with sqlite3.connect(path) as target: old.backup(target)
+    else:
+        store.db_path=str(tmp_path/'different.sqlite')
+        with pytest.raises(PublicationDenied,match='path changed'): store.upsert(bar(1))
+        return
+    with pytest.raises((PublicationDenied,sqlite3.DatabaseError)):
+        a.reader('sandbox').read(2)
+
+
+def test_R2_store_writer_epoch_fenced_across_reopen(tmp_path):
+    from aql.delivery.store_binding import fence_store
+    j,a,e=setup(tmp_path);a.deliver('sandbox',e,2)
+    old=OperationalStore(str(tmp_path/'store.sqlite'))
+    assert fence_store(a,old)==2
+    with pytest.raises(PublicationDenied,match='Stale store writer'): old.upsert(bar(1))
+    fresh=OperationalStore(str(tmp_path/'store.sqlite'))
+    assert reopen(a).store_writer(fresh).upsert(bar(1))
+    with pytest.raises(ContentConflictError): fresh.upsert(bar(1,close=100.5))
+    with pytest.raises(ContentConflictError): a.read('sandbox',2)
+
+
+@pytest.mark.parametrize('failure',['source_audit','store_audit','completion','post_commit'])
+def test_R2_audit_or_completion_failure_retains_durable_denial(tmp_path,failure):
+    import aql.delivery.store_binding as module
+    j,a,e=setup(tmp_path);a.deliver('sandbox',e,2)
+    store=OperationalStore(str(tmp_path/'store.sqlite'));store.upsert(bar(1))
+    actual=module.record_event
+    def fail(conn,*args,**kwargs):
+        is_source=bool(conn.execute("SELECT 1 FROM sqlite_master WHERE name='journal_entries'").fetchone())
+        if (failure=='source_audit' and is_source) or (failure=='store_audit' and not is_source):
+            raise sqlite3.OperationalError('injected audit failure')
+        return actual(conn,*args,**kwargs)
+    original_append=module._append
+    def append(conn,op,data):
+        if failure=='completion' and op=='STORE_COMMIT':
+            raise sqlite3.OperationalError('injected completion failure')
+        return original_append(conn,op,data)
+    if failure=='post_commit':
+        store.binding_fault=lambda stage: (_ for _ in ()).throw(sqlite3.OperationalError('after store commit')) if stage=='after_store_commit' else None
+    with patch.object(module,'record_event',side_effect=fail),patch.object(module,'_append',side_effect=append):
+        with pytest.raises(sqlite3.OperationalError): store.upsert(bar(1,close=100.5))
+    for attempt in range(2):
+        with pytest.raises(PublicationDenied): a.reader('sandbox').read(2)
+        with pytest.raises(PublicationDenied): reopen(a)
+    with j._connect() as conn:
+        assert sum(json.loads(r[0])['op']=='STORE_INTENT' for r in conn.execute('SELECT body FROM core128_events'))==2
+
+
+@pytest.mark.parametrize('winner',['publish','intent'])
+def test_R2_store_conflict_publish_serialization(tmp_path,winner):
+    j,a,e=setup(tmp_path);sid=a.stage('sandbox',e,2)
+    store=OperationalStore(str(tmp_path/'store.sqlite'));store.upsert(bar(1))
+    entered,release=threading.Event(),threading.Event()
+    def pause(stage):
+        if stage==('before_publish' if winner=='publish' else 'after_intent'):
+            entered.set();assert release.wait(10)
+    def quarantine():
+        with pytest.raises(ContentConflictError): store.upsert(bar(1,close=100.5))
+    if winner=='publish':
+        a.fault=pause
+        with ThreadPoolExecutor(2) as pool:
+            published=pool.submit(a.publish,'sandbox',e,2,sid)
+            assert entered.wait(10)
+            blocked=pool.submit(quarantine)
+            release.set();assert published.result(10);blocked.result(10)
+    else:
+        store.binding_fault=pause
+        with ThreadPoolExecutor(2) as pool:
+            blocked=pool.submit(quarantine)
+            assert entered.wait(10)
+            try:
+                with pytest.raises(PublicationDenied,match='denial intent'): a.publish('sandbox',e,2,sid)
+                with pytest.raises(PublicationDenied): a.read('sandbox',2)
+            finally: release.set()
+            blocked.result(10)
+    a.fault=lambda _:None
+    with pytest.raises(ContentConflictError): a.reader('sandbox').read(2)
+    with pytest.raises(ContentConflictError): a.settle('sandbox',e,2,receipt='forged')
+
+
+@pytest.mark.parametrize('window',['after_intent','after_store_commit','before_source_commit'])
+def test_R2_store_process_exit_retains_denial_on_restart(tmp_path,window):
+    import os,subprocess,sys
+    from pathlib import Path
+    j,a,e=setup(tmp_path);a.deliver('sandbox',e,2)
+    store=OperationalStore(str(tmp_path/'store.sqlite'));store.upsert(bar(1))
+    script='''
+import os,sys
+from dataclasses import replace
+from aql.storage.operational_store import OperationalStore
+from aql.models.bar import MarketBar
+s=OperationalStore(sys.argv[1])
+s.binding_fault=lambda stage:os._exit(29) if stage==sys.argv[2] else None
+b=MarketBar('BTCUSDT','1m',60000,119999,100.,101.,99.,100.5,1.,True,'synthetic-core128',120000).with_checksum()
+s.upsert(b)
+'''
+    env={k:os.environ[k] for k in ('PATH','SYSTEMROOT','WINDIR','TEMP','TMP') if k in os.environ}
+    env['PYTHONPATH']=str(Path(__file__).resolve().parents[1]/'src')
+    p=subprocess.run([sys.executable,'-B','-c',script,store.db_path,window],env=env,
+                     capture_output=True,text=True,timeout=30)
+    assert p.returncode==29,p.stderr
+    # Even a current head read by this independent parent fixture cannot clear
+    # the unresolved intent. No successful store completion/ACK is fabricated.
+    with j._connect() as conn:
+        head=tuple(conn.execute('SELECT seq,hash FROM core128_events ORDER BY seq DESC LIMIT 1').fetchone())
+    with pytest.raises(PublicationDenied): a.read('sandbox',2)
+    with pytest.raises(PublicationDenied):
+        Authority(DurableJournal(j.db_path),limits=a.limits,synthetic=True,anchor=a.anchor,checkpoint=head)
+
+
+def test_R2_bound_store_legacy_coverage_and_outside_inventory_denied(tmp_path):
+    j,a,e=setup(tmp_path)
+    store=OperationalStore(str(tmp_path/'store.sqlite'))
+    with pytest.raises(PublicationDenied): store.get_stored_keys('BTCUSDT','1m')
+    with pytest.raises(PublicationDenied): store.get_range('BTCUSDT','1m')
+    with pytest.raises(PublicationDenied,match='outside frozen'): store.upsert(bar(9))
+    assert store.count()==0
+
+
+def test_R2_mirrored_quarantine_uses_bound_protocol(tmp_path):
+    j,a,e=setup(tmp_path);a.deliver('sandbox',e,2)
+    store=OperationalStore(str(tmp_path/'store.sqlite'));store.upsert(bar(1))
+    with pytest.raises(ContentConflictError) as error: j.commit(bar(1,close=100.5))
+    store.quarantine(error.value)
+    with pytest.raises(ContentConflictError): a.read('sandbox',2)
+    assert store.quarantined_keys()=={bar(1).stable_key()}
