@@ -14,7 +14,7 @@ class SweepProgress:
         self.db = sqlite3.connect(str(path), isolation_level=None)
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA synchronous=FULL")
-        self.db.execute("""CREATE TABLE IF NOT EXISTS proof_sweep_progress(
+        self.db.execute("""CREATE TABLE IF NOT EXISTS proof_sweep_generation(\n            journal_instance TEXT NOT NULL, symbol TEXT NOT NULL,\n            interval TEXT NOT NULL, generation INTEGER NOT NULL,\n            PRIMARY KEY(journal_instance,symbol,interval))""")\n        self.db.execute("""CREATE TABLE IF NOT EXISTS proof_sweep_progress(
             journal_instance TEXT NOT NULL, symbol TEXT NOT NULL,
             interval TEXT NOT NULL, cursor INTEGER NOT NULL,
             high_water INTEGER NOT NULL,
@@ -26,7 +26,7 @@ class SweepProgress:
             (instance, symbol, interval)).fetchone()
         return tuple(row) if row else None
 
-    def save(self, instance, symbol, interval, cursor, high_water, *, expected=None):
+    def generation(self, instance, symbol, interval):\n        row = self.db.execute(\n            "SELECT generation FROM proof_sweep_generation WHERE journal_instance=? AND symbol=? AND interval=?",\n            (instance, symbol, interval)).fetchone()\n        return int(row[0]) if row else 0\n\n    def save(self, instance, symbol, interval, cursor, high_water, *, expected=None, expected_generation=None):
         if any(type(x) is not int or x < 0 for x in (cursor, high_water)):
             raise ProofError("invalid sweep checkpoint")
         self.db.execute("BEGIN IMMEDIATE")
@@ -36,7 +36,7 @@ class SweepProgress:
                 raise ProofError("stale sweep checkpoint update")
             if current is not None and (high_water != current[1] or cursor < current[0]):
                 raise ProofError("sweep checkpoint regression")
-            self.db.execute("""INSERT INTO proof_sweep_progress VALUES(?,?,?,?,?)
+            if current is None:\n                self.db.execute("""INSERT INTO proof_sweep_generation VALUES(?,?,?,1)\n                    ON CONFLICT(journal_instance,symbol,interval)\n                    DO UPDATE SET generation=generation+1""",\n                    (instance, symbol, interval))\n            self.db.execute("""INSERT INTO proof_sweep_progress VALUES(?,?,?,?,?)
                 ON CONFLICT(journal_instance,symbol,interval)
                 DO UPDATE SET cursor=excluded.cursor,high_water=excluded.high_water""",
                 (instance, symbol, interval, cursor, high_water))
@@ -45,10 +45,10 @@ class SweepProgress:
             self.db.execute("ROLLBACK")
             raise
 
-    def clear(self, instance, symbol, interval, *, expected):
+    def clear(self, instance, symbol, interval, *, expected, expected_generation=None):
         self.db.execute("BEGIN IMMEDIATE")
         try:
-            if self.state(instance, symbol, interval) != expected:
+            if expected_generation is not None and self.generation(instance, symbol, interval) != expected_generation:\n                raise ProofError("stale sweep generation")\n            if self.state(instance, symbol, interval) != expected:
                 raise ProofError("stale sweep checkpoint clear")
             self.db.execute("DELETE FROM proof_sweep_progress WHERE journal_instance=? AND symbol=? AND interval=?",
                             (instance, symbol, interval))
@@ -72,7 +72,7 @@ def run_sweep_slice(journal, registry, progress, *, symbol, interval,
     state = progress.state(instance, symbol, interval)
     if state is None:
         state = (0, journal.startup_entry_boundary())
-        progress.save(instance, symbol, interval, *state, expected=None)
+        progress.save(instance, symbol, interval, *state, expected=None,\n                      expected_generation=generation)\n        generation = progress.generation(instance, symbol, interval)
     cursor, high_water = state
     added = existing = pages = 0
     for _ in range(max_pages):
@@ -87,13 +87,13 @@ def run_sweep_slice(journal, registry, progress, *, symbol, interval,
         previous = (cursor, high_water)
         cursor = result["next_cursor"]
         progress.save(instance, symbol, interval, cursor, high_water,
-                      expected=previous)
+                      expected=previous, expected_generation=generation)
         if result["failed_key"]:
             return {"complete": False, "failed_key": result["failed_key"],
                     "added": added, "existing": existing, "pages": pages}
         if result["complete"]:
             progress.clear(instance, symbol, interval,
-                           expected=(cursor, high_water))
+                           expected=(cursor, high_water),\n                           expected_generation=generation)
             return {"complete": True, "failed_key": None,
                     "added": added, "existing": existing, "pages": pages}
     return {"complete": False, "failed_key": None,
