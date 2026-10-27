@@ -37,7 +37,7 @@ def test_new_entries_wait_until_next_bounded_sweep_cycle(tmp_path):
     second = run_sweep_slice(journal, registry, progress,
         symbol="BTCUSDT", interval="1m", page_size=1, max_pages=3)
     assert second["complete"] and second["added"] == 1
-    assert registry.revisions(late.stable_key()) == []
+    assert not registry.revisions(late.stable_key())
 
     next_cycle = run_sweep_slice(journal, registry, progress,
         symbol="BTCUSDT", interval="1m", page_size=2, max_pages=3)
