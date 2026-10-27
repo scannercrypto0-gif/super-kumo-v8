@@ -34,8 +34,8 @@ jobs:
         run: python -B research_wp_r0/_dep_guard.py research_wp_r0/strategy_dna_v2.py research_wp_r0/strategy_dna_v2_example.py
       - name: Focused synthetic acceptance
         run: python -B -m pytest -p no:cacheprovider tests/test_sf_strategy_dna_v2.py -v --tb=short --junitxml=dna-tests.xml
-      - name: Require thirty-five tests and no skips
-        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('dna-tests.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))>=35; import unittest; assert unittest.defaultTestLoader.discover('tests', pattern='test_sf_strategy_dna_v2.py').countTestCases()==35; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
+      - name: Require thirty-seven tests and no skips
+        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('dna-tests.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))>=37; import unittest; assert unittest.defaultTestLoader.discover('tests', pattern='test_sf_strategy_dna_v2.py').countTestCases()==37; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
       - name: Reproducible synthetic example
         run: python -B -m research_wp_r0.strategy_dna_v2_example
       - uses: actions/upload-artifact@v4
