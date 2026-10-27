@@ -21,6 +21,13 @@ from ..g1_integrity import require_eligible_db
 from .authority import PublicationDenied
 from .store_binding import existing
 
+_ACK_GUARD = """CREATE TRIGGER core128_d2_ack_eligibility BEFORE INSERT ON core128_d2_events
+WHEN json_extract(NEW.body,'$.op')='D2_CONFIRMED'
+AND json_extract(NEW.body,'$.data.receipt.disposition')='APPLIED'
+AND EXISTS(SELECT 1 FROM g1_integrity_events g JOIN journal_entries j
+ON j.stable_key=g.stable_key WHERE j.id=json_extract(NEW.body,'$.data.source_seq'))
+BEGIN SELECT RAISE(ABORT,'source quarantined at D2 ACK authorization'); END"""
+
 
 class InDoubt(PublicationDenied):
     """A durable attempt lacks a confirmed target disposition/source ACK."""
@@ -123,6 +130,10 @@ class EffectDelivery:
                 conn.execute('CREATE TABLE core128_d2_events(consumer TEXT NOT NULL,seq INTEGER NOT NULL,body TEXT NOT NULL,hash TEXT NOT NULL,PRIMARY KEY(consumer,seq))')
                 for table in ('core128_d2_meta', 'core128_d2_registry', 'core128_d2_events'):
                     _immutable(conn, table)
+                # INSERT-time authorization preserves ordering: ACK-before-block
+                # remains historical, ACK-after-block cannot be backdated by a
+                # self-rehashed event, even through raw INSERT rather than API.
+                conn.execute(_ACK_GUARD)
                 config = dict(schema='aql.d2-registry.v1', source_anchor=digest(authority.anchor), max_consumers=max_consumers)
                 conn.execute('INSERT INTO core128_d2_meta VALUES(1,?)', (canonical(config).decode(),))
             row = conn.execute('SELECT body FROM core128_d2_registry WHERE consumer=?', (consumer,)).fetchone()
@@ -144,7 +155,7 @@ class EffectDelivery:
                     source_anchor=digest(authority.anchor), consumer=consumer, target=identity,
                     max_consumers=max_consumers, limits=asdict(limits))
                 self.limits = limits
-                with existing(_path(target.path), limits.timeout_seconds) as dest:
+                with existing(_path(target.path), 0) as dest:
                     dest.execute('BEGIN IMMEDIATE')
                     actual = json.loads(dest.execute('SELECT body FROM d2_target_meta').fetchone()[0])
                     if actual != identity or identity['path'] != _path(target.path):
@@ -186,6 +197,9 @@ class EffectDelivery:
         bound = conn.execute('SELECT body FROM core128_d2_registry WHERE consumer=?', (self.consumer,)).fetchone()
         if row is None or row[0] != canonical(config).decode() or bound is None or bound[0] != canonical(self.anchor).decode():
             raise PublicationDenied("Frozen D2 registry mismatch")
+        guard = conn.execute("SELECT sql FROM sqlite_master WHERE name='core128_d2_ack_eligibility'").fetchone()
+        if guard is None or guard[0] != _ACK_GUARD:
+            raise PublicationDenied("D2 source ACK authorization guard missing/changed")
         if conn.execute('SELECT COUNT(*) FROM core128_d2_registry').fetchone()[0] > config['max_consumers']:
             raise PublicationDenied("Consumer registry exceeds frozen capacity")
         if self._observed_head is not None:
@@ -313,7 +327,9 @@ class EffectDelivery:
     @contextmanager
     def _target(self):
         try:
-            with existing(_path(self.anchor['target']['path']), self.limits.timeout_seconds) as target:
+            # Proof reads never wait on optional target locks while a source
+            # transaction is held. Only _execute waits, BEFORE taking source.
+            with existing(_path(self.anchor['target']['path']), 0) as target:
                 self._target_meta(target)
                 yield target
         except (sqlite3.DatabaseError, OSError) as exc:
@@ -368,10 +384,10 @@ class EffectDelivery:
                         raise PublicationDenied("Confirmed D2 lacks persisted target receipt")
 
     @contextmanager
-    def _tx(self, *, target=True):
+    def _tx(self, *, target=True, nowait=False):
         with self.authority._connection() as conn:
             try:
-                conn.execute(f'PRAGMA busy_timeout={int(self.limits.timeout_seconds*1000)}')
+                conn.execute(f'PRAGMA busy_timeout={0 if nowait else int(self.limits.timeout_seconds*1000)}')
                 conn.execute('BEGIN IMMEDIATE')
                 self._verify_source(conn)
                 states,epoch = self._replay(conn)
@@ -431,20 +447,24 @@ class EffectDelivery:
         return attempt,True
 
     def _execute(self, epoch, seq):
-        with self._tx() as (conn,states,current):
-            self._check_epoch(current,epoch)
-            s = states.get(seq)
-            attempt = s['attempts'].get(epoch) if s else None
-            if attempt is None or s['receipt'] is not None:
-                raise PublicationDenied("Current unresolved source intent required")
-            request = s['request']
-            if attempt['disposition'] == 'APPLIED':
-                require_eligible_db(conn,request['key'])
-            else:
-                self._evidence(conn,request['key'],attempt['evidence'])
-            self.fault('pre_effect')
-            with self._target() as target:
-                target.execute('BEGIN IMMEDIATE')
+        # Optional archive target contention must not hold the source lock.
+        # Target-first then NONBLOCKING source acquisition avoids lock-order
+        # cycles with another source-held proof reader/receipt writer.
+        with self._target() as target:
+            target.execute(f'PRAGMA busy_timeout={int(self.limits.timeout_seconds*1000)}')
+            target.execute('BEGIN IMMEDIATE')
+            with self._tx(nowait=True) as (conn,states,current):
+                self._check_epoch(current,epoch)
+                s = states.get(seq)
+                attempt = s['attempts'].get(epoch) if s else None
+                if attempt is None or s['receipt'] is not None:
+                    raise PublicationDenied("Current unresolved source intent required")
+                request = s['request']
+                if attempt['disposition'] == 'APPLIED':
+                    require_eligible_db(conn,request['key'])
+                else:
+                    self._evidence(conn,request['key'],attempt['evidence'])
+                self.fault('pre_effect')
                 inbox = target.execute('SELECT * FROM d2_inbox WHERE effect_id=?',(request['effect_id'],)).fetchone()
                 if inbox is None:
                     target.execute('INSERT INTO d2_inbox VALUES(?,?,?,?,?)',(request['effect_id'],canonical(request).decode(),attempt['disposition'],attempt['evidence'],epoch))
@@ -463,6 +483,9 @@ class EffectDelivery:
                 body = dict(schema='aql.d2-target-receipt.v1',request=request,attempt_id=attempt['id'],
                     attempt_epoch=epoch,origin_epoch=origin,disposition=attempt['disposition'],evidence=attempt['evidence'])
                 receipt = dict(body,proof_digest=digest(body))
+                # Effect COMMIT released target lock. Reacquire without waiting
+                # while source is held; contention leaves explicit IN_DOUBT.
+                target.execute('PRAGMA busy_timeout=0')
                 target.execute('BEGIN IMMEDIATE')
                 prior = target.execute('SELECT body FROM d2_receipts WHERE attempt_id=?',(attempt['id'],)).fetchone()
                 if prior is None:
@@ -471,7 +494,7 @@ class EffectDelivery:
                 elif prior[0] != canonical(receipt).decode():
                     raise PublicationDenied("Receipt retry content mismatch")
                 target.commit()
-            self.fault('post_receipt')
+                self.fault('post_receipt')
         return receipt
 
     def perform(self, epoch, seq):

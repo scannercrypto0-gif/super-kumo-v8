@@ -4,7 +4,8 @@ The first revision f964e1e recorded five RED baseline gaps against local D1.
 These same five requirements now target the separately versioned D2 adapter;
 the original 64 D1 tests and their accepted local semantics are untouched.
 """
-from contextlib import closing
+from contextlib import closing, contextmanager
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 import copy
 import json
@@ -13,6 +14,7 @@ import sqlite3
 import subprocess
 import sys
 import os
+import threading
 
 import pytest
 
@@ -358,3 +360,66 @@ def test_real_mode_and_existing_target_adoption_refused(tmp_path):
     with pytest.raises(FileExistsError): SQLiteEffectTarget.create(t.path,synthetic=True)
     with pytest.raises(PublicationDenied):
         EffectDelivery(a,'sandbox',target=t,limits=effect_limits(),max_consumers=2)
+
+
+@pytest.mark.parametrize('route',['append','raw_insert'])
+def test_source_insert_guard_rejects_ack_appended_after_source_quarantine(tmp_path,route):
+    j,a,t,d,e=setup(tmp_path);receipt=d.perform(e,1);conflict(j)
+    with pytest.raises(ContentConflictError): d.confirm(e,receipt)
+    with closing(j._connect()) as c:
+        c.execute('BEGIN IMMEDIATE')
+        with pytest.raises(sqlite3.IntegrityError):
+            data=dict(source_seq=1,epoch=e,id=receipt['attempt_id'],receipt=receipt)
+            if route=='append':
+                d._append(c,'D2_CONFIRMED',data)
+            else:
+                head=d._head(c)
+                event=dict(schema='aql.d2-event.v1',consumer='sandbox',seq=head[0]+1,
+                           previous=head[1],op='D2_CONFIRMED',data=data)
+                c.execute('INSERT INTO core128_d2_events VALUES(?,?,?,?)',
+                          ('sandbox',event['seq'],canonical(event).decode(),digest(event)))
+        c.rollback()
+    assert d.view()['D']==[] and d.view()['S']==0 and d.view()['IN_DOUBT']==[1]
+
+
+def test_locked_optional_target_never_holds_source_while_waiting(tmp_path):
+    j,a,t,d,e=setup(tmp_path);archive,ad,ae=add_consumer(a,tmp_path,'archive')
+    waiting=threading.Event();original=ad._target
+    class ObservedTarget:
+        def __init__(self,connection): self.connection=connection
+        def __getattr__(self,name): return getattr(self.connection,name)
+        def execute(self,sql,*args):
+            if sql=='BEGIN IMMEDIATE': waiting.set()
+            return self.connection.execute(sql,*args)
+    @contextmanager
+    def observed():
+        with original() as connection: yield ObservedTarget(connection)
+    ad._target=observed
+    with closing(sqlite3.connect(archive.path,isolation_level=None)) as blocker:
+        blocker.execute('BEGIN IMMEDIATE')
+        with ThreadPoolExecutor(1) as pool:
+            pending=pool.submit(ad.perform,ae,1)
+            try:
+                assert waiting.wait(10)
+                with closing(j._connect()) as source:
+                    source.execute('PRAGMA busy_timeout=0')
+                    source.execute('BEGIN IMMEDIATE')  # Must remain available.
+                    source.rollback()
+                assert d.deliver(e,1) and t.count()==1
+            finally: blocker.rollback()
+            assert pending.result(10)
+    assert ad.view()['IN_DOUBT']==[1] and ad.view()['D']==[]
+
+
+def test_removed_source_authorization_guard_denies_d2_without_changing_d1(tmp_path):
+    j,a,t,d,e=setup(tmp_path);a.deliver('sandbox',1,1)
+    with closing(j._connect()) as c: c.execute('DROP TRIGGER core128_d2_ack_eligibility')
+    with pytest.raises(PublicationDenied,match='authorization guard'): d.view()
+    assert a.reader('sandbox').read(1)['bar_open']==0
+
+
+def test_consumer_byte_backpressure_never_creates_false_progress(tmp_path):
+    j,a,_=baseline(tmp_path)
+    t,d,e=add_consumer(a,tmp_path,limits=effect_limits(max_bytes=2048))
+    with pytest.raises(PublicationDenied): d.deliver(e,1)
+    assert d.view()['D']==[] and d.view()['S']==0
