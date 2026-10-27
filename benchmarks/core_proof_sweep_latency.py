@@ -35,8 +35,6 @@ def trial(root: Path, with_sweep: bool, *, warmup: int = 100,
           measured: int = 500) -> dict:
     root.mkdir(parents=True, exist_ok=True)
     journal = DurableJournal(str(root / "journal.sqlite"))
-    registry = RevisionRegistry(root / "proof.sqlite")
-    progress = SweepProgress(root / "sweep.sqlite")
     for i in range(warmup):
         item = bar(i)
         journal.commit(item)
@@ -45,7 +43,11 @@ def trial(root: Path, with_sweep: bool, *, warmup: int = 100,
     errors: list[str] = []
 
     def sweep():
+        registry = None
+        progress = None
         try:
+            registry = RevisionRegistry(root / "proof.sqlite")
+            progress = SweepProgress(root / "sweep.sqlite")
             while not stop.is_set():
                 run_sweep_slice(journal, registry, progress,
                     symbol="BTCUSDT", interval="1m", page_size=16,
@@ -54,6 +56,11 @@ def trial(root: Path, with_sweep: bool, *, warmup: int = 100,
         except Exception as exc:
             errors.append(repr(exc))
             stop.set()
+        finally:
+            if progress is not None:
+                progress.close()
+            if registry is not None:
+                registry.close()
 
     worker = threading.Thread(target=sweep, daemon=True)
     if with_sweep:
@@ -74,8 +81,6 @@ def trial(root: Path, with_sweep: bool, *, warmup: int = 100,
             worker.join(timeout=10)
             if worker.is_alive():
                 raise RuntimeError("sweep thread did not stop")
-        progress.close()
-        registry.close()
     if errors:
         raise RuntimeError(errors[0])
     return {"count": len(samples), "p50_ms": percentile(samples, 0.50),
