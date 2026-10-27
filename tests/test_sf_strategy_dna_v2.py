@@ -223,6 +223,50 @@ class StrategyDNAV2Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.run_report(self.assets+[self.assets[0]])
 
+    def test_monitor_extreme_finite_numeric_must_not_abort_core(self):
+        baseline=self.run_report().spec["core"]
+        for value in (1e20, -1e20, 1e308, -(2**53+1)):
+            with self.subTest(value=value):
+                assets=copy.deepcopy(self.assets)
+                assets[0]["features"]["observe"]["values"]["value"]=value
+                report=self.run_report(assets).spec
+                self.assertEqual(report["core"],baseline)
+                observed=report["monitoring"][0]["observations"][0]
+                self.assertEqual(observed["status"],"UNVERIFIED")
+                self.assertIsNone(observed["value"])
+                self.assertEqual(observed["reason"],"INVALID_FINITE_VALUE")
+        assets=copy.deepcopy(self.assets)
+        assets[0]["features"]["strength"]["values"]["value"]=1e20
+        decision=self.run_report(assets).spec["core"]["decisions"][0]
+        self.assertEqual(decision["signal"],"BLOCKED")
+        self.assertIsNone(decision["entry"]["score"])
+
+    def test_maximum_asset_report_roundtrip_and_size_rejection(self):
+        spec=self.dna.spec
+        symbols=["A%03d" % i for i in range(256)]
+        spec["scanner_profile"]["allowed_symbols"]=symbols
+        dna=StrategyDNAV2(spec,v1_definition=self.v1)
+        assets=[]
+        for symbol in symbols:
+            asset=copy.deepcopy(self.assets[0])
+            asset["symbol"]=symbol
+            assets.append(asset)
+        report=self.run_report(assets,dna)
+        raw=report.to_json()
+        self.assertGreater(len(raw.encode("utf-8")),100000)
+        self.assertEqual(
+            SyntheticRoleReport.from_json(raw,expected_digest=report.digest).payload,
+            report.payload)
+        with self.assertRaises(ValueError):
+            SyntheticRoleReport.from_json(raw,expected_digest="0"*64)
+        from research_wp_r0.strategy_dna_v2 import MAX_SYNTHETIC_REPORT_BYTES
+        with self.assertRaises(ValueError):
+            SyntheticRoleReport.from_json(" "*(MAX_SYNTHETIC_REPORT_BYTES+1),
+                                          expected_digest=report.digest)
+        tampered=raw.replace('"digest":', '"digest":"extra","digest":',1)
+        with self.assertRaises(ValueError):
+            SyntheticRoleReport.from_json(tampered,expected_digest=report.digest)
+
     def test_explicit_same_indicator_multiple_roles(self):
         spec=self.dna.spec;spec["monitoring_profile"]["features"].append(
             dict(feature_id="trend_observe",reference="trend",field="value",max_age_ms=100))
