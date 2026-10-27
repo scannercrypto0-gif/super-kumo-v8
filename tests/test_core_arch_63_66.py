@@ -551,3 +551,68 @@ def test_R2_mirrored_quarantine_uses_bound_protocol(tmp_path):
     store.quarantine(error.value)
     with pytest.raises(ContentConflictError): a.read('sandbox',2)
     assert store.quarantined_keys()=={bar(1).stable_key()}
+
+
+@pytest.mark.parametrize('operation',['upsert','quarantine'])
+def test_R2_legacy_dispatch_cannot_write_after_enrollment(tmp_path,operation):
+    j=DurableJournal(str(tmp_path/'source.sqlite'));j.commit(bar())
+    path=str(tmp_path/'store.sqlite')
+    old=OperationalStore(path);fresh=OperationalStore(path)
+    entered,release=threading.Event(),threading.Event()
+    def pause():
+        entered.set();assert release.wait(10)
+    if operation=='upsert':
+        actual=old._upsert_local
+        def delayed(*args,**kwargs):
+            pause();return actual(*args,**kwargs)
+        old._upsert_local=delayed
+        work=lambda:old.upsert(bar())
+        scope=patch('aql.delivery.authority.prepare_candidate',wraps=__import__('aql.delivery.authority',fromlist=['prepare_candidate']).prepare_candidate)
+    else:
+        from aql.g1_integrity import IntegrityAccess
+        actual=__import__('aql.delivery.authority',fromlist=['prepare_candidate']).prepare_candidate
+        def delayed(*args,**kwargs):
+            pause();return actual(*args,**kwargs)
+        scope=patch('aql.delivery.authority.prepare_candidate',side_effect=delayed)
+        work=lambda:old._record_integrity_event(bar(),bar(close=100.5))
+    with scope,ThreadPoolExecutor(1) as pool:
+        pending=pool.submit(work)
+        assert entered.wait(10)
+        try:
+            a=Authority(j,limits=Limits(4,8192,2,64),synthetic=True,stores=[fresh])
+            e=a.fence('sandbox');a.deliver('sandbox',e,1)
+        finally: release.set()
+        with pytest.raises(PublicationDenied): pending.result(10)
+    assert fresh.count()==0 and fresh.quarantined_keys()==set()
+    assert a.read('sandbox',1)['close']==100.
+
+
+@pytest.mark.parametrize('conflicting',[False,True])
+def test_R2_rehashed_completion_cannot_erase_unperformed_intent(tmp_path,conflicting):
+    import aql.delivery.store_binding as module
+    from aql.delivery.authority import _append,_project
+    j,a,e=setup(tmp_path);a.deliver('sandbox',e,2)
+    store=OperationalStore(str(tmp_path/'store.sqlite'))
+    def interrupted(stage):
+        if stage=='after_intent': raise RuntimeError('interrupted before store effect')
+    store.binding_fault=interrupted
+    with pytest.raises(RuntimeError): store.upsert(bar(1,close=100.5 if conflicting else 100.))
+    with pytest.raises(PublicationDenied): a.read('sandbox',2)
+    # Same adversarial SQL/rehash privilege as retained R4 tests. A matching
+    # local hash is not semantic proof of quarantine or a completed write.
+    with j._connect() as conn:
+        conn.execute('BEGIN IMMEDIATE')
+        intent=json.loads(conn.execute("SELECT body FROM core128_events ORDER BY seq DESC LIMIT 1").fetchone()[0])['data']
+        with module.existing(store.db_path) as target: current=module.state_digest(target,a.limits)
+        _append(conn,'STORE_COMMIT',dict(store=intent['store'],epoch=intent['epoch'],id=intent['id'],state_digest=current))
+        _project(conn);conn.commit()
+    with pytest.raises(PublicationDenied,match='completion lacks matching'): a.read('sandbox',2)
+
+
+def test_R2_original_acceptance_function_is_text_unchanged():
+    import ast,hashlib
+    from pathlib import Path
+    text=Path(__file__).read_text(encoding='utf-8')
+    node=next(n for n in ast.parse(text).body if isinstance(n,ast.FunctionDef)
+              and n.name=='test_R2_unbound_operational_store_conflict_must_deny_read')
+    assert hashlib.sha256(ast.get_source_segment(text,node).encode()).hexdigest()=='ab467cdba1339ae499d5acad4a6097012ec9d1728b0650de2c5030a9e46c7a5d'

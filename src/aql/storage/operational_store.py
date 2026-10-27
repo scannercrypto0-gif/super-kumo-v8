@@ -118,6 +118,11 @@ class OperationalStore(IntegrityAccess):
         conn=connection if connection is not None else self._connect()
         try:
             conn.execute("BEGIN IMMEDIATE")
+            if connection is None:
+                # Enrollment may have happened after public dispatch. Check
+                # under the SAME store write lock, before any legacy effect.
+                from ..delivery.store_binding import deny_store_legacy
+                deny_store_legacy(conn)
             prior=self._original_bar(conn,bar.stable_key())
             if prior is not None and content(prior)!=material:
                 evidence=record_event(conn,prior,bar)

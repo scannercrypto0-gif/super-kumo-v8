@@ -193,6 +193,10 @@ class IntegrityAccess:
         conn = self._connect()
         try:
             conn.execute("BEGIN IMMEDIATE")
+            # A legacy store event dispatched before v2 enrollment must not
+            # bypass the source protocol after that enrollment commits.
+            from .delivery.store_binding import deny_store_legacy
+            deny_store_legacy(conn)
             local = self._original_bar(conn,original.stable_key())
             if kwargs.get("kind") == "CORRECTION_PROPOSAL":
                 if local is None or local.to_dict() != original.to_dict():

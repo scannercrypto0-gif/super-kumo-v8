@@ -23,8 +23,12 @@ jobs:
           python-version: '3.11'
       - run: python -m pip install -e ".[dev]"
       - name: Exact source
-        run: git rev-parse HEAD
-      - name: Independent-review acceptance gate (known R2 MUST stay red until fixed)
+        run: |
+          git rev-parse HEAD
+          git rev-parse HEAD > core128-source.txt
+          git rev-parse 'HEAD^{tree}' >> core128-source.txt
+          python --version >> core128-source.txt
+      - name: D1 R2 and adversarial acceptance gate
         run: python -B -m pytest tests/test_core_arch_63_66.py -v --tb=short --junitxml=core128.xml
       - name: Existing exact-head compatibility
         if: always()
@@ -43,3 +47,4 @@ jobs:
           path: |
             core128.xml
             legacy.xml
+            core128-source.txt

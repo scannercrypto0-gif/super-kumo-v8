@@ -58,20 +58,18 @@ def freeze_stores(authority, stores):
             raise PublicationDenied("Distinct explicit store identities required")
         seen.add(path)
         with existing(path) as conn:
+            conn.execute('BEGIN IMMEDIATE')
             if has_binding(conn) or conn.execute("SELECT COUNT(*) FROM market_bars").fetchone()[0] or conn.execute("SELECT COUNT(*) FROM g1_integrity_events").fetchone()[0]:
                 raise PublicationDenied("Enroll a fresh empty synthetic store; no legacy conversion")
             binding = dict(schema="aql.source-store-binding.v1", source=authority.anchor['source'],
                            source_path=authority.anchor['path'], generation=generation,
                            path=path, store=uuid.uuid4().hex, writer=WRITER)
-            conn.executescript("""
-                CREATE TABLE core128_store_link(singleton INTEGER PRIMARY KEY CHECK(singleton=1),body TEXT NOT NULL);
-                CREATE TRIGGER core128_link_no_update BEFORE UPDATE ON core128_store_link BEGIN
-                  SELECT RAISE(ABORT,'immutable source binding'); END;
-                CREATE TRIGGER core128_link_no_delete BEFORE DELETE ON core128_store_link BEGIN
-                  SELECT RAISE(ABORT,'immutable source binding'); END;
-            """)
+            conn.execute('CREATE TABLE core128_store_link(singleton INTEGER PRIMARY KEY CHECK(singleton=1),body TEXT NOT NULL)')
+            for operation in ('UPDATE', 'DELETE'):
+                conn.execute(f"CREATE TRIGGER core128_link_no_{operation.lower()} BEFORE {operation} ON core128_store_link BEGIN SELECT RAISE(ABORT,'immutable source binding'); END")
             conn.execute("INSERT INTO core128_store_link VALUES(1,?)", (canonical(binding).decode(),))
             bindings.append(dict(binding=binding, state_digest=state_digest(conn, authority.limits)))
+            conn.commit()
             # Objects created before enrollment receive a specific frozen epoch.
             store._core128_token = (binding, 1)
     return dict(generation=generation, stores=bindings)
@@ -87,7 +85,7 @@ def initial_state(anchor):
                 or b.get('source') != anchor['source'] or b.get('source_path') != anchor['path']
                 or b.get('generation') != anchor['generation'] or b['store'] in state):
             raise PublicationDenied("Invalid frozen source/store registration")
-        state[b['store']] = dict(epoch=1, digest=item['state_digest'], pending=None, seen=set())
+        state[b['store']] = dict(epoch=1, digest=item['state_digest'], pending=None, seen=set(), completed=[])
     return state
 
 
@@ -105,14 +103,18 @@ def apply_store_event(state, op, data):
                 or len(data['id']) != 32 or data['id'] in s['seen']):
             raise PublicationDenied("Invalid store denial intent/fence")
         candidate = MarketBar.from_dict(data['incoming'])
-        if candidate.stable_key() != data.get('key') or digest(data['incoming']) != data.get('hash'):
+        if (candidate.stable_key() != data.get('key') or digest(data['incoming']) != data.get('hash')
+                or type(data.get('denial')) is not bool or type(data.get('force')) is not bool
+                or (data['denial'] and not isinstance(data.get('candidate'), dict))
+                or (not data['denial'] and data.get('candidate') is not None)):
             raise PublicationDenied("Store intent content mismatch")
-        s['pending'] = data['id']
+        s['pending'] = data
         s['seen'].add(data['id'])
     elif op == 'STORE_COMMIT':
-        if (not s['pending'] or data.get('id') != s['pending'] or data.get('epoch') != s['epoch']
+        if (not s['pending'] or data.get('id') != s['pending']['id'] or data.get('epoch') != s['epoch']
                 or not isinstance(data.get('state_digest'), str) or len(data['state_digest']) != 64):
             raise PublicationDenied("Unproven store completion")
+        s['completed'].append(s['pending'])
         s['digest'], s['pending'] = data['state_digest'], None
     else:
         raise PublicationDenied("Unsupported store operation")
@@ -137,13 +139,14 @@ def verify_store(conn, binding):
 
 
 def verify_bindings(conn, anchor, *, pending_store_intent=None):
+    from ..storage.operational_store import OperationalStore
     state = store_state(conn, anchor)
     allowed = False
     for item in anchor['stores']:
         binding = item['binding']
         s = state[binding['store']]
         if s['pending']:
-            if s['pending'] != pending_store_intent:
+            if s['pending']['id'] != pending_store_intent:
                 raise PublicationDenied("Unresolved durable store denial intent")
             allowed = True
         with existing(binding['path']) as store:
@@ -161,10 +164,40 @@ def verify_bindings(conn, anchor, *, pending_store_intent=None):
                     raise PublicationDenied("Store row outside frozen source inventory")
                 # Full state bytes are committed above; semantic agreement is a
                 # separate invariant, not inferred from a matching hash alone.
-                from ..storage.operational_store import OperationalStore
                 retained = OperationalStore._original_bar(None, store, key)
                 if content(retained) != content(MarketBar.from_dict(json.loads(source[0]))) and key not in source_blocked:
                     raise PublicationDenied("Store/source divergence lacks authoritative denial")
+            intents = s['completed'] + ([s['pending']] if s['pending'] else [])
+            for intent in intents:
+                source = conn.execute('SELECT payload_json FROM journal_entries WHERE stable_key=?', (intent['key'],)).fetchone()
+                if source is None:
+                    raise PublicationDenied("Intent outside frozen source inventory")
+                incoming = MarketBar.from_dict(intent['incoming'])
+                original = MarketBar.from_dict(json.loads(source[0]))
+                if (intent['force'] or content(incoming) != content(original)) and not intent['denial']:
+                    raise PublicationDenied("Conflict intent disguised as normal store write")
+                if intent['denial']:
+                    candidate = MarketBar.from_dict(intent['candidate'])
+                    if candidate.stable_key() != intent['key']:
+                        raise PublicationDenied("Denial candidate key mismatch")
+                    if (not intent['force'] and content(incoming) == content(original)
+                            and content(candidate) == content(original)):
+                        raise PublicationDenied("Unproven store conflict intent")
+                if intent is s['pending']:
+                    continue
+                if intent['denial']:
+                    def has_proof(db, wanted):
+                        for row in db.execute('SELECT evidence_json FROM g1_integrity_events WHERE stable_key=?', (intent['key'],)):
+                            proof=json.loads(row[0])
+                            if content(MarketBar.from_dict(proof['incoming_record'])) == content(wanted):
+                                return True
+                        return False
+                    if not has_proof(conn, candidate) or not has_proof(store, incoming):
+                        raise PublicationDenied("Store completion lacks matching source/store quarantine proof")
+                else:
+                    retained = OperationalStore._original_bar(None, store, intent['key'])
+                    if retained is None or content(retained) != content(incoming):
+                        raise PublicationDenied("Store completion lacks matching retained effect")
     if pending_store_intent is not None and not allowed:
         raise PublicationDenied("Missing durable store denial intent")
 
@@ -241,8 +274,14 @@ def write(store, incoming, *, force=False, original=None, event_options=None):
         if force and event_options and event_options.get('kind') == 'CORRECTION_PROPOSAL':
             if original is None or content(source_bar) != content(original):
                 raise PublicationDenied("Correction source binding mismatch")
+        with existing(binding['path']) as target:
+            verify_store(target, binding)
+            prior = store._original_bar(target, incoming.stable_key())
+        denial = force or content(incoming) != content(source_bar) or (prior is not None and content(prior) != content(incoming))
+        candidate = incoming if content(incoming) != content(source_bar) else (prior or incoming)
         _append(conn, 'STORE_INTENT', dict(store=binding['store'], writer=WRITER, epoch=epoch,
-                id=operation, key=incoming.stable_key(), incoming=incoming.to_dict(), hash=digest(incoming.to_dict())))
+                id=operation, key=incoming.stable_key(), incoming=incoming.to_dict(), hash=digest(incoming.to_dict()),
+                force=force, denial=denial, candidate=candidate.to_dict() if denial else None))
     store.binding_fault('after_intent')
     with authority._connection() as conn:
         try:
