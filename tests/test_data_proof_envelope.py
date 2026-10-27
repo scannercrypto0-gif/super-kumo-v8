@@ -12,7 +12,7 @@ def _version(n=1, *, first_seen=1000, previous=None):
         payload_digest=("a" if n == 1 else "b") * 64,
         bar_open_ms=0, bar_close_ms=999, first_local_seen_ms=first_seen,
         source_id="binance_ws", supersedes_version_id=previous,
-        clock_evidence_ref="clock:local", local_commit_evidence_ref="journal:receipt")
+        clock_evidence_ref="clock:local", local_commit_evidence_ref="journal:receipt", ingest_committed_ms=(first_seen + 1 if first_seen is not None else None))
 
 
 def test_factory_envelope_replay_preserves_revision_cutoff_and_gap():
