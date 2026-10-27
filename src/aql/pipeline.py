@@ -166,6 +166,9 @@ def run_pipeline(
 
     journal = DurableJournal(journal_path)
     store = OperationalStore(store_path)
+    # Freeze the durable pre-collection journal population, not market timestamps.
+    # Recovery stays asynchronous; newly collected rows are not startup backlog.
+    startup_max_entry_id = journal.startup_entry_boundary()
     recovery_lane = BackgroundLane()
     startup_ready = threading.Event()
     consumer = JournalConsumer(journal, store, symbol, interval, ready=startup_ready)
@@ -199,6 +202,7 @@ def run_pipeline(
                 store=store,
                 symbol=symbol,
                 interval=interval,
+                startup_max_entry_id=startup_max_entry_id,
             )
             logger.info(
                 "Startup reconciliation complete: bars_replayed=%d "
