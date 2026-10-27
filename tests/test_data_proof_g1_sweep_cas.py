@@ -27,3 +27,32 @@ def test_stale_worker_cannot_regress_or_clear(tmp_path):
     finally:
         a.close()
         b.close()
+
+
+def test_generation_fences_aba_after_cycle_restart(tmp_path):
+    a = SweepProgress(tmp_path / "sweep.sqlite")
+    b = SweepProgress(tmp_path / "sweep.sqlite")
+    key = ("instance", "BTCUSDT", "1m")
+    try:
+        old_generation = a.generation(*key)
+        a.save(*key, 0, 100, expected=None,
+               expected_generation=old_generation)
+        first_generation = a.generation(*key)
+        assert first_generation == old_generation + 1
+        stale_state = b.state(*key)
+        a.clear(*key, expected=stale_state,
+                expected_generation=first_generation)
+        a.save(*key, 0, 100, expected=None,
+               expected_generation=first_generation)
+        assert a.state(*key) == stale_state
+        assert a.generation(*key) == first_generation + 1
+        with pytest.raises(ProofError, match="stale sweep generation"):
+            b.save(*key, 1, 100, expected=stale_state,
+                   expected_generation=first_generation)
+        with pytest.raises(ProofError, match="stale sweep generation"):
+            b.clear(*key, expected=stale_state,
+                    expected_generation=first_generation)
+        assert a.state(*key) == stale_state
+    finally:
+        a.close()
+        b.close()
