@@ -112,6 +112,27 @@ changes relative to a retained digest; they are not signatures or an independent
 append-only ledger. Replay here is deterministic pure fixture reevaluation,
 not crash recovery or operational durability acceptance.
 
+## Codex F012-P2-03 — unsafe monitor source ID rejection
+
+Codex independently reported that a rejected OBSERVE_ONLY `source_id` was
+retained as raw string in the monitoring row. A lone U+D800 surrogate caused
+`evaluate_synthetic` UTF-8 canonicalization to fail, while a rejected
+17 MiB source string could make `to_json` exceed the otherwise correct
+16 MiB report cap. This is NOT a justification to raise the size cap.
+
+Every supplied observation now validates `source_id` against the same bounded
+ASCII identifier format as immutable provenance (1–64 characters), and requires
+the ID to be in the frozen allowlist, **before writing it to any returned row**.
+Malformed, oversized or unauthorized IDs produce `UNVERIFIED` with fixed
+`INVALID_SOURCE_ID`, null `source_id` and null `value`. Valid authorized
+identifiers remain included, and other quality, finality and as-of checks
+still apply. Monitoring remains OBSERVE_ONLY; critical invalid provenance fails
+closed. The tests verify unchanged `core` and `core_digest`, valid report
+round-trip for both adversarial inputs, valid-source control, and critical
+rejection. Previous numerical and large-report regressions remain unchanged.
+This is scoped source hardening only; it does not implement SF-DEC-49, real
+provenance, PIT custody, OOS, paper or live trading.
+
 ## Independent review P2 hardening (synthetic only)
 
 Read-only Codex found two source failures on the former f7ec5231 commit. A finite but canonically unrepresentable monitor value (e.g. 1e20) could abort the entire report; V2 now rejects such readings as UNVERIFIED/null before serialization, preserving monitor-only noninterference and failing closed for critical readings.
