@@ -231,6 +231,7 @@ class DurableJournal(IntegrityAccess):
         *, pending_only: bool = False, limit: int | None = None,
         include_quarantined: bool = False,
         max_entry_id: int | None = None,
+        persisted_only: bool = False,
     ) -> List[MarketBar]:
         """
         Return eligible committed entries in bar_open order.
@@ -256,6 +257,11 @@ class DurableJournal(IntegrityAccess):
                 params.append(interval)
             if final_only:
                 query += " AND is_final = 1"
+            if persisted_only and pending_only:
+                raise ValueError("pending_only and persisted_only are mutually exclusive")
+            if persisted_only:
+                query += " AND state = ?"
+                params.append(BarState.PERSISTED.value)
             if pending_only:
                 query += " AND state = ?"
                 params.append(BarState.LOCAL_COMMITTED.value)
