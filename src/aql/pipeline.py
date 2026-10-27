@@ -175,7 +175,8 @@ def run_pipeline(
     startup_max_entry_id = journal.startup_entry_boundary()
     recovery_lane = BackgroundLane()
     startup_ready = threading.Event()
-    consumer = JournalConsumer(journal, store, symbol, interval, ready=startup_ready,\n                               after_persisted=after_persisted)
+    consumer = JournalConsumer(journal, store, symbol, interval, ready=startup_ready,
+                               after_persisted=after_persisted)
 
     logger.info(
         "Pipeline start: symbol=%s interval=%s duration=%.0fs",
