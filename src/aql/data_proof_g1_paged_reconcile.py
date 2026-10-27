@@ -8,13 +8,15 @@ from aql.data_proof_g1_writer import G1RevisionWriter
 
 
 def reconcile_persisted_page(journal, registry, *, symbol: str, interval: str,
-                             after_entry_id: int = 0, limit: int = 256) -> dict:
+                             after_entry_id: int = 0, limit: int = 256,
+                             max_entry_id: int | None = None) -> dict:
     if type(after_entry_id) is not int or after_entry_id < 0:
         raise ProofError("invalid journal cursor")
     if type(limit) is not int or not 1 <= limit <= 10000:
         raise ProofError("invalid bounded page size")
     bars = journal.replay(symbol, interval, persisted_only=True,
-                          after_entry_id=after_entry_id, limit=limit)
+                          after_entry_id=after_entry_id, limit=limit,
+                          max_entry_id=max_entry_id)
     cursor = after_entry_id
     added = existing = 0
     writer = G1RevisionWriter(registry)
