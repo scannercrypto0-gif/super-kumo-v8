@@ -65,3 +65,49 @@ def test_actual_core_fixture_preserves_four_scheduled_slots():
                        for s in receipt["slots"])
     finally:
         sys.path.pop(0)
+
+def test_same_pinned_core_chain_stays_blocked_through_existing_r0():
+    """Four Core producer-linked slots reach R0 as UNKNOWN, never fictitious trades."""
+    root = os.environ.get("CORE_PROOF_SOURCE_ROOT")
+    if not root:
+        pytest.skip("Pinned Core source checkout required")
+    import copy
+    from research_wp_r0.pre_indicator_boundary import block_unproven_opportunities
+    from research_wp_r0.factory_exam_example import fixture
+    from research_wp_r0.factory_exam import freeze_manifest, freeze_protocol, run_route
+    sys.path.insert(0, str(Path(root, "src")))
+    try:
+        from aql.data_proof_shared_fixture import factory_negative_cases
+        bundle = factory_negative_cases()
+    finally:
+        sys.path.pop(0)
+    ids = [item["version_id"] for item in bundle["envelope"]["versions"]]
+    scheduled = [{"event_id": f"CORE_SLOT_{i}", "version_id": v}
+                 for i, v in enumerate([*ids, "not-delivered"], 1)]
+    guarded = block_unproven_opportunities(
+        scheduled=scheduled, envelope=bundle["envelope"],
+        pinned_digest=bundle["pinned_sha256"],
+        cutoff_ms=bundle["decision_cutoff_ms"])
+    assert guarded["scheduled_total"] == guarded["blocked_total"] == 4
+    dna, template, config = fixture()
+    events = []
+    for i, row in enumerate(guarded["slots"]):
+        event = copy.deepcopy(template[i])
+        event["event_id"] = row["event_id"]
+        event["cutoff_ms"] = bundle["decision_cutoff_ms"] + i * 1000
+        event["features"] = row["indicator_features"]
+        event["quotes"] = []
+        event["regime"] = None
+        event["fill_fraction"] = None
+        events.append(event)
+    manifest = freeze_manifest(dna, events)
+    protocol = freeze_protocol(manifest, expected_manifest_digest=manifest.digest,
+                               config=config)
+    for arm in ("ALWAYS", "REGIME"):
+        receipt = run_route(manifest, protocol,
+                            expected_manifest_digest=manifest.digest,
+                            expected_protocol_digest=protocol.digest, arm=arm).spec
+        assert len(receipt["outcomes"]) == guarded["scheduled_total"]
+        assert [x["event_id"] for x in receipt["outcomes"]] == [x["event_id"] for x in events]
+        assert all(x["status"] == "UNKNOWN" for x in receipt["outcomes"])
+        assert not any(item["kind"] == "SIMULATED_ENTRY" for item in receipt["ledger"])
