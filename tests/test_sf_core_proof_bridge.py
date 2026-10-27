@@ -77,7 +77,8 @@ def test_core_shared_fixture_shape_preserves_late_and_missing():
               provenance_scope="LOCAL_ONLY_UNATTESTED",
               versions=[dict(version_id="obs-v1:"+digest(v),record=v) for v in
                         [original,revised,missing]],
-              gap_states={"gap:unknown":"IN_DOUBT"})
+              gap_states={"BTCUSDT:1m:0":"CONFIRMED",
+                          "ETHUSDT:1m:0":"IN_DOUBT", "gap:unknown":"IN_DOUBT"})
     packet=dict(body,manifest_sha256=digest(body))
     outcomes=review_core_envelope(packet,pinned_digest=packet["manifest_sha256"],
                                   cutoff_ms=70000)
