@@ -26,3 +26,14 @@ isolated temporary SQLite files and never touches production data.
 - The sweep uses a soft page-boundary time budget; a single page can exceed
   its nominal limit. It must remain outside the live ingest hot path.
 - No scheduler or trading mode is activated by this benchmark.
+
+## Owner provisional decision — B (latency AND sweep coverage)
+
+Do not select a lower-duty-cycle setting solely on write p95/p99. Compare
+per-arm `sweep_work.slices`, `pages`, `complete_cycles`, `added`, and
+`existing` alongside write latency. These are **work counters**, not a
+measured maximum late-ACK discovery delay: that requires a separately
+controlled injected late-ACK experiment and elapsed-time measurement.
+A setting that makes writes faster but leaves full cycles unfinished is
+not accepted. Final numerical thresholds remain pending representative
+measurements, Factory/Audit review, and G0 approval.
