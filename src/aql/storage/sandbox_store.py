@@ -142,7 +142,9 @@ class SandboxReplicator:
             bar = MarketBar.from_dict(json.loads(row["payload_json"]))
             if bar.compute_checksum() != row["checksum"]:
                 raise ValueError("Journal integrity failure; remote cursor unchanged")
-            self.remote.upsert(bar)  # False means key already committed, also safe to ACK.
+            self.journal.require_eligible(bar.stable_key())
+            self.remote.upsert(bar)  # Matching remote key/content is required before ACK.
+            self.journal.require_eligible(bar.stable_key())
             with self._connect() as checkpoint:
                 checkpoint.execute("UPDATE delivery_cursor SET seq=MAX(seq,?) WHERE consumer=?",
                                    (row["id"], self.consumer_id))

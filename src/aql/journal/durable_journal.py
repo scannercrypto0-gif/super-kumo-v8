@@ -14,6 +14,10 @@ Durability guarantee:
   No additional manual fsync on the WAL or database file is required or safe
   during an active session.
 
+  CORE-ARCH-58: the added receipt observes successful SQLite COMMIT return.
+  It is not a hardware fsync-completion clock or proof of power-loss survival.
+  Legacy committed_at remains a pre-COMMIT marker.
+
   Reference: https://www.sqlite.org/pragma.html#pragma_synchronous
   "FULL: SQLite will use the xSync method of the VFS to ensure that content
    is safely written to the disk surface prior to continuing."
@@ -30,6 +34,8 @@ from typing import List, Optional, Tuple
 
 from ..models.bar import BarState, MarketBar
 from ..lanes import WritePriority
+from ..g1_integrity import (CommitEvidenceError, IntegrityAccess, ContentConflictError, content, fingerprint,
+    init_integrity, post_commit_receipt, receipt, record_event, require_eligible_db)
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +75,7 @@ class JournalCorruptionError(Exception):
     """Raised when a journal entry fails checksum verification."""
 
 
-class DurableJournal:
+class DurableJournal(IntegrityAccess):
     """
     Append-only durable journal backed by SQLite.
 
@@ -100,6 +106,7 @@ class DurableJournal:
         conn = self._connect()
         try:
             conn.executescript(JOURNAL_SCHEMA)
+            init_integrity(conn)
             conn.execute("INSERT OR IGNORE INTO journal_meta(key,value) VALUES ('instance_id',?)",
                          (uuid.uuid4().hex,))
             conn.execute("PRAGMA wal_checkpoint(FULL)")
@@ -121,74 +128,71 @@ class DurableJournal:
         with self.write_priority.hold(background):
             return self._commit(bar)
 
-    def _commit(self, bar: MarketBar) -> bool:
-        """
-        Append a bar to the journal.  Returns True if newly committed,
-        False if already present (idempotent).
-        Sets bar.state = LOCAL_COMMITTED and bar.committed_at.
+    def _original_bar(self, conn, key):
+        row = conn.execute("SELECT payload_json FROM journal_entries WHERE stable_key=?", (key,)).fetchone()
+        return MarketBar.from_dict(json.loads(row[0])) if row else None
 
-        Durability: PRAGMA synchronous=FULL guarantees that the COMMIT call
-        itself fsyncs the WAL before returning.  No additional file-level
-        fsync is performed (opening the WAL file during an active session
-        is unsafe and unnecessary).
-        """
-        now_ms = int(time.time() * 1000)
-        bar.committed_at = now_ms
-        bar.state = BarState.LOCAL_COMMITTED
-        payload = json.dumps(bar.to_dict(), sort_keys=True)
-
+    def commit_receipt(self, key):
+        """Core-only v1 observed data-COMMIT return; never backfill legacy times."""
         conn = self._connect()
         try:
-            # Separate try/except blocks so that ROLLBACK is only attempted
-            # when BEGIN/INSERT/COMMIT itself failed — never after a successful COMMIT.
-            try:
-                conn.execute("BEGIN IMMEDIATE")
-                conn.execute(
-                    """
-                    INSERT OR IGNORE INTO journal_entries
-                      (stable_key, bar_open, bar_close, symbol, interval,
-                       is_final, source, ingested_at, committed_at,
-                       payload_json, checksum, state)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-                    """,
-                    (
-                        bar.stable_key(),
-                        bar.bar_open,
-                        bar.bar_close,
-                        bar.symbol,
-                        bar.interval,
-                        int(bar.is_final),
-                        bar.source,
-                        bar.ingested_at,
-                        bar.committed_at,
-                        payload,
-                        bar.checksum or bar.compute_checksum(),
-                        BarState.LOCAL_COMMITTED.value,
-                    ),
-                )
-                changes = conn.execute("SELECT changes()").fetchone()[0]
-                # With synchronous=FULL, this COMMIT call fsyncs to disk before
-                # returning.  No additional file-level fsync needed or safe.
-                conn.execute("COMMIT")
-            except sqlite3.Error:
-                # COMMIT has NOT succeeded — safe to rollback.
-                try:
-                    conn.execute("ROLLBACK")
-                except Exception:
-                    pass
-                raise
-        except Exception as exc:
-            logger.error("Journal commit failed: %s", exc)
-            raise
+            result = receipt(conn,"BAR",key)
+            bar = self._original_bar(conn,key)
+            marker = conn.execute("SELECT version FROM g1_record_contracts WHERE stable_key=?", (key,)).fetchone()
+            result["record_contract_version"] = marker[0] if marker else (0 if bar is not None else None)
+            if not result["version"]:
+                result["status"] = ("NO_RECORD" if bar is None else
+                    "V1_COMPLETION_UNCONFIRMED" if marker else "LEGACY_COMPLETION_UNVERIFIED")
+            if result["version"] and (marker is None or marker[0] != 1 or bar is None
+                    or result["content_digest"] != fingerprint(content(bar))):
+                raise JournalCorruptionError("Commit receipt/content mismatch")
+            return result
         finally:
             conn.close()
 
-        if changes == 0:
-            logger.debug("Duplicate ignored: %s", bar.stable_key())
-            return False
-
-        logger.debug("Committed: %s", bar.stable_key())
-        return True
+    def _commit(self, bar: MarketBar) -> bool:
+        # committed_at remains the historical pre-attempt marker. No MarketBar
+        # fields/checksums/export schemas are changed by the new sidecar receipt.
+        material = content(bar)
+        now_ms = int(time.time() * 1000)
+        bar.committed_at = now_ms
+        bar.state = BarState.LOCAL_COMMITTED
+        conn = self._connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            prior = self._original_bar(conn,bar.stable_key())
+            if prior is not None and content(prior) != material:
+                evidence = record_event(conn,prior,bar)
+                conn.execute("COMMIT")  # conflict evidence survives raised error
+                try:
+                    post_commit_receipt(conn,"AUDIT",evidence["event_id"],fingerprint(evidence),evidence["detected_at_ms"])
+                except CommitEvidenceError:
+                    # Quarantine already committed; lack of a timing receipt
+                    # must not conceal the content conflict or enable ACK.
+                    raise ContentConflictError(evidence)
+                raise ContentConflictError(evidence)
+            require_eligible_db(conn,bar.stable_key())
+            if prior is not None:
+                conn.execute("COMMIT")
+                return False  # identical retry; no fabricated new/legacy timestamp
+            conn.execute("INSERT INTO journal_entries "
+                "(stable_key,bar_open,bar_close,symbol,interval,is_final,source,ingested_at,committed_at,payload_json,checksum,state) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (
+                    bar.stable_key(),bar.bar_open,bar.bar_close,bar.symbol,bar.interval,
+                    int(bar.is_final),bar.source,bar.ingested_at,bar.committed_at,
+                    json.dumps(bar.to_dict(),sort_keys=True),bar.checksum or bar.compute_checksum(),
+                    BarState.LOCAL_COMMITTED.value))
+            conn.execute("INSERT INTO g1_record_contracts VALUES (?,1)",(bar.stable_key(),))
+            conn.execute("COMMIT")
+            # This observation follows the data COMMIT; its own persistence is
+            # a separate FULL transaction. Failure never invents a v1 receipt.
+            post_commit_receipt(conn,"BAR",bar.stable_key(),fingerprint(material),max(now_ms,bar.ingested_at))
+            return True
+        except Exception:
+            if conn.in_transaction: conn.execute("ROLLBACK")
+            raise
+        finally:
+            conn.close()
 
     def replay(
         self,
@@ -196,9 +200,11 @@ class DurableJournal:
         interval: Optional[str] = None,
         final_only: bool = True,
         *, pending_only: bool = False, limit: int | None = None,
+        include_quarantined: bool = False,
     ) -> List[MarketBar]:
         """
-        Return all committed entries in bar_open order.
+        Return eligible committed entries in bar_open order.
+        include_quarantined=True is FORENSIC ONLY, never decision permission.
         Verifies checksum on each entry; raises JournalCorruptionError on mismatch.
         """
         conn = self._connect()
@@ -216,6 +222,8 @@ class DurableJournal:
             if pending_only:
                 query += " AND state = ?"
                 params.append(BarState.LOCAL_COMMITTED.value)
+            if not include_quarantined:
+                query += " AND stable_key NOT IN (SELECT stable_key FROM g1_integrity_events)"
             query += " ORDER BY bar_open ASC"
             if limit is not None:
                 if type(limit) is not int or limit < 1:
@@ -259,6 +267,7 @@ class DurableJournal:
         try:
             try:
                 conn.execute("BEGIN IMMEDIATE")
+                require_eligible_db(conn,stable_key)
                 conn.execute(
                     "UPDATE journal_entries SET state = ? WHERE stable_key = ?",
                     (BarState.PERSISTED.value, stable_key),
@@ -324,39 +333,28 @@ class DurableJournal:
         replay_errors = 0
 
         for bar in journal_bars:
-            if bar.bar_open in stored_keys:
-                # Already in store — sync journal state to PERSISTED
-                try:
-                    self.mark_persisted(bar.stable_key())
-                except Exception as exc:
-                    logger.warning(
-                        "startup_reconcile: mark_persisted failed for %s (non-fatal): %s",
-                        bar.stable_key(), exc,
-                    )
-            else:
-                # Missing from store — perform real upsert (journal-to-store replay)
-                bars_replayed += 1
-                try:
-                    store.upsert(bar)
-                    replay_inserted += 1
-                    try:
-                        self.mark_persisted(bar.stable_key())
-                    except Exception as exc:
-                        logger.warning(
-                            "startup_reconcile: mark_persisted failed after upsert "
-                            "for %s (non-fatal): %s", bar.stable_key(), exc,
-                        )
-                except Exception as exc:
-                    replay_errors += 1
-                    logger.error(
-                        "startup_reconcile: store upsert failed for %s: %s",
-                        bar.stable_key(), exc,
-                    )
+            missing = bar.bar_open not in stored_keys
+            bars_replayed += int(missing)
+            try:
+                self.require_eligible(bar.stable_key())
+                store.upsert(bar)  # validates matching content even for existing keys
+                self.mark_persisted(bar.stable_key())
+                replay_inserted += int(missing)
+            except ContentConflictError as exc:
+                from ..g1_integrity import propagate_conflict
+                propagate_conflict(exc,self,store)
+                replay_errors += 1
+            except Exception as exc:
+                replay_errors += 1
+                logger.error("startup_reconcile failed for %s: %s",bar.stable_key(),exc)
 
         # Step 2: detect ALL gaps (internal + trailing) in the known bar sequence.
         # Re-read store keys to include any bars just upserted in the replay above.
         store_opens_after: set = store.get_stored_keys(symbol, interval)
-        journal_opens: set = {b.bar_open for b in journal_bars}
+        # A replayed key may have become quarantined during reconciliation.
+        quarantined = self.quarantined_keys(symbol, interval)
+        journal_opens: set = {b.bar_open for b in journal_bars if b.stable_key() not in quarantined}
+        store_opens_after -= {int(key.rsplit(':', 1)[1]) for key in quarantined}
 
         all_known_opens: List[int] = sorted(journal_opens | store_opens_after)
         gaps: List[Tuple[int, int]] = []
@@ -406,7 +404,7 @@ class DurableJournal:
     def get_committed_range(
         self, symbol: str, interval: str
     ) -> Tuple[Optional[int], Optional[int]]:
-        """Return (min_bar_open, max_bar_open) for final bars in the journal."""
+        """Return eligible final-bar bounds; physical rows remain available for audit."""
         conn = self._connect()
         try:
             row = conn.execute(
@@ -414,6 +412,7 @@ class DurableJournal:
                 SELECT MIN(bar_open) as mn, MAX(bar_open) as mx
                 FROM journal_entries
                 WHERE symbol=? AND interval=? AND is_final=1
+                AND stable_key NOT IN (SELECT stable_key FROM g1_integrity_events)
                 """,
                 (symbol, interval),
             ).fetchone()

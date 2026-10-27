@@ -3,6 +3,7 @@ from __future__ import annotations
 import queue
 import threading
 import time
+from .g1_integrity import ContentConflictError, propagate_conflict
 
 
 class BackgroundLane:
@@ -79,8 +80,13 @@ class JournalConsumer:
         for bar in bars:
             if self.stop_event.is_set():
                 break
-            self.store.upsert(bar)
-            self.journal.mark_persisted(bar.stable_key())
+            try:
+                self.journal.require_eligible(bar.stable_key())
+                self.store.upsert(bar)
+                self.journal.mark_persisted(bar.stable_key())
+            except ContentConflictError as exc:
+                propagate_conflict(exc,self.journal,self.store)
+                self.errors += 1  # leave this key unacknowledged; continue others
         return len(bars)
 
     def _run(self):

@@ -47,7 +47,8 @@ class MarketBar:
     is_final: bool       # Binance k.x — True only when the bar is complete
     source: str          # "binance_ws" | "binance_rest_recovery"
     ingested_at: int     # local wall-clock when message was received — ms epoch UTC
-    committed_at: Optional[int] = None  # ms epoch UTC when flush/fsync completed
+    committed_at: Optional[int] = None  # LEGACY pre-COMMIT attempt marker; not completion proof.
+    # New completion evidence is a separate Core journal receipt; wire fields/checksum unchanged.
 
     # Pipeline state
     state: BarState = BarState.RECEIVED

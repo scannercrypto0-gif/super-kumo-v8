@@ -15,6 +15,7 @@ import time
 import uuid
 
 from .contracts import canonical, digest, market_envelope, parse
+from ..g1_integrity import require_eligible_db
 
 MAX_BYTES = 262144
 MAX_RECORD_BYTES = 16384
@@ -26,7 +27,11 @@ def source_row(conn, sequence):
         return None
     if size[0] > MAX_RECORD_BYTES:
         raise ValueError("Oversized source record denied before materialization")
-    return conn.execute("SELECT id,stable_key,payload_json,checksum FROM journal_entries WHERE id=?", (sequence,)).fetchone()
+    row = conn.execute("SELECT id,stable_key,payload_json,checksum FROM journal_entries WHERE id=?", (sequence,)).fetchone()
+    if row is None:
+        return None
+    require_eligible_db(conn,row[1])
+    return row
 
 
 def check_path(path):
@@ -249,6 +254,12 @@ class LocalArchive:
                          (record["bar"]["symbol"], record["bar"]["interval"], record["bar"]["bar_open"]))
         conn.execute("INSERT INTO segments VALUES (?,?)", (relative, expected))
         self.fault("before_ack")
+        # Eligibility may have changed after segment reconciliation. Recheck
+        # the whole batch before advancing its indivisible prefix watermark.
+        for record in records:
+            row = source_row(source, record["source_seq"])
+            if row is None or self.envelope(row) != record:
+                raise ValueError("Archive/source changed before acknowledgment")
         conn.execute("UPDATE meta SET value=? WHERE key='cursor'", (str(manifest["completion_watermark"]),))
         conn.execute("DELETE FROM pending")
         return len(records)
