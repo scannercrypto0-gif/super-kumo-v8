@@ -10,7 +10,7 @@ def _version(n, *, previous=None, first_seen=1000):
         payload_digest=("a" if n == 1 else "b") * 64,
         bar_open_ms=0, bar_close_ms=999, first_local_seen_ms=first_seen,
         source_id="binance_ws", supersedes_version_id=previous,
-        clock_evidence_ref="local:clock", local_commit_evidence_ref="journal:receipt")
+        clock_evidence_ref="local:clock", local_commit_evidence_ref="journal:receipt", ingest_committed_ms=first_seen + 1)
 
 
 def test_persist_reopen_revision_history_and_idempotent_replay(tmp_path):
