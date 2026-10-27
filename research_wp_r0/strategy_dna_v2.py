@@ -252,7 +252,16 @@ def _read(features, item, ref, provenance, cutoff):
     if type(raw) is not dict:
         return dict(row, status="UNVERIFIED", reason="MALFORMED_OBSERVATION")
     row.update({k: _stamp(raw.get(k)) for k in ("as_of_ms", "observed_at_ms", "available_at_ms")})
-    row["source_id"] = raw.get("source_id") if type(raw.get("source_id")) is str else None
+    # Do not retain untrusted provenance text in either valid or rejected rows.
+    # The frozen allowlist uses the same bounded ASCII identifier contract.
+    source_id = raw.get("source_id")
+    try:
+        identifier(source_id)
+    except ValueError:
+        return dict(row, status="UNVERIFIED", reason="INVALID_SOURCE_ID")
+    if source_id not in provenance["allowed_sources"]:
+        return dict(row, status="UNVERIFIED", reason="INVALID_SOURCE_ID")
+    row["source_id"] = source_id
     quality = raw.get("quality")
     if quality in ("MISSING", "STALE", "LATE", "DROPPED", "UNVERIFIED", "NOT_APPLICABLE"):
         return dict(row, status=quality, reason="SOURCE_MARKED_" + quality)
