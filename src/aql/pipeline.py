@@ -145,6 +145,7 @@ def run_pipeline(
     duration_s: float = 600,
     data_dir: str = "./data",
     now_ms_fn=None,
+    after_persisted=None,
 ) -> dict:
     """
     Run the full G1-WP01 MVP pipeline.
@@ -152,6 +153,9 @@ def run_pipeline(
 
     Parameters
     ----------
+    after_persisted : callable, optional
+        Opt-in post-ACK observer for committed journal/store bars. Observer
+        failure is isolated and never constitutes provider/PIT evidence.
     now_ms_fn : callable, optional
         ``() -> int`` returning the current epoch-millisecond timestamp.
         Passed through to ``take_snapshot``; defaults to wall clock when
@@ -171,7 +175,7 @@ def run_pipeline(
     startup_max_entry_id = journal.startup_entry_boundary()
     recovery_lane = BackgroundLane()
     startup_ready = threading.Event()
-    consumer = JournalConsumer(journal, store, symbol, interval, ready=startup_ready)
+    consumer = JournalConsumer(journal, store, symbol, interval, ready=startup_ready,\n                               after_persisted=after_persisted)
 
     logger.info(
         "Pipeline start: symbol=%s interval=%s duration=%.0fs",
