@@ -7,7 +7,7 @@ any supplied empirical feature into Scanner, indicators or Decision.
 from dataclasses import dataclass
 import re
 
-_SHA = re.compile(r"[0-9a-f]{64}\\Z")
+_SHA = re.compile(r"[0-9a-f]{64}")
 _STATES = frozenset(("CONFIRMED", "WITHHELD", "IN_DOUBT", "UNKNOWN"))
 
 
