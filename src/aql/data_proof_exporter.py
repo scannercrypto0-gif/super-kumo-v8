@@ -18,6 +18,8 @@ class BoundedEvidenceExporter:
         if type(capacity) is not int or capacity < 1:
             raise ProofError("capacity must be positive")
         self._registry = registry
+        # Snapshot committed SQLite revisions on the caller's owning thread.
+        # Worker never shares a sqlite3 connection across threads.
         self._queue: Queue = Queue(maxsize=capacity)
         self._closed = False
         self._worker = Thread(target=self._run, daemon=True, name="core-evidence-export")
@@ -30,7 +32,12 @@ class BoundedEvidenceExporter:
         if self._closed:
             future.set_exception(ProofError("exporter closed"))
             return future
-        job = (consumer, epoch, logical_bar_id, dict(gap_states or {}), future)
+        try:
+            versions = self._registry.revisions(logical_bar_id)
+        except Exception as exc:
+            future.set_exception(exc)
+            return future
+        job = (consumer, epoch, versions, dict(gap_states or {}), future)
         try:
             self._queue.put_nowait(job)
         except Full:
@@ -43,10 +50,9 @@ class BoundedEvidenceExporter:
             try:
                 if job is None:
                     return
-                consumer, epoch, bar_id, gaps, future = job
+                consumer, epoch, versions, gaps, future = job
                 if future.set_running_or_notify_cancel():
                     try:
-                        versions = self._registry.revisions(bar_id)
                         if not versions:
                             raise ProofError("no committed observation revisions")
                         future.set_result(export_envelope(
