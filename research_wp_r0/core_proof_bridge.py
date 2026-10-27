@@ -30,7 +30,12 @@ def review_core_envelope(envelope, *, pinned_digest, cutoff_ms, consumer="factor
             or type(body.get("gap_states")) is not dict
             or type(body.get("versions")) is not list):
         return (Admission("REJECT_FOR_EMPIRICAL", "CORE_ENVELOPE_CONTRACT_MISMATCH"),)
+    allowed = {"CONFIRMED", "WITHHELD", "IN_DOUBT", "UNKNOWN"}
+    if any(state not in allowed for state in body["gap_states"].values()):
+        return (Admission("REJECT_FOR_EMPIRICAL", "INVALID_CORE_GAP_STATE"),)
     results = []
+    latest = {}
+    seen_versions = set()
     for item in body["versions"]:
         if type(item) is not dict or type(item.get("record")) is not dict:
             return (Admission("REJECT_FOR_EMPIRICAL", "INVALID_CORE_VERSION"),)
@@ -39,6 +44,19 @@ def review_core_envelope(envelope, *, pinned_digest, cutoff_ms, consumer="factor
         if (type(version) is not str or version != "obs-v1:" + _hash(record)
                 or record.get("payload_digest") is None):
             return (Admission("REJECT_FOR_EMPIRICAL", "CORE_VERSION_DIGEST_MISMATCH"),)
+        if version in seen_versions:
+            return (Admission("REJECT_FOR_EMPIRICAL", "DUPLICATE_CORE_VERSION"),)
+        seen_versions.add(version)
+        bar_id = record.get("logical_bar_id")
+        number = record.get("version_number")
+        if type(bar_id) is not str or not bar_id or type(number) is not int or number < 1:
+            return (Admission("REJECT_FOR_EMPIRICAL", "INVALID_CORE_REVISION_ORDER"),)
+        prior = latest.get(bar_id)
+        if ((prior is None and (number != 1 or record.get("supersedes_version_id") is not None))
+                or (prior is not None and
+                    (number != prior[0] + 1 or record.get("supersedes_version_id") != prior[1]))):
+            return (Admission("REJECT_FOR_EMPIRICAL", "BROKEN_CORE_REVISION_ANCESTRY"),)
+        latest[bar_id] = (number, version)
         # Revision details and gap states are *not* manufactured into evidence.
         # A Core post-commit reference is not a trusted post-COMMIT timestamp.
         normalized = dict(version_id=version, manifest_digest=pinned_digest,

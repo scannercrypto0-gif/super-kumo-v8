@@ -44,3 +44,16 @@ def test_sparse_unknown_preserved():
 def test_stale_epoch_refused():
     obj=fixture()
     assert review_core_envelope(obj, pinned_digest=obj["manifest_sha256"], cutoff_ms=1202, minimum_epoch=2)[0].status == "REJECT_FOR_EMPIRICAL"
+
+def test_invalid_sparse_state_rejected():
+    obj=fixture(gap="DELIVERED")
+    body={k:v for k,v in obj.items() if k!="manifest_sha256"}
+    obj["manifest_sha256"]=digest(body)
+    assert review_core_envelope(obj, pinned_digest=obj["manifest_sha256"], cutoff_ms=1202)[0].reason=="INVALID_CORE_GAP_STATE"
+
+def test_duplicate_revision_rejected():
+    obj=fixture()
+    obj["versions"].append(obj["versions"][0])
+    body={k:v for k,v in obj.items() if k!="manifest_sha256"}
+    obj["manifest_sha256"]=digest(body)
+    assert review_core_envelope(obj, pinned_digest=obj["manifest_sha256"], cutoff_ms=1202)[0].reason=="DUPLICATE_CORE_VERSION"
