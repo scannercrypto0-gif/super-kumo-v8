@@ -26,7 +26,25 @@ def publish_generation(directory: Path, catalog: Mapping[str, object]) -> Path:
         raise D3IntegrityError("unsafe generation")
     destination = root / (name + ".json")
     pending = root / (name + ".pending")
-    # Validate manifest shape and self-consistency before any local publication.\n    from .d3_synthetic_archive import VERSION, _digest, SparseRecord, _validate, _records\n    raw = dict(catalog)\n    claimed = raw.pop("catalog_digest", None)\n    if set(raw) != {"version", "generation", "consumer", "epoch", "inventory", "inventory_digest"} or raw["version"] != VERSION:\n        raise D3IntegrityError("invalid catalog schema")\n    if raw["generation"] != name or type(raw["epoch"]) is not int or raw["epoch"] < 0:\n        raise D3IntegrityError("invalid generation or epoch")\n    try:\n        rows = tuple(SparseRecord(**row) for row in raw["inventory"])\n        _validate(rows)\n        if _records(tuple(sorted(rows, key=lambda r: r.sequence))) != raw["inventory"]:\n            raise D3IntegrityError("noncanonical archive inventory")\n        if raw["inventory_digest"] != _digest(raw["inventory"]) or claimed != _digest(raw):\n            raise D3IntegrityError("archive manifest checksum mismatch")\n        data = _canonical(dict(catalog)) + b"\\n"\n    except (KeyError, TypeError, ValueError, AttributeError) as exc:\n        raise D3IntegrityError("invalid archive manifest") from exc
+    # Validate manifest shape and self-consistency before any local publication.
+    from .d3_synthetic_archive import VERSION, _digest, SparseRecord, _validate, _records
+    raw = dict(catalog)
+    claimed = raw.pop("catalog_digest", None)
+    if set(raw) != {"version", "generation", "consumer", "epoch", "inventory", "inventory_digest"} or raw["version"] != VERSION:
+        raise D3IntegrityError("invalid catalog schema")
+    if raw["generation"] != name or type(raw["epoch"]) is not int or raw["epoch"] < 0:
+        raise D3IntegrityError("invalid generation or epoch")
+    try:
+        rows = tuple(SparseRecord(**row) for row in raw["inventory"])
+        _validate(rows)
+        if _records(tuple(sorted(rows, key=lambda r: r.sequence))) != raw["inventory"]:
+            raise D3IntegrityError("noncanonical archive inventory")
+        if raw["inventory_digest"] != _digest(raw["inventory"]) or claimed != _digest(raw):
+            raise D3IntegrityError("archive manifest checksum mismatch")
+        data = _canonical(dict(catalog)) + b"\
+"
+    except (KeyError, TypeError, ValueError, AttributeError) as exc:
+        raise D3IntegrityError("invalid archive manifest") from exc
     # O_EXCL prevents overwrite, including stale pending generations.
     fd = None
     try:
