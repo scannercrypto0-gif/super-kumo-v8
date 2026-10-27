@@ -8,7 +8,7 @@ def version(number=1, *, seen=1000, previous=None, **kw):
                   payload_digest=("a" if number == 1 else "b") * 64,
                   bar_open_ms=0, bar_close_ms=999, first_local_seen_ms=seen,
                   source_id="binance_ws", supersedes_version_id=previous,
-                  clock_evidence_ref="clock:local", local_commit_evidence_ref="journal:receipt")
+                  clock_evidence_ref="clock:local", local_commit_evidence_ref="journal:receipt", ingest_committed_ms=seen + 1)
     values.update(kw)
     return ObservationVersion(**values)
 
