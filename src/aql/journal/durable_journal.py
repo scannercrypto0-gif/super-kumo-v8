@@ -302,6 +302,9 @@ class DurableJournal(IntegrityAccess):
                     f"stored={stored} computed={expected}"
                 )
 
+            if after_entry_id is not None:
+                # Cursor metadata is local scan state, never serialized into the bar.
+                bar._journal_entry_id = int(row['id'])
             bars.append(bar)
 
         return bars
