@@ -41,8 +41,7 @@ def publish_generation(directory: Path, catalog: Mapping[str, object]) -> Path:
             raise D3IntegrityError("noncanonical archive inventory")
         if raw["inventory_digest"] != _digest(raw["inventory"]) or claimed != _digest(raw):
             raise D3IntegrityError("archive manifest checksum mismatch")
-        data = _canonical(dict(catalog)) + b"\
-"
+        data = _canonical(dict(catalog)) + bytes([10])
     except (KeyError, TypeError, ValueError, AttributeError) as exc:
         raise D3IntegrityError("invalid archive manifest") from exc
     # O_EXCL prevents overwrite, including stale pending generations.
