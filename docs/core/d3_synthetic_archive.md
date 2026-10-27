@@ -21,3 +21,9 @@ Opt-in pure offline contract in `aql.d3_synthetic_archive`. No runtime wiring, f
 Targeted tests in `tests/test_d3_offline_archive.py` cover publication/restore parity, immutable no-overwrite, corruption, missing target receipt, stale epoch and blocked archive worker while submissions remain bounded. This is an isolated synthetic nonblocking demonstration, **not** an integration test of the actual realtime G1 collector and not a latency/throughput SLA.
 
 **Remaining audit gates:** external independent custody and genuine receipt authenticity; crash/power-loss host and filesystem matrix; restart recovery for abandoned pending generations; durable upstream handoff for accepted-but-unconfirmed volatile jobs; integration proof with real collector and source/target authorities; Windows portability of hard-link/directory sync; formal independent Council review and exact-head CI. These are not claimed complete or production-ready.
+
+## Slice 3 — explicit G1 post-commit sidecopy seam
+
+`aql.d3_g1_sidecopy.G1ArchiveSidecopy` exposes a **manual, opt-in** interface after existing source journal/store authority has committed. It returns `QUEUED_NOT_DURABLE` (not an ACK), `ARCHIVE_UNAVAILABLE_OR_FULL` on rejection, and separately polled `PENDING`, `FAILED`, or `PUBLISHED_LOCAL_ONLY`. Unconfirmed target evidence cannot be represented as a confirmed target receipt. No code modifies `pipeline.py`, `lanes.py`, source ACKs or G1 production configuration.
+
+`tests/test_d3_g1_sidecopy.py` tests a **deterministic modeled G1 commit/store/ACK seam** while the archive sink is blocked. This validates adapter behavior, NOT the real G1 pipeline, real network collector or durable restart recovery. Actual G1 journal/store integration test and crash/restart evidence remain open audit blockers; do not call this a production nonblocking guarantee.
