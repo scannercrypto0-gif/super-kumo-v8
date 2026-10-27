@@ -5,6 +5,7 @@ Not a realtime pipeline integration, independent custody or physical durability 
 from __future__ import annotations
 
 from concurrent.futures import Future
+from copy import deepcopy
 import json
 import os
 from pathlib import Path
@@ -106,7 +107,7 @@ class OfflineArchiveLane:
                 return None
             future: Future = Future()
             try:
-                self._jobs.put_nowait((dict(catalog), future))
+                self._jobs.put_nowait((deepcopy(dict(catalog)), future))
             except queue.Full:
                 return None
             return future
