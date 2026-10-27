@@ -54,7 +54,7 @@ def run_sweep_slice(journal, registry, progress, *, symbol, interval,
     instance = journal.instance_id
     state = progress.state(instance, symbol, interval)
     if state is None:
-        state = (0, journal.max_entry_id())
+        state = (0, journal.last_entry_id())
         progress.save(instance, symbol, interval, *state)
     cursor, high_water = state
     added = existing = pages = 0
