@@ -1,4 +1,4 @@
-# CORE-128: R2 source/store binding candidate â€” independent acceptance pending
+# CORE-128: R2 baseline and D2-B slice 1 synthetic candidate
 
 Project AQL-CRYPTO-RESEARCH-001. Owner repair handoff: PR #129 comment
 6417847879, followed by continuation 6417931579 and the current direct repair
@@ -185,3 +185,157 @@ collector binance_collector, pipeline recovery entry, lanes consumer entry,
 the acceptance tests and this document. Those extra entry guards are necessary
 source-writer admission checks, not new pipeline activation or Factory work.
 No GitHub workflow was weakened or changed in the net repair diff.
+
+
+## D2-B slice 1 — owner-authorized versioned effect evidence
+
+Execution order #128/6436706901 follows code delivery33c046, the evidence
+inventory6436551719 and handoff6436682856. This section supersedes only absence
+of a bounded D2 prototype above; R2 critical-store pending intents are NOT
+automatically repaired by D2. No live pipeline, Factory, D3 format, MarketBar or
+v1 cursor changes.
+
+### Separate contracts; no silent D1 promotion
+
+delivery/effects.py is opt-in, synthetic OFFLINE only. D1 DELIVERED, Authority.view,
+its original64 tests and legacy APIs retain their local meaning. D2 has separate
+immutable per-consumer source chains, registry, epochs, effect identities and quota
+accounting. A D1 PUBLISH hash is NEVER a D2 target receipt.
+
+    target = SQLiteEffectTarget.create(disposable_path, synthetic=True)
+    delivery = EffectDelivery(
+        authority, "sandbox", target=target,
+        limits=EffectLimits(max_effects=4, max_events=64, max_bytes=65536,
+                            max_attempts=3, timeout_seconds=1),
+        max_consumers=2, synthetic=True)
+    epoch = delivery.fence()
+    receipt = delivery.deliver(epoch, source_sequence)
+
+These numbers are EXPLICIT FIXTURE SETTINGS, not production defaults or SLOs.
+Limits are mandatory/frozen and bounded by supported adapter ceilings. Registry
+count, unique effects, attempts, source event count/bytes and target inbox/receipt/
+payload bytes are bounded.
+
+Registration freezes source instance/path/generation/inventory/anchor digest,
+consumer, registration generation, distinct target UUID/path and limits.
+Only a fresh synthetic SQLite target enrolls. Target/backlink/receipt/effect are
+verified by opening the independently queryable persisted target DB, never by
+accepting a caller-supplied source hash. Missing/replaced/copied/rolled-back target
+evidence denies that consumer. Reopen requires a separately retained D2 anchor
+and current per-consumer progress checkpoint; live observed head detects rollback.
+Caller commitments are not a trusted latest-anchor service or host-admin isolation.
+
+### Commits and uncertainty
+
+1. D2_INTENT commits in source BEFORE target effects. Request binds frozen source
+   row/key/payload, consumer/target/registration and stable effect ID.
+2. Target inbox + optional synthetic effect commit atomically in target.
+3. Target receipt commits separately, binding request/identity, origin epoch,
+   current attempt epoch/ID, disposition, evidence and proof digest.
+4. Only verified persisted target effect/disposition AND receipt allow a separate
+   source D2_CONFIRMED commit. A local publication does not count.
+
+These are separate SQLite commits: no cross-file atomicity, independent custody
+or universal exactly-once. The fixture proves at-most-one APPLIED row per stable
+effect ID through bounded retries, not arbitrary external side effects.
+Effect ID is stable across retry; authorization attempt epoch is separate.
+
+Existing unresolved attempts cannot be repeated through normal deliver:
+IN_DOUBT needs explicit reconcile. Reconciliation queries the original registered
+target and can finish a missing receipt or repeat an absent effect idempotently
+under a current fence. New epoch cannot blindly accept an old attempt receipt.
+If an unconfirmed APPLIED effect exists but source is quarantined before ACK,
+confirmation remains refused/IN_DOUBT. No false progress/recall claim. Failures
+that block the underlying R2 authority also block D2.
+
+### Source authorization order and replay
+
+Source events are immutable/chained/canonical. Replay validates genesis, consumer,
+source sequence, epoch, attempt identity/order, receipt binding and persisted
+target state. Rehashed source event text alone is not proof.
+
+SQLite BEFORE INSERT ACK-eligibility guard rejects APPLIED D2_CONFIRMED when the
+actual source row is already quarantined, through raw INSERT and helper paths.
+A valid old target receipt cannot backdate an ACK after block. Genuine ACK-before-
+late-block stays historical D. Exact guard definition is checked; missing/changed
+guard denies D2. This is insertion-time authorization in a cooperating adapter,
+NOT protection from admins dropping/recreating guards, replacing all evidence/
+anchors, changing source binaries or controlling the host.
+
+Duplicate confirmed ACK/retry adds no source event, target effect or receipt.
+Reordered/unproven confirmations and cross-consumer/target/source-generation
+receipts fail. Rebuild derives states from source events plus target proof;
+no mutable projection is treated as external evidence.
+
+### D/W/V/S and expected inventory
+
+D = historically confirmed APPLIED target effect.
+W = explicit withheld disposition backed by source quarantine evidence.
+V = currently eligible confirmed APPLIED rows. Late quarantine withdraws V
+without erasing D; epoch change cannot release W.
+
+An initially withheld row settles ONLY with a persisted target WITHHELD disposition
+and receipt, and NO applied effect for that ID. After genuine historical D, late W
+references its original verified APPLIED receipt rather than falsely recalling
+bytes/effects. D and late W may overlap historically. Target WITHHELD is immutable.
+
+S = prefix of actual frozen source rows having verified target terminal proof,
+APPLIED or target-confirmed WITHHELD. Pending/unattempted rows stop it. Source-only
+W/hash is insufficient. SQL ID holes are not missing actual rows; time gaps do not
+prove completeness. Expected-market-time coverage remains UNKNOWN; no COMPLETE
+or D4-C authority is invented.
+
+### Consumer isolation and lock ordering
+
+Each consumer owns chain/epoch/pending/quota/target. D2 consumes no D1 stage/global
+event quota. Optional target unavailability or pending effects are not added to
+Authority._verify's global critical-store scan and cannot settle another consumer.
+
+Proof reads and registration lock acquisitions fail fast under source lock.
+Execution waits for its target writer lock BEFORE source acquisition, then takes
+source nonblocking. Receipt-lock reacquisition is nonblocking while source is held.
+This avoids optional-target waiting holding source and lock-order cycles.
+Authorization/actual target mutation still serialize during bounded SQLite commits.
+Contention may yield IN_DOUBT; no host-wide realtime latency/fairness SLO or
+production storage isolation is claimed. Historical archive stays an unimplemented
+nonblocking side-copy integration, never an activated live dependency here.
+
+### Test evidence and independent review
+
+New tests/test_core_d2_effects.py; original D1 suite is byte-identical.
+Red-first localf964e1e actually ran FIVE FAIL/0SKIP for missing P1/P2/P5/P7/P8
+against local-only D1. New API meets those requirements separately; D1 was not
+reinterpreted to hide its local-only boundary.
+
+Candidate4ca980a had42 authored PASS but independent review reproduced TWO blockers:
+rehashed ACK after quarantine and optional target wait holding source. Both were
+registered as failing tests (2FAIL) BEFORE repairs. Guard + target-first/no-wait
+ordering fix them; raw-insert, missing-guard and byte-quota cases were added.
+Revised author47PASS and independent47PASS are candidate evidence; final SHA,
+native CI and exact-source review are linked in #128/PR129 receipts. No earlier
+green result certifies later source.
+
+Eight real subprocess windows: before intent, after intent/pre-effect, pre-effect,
+post-target, pre-receipt, post-receipt, pre-ACK and post-ACK. Recovery must preserve
+one idempotent effect and no ACK before target proof. Other cases cover forged/
+rebound receipts, forged source confirmation, receipt without effect, target loss/
+replacement/rollback, two consumers, late conflict/W refusal, sparse inventory,
+source rollback, event/byte/effect/attempt/registry quotas and SQL receipt/ACK faults.
+
+CI runs new suite beside unchanged64D1 and legacy compatibility; no continue-on-
+error masks failed gates. No hidden skips, relaxed legacy threshold, DB conversion
+or runtime activation. Physical reboot/power-loss/real ACL tests are NOT EXECUTED.
+
+### Remaining phase and audit boundaries
+
+D2 slice acceptance needs independent adversarial review + new exact-head native
+Ubuntu/Windows, not R2 approval reuse. Full Core phase stays OPEN even if this slice
+passes. D3 sparse archive/catalog/coverage/backup/restore, true expected inventory,
+external authenticated issuer/receipts, custody, physical durability, production
+capacity and real consumers remain NOT EXECUTED/NOT ACCEPTED.
+
+AIARC #134 linkage F003-D2-S1/F005: this branch does not close F003 on accepted
+main, prove F005 historical provenance, establish F006 OOS alpha, resolve F008
+issuer rotation or alter Factory F010/F012. E01 parent fix retained;
+E02/E03/E06/E07 gain bounded local D2 evidence only; E04/E05/E08/E09 unchanged;
+E10–E13 real PIT/custody/health/physical durability/integration remain owner gates.
