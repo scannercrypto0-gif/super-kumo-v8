@@ -7,8 +7,7 @@ PYTHONPATH=src python benchmarks/core_proof_sweep_latency.py
 ```
 
 The harness measures **journal commit + PERSISTED ACK** latency in milliseconds,
-first without and then with a background bounded proof sweep. It prints
-p50/p95/p99/max/mean and the with-sweep/baseline latency ratios. It uses
+in two counterbalanced sequential pairs: baseline→sweep and sweep→baseline. It prints per-pair p50/p95/p99/max/mean and the with-sweep/baseline latency ratios. It uses
 isolated temporary SQLite files and never touches production data.
 
 **Interpretation and limits**
