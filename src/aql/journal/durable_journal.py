@@ -232,6 +232,7 @@ class DurableJournal(IntegrityAccess):
         include_quarantined: bool = False,
         max_entry_id: int | None = None,
         persisted_only: bool = False,
+        after_entry_id: int | None = None,
     ) -> List[MarketBar]:
         """
         Return eligible committed entries in bar_open order.
@@ -244,6 +245,11 @@ class DurableJournal(IntegrityAccess):
             from ..delivery.authority import deny_legacy
             deny_legacy(conn)
             params: list = []
+            if after_entry_id is not None:
+                if type(after_entry_id) is not int or after_entry_id < 0:
+                    raise ValueError("Non-negative journal cursor required")
+                query += " AND id > ?"
+                params.append(after_entry_id)
             if max_entry_id is not None:
                 if type(max_entry_id) is not int or max_entry_id < 0:
                     raise ValueError("Non-negative journal entry boundary required")
@@ -267,7 +273,7 @@ class DurableJournal(IntegrityAccess):
                 params.append(BarState.LOCAL_COMMITTED.value)
             if not include_quarantined:
                 query += " AND stable_key NOT IN (SELECT stable_key FROM g1_integrity_events)"
-            query += " ORDER BY bar_open ASC"
+            query += " ORDER BY id ASC" if after_entry_id is not None else " ORDER BY bar_open ASC"
             if limit is not None:
                 if type(limit) is not int or limit < 1:
                     raise ValueError("Positive batch limit required")
