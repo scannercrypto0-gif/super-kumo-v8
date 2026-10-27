@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import time
 from pathlib import Path
 
 from aql.data_proof import ObservationVersion, ProofError, verify_chain
@@ -18,6 +19,13 @@ class RevisionRegistry:
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.execute("PRAGMA synchronous=FULL")
         self._db.execute("""
+            CREATE TABLE IF NOT EXISTS postcommit_receipts (
+                version_id TEXT PRIMARY KEY,
+                observed_after_commit_ms INTEGER NOT NULL,
+                clock_scope TEXT NOT NULL
+            )
+        """)
+        self._db.execute("""
             CREATE TABLE IF NOT EXISTS observation_revisions (
                 version_id TEXT PRIMARY KEY,
                 logical_bar_id TEXT NOT NULL,
@@ -26,6 +34,13 @@ class RevisionRegistry:
                 UNIQUE(logical_bar_id, version_number)
             )
         """)
+
+    def postcommit_receipt(self, version_id: str) -> dict | None:
+        row = self._db.execute(
+            "SELECT observed_after_commit_ms, clock_scope FROM postcommit_receipts WHERE version_id=?",
+            (version_id,)).fetchone()
+        return ({"version_id": version_id, "observed_after_commit_ms": row[0],
+                 "clock_scope": row[1]} if row else None)
 
     def revisions(self, logical_bar_id: str) -> tuple[ObservationVersion, ...]:
         rows = self._db.execute(
@@ -50,6 +65,11 @@ class RevisionRegistry:
                 (version.version_id, version.logical_bar_id, version.version_number,
                  json.dumps(version.__dict__, sort_keys=True, separators=(",", ":"))))
             self._db.execute("COMMIT")
+            # This is a distinct second durable write after the revision COMMIT.
+            # A crash before this write leaves receipt absent (UNKNOWN).
+            self._db.execute(
+                "INSERT INTO postcommit_receipts(version_id,observed_after_commit_ms,clock_scope) VALUES (?,?,?)",
+                (version.version_id, time.time_ns() // 1_000_000, "LOCAL_WALL_CLOCK_UNATTESTED"))
             return "APPENDED"
         except (Exception,):
             self._db.execute("ROLLBACK")
