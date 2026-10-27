@@ -24,7 +24,7 @@ def test_late_correction_cannot_rewrite_earlier_decision():
 
 def test_missing_arrival_or_receipt_is_unknown():
     assert version(first_local_seen_ms=None).eligibility(3000) == "UNKNOWN_PENDING_EVIDENCE"
-    assert version(local_commit_evidence_ref=None).eligibility(3000) == "UNKNOWN_PENDING_EVIDENCE"
+    assert version(local_commit_evidence_ref=None, ingest_committed_ms=None).eligibility(3000) == "UNKNOWN_PENDING_EVIDENCE"
 
 
 def test_unattested_provider_time_rejected():
