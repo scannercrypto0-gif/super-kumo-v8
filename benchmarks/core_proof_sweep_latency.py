@@ -6,6 +6,7 @@ Not a CI performance gate: runner noise and SQLite storage vary by machine.
 from __future__ import annotations
 
 import json
+import argparse
 import statistics
 import tempfile
 import threading
@@ -32,7 +33,8 @@ def percentile(values: list[float], pct: float) -> float:
 
 
 def trial(root: Path, with_sweep: bool, *, warmup: int = 100,
-          measured: int = 500) -> dict:
+          measured: int = 500, page_size: int = 16,
+          pause_ms: int = 5) -> dict:
     root.mkdir(parents=True, exist_ok=True)
     journal = DurableJournal(str(root / "journal.sqlite"))
     for i in range(warmup):
@@ -50,9 +52,9 @@ def trial(root: Path, with_sweep: bool, *, warmup: int = 100,
             progress = SweepProgress(root / "sweep.sqlite")
             while not stop.is_set():
                 run_sweep_slice(journal, registry, progress,
-                    symbol="BTCUSDT", interval="1m", page_size=16,
+                    symbol="BTCUSDT", interval="1m", page_size=page_size,
                     max_pages=2, max_elapsed_ms=20)
-                stop.wait(0.005)
+                stop.wait(pause_ms / 1000)
         except Exception as exc:
             errors.append(repr(exc))
             stop.set()
@@ -91,6 +93,12 @@ def trial(root: Path, with_sweep: bool, *, warmup: int = 100,
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--page-size", type=int, default=16)
+    parser.add_argument("--pause-ms", type=int, default=5)
+    args = parser.parse_args()
+    if not 1 <= args.page_size <= 1024 or not 0 <= args.pause_ms <= 1000:
+        parser.error("page-size must be 1..1024 and pause-ms 0..1000")
     # Counterbalance warm-cache/order effects: AB then BA, separate databases.
     runs = []
     with tempfile.TemporaryDirectory(prefix="aql-proof-perf-") as tmp:
@@ -100,14 +108,17 @@ def main() -> None:
             for position, with_sweep in enumerate(order):
                 label = "with_sweep" if with_sweep else "baseline"
                 pair[label] = trial(root / f"r{repeat}_p{position}_{label}",
-                                    with_sweep)
+                                    with_sweep, page_size=args.page_size,
+                                    pause_ms=args.pause_ms)
             ratios = {k: round(pair["with_sweep"][k] / pair["baseline"][k], 3)
                       for k in ("p50_ms", "p95_ms", "p99_ms")
                       if pair["baseline"][k] > 0}
             runs.append({"order": ["with_sweep" if x else "baseline"
                                     for x in order],
                          **pair, "ratios": ratios})
-    print(json.dumps({"runs": runs,
+    print(json.dumps({"configuration": {"page_size": args.page_size,
+                                      "pause_ms": args.pause_ms},
+                      "runs": runs,
                       "status": "observational_only_not_acceptance",
                       "caution": "two sequential matched pairs; no SLO inference"},
                      indent=2))
