@@ -223,6 +223,48 @@ class StrategyDNAV2Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.run_report(self.assets+[self.assets[0]])
 
+    def test_rejected_monitor_source_id_cannot_break_report_or_core(self):
+        baseline=self.run_report().spec
+        for source_id in ("\\ud800", "x" * (17 * 1024 * 1024),
+                          "unknown", "", "bad/source"):
+            with self.subTest(source_kind=("huge" if len(source_id)>1000 else repr(source_id))):
+                assets=copy.deepcopy(self.assets)
+                assets[0]["features"]["observe"]["source_id"]=source_id
+                report=self.run_report(assets)
+                actual=report.spec
+                self.assertEqual(actual["core"],baseline["core"])
+                self.assertEqual(actual["core_digest"],baseline["core_digest"])
+                observation=actual["monitoring"][0]["observations"][0]
+                self.assertEqual(observation["status"],"UNVERIFIED")
+                self.assertEqual(observation["reason"],"INVALID_SOURCE_ID")
+                self.assertIsNone(observation["source_id"])
+                self.assertIsNone(observation["value"])
+                restored=SyntheticRoleReport.from_json(
+                    report.to_json(),expected_digest=report.digest)
+                self.assertEqual(restored.payload,report.payload)
+                self.assertEqual(actual["monitoring"][0]["expected"],
+                                 baseline["monitoring"][0]["expected"])
+
+    def test_rejected_critical_source_id_fails_closed_and_valid_control(self):
+        baseline=self.run_report().spec
+        valid_source=self.assets[0]["features"]["observe"]["source_id"]
+        self.assertEqual(baseline["monitoring"][0]["observations"][0]["source_id"],
+                         valid_source)
+        self.assertEqual(baseline["monitoring"][0]["observations"][0]["status"],
+                         "AVAILABLE_SYNTHETIC")
+        for ref in ("trend", "strength"):
+            with self.subTest(ref=ref):
+                assets=copy.deepcopy(self.assets)
+                assets[0]["features"][ref]["source_id"]="\\ud800"
+                report=self.run_report(assets)
+                row=report.spec["core"]
+                self.assertFalse(row["scanner"][0]["selected"] if ref=="trend" else
+                                 row["decisions"][0]["entry"]["eligible"])
+                self.assertEqual(
+                    SyntheticRoleReport.from_json(
+                        report.to_json(),expected_digest=report.digest).payload,
+                    report.payload)
+
     def test_monitor_extreme_finite_numeric_must_not_abort_core(self):
         baseline=self.run_report().spec["core"]
         for value in (1e20, -1e20, 1e308, -(2**53+1)):
