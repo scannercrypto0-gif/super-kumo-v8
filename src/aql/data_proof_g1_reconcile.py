@@ -15,7 +15,7 @@ def reconcile_persisted_observations(journal, registry, *,
         raise ProofError("bounded reconciliation limit required")
     # Journal replay validates each payload checksum and excludes quarantined
     # keys by default. A bounded prefix does NOT prove full coverage.
-    bars = journal.replay(symbol, interval, pending_only=False, limit=limit)
+    bars = journal.replay(symbol, interval, persisted_only=True, limit=limit)
     writer = G1RevisionWriter(registry)
     added = 0
     existing = 0
@@ -23,8 +23,6 @@ def reconcile_persisted_observations(journal, registry, *,
     for bar in bars:
         # Only confirmed operational-store persisted entries; do not promote
         # LOCAL_COMMITTED into PERSISTED based on this evidence scan.
-        if getattr(getattr(bar, "state", None), "value", None) != "PERSISTED":
-            continue
         try:
             result = writer.observe(bar)
             if result == "APPENDED":
