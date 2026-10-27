@@ -68,19 +68,20 @@ synthetic research fixture. Existing `opportunity_id` is unchanged: it binds
 the **full** `dna_digest` and is unique to the V2 strategy version. In addition,
 decision and monitoring rows both expose `opportunity_family_id` calculated
 from versioned `synthetic-opportunity-family-1` schema, the
-`decision_policy_digest`, frozen synthetic `source_generation_id`,
+immutable `strategy_id` lineage, `decision_policy_digest`, frozen synthetic `source_generation_id`,
 `plan_id`, symbol, venue, and decision cutoff. The family ID deliberately
 does not include monitoring-only policy. Changing monitoring alone preserves
 the family ID if the compared decision policy and source context are unchanged,
 although the per-version opportunity ID changes.
 
-Different Scanner/Decision policies, source generations, plans, assets, venues
+Different strategy IDs, Scanner/Decision policies, source generations, plans, assets, venues
 or decision cutoffs cannot be silently joined under a common family ID.
 Unselected/scanner-excluded opportunities retain both identifiers and a monitor
 row. The ID is **a comparison candidate**, not proof that all input observations
 were identical, that two portfolio paths can be paired without separate
-simulation, or that missing/rejected populations are interchangeable. Consumers
-must verify explicit experiment/source/eligibility compatibility and preserve
+simulation, or that missing/rejected populations are interchangeable. A child strategy with a distinct strategy ID cannot claim the same comparison
+family without a future independently frozen parent/child lineage mapping.
+Consumers must verify explicit experiment/source/eligibility compatibility and preserve
 unmatched observations; no arbitrary joins, synthetic-to-real normalization,
 retrospective backfill or deduplication of a live event stream are authorized.
 This pure function evaluates at most one supplied event per symbol+venue per
