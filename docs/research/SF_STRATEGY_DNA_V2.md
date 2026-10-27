@@ -112,6 +112,12 @@ changes relative to a retained digest; they are not signatures or an independent
 append-only ledger. Replay here is deterministic pure fixture reevaluation,
 not crash recovery or operational durability acceptance.
 
+## Independent review P2 hardening (synthetic only)
+
+Read-only Codex found two source failures on the former f7ec5231 commit. A finite but canonically unrepresentable monitor value (e.g. 1e20) could abort the entire report; V2 now rejects such readings as UNVERIFIED/null before serialization, preserving monitor-only noninterference and failing closed for critical readings.
+
+Large valid reports covering up to 256 synthetic assets could exceed the shared V1 JSON loader's 100 KB cap. V1 remains untouched. V2 SyntheticRoleReport has its own bounded 16 MiB JSON loader and symmetric serialization limit; duplicate-key, nonfinite, depth/canonical number and retained-digest checks remain required. Values above the report cap are rejected instead of being silently emitted as retrievable evidence. Focused regressions cover monitor overflow, 256-asset report roundtrip, oversized input, duplicate keys and retained-digest mismatch. Independent rereview is still a separate gate.
+
 ## Decision traceability
 
 All source links are comments on
@@ -144,7 +150,7 @@ The example reuses unchanged `examples/strategy_definition_v1.json` and supplies
 three entirely synthetic assets. Expected: AAA meets entry conditions, BBB waits,
 CCC is scanner-excluded but still has a monitor row. No fill or profitability.
 
-The new exact-head workflow runs 30 focused tests and this example on Ubuntu
+The new exact-head workflow runs 35 focused tests and this example on Ubuntu
 and Windows with Python 3.11. The existing unmodified SF-RESEARCH-INT-01 workflow
 runs its 464 accepted contract regressions on both OSes with Python 3.10–3.12.
 Actual CI run links, counts, durations and limitations belong in the delivery
