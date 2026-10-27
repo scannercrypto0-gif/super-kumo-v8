@@ -155,6 +155,71 @@ class StrategyDNAV2Tests(unittest.TestCase):
         self.assertEqual(a["core"]["scanner"],b["core"]["scanner"])
         for x,y in zip(a["core"]["decisions"],b["core"]["decisions"]):
             self.assertEqual(x["signal"],y["signal"])
+    def test_opportunity_family_monitor_only_revision(self):
+        baseline=self.run_report().spec
+        spec=self.dna.spec
+        spec["strategy_version"]="v2_monitor_revision"
+        spec["monitoring_profile"]["features"][0]["max_age_ms"]=99
+        revised=StrategyDNAV2(spec,v1_definition=self.v1)
+        updated=self.run_report(dna=revised).spec
+        self.assertNotEqual(baseline["dna_digest"],updated["dna_digest"])
+        self.assertEqual(baseline["decision_policy_digest"],updated["decision_policy_digest"])
+        self.assertEqual(
+            [r["opportunity_family_id"] for r in baseline["core"]["decisions"]],
+            [r["opportunity_family_id"] for r in updated["core"]["decisions"]])
+        self.assertNotEqual(
+            [r["opportunity_id"] for r in baseline["core"]["decisions"]],
+            [r["opportunity_id"] for r in updated["core"]["decisions"]])
+        for report in (baseline,updated):
+            for decision,monitor in zip(report["core"]["decisions"],report["monitoring"]):
+                self.assertEqual(decision["opportunity_id"],monitor["opportunity_id"])
+                self.assertEqual(decision["opportunity_family_id"],monitor["opportunity_family_id"])
+            self.assertEqual(report["core"]["decisions"][2]["signal"],"NOT_EVALUATED_SCANNER")
+            self.assertEqual(report["monitoring"][2]["coverage_scope"],"SCANNER_EXCLUDED")
+
+    def test_opportunity_family_separates_semantic_policy_and_source(self):
+        original=self.run_report().spec["core"]["decisions"][0]
+        variants=[]
+        spec=self.dna.spec
+        spec["strategy_version"]="v2_scanner_revision"
+        spec["scanner_profile"]["max_candidates"]=1
+        variants.append(StrategyDNAV2(spec,v1_definition=self.v1))
+        spec=self.dna.spec
+        spec["strategy_version"]="v2_decision_revision"
+        spec["decision_profile"]["entry"]["threshold"]=.9
+        variants.append(StrategyDNAV2(spec,v1_definition=self.v1))
+        spec=self.dna.spec
+        spec["strategy_version"]="v2_generation_revision"
+        spec["provenance"]["source_generation_id"]="fixture_v2"
+        variants.append(StrategyDNAV2(spec,v1_definition=self.v1))
+        spec=self.dna.spec
+        spec["strategy_version"]="v2_plan_revision"
+        spec["provenance"]["plan_id"]="bounded_roles_v2"
+        variants.append(StrategyDNAV2(spec,v1_definition=self.v1))
+        for dna in variants:
+            with self.subTest(version=dna.spec["strategy_version"]):
+                changed=self.run_report(dna=dna).spec["core"]["decisions"][0]
+                self.assertNotEqual(original["opportunity_family_id"],changed["opportunity_family_id"])
+
+    def test_opportunity_family_separates_symbol_venue_cutoff_and_replays(self):
+        base=self.run_report().spec
+        again=self.run_report().spec
+        self.assertEqual(base["core"]["decisions"],again["core"]["decisions"])
+        self.assertEqual(len({d["opportunity_family_id"] for d in base["core"]["decisions"]}),3)
+        changed=copy.deepcopy(self.assets)
+        changed[0]["venue"]="other"
+        venue=self.run_report(changed).spec["core"]["decisions"][0]
+        self.assertNotEqual(base["core"]["decisions"][0]["opportunity_family_id"],venue["opportunity_family_id"])
+        later=evaluate_synthetic(self.dna,self.assets,decision_cutoff_ms=1001).spec
+        self.assertNotEqual(base["core"]["decisions"][0]["opportunity_family_id"],
+                            later["core"]["decisions"][0]["opportunity_family_id"])
+        changed=copy.deepcopy(self.assets)
+        changed[0]["symbol"]="DDD"
+        symbol=self.run_report(changed).spec["core"]["decisions"][0]
+        self.assertNotEqual(base["core"]["decisions"][0]["opportunity_family_id"],symbol["opportunity_family_id"])
+        with self.assertRaises(ValueError):
+            self.run_report(self.assets+[self.assets[0]])
+
     def test_explicit_same_indicator_multiple_roles(self):
         spec=self.dna.spec;spec["monitoring_profile"]["features"].append(
             dict(feature_id="trend_observe",reference="trend",field="value",max_age_ms=100))
