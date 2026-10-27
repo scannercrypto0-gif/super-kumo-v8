@@ -1,0 +1,10 @@
+# ATLAS incremental linting baseline.
+# Keep legacy violations out of the initial gate; expand after measured baseline.
+target-version = "py311"
+line-length = 100
+
+[lint]
+select = ["E4", "E7", "E9", "F63", "F7", "F82"]
+
+# No global automatic fixes; all changes require code review.
+fixable = []

@@ -398,7 +398,10 @@ class TestT_WP04_FIX01_01_PipelineOrchestration:
         assert hs["status"] == "HEALTHY", (
             f"AG-F02 FAIL: expected exactly HEALTHY with deterministic clock "
             f"(lag≈30s) after journal-replay restart. Got: {hs['status']}. "
-            f"Full snapshot: {hs}"
+            f"Full snapshot: {hs}; "
+            f"background_recovery={result.get('background_recovery')}; "
+            f"background_persistence={result.get('background_persistence')}; "
+            f"startup_reconcile={result.get('startup_reconcile')}"
         )
         assert hs["unresolved_backlog"] is False
         assert hs["integrity_ok"] is True
