@@ -57,3 +57,32 @@ def test_duplicate_revision_rejected():
     body={k:v for k,v in obj.items() if k!="manifest_sha256"}
     obj["manifest_sha256"]=digest(body)
     assert review_core_envelope(obj, pinned_digest=obj["manifest_sha256"], cutoff_ms=1202)[0].reason=="DUPLICATE_CORE_VERSION"
+
+def test_core_shared_fixture_shape_preserves_late_and_missing():
+    original=dict(logical_bar_id="BTCUSDT:1m:0", version_number=1, payload_digest="a"*64,
+                  bar_open_ms=0, bar_close_ms=59999, first_local_seen_ms=60001,
+                  source_id="synthetic-ws", supersedes_version_id=None,
+                  provider_available_ms=None, provider_evidence_ref=None,
+                  clock_evidence_ref="synthetic-clock",
+                  local_commit_evidence_ref="synthetic-local-receipt",
+                  ingest_committed_ms=60002)
+    original_id="obs-v1:"+digest(original)
+    revised=dict(original, version_number=2, payload_digest="b"*64,
+                 first_local_seen_ms=90000, ingest_committed_ms=90001,
+                 supersedes_version_id=original_id)
+    missing=dict(original, logical_bar_id="ETHUSDT:1m:0", payload_digest="c"*64,
+                 first_local_seen_ms=None, ingest_committed_ms=None,
+                 clock_evidence_ref=None, local_commit_evidence_ref=None)
+    body=dict(schema="core-data-proof-envelope-v1", consumer="factory", epoch=1,
+              provenance_scope="LOCAL_ONLY_UNATTESTED",
+              versions=[dict(version_id="obs-v1:"+digest(v),record=v) for v in
+                        [original,revised,missing]],
+              gap_states={"gap:unknown":"IN_DOUBT"})
+    packet=dict(body,manifest_sha256=digest(body))
+    outcomes=review_core_envelope(packet,pinned_digest=packet["manifest_sha256"],
+                                  cutoff_ms=70000)
+    assert [o.status for o in outcomes]==[
+        "UNKNOWN_PENDING_EVIDENCE","REJECT_FOR_EMPIRICAL",
+        "UNKNOWN_PENDING_EVIDENCE"]
+    assert outcomes[1].reason=="NOT_KNOWN_AT_CUTOFF"
+    assert not any(o.real_pit_accepted or o.empirical_eligible for o in outcomes)

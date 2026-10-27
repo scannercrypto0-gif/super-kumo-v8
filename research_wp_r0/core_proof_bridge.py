@@ -58,17 +58,17 @@ def review_core_envelope(envelope, *, pinned_digest, cutoff_ms, consumer="factor
             return (Admission("REJECT_FOR_EMPIRICAL", "BROKEN_CORE_REVISION_ANCESTRY"),)
         latest[bar_id] = (number, version)
         # Revision details and gap states are *not* manufactured into evidence.
-        # A Core post-commit reference is not a trusted post-COMMIT timestamp.
+        # Never infer a timestamp from a receipt reference. Use only the explicit\n        # producer timestamp, and retain LOCAL_ONLY_UNATTESTED limitations.
         normalized = dict(version_id=version, manifest_digest=pinned_digest,
                           gap_state=body["gap_states"].get(record.get("logical_bar_id"), "UNKNOWN"),
                           payload_digest=record["payload_digest"],
                           bar_close_ms=record.get("bar_close_ms"),
                           first_local_seen_ms=record.get("first_local_seen_ms"),
-                          ingest_committed_ms=None, provider_available_ms=record.get("provider_available_ms"),
+                          ingest_committed_ms=record.get("ingest_committed_ms"),\n                          provider_available_ms=record.get("provider_available_ms"),
                           provider_evidence_ref=record.get("provider_evidence_ref"),
                           clock_evidence_ref=record.get("clock_evidence_ref"),
                           supersedes_version_id=record.get("supersedes_version_id"),
-                          revision_first_seen_ms=None)
+                          revision_first_seen_ms=record.get("first_local_seen_ms") if number > 1 else None)
         local = admit_revision(normalized, cutoff_ms=cutoff_ms,
                                expected_manifest_digest=pinned_digest,
                                verified_source_timing=False)
