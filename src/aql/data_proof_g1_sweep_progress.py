@@ -26,11 +26,16 @@ class SweepProgress:
             (instance, symbol, interval)).fetchone()
         return tuple(row) if row else None
 
-    def save(self, instance, symbol, interval, cursor, high_water):
+    def save(self, instance, symbol, interval, cursor, high_water, *, expected=None):
         if any(type(x) is not int or x < 0 for x in (cursor, high_water)):
             raise ProofError("invalid sweep checkpoint")
         self.db.execute("BEGIN IMMEDIATE")
         try:
+            current = self.state(instance, symbol, interval)
+            if current != expected:
+                raise ProofError("stale sweep checkpoint update")
+            if current is not None and (high_water != current[1] or cursor < current[0]):
+                raise ProofError("sweep checkpoint regression")
             self.db.execute("""INSERT INTO proof_sweep_progress VALUES(?,?,?,?,?)
                 ON CONFLICT(journal_instance,symbol,interval)
                 DO UPDATE SET cursor=excluded.cursor,high_water=excluded.high_water""",
@@ -40,9 +45,17 @@ class SweepProgress:
             self.db.execute("ROLLBACK")
             raise
 
-    def clear(self, instance, symbol, interval):
-        self.db.execute("DELETE FROM proof_sweep_progress WHERE journal_instance=? AND symbol=? AND interval=?",
-                        (instance, symbol, interval))
+    def clear(self, instance, symbol, interval, *, expected):
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            if self.state(instance, symbol, interval) != expected:
+                raise ProofError("stale sweep checkpoint clear")
+            self.db.execute("DELETE FROM proof_sweep_progress WHERE journal_instance=? AND symbol=? AND interval=?",
+                            (instance, symbol, interval))
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
 
     def close(self):
         self.db.close()
@@ -59,7 +72,7 @@ def run_sweep_slice(journal, registry, progress, *, symbol, interval,
     state = progress.state(instance, symbol, interval)
     if state is None:
         state = (0, journal.startup_entry_boundary())
-        progress.save(instance, symbol, interval, *state)
+        progress.save(instance, symbol, interval, *state, expected=None)
     cursor, high_water = state
     added = existing = pages = 0
     for _ in range(max_pages):
@@ -71,13 +84,16 @@ def run_sweep_slice(journal, registry, progress, *, symbol, interval,
         added += result["added"]
         existing += result["existing"]
         pages += 1
+        previous = (cursor, high_water)
         cursor = result["next_cursor"]
-        progress.save(instance, symbol, interval, cursor, high_water)
+        progress.save(instance, symbol, interval, cursor, high_water,
+                      expected=previous)
         if result["failed_key"]:
             return {"complete": False, "failed_key": result["failed_key"],
                     "added": added, "existing": existing, "pages": pages}
         if result["complete"]:
-            progress.clear(instance, symbol, interval)
+            progress.clear(instance, symbol, interval,
+                           expected=(cursor, high_water))
             return {"complete": True, "failed_key": None,
                     "added": added, "existing": existing, "pages": pages}
     return {"complete": False, "failed_key": None,
