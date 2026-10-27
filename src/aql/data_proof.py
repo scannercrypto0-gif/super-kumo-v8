@@ -32,6 +32,7 @@ class ObservationVersion:
     provider_evidence_ref: str | None = None
     clock_evidence_ref: str | None = None
     local_commit_evidence_ref: str | None = None
+    ingest_committed_ms: int | None = None
 
     def __post_init__(self):
         if not self.logical_bar_id or not self.source_id:
@@ -42,9 +43,14 @@ class ObservationVersion:
             raise ProofError("invalid payload SHA256")
         if type(self.bar_open_ms) is not int or type(self.bar_close_ms) is not int or self.bar_close_ms < self.bar_open_ms:
             raise ProofError("invalid bar interval")
-        for timestamp in (self.first_local_seen_ms, self.provider_available_ms):
+        for timestamp in (self.first_local_seen_ms, self.provider_available_ms, self.ingest_committed_ms):
             if timestamp is not None and (type(timestamp) is not int or timestamp < 0):
                 raise ProofError("invalid evidence timestamp")
+        if self.ingest_committed_ms is not None and not self.local_commit_evidence_ref:
+            raise ProofError("post-commit time requires durable receipt evidence")
+        if (self.first_local_seen_ms is not None and self.ingest_committed_ms is not None
+                and self.ingest_committed_ms < self.first_local_seen_ms):
+            raise ProofError("post-commit timestamp precedes local first seen")
         if self.provider_available_ms is not None and not self.provider_evidence_ref:
             raise ProofError("provider availability requires independent evidence reference")
         if self.version_number == 1 and self.supersedes_version_id is not None:
@@ -66,7 +72,9 @@ class ObservationVersion:
             return "REJECT_LATE"
         if self.provider_available_ms is not None and self.provider_available_ms > decision_cutoff_ms:
             return "REJECT_LATE"
-        if not self.clock_evidence_ref or not self.local_commit_evidence_ref:
+        if self.ingest_committed_ms is not None and self.ingest_committed_ms > decision_cutoff_ms:
+            return "REJECT_LATE"
+        if not self.clock_evidence_ref or not self.local_commit_evidence_ref or self.ingest_committed_ms is None:
             return "UNKNOWN_PENDING_EVIDENCE"
         return "LOCAL_EVIDENCE_ONLY"
 
