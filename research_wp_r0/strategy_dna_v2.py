@@ -392,6 +392,14 @@ def evaluate_synthetic(dna, assets, *, decision_cutoff_ms):
         identity = dict(scope="SYNTHETIC_DNA_V2", dna_digest=dna.digest,
                         symbol=asset["symbol"], venue=asset["venue"], cutoff=decision_cutoff_ms)
         opportunity_id = digest(identity)  # NOT a Core operational candidate ID
+        # Comparison identity is deliberately independent of monitor-only revisions.
+        # It is synthetic research lineage, not an operational/Core identifier.
+        opportunity_family_id = digest(dict(
+            schema="synthetic-opportunity-family-1",
+            decision_policy_digest=dna.decision_policy_digest,
+            source_generation_id=spec["provenance"]["source_generation_id"],
+            plan_id=spec["provenance"]["plan_id"],
+            symbol=asset["symbol"], venue=asset["venue"], cutoff=decision_cutoff_ms))
         if screen["selected"]:
             entry = _channel(spec["decision_profile"]["entry"], read)
             exit_value = _channel(spec["decision_profile"]["exit"], read)
@@ -406,14 +414,17 @@ def evaluate_synthetic(dna, assets, *, decision_cutoff_ms):
             else:
                 signal = "WAIT"
             decisions.append(dict(symbol=asset["symbol"], opportunity_id=opportunity_id,
+                                   opportunity_family_id=opportunity_family_id,
                                   signal=signal, entry=entry, exit=exit_value))
         else:
             decisions.append(dict(symbol=asset["symbol"], opportunity_id=opportunity_id,
+                                   opportunity_family_id=opportunity_family_id,
                                   signal="NOT_EVALUATED_SCANNER"))
         expected = []
         for feature in spec["monitoring_profile"]["features"]:
             expected.append(dict(feature_id=feature["feature_id"], **read(feature)))
         monitoring.append(dict(symbol=asset["symbol"], opportunity_id=opportunity_id,
+                               opportunity_family_id=opportunity_family_id,
                                coverage_scope="SCANNER_SELECTED" if screen["selected"] else "SCANNER_EXCLUDED",
                                expected=len(expected), available=sum(r["status"] == "AVAILABLE_SYNTHETIC" for r in expected),
                                status="COMPLETE_SYNTHETIC" if all(r["status"] == "AVAILABLE_SYNTHETIC" for r in expected) else "MONITORING_INCOMPLETE",
