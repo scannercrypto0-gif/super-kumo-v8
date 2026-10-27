@@ -43,6 +43,8 @@ def trial(root: Path, with_sweep: bool, *, warmup: int = 100,
         journal.mark_persisted(item.stable_key())
     stop = threading.Event()
     errors: list[str] = []
+    sweep_stats = {"slices": 0, "pages": 0, "complete_cycles": 0,
+                   "added": 0, "existing": 0}
 
     def sweep():
         registry = None
@@ -51,9 +53,16 @@ def trial(root: Path, with_sweep: bool, *, warmup: int = 100,
             registry = RevisionRegistry(root / "proof.sqlite")
             progress = SweepProgress(root / "sweep.sqlite")
             while not stop.is_set():
-                run_sweep_slice(journal, registry, progress,
+                result = run_sweep_slice(journal, registry, progress,
                     symbol="BTCUSDT", interval="1m", page_size=page_size,
                     max_pages=2, max_elapsed_ms=20)
+                sweep_stats["slices"] += 1
+                sweep_stats["pages"] += result["pages"]
+                sweep_stats["complete_cycles"] += int(result["complete"])
+                sweep_stats["added"] += result["added"]
+                sweep_stats["existing"] += result["existing"]
+                if result["failed_key"]:
+                    raise RuntimeError("sweep failed at " + str(result["failed_key"]))
                 stop.wait(pause_ms / 1000)
         except Exception as exc:
             errors.append(repr(exc))
@@ -85,7 +94,8 @@ def trial(root: Path, with_sweep: bool, *, warmup: int = 100,
                 raise RuntimeError("sweep thread did not stop")
     if errors:
         raise RuntimeError(errors[0])
-    return {"count": len(samples), "p50_ms": percentile(samples, 0.50),
+    return {"count": len(samples), "sweep_work": sweep_stats if with_sweep else None,
+            "p50_ms": percentile(samples, 0.50),
             "p95_ms": percentile(samples, 0.95),
             "p99_ms": percentile(samples, 0.99),
             "max_ms": max(samples),
