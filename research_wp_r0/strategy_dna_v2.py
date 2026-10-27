@@ -396,6 +396,7 @@ def evaluate_synthetic(dna, assets, *, decision_cutoff_ms):
         # It is synthetic research lineage, not an operational/Core identifier.
         opportunity_family_id = digest(dict(
             schema="synthetic-opportunity-family-1",
+            strategy_id=spec["strategy_id"],
             decision_policy_digest=dna.decision_policy_digest,
             source_generation_id=spec["provenance"]["source_generation_id"],
             plan_id=spec["provenance"]["plan_id"],
