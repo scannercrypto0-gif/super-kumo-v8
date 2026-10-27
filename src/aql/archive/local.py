@@ -22,6 +22,8 @@ MAX_RECORD_BYTES = 16384
 
 
 def source_row(conn, sequence):
+    from ..delivery.authority import deny_legacy
+    deny_legacy(conn)
     size = conn.execute("SELECT length(CAST(payload_json AS BLOB))+length(stable_key)+length(checksum) FROM journal_entries WHERE id=?", (sequence,)).fetchone()
     if size is None:
         return None

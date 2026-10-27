@@ -65,6 +65,13 @@ class OperationalStore(IntegrityAccess):
         self.db_path = db_path
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
+        self.binding_fault = lambda stage: None
+        from ..delivery.store_binding import load_token
+        conn = self._connect()
+        try:
+            self._core128_token = load_token(conn)
+        finally:
+            conn.close()
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=0.25)
@@ -92,12 +99,30 @@ class OperationalStore(IntegrityAccess):
         return MarketBar.from_dict(fields)
 
     def upsert(self, bar: MarketBar) -> bool:
+        from ..delivery.store_binding import has_binding, write
+        conn = self._connect()
+        try:
+            bound = has_binding(conn)
+        finally:
+            conn.close()
+        if bound or self._core128_token is not None:
+            if not bar.is_final:
+                raise ValueError("Non-final bar rejected")
+            return write(self, bar)
+        return self._upsert_local(bar)
+
+    def _upsert_local(self, bar: MarketBar, *, connection=None) -> bool:
         if not bar.is_final:
             raise ValueError("Non-final bar rejected")
         material=content(bar)
-        conn=self._connect()
+        conn=connection if connection is not None else self._connect()
         try:
             conn.execute("BEGIN IMMEDIATE")
+            if connection is None:
+                # Enrollment may have happened after public dispatch. Check
+                # under the SAME store write lock, before any legacy effect.
+                from ..delivery.store_binding import deny_store_legacy
+                deny_store_legacy(conn)
             prior=self._original_bar(conn,bar.stable_key())
             if prior is not None and content(prior)!=material:
                 evidence=record_event(conn,prior,bar)
@@ -123,7 +148,19 @@ class OperationalStore(IntegrityAccess):
             if conn.in_transaction: conn.rollback()
             raise
         finally:
+            if connection is None:
+                conn.close()
+
+    def _record_integrity_event(self, original, incoming, **kwargs):
+        from ..delivery.store_binding import has_binding, write
+        conn = self._connect()
+        try:
+            bound = has_binding(conn)
+        finally:
             conn.close()
+        if bound or self._core128_token is not None:
+            return write(self, incoming, force=True, original=original, event_options=kwargs)
+        return super()._record_integrity_event(original, incoming, **kwargs)
 
     def bulk_upsert(self, bars: List[MarketBar]) -> dict:
         """Upsert multiple bars. Returns counts dict."""
@@ -160,6 +197,8 @@ class OperationalStore(IntegrityAccess):
         """Return eligible stored opens; retained quarantined rows are not coverage."""
         conn = self._connect()
         try:
+            from ..delivery.store_binding import deny_store_legacy
+            deny_store_legacy(conn)
             rows = conn.execute(
                 "SELECT bar_open FROM market_bars WHERE symbol=? AND interval=? "
                 "AND NOT EXISTS (SELECT 1 FROM g1_integrity_events e "
@@ -174,6 +213,8 @@ class OperationalStore(IntegrityAccess):
         """Return eligible stored bounds, excluding retained quarantined rows."""
         conn = self._connect()
         try:
+            from ..delivery.store_binding import deny_store_legacy
+            deny_store_legacy(conn)
             row = conn.execute(
                 "SELECT MIN(bar_open) as mn, MAX(bar_open) as mx FROM market_bars WHERE symbol=? AND interval=? "
                 "AND NOT EXISTS (SELECT 1 FROM g1_integrity_events e "

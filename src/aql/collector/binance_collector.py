@@ -86,6 +86,10 @@ class BinanceCollector:
         store: OperationalStore,
         max_bars: Optional[int] = None,
     ):
+        # The finite v2 source has no live/legacy collector activation contract.
+        # Reject configuration before any network or operational-store effect.
+        from ..delivery.authority import register_legacy_writer
+        register_legacy_writer(journal, 'collector')
         self.symbol = symbol.upper()
         self.interval = interval
         self.journal = journal
@@ -227,6 +231,8 @@ class BinanceCollector:
         Run the collector synchronously.  Returns metrics on completion.
         timeout_s: stop after this many seconds (useful for tests / 10-min run).
         """
+        from ..delivery.authority import register_legacy_writer
+        register_legacy_writer(self.journal, 'collector-run')
         url = f"{WS_BASE}/{self._stream_name()}"
         self._stop_event.clear()
 

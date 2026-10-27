@@ -1247,3 +1247,42 @@ class TestT_WP04_FIX02_04_FullPipelineSIGKILL:
             f"exact_key_coverage=True  "
             f"idempotent=(replay_inserted_2=={sr2['replay_inserted']})"
         )
+
+
+# AG-F01: a frozen startup journal population must not include fresh collection.
+def test_ag_f01_startup_boundary_excludes_new_collector_row(tmp_path):
+    journal = DurableJournal(str(tmp_path / "journal.sqlite"))
+    store = OperationalStore(str(tmp_path / "store.sqlite"))
+    boundary = journal.startup_entry_boundary()
+    assert boundary == 0
+
+    fresh = _make_live_bar(0)
+    # Model the actual race: new collection commits to journal, but has not
+    # written to OperationalStore when asynchronous startup recovery runs.
+    journal.commit(fresh)
+    replayed, inserted, errors, _ = journal.startup_reconcile(
+        store=store, symbol=SYMBOL, interval=INTERVAL,
+        startup_max_entry_id=boundary,
+    )
+    assert (replayed, inserted, errors) == (0, 0, 0)
+    assert store.count(SYMBOL, INTERVAL) == 0
+    store.upsert(fresh)
+    journal.mark_persisted(fresh.stable_key())
+    assert store.count(SYMBOL, INTERVAL) == 1
+    assert journal.replay(symbol=SYMBOL, interval=INTERVAL)[0].checksum == fresh.checksum
+
+
+def test_ag_f01_startup_boundary_recovers_preexisting_backlog(tmp_path):
+    journal = DurableJournal(str(tmp_path / "journal.sqlite"))
+    store = OperationalStore(str(tmp_path / "store.sqlite"))
+    old = _make_live_bar(0)
+    journal.commit(old)
+    boundary = journal.startup_entry_boundary()
+    assert boundary > 0
+    replayed, inserted, errors, _ = journal.startup_reconcile(
+        store=store, symbol=SYMBOL, interval=INTERVAL,
+        startup_max_entry_id=boundary,
+    )
+    assert (replayed, inserted, errors) == (1, 1, 0)
+    assert store.count(SYMBOL, INTERVAL) == 1
+    assert store.get_stored_keys(SYMBOL, INTERVAL) == {old.bar_open}

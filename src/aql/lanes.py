@@ -63,6 +63,8 @@ class JournalConsumer:
     prevents another core commit; retry uses the journal, not a lossy RAM queue.
     """
     def __init__(self, journal, store, symbol, interval, batch_size=64, ready=None):
+        from .delivery.authority import register_legacy_writer
+        register_legacy_writer(journal, 'journal-consumer')
         self.journal, self.store = journal, store
         self.symbol, self.interval = symbol, interval
         self.batch_size = batch_size

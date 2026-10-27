@@ -158,9 +158,19 @@ class DurableJournal(IntegrityAccess):
         bar.committed_at = now_ms
         bar.state = BarState.LOCAL_COMMITTED
         conn = self._connect()
+        from ..delivery.authority import enabled, prepare_candidate
+        if enabled(conn):
+            conn.close()
+            prepare_candidate(self,bar)
+            conn = self._connect()
         try:
             conn.execute("BEGIN IMMEDIATE")
             prior = self._original_bar(conn,bar.stable_key())
+            from ..delivery.authority import enabled, activation_reserved, PublicationDenied
+            if activation_reserved(conn) and not enabled(conn):
+                raise PublicationDenied("Incomplete v2 activation; legacy writes denied")
+            if prior is None and enabled(conn):
+                raise PublicationDenied("Finite v2 source is frozen; no legacy appends")
             if prior is not None and content(prior) != material:
                 evidence = record_event(conn,prior,bar)
                 conn.execute("COMMIT")  # conflict evidence survives raised error
@@ -173,6 +183,10 @@ class DurableJournal(IntegrityAccess):
                 raise ContentConflictError(evidence)
             require_eligible_db(conn,bar.stable_key())
             if prior is not None:
+                if enabled(conn):
+                    # A legacy collector created before activation must not
+                    # treat a matching retry as authority to write another DB.
+                    raise PublicationDenied("Activated source refuses legacy writer retries")
                 conn.execute("COMMIT")
                 return False  # identical retry; no fabricated new/legacy timestamp
             conn.execute("INSERT INTO journal_entries "
@@ -194,6 +208,21 @@ class DurableJournal(IntegrityAccess):
         finally:
             conn.close()
 
+    def startup_entry_boundary(self) -> int:
+        """Last journal row ID committed before collection starts.
+
+        AUTOINCREMENT journal IDs form a durable insertion-order boundary;
+        this is not a market-time timestamp or a row-count assumption.
+        """
+        conn = self._connect()
+        try:
+            from ..delivery.authority import deny_legacy
+            deny_legacy(conn)
+            row = conn.execute("SELECT COALESCE(MAX(id), 0) FROM journal_entries").fetchone()
+            return int(row[0])
+        finally:
+            conn.close()
+
     def replay(
         self,
         symbol: Optional[str] = None,
@@ -201,6 +230,7 @@ class DurableJournal(IntegrityAccess):
         final_only: bool = True,
         *, pending_only: bool = False, limit: int | None = None,
         include_quarantined: bool = False,
+        max_entry_id: int | None = None,
     ) -> List[MarketBar]:
         """
         Return eligible committed entries in bar_open order.
@@ -210,7 +240,14 @@ class DurableJournal(IntegrityAccess):
         conn = self._connect()
         try:
             query = "SELECT * FROM journal_entries WHERE 1=1"
+            from ..delivery.authority import deny_legacy
+            deny_legacy(conn)
             params: list = []
+            if max_entry_id is not None:
+                if type(max_entry_id) is not int or max_entry_id < 0:
+                    raise ValueError("Non-negative journal entry boundary required")
+                query += " AND id <= ?"
+                params.append(max_entry_id)
             if symbol:
                 query += " AND symbol = ?"
                 params.append(symbol)
@@ -265,6 +302,8 @@ class DurableJournal(IntegrityAccess):
         """Mark a journal entry as PERSISTED after successful operational storage write."""
         conn = self._connect()
         try:
+            from ..delivery.authority import deny_legacy
+            deny_legacy(conn)
             try:
                 conn.execute("BEGIN IMMEDIATE")
                 require_eligible_db(conn,stable_key)
@@ -287,6 +326,8 @@ class DurableJournal(IntegrityAccess):
         store,
         symbol: str,
         interval: str,
+        *,
+        startup_max_entry_id: int | None = None,
     ) -> Tuple[int, int, int, List[Tuple[int, int]]]:
         """
         On process restart (including after SIGKILL):
@@ -321,11 +362,14 @@ class DurableJournal(IntegrityAccess):
         (pipeline) uses the returned gap list to invoke recover_gap().
         """
         from ..recovery.gap_recovery import _binance_interval_ms
+        from ..delivery.authority import register_legacy_writer
+        register_legacy_writer(self, 'startup-reconcile')
 
         interval_ms = _binance_interval_ms(interval)
 
         # Step 1: replay journal — find bars committed locally but absent from store
-        journal_bars = self.replay(symbol=symbol, interval=interval, final_only=True)
+        journal_bars = self.replay(symbol=symbol, interval=interval, final_only=True,
+                                   max_entry_id=startup_max_entry_id)
         stored_keys = store.get_stored_keys(symbol, interval)
 
         bars_replayed = 0
