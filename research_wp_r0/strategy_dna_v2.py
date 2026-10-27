@@ -14,7 +14,7 @@ import math
 from research_wp_r0.indicator_library_v2 import IndicatorRegistryV2
 from research_wp_r0.strategy_definition import (
     StrategyDefinition, canonical, digest, identifier, integer, keys, load_json,
-    number, _reference,
+    number, _reference, _pairs, _reject, _json_float,
 )
 
 
@@ -273,6 +273,7 @@ def _read(features, item, ref, provenance, cutoff):
     value = values.get(item["field"]) if type(values) is dict else None
     try:
         number(value)
+        canonical(value)  # Match report serialization's exact-number constraints.
     except (ValueError, TypeError, OverflowError):
         return dict(row, status="UNVERIFIED", reason="INVALID_FINITE_VALUE")
     return dict(row, status="AVAILABLE_SYNTHETIC", reason=None, value=value)
@@ -317,13 +318,21 @@ def _channel(spec, read):
                 eligible=not reasons and score >= spec["threshold"], reasons=reasons)
 
 
+# Separate synthetic-report bound: V1 definitions keep their strict 100 KB loader.
+# Allow 256 supplied assets while bounding parse and serialization resources.
+MAX_SYNTHETIC_REPORT_BYTES = 16 * 1024 * 1024
+
+
 @dataclass(frozen=True)
 class SyntheticRoleReport(_Frozen):
     payload: bytes
 
     @classmethod
     def from_json(cls, raw, *, expected_digest):
-        value = load_json(raw)
+        if type(raw) is not str or len(raw.encode("utf-8")) > MAX_SYNTHETIC_REPORT_BYTES:
+            raise ValueError("Synthetic report exceeds bounded UTF-8 JSON size")
+        value = json.loads(raw, object_pairs_hook=_pairs,
+                           parse_constant=_reject, parse_float=_json_float)
         keys(value, "report digest")
         obj = cls(canonical(value["report"]))
         if obj.digest != value["digest"] or obj.digest != expected_digest:
@@ -331,7 +340,10 @@ class SyntheticRoleReport(_Frozen):
         return obj
 
     def to_json(self):
-        return canonical({"report": self.spec, "digest": self.digest}).decode("utf-8")
+        wrapped = canonical({"report": self.spec, "digest": self.digest})
+        if len(wrapped) > MAX_SYNTHETIC_REPORT_BYTES:
+            raise ValueError("Synthetic report exceeds bounded UTF-8 JSON size")
+        return wrapped.decode("utf-8")
 
 
 def evaluate_synthetic(dna, assets, *, decision_cutoff_ms):
