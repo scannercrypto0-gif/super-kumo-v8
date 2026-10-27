@@ -35,6 +35,25 @@ class RevisionRegistry:
             )
         """)
 
+    def receipt_status(self, version_id: str) -> str:
+        """Never reconstruct missing post-COMMIT evidence from a later replay."""
+        known = self._db.execute(
+            "SELECT 1 FROM observation_revisions WHERE version_id=?", (version_id,)
+        ).fetchone()
+        if known is None:
+            return "UNKNOWN_VERSION"
+        return ("POSTCOMMIT_LOCAL_OBSERVED" if self.postcommit_receipt(version_id)
+                else "UNKNOWN_PENDING_EVIDENCE")
+
+    def missing_receipt_versions(self) -> tuple[str, ...]:
+        """Crash-gap inventory for audit, never a backfill instruction."""
+        rows = self._db.execute(
+            """SELECT r.version_id FROM observation_revisions r
+               LEFT JOIN postcommit_receipts p ON p.version_id=r.version_id
+               WHERE p.version_id IS NULL ORDER BY r.logical_bar_id,r.version_number"""
+        ).fetchall()
+        return tuple(row[0] for row in rows)
+
     def postcommit_receipt(self, version_id: str) -> dict | None:
         row = self._db.execute(
             "SELECT observed_after_commit_ms, clock_scope FROM postcommit_receipts WHERE version_id=?",
