@@ -13,6 +13,7 @@ from aql.data_proof import ObservationVersion, ProofError, verify_chain
 
 class RevisionRegistry:
     def __init__(self, path: str | Path):
+        self.path = str(path)
         self._db = sqlite3.connect(str(path), isolation_level=None)
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.execute("PRAGMA synchronous=FULL")
