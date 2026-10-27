@@ -28,7 +28,7 @@ def factory_negative_cases() -> dict:
         first_local_seen_ms=None, source_id="synthetic-ws")
     envelope = export_envelope(
         consumer="factory", epoch=1, versions=(original, late, missing),
-        gap_states={"gap:unknown": "IN_DOUBT"})
+        gap_states={original.logical_bar_id: "CONFIRMED", missing.logical_bar_id: "IN_DOUBT", "gap:unknown": "IN_DOUBT"})
     return {
         "decision_cutoff_ms": 70000,
         "envelope": envelope,
