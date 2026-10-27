@@ -2,7 +2,7 @@ name: Core 128 D1 gate and legacy compatibility
 on:
   pull_request:
     branches: [fix/core-g1-integrity-58-59]
-    paths: ['src/aql/**', 'tests/test_core_arch_63_66.py', '.github/workflows/core-63-66.yml']
+    paths: ['src/aql/**', 'tests/test_core_arch_63_66.py', 'tests/test_core_d2_effects.py', '.github/workflows/core-63-66.yml']
 permissions:
   contents: read
 jobs:
@@ -26,6 +26,9 @@ jobs:
         run: git rev-parse HEAD
       - name: Independent-review acceptance gate (known R2 MUST stay red until fixed)
         run: python -B -m pytest tests/test_core_arch_63_66.py -v --tb=short --junitxml=core128.xml
+      - name: D2 target-effect and uncertain-ACK acceptance
+        if: always()
+        run: python -B -m pytest tests/test_core_d2_effects.py -v --tb=short --junitxml=core128-d2.xml
       - name: Existing exact-head compatibility
         if: always()
         run: >-
@@ -42,4 +45,5 @@ jobs:
           name: core128-${{ matrix.os }}
           path: |
             core128.xml
+            core128-d2.xml
             legacy.xml
