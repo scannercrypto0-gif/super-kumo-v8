@@ -196,6 +196,9 @@ class StrategyDNAV2Tests(unittest.TestCase):
         spec["strategy_version"]="v2_plan_revision"
         spec["provenance"]["plan_id"]="bounded_roles_v2"
         variants.append(StrategyDNAV2(spec,v1_definition=self.v1))
+        spec=self.dna.spec
+        spec["strategy_id"]="unrelated_strategy"
+        variants.append(StrategyDNAV2(spec,v1_definition=self.v1))
         for dna in variants:
             with self.subTest(version=dna.spec["strategy_version"]):
                 changed=self.run_report(dna=dna).spec["core"]["decisions"][0]
