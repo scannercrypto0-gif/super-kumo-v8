@@ -54,6 +54,7 @@ class RevisionRegistry:
     def append(self, version: ObservationVersion) -> str:
         """Atomic compare-and-append. Duplicate replay is idempotent."""
         self._db.execute("BEGIN IMMEDIATE")
+        revision_committed = False
         try:
             existing = self.revisions(version.logical_bar_id)
             if existing and existing[-1].version_id == version.version_id:
@@ -65,14 +66,16 @@ class RevisionRegistry:
                 (version.version_id, version.logical_bar_id, version.version_number,
                  json.dumps(version.__dict__, sort_keys=True, separators=(",", ":"))))
             self._db.execute("COMMIT")
+            revision_committed = True
             # This is a distinct second durable write after the revision COMMIT.
             # A crash before this write leaves receipt absent (UNKNOWN).
             self._db.execute(
                 "INSERT INTO postcommit_receipts(version_id,observed_after_commit_ms,clock_scope) VALUES (?,?,?)",
                 (version.version_id, time.time_ns() // 1_000_000, "LOCAL_WALL_CLOCK_UNATTESTED"))
             return "APPENDED"
-        except (Exception,):
-            self._db.execute("ROLLBACK")
+        except Exception:
+            if not revision_committed:
+                self._db.execute("ROLLBACK")
             raise
 
     def close(self) -> None:
