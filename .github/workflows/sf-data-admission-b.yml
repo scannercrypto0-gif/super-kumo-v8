@@ -9,6 +9,8 @@ on:
       - 'research_wp_r0/pre_indicator_boundary.py'
       - 'tests/test_sf_pre_indicator_boundary.py'
       - 'tests/test_sf_negative_r0_integration.py'
+      - 'research_wp_r0/indicator_calculation_identity.py'
+      - 'tests/test_sf_indicator_calculation_identity.py'
       - 'docs/research/FACTORY_DATA_ADMISSION_B.md'
       - '.github/workflows/sf-data-admission-b.yml'
   workflow_dispatch:
@@ -27,4 +29,4 @@ jobs:
       - name: Run targeted consumer falsifiers
         run: |
           python -m pip install pytest
-          python -m pytest -q tests/test_sf_data_admission_b.py tests/test_sf_core_proof_bridge.py tests/test_sf_pre_indicator_boundary.py tests/test_sf_negative_r0_integration.py
+          python -m pytest -q tests/test_sf_data_admission_b.py tests/test_sf_core_proof_bridge.py tests/test_sf_pre_indicator_boundary.py tests/test_sf_negative_r0_integration.py tests/test_sf_indicator_calculation_identity.py
