@@ -70,3 +70,20 @@ def test_generation_token_cannot_be_omitted(tmp_path):
         assert progress.state(*key) == (0, 10)
     finally:
         progress.close()
+
+
+def test_snapshot_returns_coherent_state_and_generation(tmp_path):
+    path = tmp_path / "sweep.sqlite"
+    a = SweepProgress(path)
+    b = SweepProgress(path)
+    key = ("instance", "BTCUSDT", "1m")
+    try:
+        assert a.snapshot(*key) == (None, 0)
+        a.save(*key, 0, 100, expected=None, expected_generation=0)
+        assert b.snapshot(*key) == ((0, 100), 1)
+        a.clear(*key, expected=(0, 100), expected_generation=1)
+        a.save(*key, 0, 100, expected=None, expected_generation=1)
+        assert b.snapshot(*key) == ((0, 100), 2)
+    finally:
+        a.close()
+        b.close()
