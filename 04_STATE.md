@@ -1,3 +1,15 @@
+## 2026-10-28 — Work148 Factory DEV exit delivery (branch only)
+
+Project AQL-CRYPTO-RESEARCH-001; verified existing Draft #143 head a6aa5fdd,
+OPEN/UNMERGED, main dbc191df. Owner-authorized Issue #148 adds versioned offline
+native exits and three independent ledger paths; 63 targeted tests passed locally
+(35 new + 28 legacy). [Contract, fixtures and proposed study v2](docs/research/work148/README.md).
+Exact final commit and observed CI results are recorded in #148/#77/#134 after
+publication. Council independent S engineering / R scientific verdict PENDING;
+no self-close, merge, OOS, Paper, Live or change to Core/#150. Historical headers
+below remain historical; no new G0 approval is asserted. Next exact action:
+independent Audit #134 accepts/rejects published exact SHA with stated scope.
+
 ## 2026-10-28 — Factory consolidated boundary batch (Draft #143 scope)
 
 Direct owner order: https://github.com/scannercrypto0-gif/super-kumo-v8/issues/77#issuecomment-6464942337

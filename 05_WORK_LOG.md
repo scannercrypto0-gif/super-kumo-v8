@@ -230,3 +230,20 @@ Local pre-publication targeted batch: `python -m pytest -q
 installed pytest/pytest-timeout before the single successful test batch. Runtime
 or tests were not weakened. Final remote SHA/matrix IDs are recorded in #143,
 #77 and #134 after publication; these lines are not a prior claim of CI success.
+
+## 2026-10-28 — AQL-SF-WORK-DEV-EXIT-THREE-PATHS-001 / Issue #148
+
+Direct owner execution received in Work. Existing Factory Draft #143 confirmed
+OPEN/unmerged at a6aa5fdd; #77/#134 latest source comments and #150 separation read.
+Added standalone historical_dev_exits_v1: fixed EMA8/21 V2 prefix availability,
+latency, native exits/optional overlays, no forced close, independent three-path
+cash/inventory/eligibility replay, fail-closed UNKNOWN and canonical chain receipt.
+Published synthetic arithmetic fixture and new proposed study v2; original Work146
+proposal and legacy fixed horizon/locked-plan bytes unchanged. No real-source
+performance replay/download, source authority upgrade or Core change.
+Final local focused command (new file + test_sf_factory_exam.py): 63 passed,
+no skips/failures, Python 3.12. Dependency guard passed. Initial environment needed
+pytest/pytest-timeout installation. Existing final-head complete/integrity CI is
+observed separately in #148/#77/#134; not claimed green in advance here.
+[Contract and evidence](docs/research/work148/README.md). Pending independent
+S/R judgment, no implementer acceptance or closure; no merge/OOS/Paper/Live.

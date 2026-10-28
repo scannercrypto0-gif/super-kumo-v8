@@ -1143,3 +1143,16 @@ candidate trial states distinct from opportunity denominators, sampled DD and
 conditional summaries. Details and static/dynamic coverage limits are canonical
 in docs/research/FACTORY_CONSOLIDATED_BOUNDARY_AUDIT.md. Independent Council S/R
 required; no merge, OOS/PAPER/LIVE or G0 authority.
+
+## Work148 — Factory historical DEV native-exit contract (2026-10-28)
+
+Owner execution authority: Issue #148 and direct Work invocation, bounded to
+Factory. Provisional SF-DEC-EXIT-LIFECYCLE-01 and SF-DEC-EXIT-AMBIGUITY-02 from
+#77/6470243101 and 6470247381 are implemented in a separate versioned DEV module.
+No forced horizon, optional indicator/TP/SL exits, factual UNKNOWN and independently
+replayed target/stop scenarios; unsupported indicator/overlay or signal timestamp
+ordering remains UNKNOWN in every path. Full modeled cost/accounting/source and
+availability rules: [Work148 contract](docs/research/work148/README.md).
+Original fixed-horizon code, locked research plans and Work146 proposal are retained.
+Model configuration is engineering demonstration, not approved empirical study
+parameters. Independent Council S/R pending. No merge/OOS/Paper/Live/G0 change.

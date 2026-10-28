@@ -1,0 +1,525 @@
+{
+  "assumptions": "ONE_LONG_FIXED_QTY; MODELED_FULL_FILL_OR_UNKNOWN; HALF_SPREAD_PLUS_SLIPPAGE_PER_SIDE; FEES_PER_SIDE; GAP_OVERLAY_AT_OPEN; NO_INTRABAR_ORDER; NO_FORCED_CLOSE; SCENARIOS_NOT_BOUNDS",
+  "claims": {
+    "actual_fills": false,
+    "as_known_at_cutoff": false,
+    "live": false,
+    "oos": false,
+    "paper": false,
+    "profitability": false,
+    "real_pit_accepted": false
+  },
+  "config": {
+    "checkpoint_ms": 86400000,
+    "fee_bps": 0,
+    "indicator_exit": true,
+    "initial_cash": 100,
+    "interval_ms": 60000,
+    "latency_ms": 0,
+    "max_signal_age_ms": 120000,
+    "quantity": 1,
+    "sl_fraction": 0.1,
+    "slippage_bps": 0,
+    "spread_bps": 0,
+    "tp_fraction": 0.1
+  },
+  "input_rows": [
+    {
+      "available_ms": 60000,
+      "close": 100,
+      "close_ms": 59999,
+      "high": 101,
+      "low": 99,
+      "modeled_quote": true,
+      "open": 100,
+      "open_ms": 0,
+      "volume": 1
+    },
+    {
+      "available_ms": 120000,
+      "close": 100,
+      "close_ms": 119999,
+      "high": 120,
+      "low": 80,
+      "modeled_quote": true,
+      "open": 100,
+      "open_ms": 60000,
+      "volume": 1
+    },
+    {
+      "available_ms": 180000,
+      "close": 100,
+      "close_ms": 179999,
+      "high": 101,
+      "low": 99,
+      "modeled_quote": true,
+      "open": 100,
+      "open_ms": 120000,
+      "volume": 1
+    }
+  ],
+  "paths": {
+    "FACTUAL": {
+      "ambiguous_events": 1,
+      "cash": 0.0,
+      "fees_paid": 0.0,
+      "held_cost_basis": 100.0,
+      "held_quantity": 1,
+      "known_realized_pnl": 0.0,
+      "ledger": [
+        {
+          "basis": 0.0,
+          "cash": 100,
+          "equity": 100.0,
+          "event_sha256": "d2ee0cc00b55a468e9d12701d5373db0ddfee85c41131461d77ff2fe6f5cbb8f",
+          "fees_paid": 0.0,
+          "kind": "SAMPLED_MTM",
+          "known_realized_pnl": 0.0,
+          "previous_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "quantity": 0.0,
+          "sequence": 0,
+          "time_ms": 60000,
+          "uncertain": false
+        },
+        {
+          "actual_fill": false,
+          "basis": 100.0,
+          "cash": 0.0,
+          "event_sha256": "161cf75842b2d329b6926e9a79243c29e6966769c415587b710808659a33412b",
+          "execution_price": 100.0,
+          "fees_paid": 0.0,
+          "filled_quantity": 1,
+          "kind": "MODELED_ENTRY",
+          "known_realized_pnl": 0.0,
+          "modeled_fill": true,
+          "previous_hash": "d2ee0cc00b55a468e9d12701d5373db0ddfee85c41131461d77ff2fe6f5cbb8f",
+          "quantity": 1,
+          "sequence": 1,
+          "time_ms": 60000,
+          "uncertain": false
+        },
+        {
+          "actual_fill": false,
+          "basis": 100.0,
+          "cash": 0.0,
+          "event_sha256": "f29c6ba6ddcb5e02f39c8834ed81921f68503be1662c35b8f3c2c202cc1a0ebe",
+          "fees_paid": 0.0,
+          "kind": "UNKNOWN_EXIT_ORDER",
+          "known_realized_pnl": 0.0,
+          "modeled_fill": false,
+          "pnl": null,
+          "previous_hash": "161cf75842b2d329b6926e9a79243c29e6966769c415587b710808659a33412b",
+          "quantity": 1,
+          "sequence": 2,
+          "time_ms": 60000,
+          "uncertain": true
+        },
+        {
+          "basis": 100.0,
+          "cash": 0.0,
+          "equity": null,
+          "event_sha256": "94abbb58d982d6b88e80af422db31d63eb593991499261cf60ad898f320462ca",
+          "fees_paid": 0.0,
+          "kind": "SAMPLED_MTM",
+          "known_realized_pnl": 0.0,
+          "previous_hash": "f29c6ba6ddcb5e02f39c8834ed81921f68503be1662c35b8f3c2c202cc1a0ebe",
+          "quantity": 1,
+          "sequence": 3,
+          "time_ms": 120000,
+          "uncertain": true
+        },
+        {
+          "basis": 100.0,
+          "cash": 0.0,
+          "equity": null,
+          "event_sha256": "e27199385ebe07d4740dc47f5fc27385c1c3bda83a1a46fe0db4dbfbb38a5b9d",
+          "fees_paid": 0.0,
+          "kind": "SAMPLED_MTM",
+          "known_realized_pnl": 0.0,
+          "previous_hash": "94abbb58d982d6b88e80af422db31d63eb593991499261cf60ad898f320462ca",
+          "quantity": 1,
+          "sequence": 4,
+          "time_ms": 180000,
+          "uncertain": true
+        }
+      ],
+      "ledger_head_sha256": "e27199385ebe07d4740dc47f5fc27385c1c3bda83a1a46fe0db4dbfbb38a5b9d",
+      "marks": [
+        {
+          "checkpoint": false,
+          "conditional_held_inventory_mark": null,
+          "realized_pnl": 0.0,
+          "sampled_mtm": 100.0,
+          "time_ms": 60000
+        },
+        {
+          "checkpoint": false,
+          "conditional_held_inventory_mark": 100.0,
+          "realized_pnl": null,
+          "sampled_mtm": null,
+          "time_ms": 120000
+        },
+        {
+          "checkpoint": false,
+          "conditional_held_inventory_mark": 100.0,
+          "realized_pnl": null,
+          "sampled_mtm": null,
+          "time_ms": 180000
+        }
+      ],
+      "modeled_equity_return": null,
+      "opportunities": [
+        {
+          "action": "ENTER_LONG",
+          "available_ms": 60000,
+          "bar_open_ms": 0,
+          "scheduled_ms": 60000,
+          "scored_return": null,
+          "stale": false,
+          "status": "MODELED_ENTRY"
+        },
+        {
+          "action": "ENTER_LONG",
+          "available_ms": 120000,
+          "bar_open_ms": 60000,
+          "scheduled_ms": 120000,
+          "scored_return": null,
+          "stale": false,
+          "status": "BLOCKED_PRIOR_UNKNOWN"
+        }
+      ],
+      "path": "FACTUAL",
+      "realized_pnl": null,
+      "sampled_mtm_drawdown": null,
+      "scenario": false,
+      "scheduled_denominator": 2,
+      "settled_equity": null,
+      "status": "UNKNOWN_UNRESOLVED",
+      "unsettled_sampled_equity": null
+    },
+    "STOP_FIRST": {
+      "ambiguous_events": 1,
+      "cash": 90.0,
+      "fees_paid": 0.0,
+      "held_cost_basis": 0.0,
+      "held_quantity": 0.0,
+      "known_realized_pnl": -10.0,
+      "ledger": [
+        {
+          "basis": 0.0,
+          "cash": 100,
+          "equity": 100.0,
+          "event_sha256": "d2ee0cc00b55a468e9d12701d5373db0ddfee85c41131461d77ff2fe6f5cbb8f",
+          "fees_paid": 0.0,
+          "kind": "SAMPLED_MTM",
+          "known_realized_pnl": 0.0,
+          "previous_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "quantity": 0.0,
+          "sequence": 0,
+          "time_ms": 60000,
+          "uncertain": false
+        },
+        {
+          "actual_fill": false,
+          "basis": 100.0,
+          "cash": 0.0,
+          "event_sha256": "161cf75842b2d329b6926e9a79243c29e6966769c415587b710808659a33412b",
+          "execution_price": 100.0,
+          "fees_paid": 0.0,
+          "filled_quantity": 1,
+          "kind": "MODELED_ENTRY",
+          "known_realized_pnl": 0.0,
+          "modeled_fill": true,
+          "previous_hash": "d2ee0cc00b55a468e9d12701d5373db0ddfee85c41131461d77ff2fe6f5cbb8f",
+          "quantity": 1,
+          "sequence": 1,
+          "time_ms": 60000,
+          "uncertain": false
+        },
+        {
+          "actual_fill": false,
+          "basis": 0.0,
+          "cash": 90.0,
+          "event_sha256": "45742d133fb7bdf5d141a341f1bf2551ee987195a9e5f3eb53eb0d5cbc372bdc",
+          "execution_price": 90.0,
+          "fees_paid": 0.0,
+          "filled_quantity": 1,
+          "kind": "MODELED_STOP_EXIT",
+          "known_realized_pnl": -10.0,
+          "modeled_fill": true,
+          "pnl": -10.0,
+          "previous_hash": "161cf75842b2d329b6926e9a79243c29e6966769c415587b710808659a33412b",
+          "quantity": 0.0,
+          "raw_model_price": 90.0,
+          "sequence": 2,
+          "time_ms": 60000,
+          "uncertain": false
+        },
+        {
+          "basis": 0.0,
+          "cash": 90.0,
+          "equity": 90.0,
+          "event_sha256": "0b4c30e5f50757eb19c5e99d44e2b25766e65871f4a2666d83588b8e9e744445",
+          "fees_paid": 0.0,
+          "kind": "SAMPLED_MTM",
+          "known_realized_pnl": -10.0,
+          "previous_hash": "45742d133fb7bdf5d141a341f1bf2551ee987195a9e5f3eb53eb0d5cbc372bdc",
+          "quantity": 0.0,
+          "sequence": 3,
+          "time_ms": 120000,
+          "uncertain": false
+        },
+        {
+          "basis": 0.0,
+          "cash": 90.0,
+          "equity": 90.0,
+          "event_sha256": "b2114d98483902caf6e802cb272ba8b054e653386c106cd5d0480434790c8d08",
+          "fees_paid": 0.0,
+          "kind": "SAMPLED_MTM",
+          "known_realized_pnl": -10.0,
+          "previous_hash": "0b4c30e5f50757eb19c5e99d44e2b25766e65871f4a2666d83588b8e9e744445",
+          "quantity": 0.0,
+          "sequence": 4,
+          "time_ms": 180000,
+          "uncertain": false
+        }
+      ],
+      "ledger_head_sha256": "b2114d98483902caf6e802cb272ba8b054e653386c106cd5d0480434790c8d08",
+      "marks": [
+        {
+          "checkpoint": false,
+          "conditional_held_inventory_mark": null,
+          "realized_pnl": 0.0,
+          "sampled_mtm": 100.0,
+          "time_ms": 60000
+        },
+        {
+          "checkpoint": false,
+          "conditional_held_inventory_mark": null,
+          "realized_pnl": -10.0,
+          "sampled_mtm": 90.0,
+          "time_ms": 120000
+        },
+        {
+          "checkpoint": false,
+          "conditional_held_inventory_mark": null,
+          "realized_pnl": -10.0,
+          "sampled_mtm": 90.0,
+          "time_ms": 180000
+        }
+      ],
+      "modeled_equity_return": -0.09999999999999998,
+      "opportunities": [
+        {
+          "action": "ENTER_LONG",
+          "available_ms": 60000,
+          "bar_open_ms": 0,
+          "scheduled_ms": 60000,
+          "scored_return": null,
+          "stale": false,
+          "status": "MODELED_ENTRY"
+        },
+        {
+          "action": "ENTER_LONG",
+          "available_ms": 120000,
+          "bar_open_ms": 60000,
+          "scheduled_ms": 120000,
+          "scored_return": null,
+          "stale": false,
+          "status": "CAPITAL_REJECTED"
+        }
+      ],
+      "path": "STOP_FIRST",
+      "realized_pnl": -10.0,
+      "sampled_mtm_drawdown": 0.1,
+      "scenario": true,
+      "scheduled_denominator": 2,
+      "settled_equity": 90.0,
+      "status": "SETTLED_MODELED",
+      "unsettled_sampled_equity": null
+    },
+    "TARGET_FIRST": {
+      "ambiguous_events": 1,
+      "cash": 10.000000000000014,
+      "fees_paid": 0.0,
+      "held_cost_basis": 100.0,
+      "held_quantity": 1,
+      "known_realized_pnl": 10.000000000000014,
+      "ledger": [
+        {
+          "basis": 0.0,
+          "cash": 100,
+          "equity": 100.0,
+          "event_sha256": "d2ee0cc00b55a468e9d12701d5373db0ddfee85c41131461d77ff2fe6f5cbb8f",
+          "fees_paid": 0.0,
+          "kind": "SAMPLED_MTM",
+          "known_realized_pnl": 0.0,
+          "previous_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "quantity": 0.0,
+          "sequence": 0,
+          "time_ms": 60000,
+          "uncertain": false
+        },
+        {
+          "actual_fill": false,
+          "basis": 100.0,
+          "cash": 0.0,
+          "event_sha256": "161cf75842b2d329b6926e9a79243c29e6966769c415587b710808659a33412b",
+          "execution_price": 100.0,
+          "fees_paid": 0.0,
+          "filled_quantity": 1,
+          "kind": "MODELED_ENTRY",
+          "known_realized_pnl": 0.0,
+          "modeled_fill": true,
+          "previous_hash": "d2ee0cc00b55a468e9d12701d5373db0ddfee85c41131461d77ff2fe6f5cbb8f",
+          "quantity": 1,
+          "sequence": 1,
+          "time_ms": 60000,
+          "uncertain": false
+        },
+        {
+          "actual_fill": false,
+          "basis": 0.0,
+          "cash": 110.00000000000001,
+          "event_sha256": "1487d0ac5b84e07824c08e268b69f69d35a6e4ff585c0230f18521dc952e3abf",
+          "execution_price": 110.00000000000001,
+          "fees_paid": 0.0,
+          "filled_quantity": 1,
+          "kind": "MODELED_TARGET_EXIT",
+          "known_realized_pnl": 10.000000000000014,
+          "modeled_fill": true,
+          "pnl": 10.000000000000014,
+          "previous_hash": "161cf75842b2d329b6926e9a79243c29e6966769c415587b710808659a33412b",
+          "quantity": 0.0,
+          "raw_model_price": 110.00000000000001,
+          "sequence": 2,
+          "time_ms": 60000,
+          "uncertain": false
+        },
+        {
+          "basis": 0.0,
+          "cash": 110.00000000000001,
+          "equity": 110.00000000000001,
+          "event_sha256": "e0384325cffab6bac3d590c53f9387144b9e25a231fbccd15b69e8d60e503852",
+          "fees_paid": 0.0,
+          "kind": "SAMPLED_MTM",
+          "known_realized_pnl": 10.000000000000014,
+          "previous_hash": "1487d0ac5b84e07824c08e268b69f69d35a6e4ff585c0230f18521dc952e3abf",
+          "quantity": 0.0,
+          "sequence": 3,
+          "time_ms": 120000,
+          "uncertain": false
+        },
+        {
+          "actual_fill": false,
+          "basis": 100.0,
+          "cash": 10.000000000000014,
+          "event_sha256": "463c82d8d02da781c65be0fe0134dd0240090cfa25491ddd07142a20b1712c90",
+          "execution_price": 100.0,
+          "fees_paid": 0.0,
+          "filled_quantity": 1,
+          "kind": "MODELED_ENTRY",
+          "known_realized_pnl": 10.000000000000014,
+          "modeled_fill": true,
+          "previous_hash": "e0384325cffab6bac3d590c53f9387144b9e25a231fbccd15b69e8d60e503852",
+          "quantity": 1,
+          "sequence": 4,
+          "time_ms": 120000,
+          "uncertain": false
+        },
+        {
+          "basis": 100.0,
+          "cash": 10.000000000000014,
+          "equity": 110.00000000000001,
+          "event_sha256": "a261e8a79689a023880f6aee5c9d25b28687d76745b8973f54a15947880531df",
+          "fees_paid": 0.0,
+          "kind": "SAMPLED_MTM",
+          "known_realized_pnl": 10.000000000000014,
+          "previous_hash": "463c82d8d02da781c65be0fe0134dd0240090cfa25491ddd07142a20b1712c90",
+          "quantity": 1,
+          "sequence": 5,
+          "time_ms": 180000,
+          "uncertain": false
+        }
+      ],
+      "ledger_head_sha256": "a261e8a79689a023880f6aee5c9d25b28687d76745b8973f54a15947880531df",
+      "marks": [
+        {
+          "checkpoint": false,
+          "conditional_held_inventory_mark": null,
+          "realized_pnl": 0.0,
+          "sampled_mtm": 100.0,
+          "time_ms": 60000
+        },
+        {
+          "checkpoint": false,
+          "conditional_held_inventory_mark": null,
+          "realized_pnl": 10.000000000000014,
+          "sampled_mtm": 110.00000000000001,
+          "time_ms": 120000
+        },
+        {
+          "checkpoint": false,
+          "conditional_held_inventory_mark": null,
+          "realized_pnl": 10.000000000000014,
+          "sampled_mtm": 110.00000000000001,
+          "time_ms": 180000
+        }
+      ],
+      "modeled_equity_return": 0.10000000000000009,
+      "opportunities": [
+        {
+          "action": "ENTER_LONG",
+          "available_ms": 60000,
+          "bar_open_ms": 0,
+          "scheduled_ms": 60000,
+          "scored_return": null,
+          "stale": false,
+          "status": "MODELED_ENTRY"
+        },
+        {
+          "action": "ENTER_LONG",
+          "available_ms": 120000,
+          "bar_open_ms": 60000,
+          "scheduled_ms": 120000,
+          "scored_return": null,
+          "stale": false,
+          "status": "MODELED_ENTRY"
+        }
+      ],
+      "path": "TARGET_FIRST",
+      "realized_pnl": 10.000000000000014,
+      "sampled_mtm_drawdown": 0.0,
+      "scenario": true,
+      "scheduled_denominator": 2,
+      "settled_equity": null,
+      "status": "OPEN_UNRESOLVED",
+      "unsettled_sampled_equity": 110.00000000000001
+    }
+  },
+  "receipt_sha256": "0ed0cdf8132876baf11677dca43f67e18c6dc06c6949df9a5fab2048299b81d5",
+  "schema": "SF-HISTORICAL-DEV-EXITS-1",
+  "scope": "HISTORICAL_DEV_ONLY",
+  "signals": [
+    {
+      "action": "ENTER_LONG",
+      "available_ms": 60000,
+      "bar_open_ms": 0
+    },
+    {
+      "action": "ENTER_LONG",
+      "available_ms": 120000,
+      "bar_open_ms": 60000
+    }
+  ],
+  "signals_sha256": "d30b853414a480a2c936b5240b6ce67d506bca9a9a21a08e5bce05bc1e7d3c8b",
+  "source": {
+    "archive_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "availability_evidence": "UNKNOWN",
+    "correction_evidence": "PINNED_VERSION_ONLY",
+    "reference": "SYNTHETIC_TEST_ONLY",
+    "rows_sha256": "bc097fc14a85902195c90d727f2bac02f05e7a0d8119352207d4111b4bfca093",
+    "version": "fabricated-v1"
+  },
+  "strategy": "CONTRACT_FIXTURE_ONLY_1"
+}
