@@ -30,7 +30,7 @@ jobs:
           git rev-parse HEAD
           python -m compileall -q research_wp_r0 tests integration_tests
       - name: Complete Factory tests and explicit cross-module integration
-        run: python -B -m pytest -p no:cacheprovider -q tests/test_sf_*.py integration_tests/test_sf_strat_ind02.py
+        run: python -c "import pathlib,pytest,sys; paths=sorted(str(p) for p in pathlib.Path('tests').glob('test_sf_*.py')); sys.exit(pytest.main(['-p','no:cacheprovider','-q',*paths,'integration_tests/test_sf_strat_ind02.py']))"
       - name: Full synthetic B2 nine-case replay and report
         run: python -m research_wp_r0.factory_b2_counterfactual > factory-b2-all-cases.json
       - uses: actions/upload-artifact@v4
