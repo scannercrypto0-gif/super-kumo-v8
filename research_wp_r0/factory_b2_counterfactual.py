@@ -71,6 +71,11 @@ def fixture(family,scenario):
             for value in obs.values():
                 value.update(as_of_ms=cutoff-50,observed_at_ms=cutoff-40,
                              available_at_ms=cutoff-30)
+            # Precommitted family-specific unfavorable feature windows. These
+            # change eligibility, not ex-post result tuning or market returns.
+            if symbol=="AAA" and ((family=="MEAN_REVERSION" and i==5)
+                                  or (family=="BREAKOUT" and i==3)):
+                obs["strength"]["values"]["value"]=10
             ret=RETURNS[scenario][i] if symbol=="AAA" else (.002 if symbol=="BBB" else -.002)
             events.append(dict(
                 event_id="B2_%02d_%s"%(i,symbol),symbol=symbol,venue="fixture",
