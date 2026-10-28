@@ -143,6 +143,25 @@ def _run_gap_recovery(
     }
 
 
+
+def _recover_bounded_slices(journal, store, symbol, interval, start_ms, end_ms, stop_event=None, *, max_slices=3):
+    """Bounded continuation; unfinished tail remains visible for next restart."""
+    results = []
+    for _ in range(max_slices):
+        if stop_event is not None and stop_event.is_set():
+            break
+        result = _run_gap_recovery(journal, store, symbol, interval,
+                                   start_ms, end_ms, stop_event)
+        results.append(result)
+        report = result["gap_report"]
+        next_start = getattr(report, "remaining_start_ms", None)
+        if (next_start is None or next_start <= start_ms
+                or result["recovery_errors"] or report.http_error):
+            break
+        start_ms = next_start
+    return results
+
+
 def run_pipeline(
     symbol: str = "BTCUSDT",
     interval: str = "1m",
@@ -231,8 +250,8 @@ def run_pipeline(
             for gap_start, gap_end in startup_gaps:
                 def recover(stop, start=gap_start, end=gap_end):
                     if not stop.is_set():
-                        gr = _run_gap_recovery(journal, store, symbol, interval, start, end, stop)
-                        startup_recovery_results.append(gr)
+                        startup_recovery_results.extend(_recover_bounded_slices(
+                            journal, store, symbol, interval, start, end, stop))
                 recovery_lane.submit(recover)
         except Exception as exc:
             startup_reconcile_error = str(exc)
@@ -267,7 +286,7 @@ def run_pipeline(
         def recover_ws(stop):
             nonlocal ws_recovery_result
             if not stop.is_set():
-                ws_recovery_result = _run_gap_recovery(
+                ws_recovery_result = _recover_bounded_slices(
                     journal, store, symbol, interval,
                     collector.gap_start_ms, collector.gap_end_ms, stop)
         recovery_lane.submit(recover_ws)
@@ -277,7 +296,7 @@ def run_pipeline(
     if (recovery_lane_status['pending'] or recovery_lane_status['rejected']
             or recovery_lane_status['errors'] or consumer_status['worker_alive']
             or any(r['recovery_errors'] for r in startup_recovery_results)
-            or (ws_recovery_result and ws_recovery_result['recovery_errors'])):
+            or (ws_recovery_result and any(r["recovery_errors"] for r in ws_recovery_result))):
         startup_reconcile_error = startup_reconcile_error or "Background work pending/failed; retry from durable journal on restart"
 
     # --- Final counts ---
@@ -291,7 +310,7 @@ def run_pipeline(
     # Fix-3: pass startup_reconcile_error so it surfaces as UNHEALTHY.
     _all_recovery_reports = [r["gap_report"] for r in startup_recovery_results]
     if ws_recovery_result is not None:
-        _all_recovery_reports.append(ws_recovery_result["gap_report"])
+        _all_recovery_reports.extend(r["gap_report"] for r in ws_recovery_result)
     if getattr(collector, "clock_uncertain", False) or getattr(collector, "health_state", "") == "CLOCK_UNCERTAIN":
         startup_reconcile_error = startup_reconcile_error or "Source/local clock divergence; temporal eligibility denied"
     if metrics.error_count:
