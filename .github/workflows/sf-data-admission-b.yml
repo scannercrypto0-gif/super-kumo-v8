@@ -46,3 +46,6 @@ jobs:
           name: factory-synthetic-b-${{ matrix.os }}
           path: factory_synthetic_b_report.json
           if-no-files-found: error
+      - name: Summarize both policy arms from retained report
+        run: |
+          python -c "import json; d=json.load(open('factory_synthetic_b_report.json')); print(json.dumps({'scheduled':d['scheduled'],'always':d['comparison']['left'],'regime':d['comparison']['right'],'both_executed':d['comparison']['conditional_both_executed_count'],'replay':d['replay'],'scope':d['scope']},sort_keys=True))"
