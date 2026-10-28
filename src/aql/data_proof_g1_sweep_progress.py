@@ -30,6 +30,18 @@ class SweepProgress:
             (instance, symbol, interval)).fetchone()
         return tuple(row) if row else None
 
+    def snapshot(self, instance, symbol, interval):
+        """Read checkpoint and generation from one SQLite snapshot."""
+        self.db.execute("BEGIN")
+        try:
+            state = self.state(instance, symbol, interval)
+            generation = self.generation(instance, symbol, interval)
+            self.db.execute("COMMIT")
+            return state, generation
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+
     def generation(self, instance, symbol, interval):
         row = self.db.execute(
             "SELECT generation FROM proof_sweep_generation WHERE journal_instance=? AND symbol=? AND interval=?",
@@ -69,7 +81,7 @@ class SweepProgress:
             raise ProofError("sweep generation token required")
         self.db.execute("BEGIN IMMEDIATE")
         try:
-            if expected_generation is not None and self.generation(instance, symbol, interval) != expected_generation:
+            if self.generation(instance, symbol, interval) != expected_generation:
                 raise ProofError("stale sweep generation")
             if self.state(instance, symbol, interval) != expected:
                 raise ProofError("stale sweep checkpoint clear")
@@ -92,8 +104,7 @@ def run_sweep_slice(journal, registry, progress, *, symbol, interval,
         raise ProofError("invalid sweep time budget")
     started = time.monotonic_ns()
     instance = journal.instance_id
-    state = progress.state(instance, symbol, interval)
-    generation = progress.generation(instance, symbol, interval)
+    state, generation = progress.snapshot(instance, symbol, interval)
     if state is None:
         state = (0, journal.startup_entry_boundary())
         progress.save(instance, symbol, interval, *state, expected=None,
