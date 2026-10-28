@@ -7,7 +7,7 @@ import json
 import math
 
 from research_wp_r0.indicator_library import IndicatorLibrary, _get_ds_meta
-from research_wp_r0.historical_library import CustodyAccessor, DataAvailabilityKind, BarQuality
+from research_wp_r0.historical_library import CustodyAccessor, DataAvailabilityKind, BarQuality, SourceType
 
 
 def _canonical(value):
@@ -184,6 +184,15 @@ class ExpandedIndicator:
             raise ValueError("Dataset manifest integrity failure")
         bars = accessor.range_query(dataset_id, start_ms, end_ms, decision_cutoff_ms,
                                     version=ds_version, require_complete=True)
+        # Confirmed does not itself attest a receipt. Preserve explicitly
+        # synthetic development fixtures, but fail closed for claim-bearing data.
+        if any(b.source != SourceType.SYNTHETIC for b in bars):
+            if version is None:
+                raise ValueError("PIT version must be pinned explicitly")
+            if any(type(b.ingest_time_ms) is not int or
+                   b.ingest_time_ms < b.bar_close + 1 or
+                   b.ingest_time_ms > decision_cutoff_ms for b in bars):
+                raise ValueError("PIT source requires recorded receipt")
         for b in bars:
             if not b.verify_checksum() or not all(math.isfinite(v) for v in (b.open,b.high,b.low,b.close,b.volume)):
                 raise ValueError("Invalid OHLCV/checksum")
