@@ -342,7 +342,9 @@ def run_pipeline(
             "inserted": recovery_result["recovery_inserted"],
             "skipped_dup": recovery_result["recovery_skipped_dup"],
             "errors": recovery_result["recovery_errors"],
-            "ack_pending": recovery_result.get("recovery_ack_pending", 0),\n            "remaining_start_ms": getattr(gr, "remaining_start_ms", None),\n            "remaining_end_ms": getattr(gr, "remaining_end_ms", None),
+            "ack_pending": recovery_result.get("recovery_ack_pending", 0),
+            "remaining_start_ms": getattr(gr, "remaining_start_ms", None),
+            "remaining_end_ms": getattr(gr, "remaining_end_ms", None),
         }
 
     result = {
