@@ -131,3 +131,42 @@ def run_suite():
 
 if __name__=="__main__":
     print(json.dumps(run_suite(),sort_keys=True,indent=2))
+
+def gate_permutation_falsifier(family, scenario="GATE_HELPS"):
+    """Keep prices, strategy, universe, costs fixed; invert ex-ante gate only.
+
+    This is a deterministic *sensitivity falsifier*. Do not infer that a
+    permuted gate is independent evidence or model predictive skill.
+    """
+    dna, events, config = fixture(family, scenario)
+    original_manifest = freeze_manifest(dna, events)
+    protocol = freeze_protocol(original_manifest,
+                               expected_manifest_digest=original_manifest.digest,
+                               config=config)
+    def route(m, arm):
+        p=freeze_protocol(m,expected_manifest_digest=m.digest,config=config)
+        result=run_route(m,p,expected_manifest_digest=m.digest,
+                         expected_protocol_digest=p.digest,arm=arm)
+        replay_route(m,p,result,arm=arm)
+        return result
+    original_always = route(original_manifest,"ALWAYS")
+    original_gated = route(original_manifest,"REGIME")
+    permuted=deepcopy(events)
+    for event in permuted:
+        event["regime"]["score"] = 1 - event["regime"]["score"]
+    permuted_manifest=freeze_manifest(dna,permuted)
+    inverted_always=route(permuted_manifest,"ALWAYS")
+    inverted_gate=route(permuted_manifest,"REGIME")
+    original_net=original_gated.spec["portfolio"]["net_quote"]
+    permuted_net=inverted_gate.spec["portfolio"]["net_quote"]
+    return dict(family=family,scenario=scenario,
+        design="FIXED_PRICES_INVERT_REGIME_SCORE_ONLY",
+        base_manifest=original_manifest.digest,permuted_manifest=permuted_manifest.digest,
+        original_always_net=original_always.spec["portfolio"]["net_quote"],
+        inverted_always_net=inverted_always.spec["portfolio"]["net_quote"],
+        original_gate_net=original_net,inverted_gate_net=permuted_net,
+        regime_net_change=None if original_net is None or permuted_net is None
+                          else permuted_net-original_net,
+        original_gate_executed=sum(x["status"]=="EXECUTED" for x in original_gated.spec["outcomes"]),
+        inverted_gate_executed=sum(x["status"]=="EXECUTED" for x in inverted_gate.spec["outcomes"]),
+        note="SYNTHETIC_SELECTION_SENSITIVITY_ONLY_NOT_PREDICTIVE_SKILL")
