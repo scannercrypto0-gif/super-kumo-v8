@@ -189,6 +189,8 @@ class ExpandedIndicator:
         if any(b.source != SourceType.SYNTHETIC for b in bars):
             if version is None:
                 raise ValueError("PIT version must be pinned explicitly")
+            if accessor._library.get_manifest(dataset_id, ds_version).parent_version is not None:
+                raise ValueError("PIT corrected vintage first-known evidence unavailable")
             if any(type(b.ingest_time_ms) is not int or
                    b.ingest_time_ms < b.bar_close + 1 or
                    b.ingest_time_ms > decision_cutoff_ms for b in bars):
