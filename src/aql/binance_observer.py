@@ -185,6 +185,16 @@ class ObserverLedger:
                     timing_class='FIRST_INDEPENDENT_OBSERVED', utc_status='UNKNOWN',
                     issuer_status='UNATTESTED', custody='LOCAL_HASH_CHAIN_REQUIRES_EXTERNAL_PIN')
 
+    def queue_external_evidence(self, outbox):
+        """Snapshot the verified ledger to a durable local queue, without network I/O.
+
+        Upload/retry is a separate process; no Guardian or Drive dependency here.
+        """
+        from aql.evidence_outbox import EvidenceOutbox
+        if not isinstance(outbox, EvidenceOutbox):
+            raise TypeError('expected EvidenceOutbox')
+        return outbox.enqueue(self.bundle())
+
     def as_of(self, cutoff_ms):
         """Select only known versions; UNKNOWN UTC blocks temporal acceptance."""
         if type(cutoff_ms) is not int:
