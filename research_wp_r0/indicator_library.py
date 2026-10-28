@@ -480,6 +480,8 @@ class EMAIndicator(_BaseIndicator):
     version = "1"
 
     def __init__(self, period: int, smoothing: float = 2.0) -> None:
+        if type(smoothing) not in (int, float):
+            raise ValueError('EMA smoothing must be a non-boolean numeric value')
         super().__init__(period=period, smoothing=float(smoothing))
         self.period = period
         self.smoothing = float(smoothing)
