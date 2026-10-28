@@ -188,7 +188,9 @@ class FactoryExamTests(unittest.TestCase):
         e['regime'].update(as_of_ms=1049,available_at_ms=1050)
         e['quotes']=[dict(at_ms=1051,available_at_ms=1051,price=100),dict(at_ms=1151,available_at_ms=1151,price=96)]
         m,p=self.build();_,pp=self.build(config=dict(self.config,trial_id='R1',overlay=dict(name='MAX_CONCURRENT',version='1',max_concurrent=1)))
-        r=compare_routes(self.run_arm(m,p),self.run_arm(m,pp)).spec
+        r=compare_routes(self.run_arm(m,p),self.run_arm(m,pp),sensitivity=True).spec
+        self.assertEqual(r['comparison_kind'],'SENSITIVITY')
+        self.assertIn('overlay',r['changed_execution_assumptions'])
         self.assertEqual(r['right']['attrition']['OVERLAY_CAPACITY'],1)
         self.assertEqual(r['conditional_both_executed_count'],1)
 
