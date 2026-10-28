@@ -18,6 +18,9 @@ on:
       - 'tests/test_sf_pit_claim_guards.py'
       - 'research_wp_r0/factory_full_synthetic_b.py'
       - 'tests/test_sf_factory_full_synthetic_b.py'
+      - 'research_wp_r0/factory_b2_counterfactual.py'
+      - 'tests/test_sf_b2_counterfactual.py'
+      - 'tests/test_sf_b2_gate_permutation.py'
       - 'research_wp_r0/synthetic_outcome_receipt.py'
       - 'tests/test_sf_synthetic_outcome_receipt.py'
       - 'docs/research/FACTORY_DATA_ADMISSION_B.md'
@@ -38,7 +41,7 @@ jobs:
       - name: Run targeted consumer falsifiers
         run: |
           python -m pip install pytest
-          python -m pytest -q tests/test_sf_data_admission_b.py tests/test_sf_core_proof_bridge.py tests/test_sf_pre_indicator_boundary.py tests/test_sf_negative_r0_integration.py tests/test_sf_indicator_calculation_identity.py tests/test_sf_guarded_factory_exam.py tests/test_sf_m18_computed_binding.py tests/test_sf_m18_roc_r0_integration.py tests/test_sf_pit_claim_guards.py tests/test_sf_factory_full_synthetic_b.py tests/test_sf_synthetic_outcome_receipt.py
+          python -m pytest -q tests/test_sf_data_admission_b.py tests/test_sf_core_proof_bridge.py tests/test_sf_pre_indicator_boundary.py tests/test_sf_negative_r0_integration.py tests/test_sf_indicator_calculation_identity.py tests/test_sf_guarded_factory_exam.py tests/test_sf_m18_computed_binding.py tests/test_sf_m18_roc_r0_integration.py tests/test_sf_pit_claim_guards.py tests/test_sf_factory_full_synthetic_b.py tests/test_sf_b2_counterfactual.py tests/test_sf_b2_gate_permutation.py tests/test_sf_synthetic_outcome_receipt.py
       - name: Run and retain complete synthetic B report
         run: python -m research_wp_r0.factory_full_synthetic_b > factory_synthetic_b_report.json
       - uses: actions/upload-artifact@v4
@@ -49,3 +52,13 @@ jobs:
       - name: Summarize both policy arms from retained report
         run: |
           python -c "import json; d=json.load(open('factory_synthetic_b_report.json')); print(json.dumps({'scheduled':d['scheduled'],'always':d['comparison']['left'],'regime':d['comparison']['right'],'both_executed':d['comparison']['conditional_both_executed_count'],'replay':d['replay'],'scope':d['scope']},sort_keys=True))"
+      - name: Execute B2 counterfactual suite and retain output
+        run: python -m research_wp_r0.factory_b2_counterfactual > factory_b2_counterfactual.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: factory-b2-counterfactual-${{ matrix.os }}
+          path: factory_b2_counterfactual.json
+          if-no-files-found: error
+      - name: Print B2 case results
+        run: |
+          python -c "import json; x=json.load(open('factory_b2_counterfactual.json')); print(json.dumps([{'family':c['family'],'scenario':c['scenario'],'left_net':c['comparison']['left']['portfolio']['net_quote'],'right_net':c['comparison']['right']['portfolio']['net_quote'],'left_executed':c['comparison']['left']['executed'],'right_executed':c['comparison']['right']['executed'],'unknown':c['comparison']['left']['unknown']+c['comparison']['right']['unknown']} for c in x['cases']],sort_keys=True))"
