@@ -382,7 +382,10 @@ def run_pipeline(
             # Machine-readable: any non-zero value here means unresolved backlog
             "unresolved_backlog": startup_replay_errors > 0 or startup_reconcile_error is not None,
         },
-        "ws_gap_recovery": (_report_from(ws_recovery_result[0])\n                            if ws_recovery_result else None),\n        "ws_gap_recovery_slices": ([_report_from(r) for r in ws_recovery_result]\n                                   if ws_recovery_result is not None else []),
+        "ws_gap_recovery": (_report_from(ws_recovery_result[0])
+                            if ws_recovery_result else None),
+        "ws_gap_recovery_slices": ([_report_from(r) for r in ws_recovery_result]
+                                   if ws_recovery_result is not None else []),
         "supabase_status": OperationalStore.SUPABASE_STATUS,
         "background_recovery": recovery_lane_status,
         "background_persistence": consumer_status,
