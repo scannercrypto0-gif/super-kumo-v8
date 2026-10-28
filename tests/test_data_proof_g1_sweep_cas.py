@@ -10,19 +10,19 @@ def test_stale_worker_cannot_regress_or_clear(tmp_path):
     key = ("instance", "BTCUSDT", "1m")
     try:
         assert a.state(*key) is None
-        a.save(*key, 0, 100, expected=None)
+        a.save(*key, 0, 100, expected=None, expected_generation=0)
         old = b.state(*key)
-        a.save(*key, 20, 100, expected=old)
+        a.save(*key, 20, 100, expected=old, expected_generation=1)
         with pytest.raises(ProofError, match="stale"):
-            b.save(*key, 10, 100, expected=old)
+            b.save(*key, 10, 100, expected=old, expected_generation=1)
         with pytest.raises(ProofError, match="stale"):
-            b.clear(*key, expected=old)
+            b.clear(*key, expected=old, expected_generation=1)
         assert a.state(*key) == (20, 100)
         with pytest.raises(ProofError, match="regression"):
-            a.save(*key, 19, 100, expected=(20, 100))
+            a.save(*key, 19, 100, expected=(20, 100), expected_generation=1)
         with pytest.raises(ProofError, match="stale"):
-            b.save(*key, 0, 200, expected=None)
-        a.clear(*key, expected=(20, 100))
+            b.save(*key, 0, 200, expected=None, expected_generation=1)
+        a.clear(*key, expected=(20, 100), expected_generation=1)
         assert b.state(*key) is None
     finally:
         a.close()
@@ -56,3 +56,17 @@ def test_generation_fences_aba_after_cycle_restart(tmp_path):
     finally:
         a.close()
         b.close()
+
+
+def test_generation_token_cannot_be_omitted(tmp_path):
+    progress = SweepProgress(tmp_path / "sweep.sqlite")
+    key = ("instance", "BTCUSDT", "1m")
+    try:
+        with pytest.raises(ProofError, match="generation token required"):
+            progress.save(*key, 0, 10, expected=None)
+        progress.save(*key, 0, 10, expected=None, expected_generation=0)
+        with pytest.raises(TypeError):
+            progress.clear(*key, expected=(0, 10))
+        assert progress.state(*key) == (0, 10)
+    finally:
+        progress.close()
