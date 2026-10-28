@@ -361,8 +361,10 @@ def compare_routes(left, right, *, sensitivity=False):
         raise ValueError("Family identity alone is insufficient: different source manifest")
     controlled = ("capital", "notional", "fee_bps", "spread_bps", "slippage_bps", "latency_ms", "holding_ms", "exit_policy", "protection_required", "overlay")
     differences = [k for k in controlled if a["assumptions"][k] != b["assumptions"][k]]
-    if differences and not sensitivity:
-        raise ValueError("Unmatched execution assumptions; explicit sensitivity required")
+    policy_fields = ("regime_threshold", "regime_max_age_ms")
+    changed_policy = [k for k in policy_fields if a["assumptions"][k] != b["assumptions"][k]]
+    if (differences or changed_policy) and not sensitivity:
+        raise ValueError("Unmatched execution or REGIME policy assumptions; explicit sensitivity required")
     if len(a["outcomes"]) != len(b["outcomes"]):
         raise ValueError("Opportunity denominator mismatch")
     matched = []
@@ -383,7 +385,7 @@ def compare_routes(left, right, *, sensitivity=False):
             observed_net_quote=math.fsum(x["net_quote"] for x in rows if x["net_quote"] is not None),
             ex_ante_policy_mean_per_requested_notional=math.fsum(vals)/len(rows) if len(vals)==len(rows) else None,
             observed_sum_per_requested_notional=math.fsum(vals), portfolio=spec["portfolio"])
-    return _freeze(dict(schema="factory-comparison-1", manifest_digest=a["manifest_digest"],
+    result = dict(schema="factory-comparison-1", manifest_digest=a["manifest_digest"],
         left_protocol=a["protocol_digest"], right_protocol=b["protocol_digest"],
         left=arm_summary(a), right=arm_summary(b),
         conditional_both_executed_count=len(matched),
@@ -391,4 +393,8 @@ def compare_routes(left, right, *, sensitivity=False):
         conditional_selection_sensitive=True, inference="DESCRIPTIVE_SYNTHETIC_NO_P_VALUES_NO_PROMOTION",
         comparison_kind="SENSITIVITY" if sensitivity else "MATCHED_ASSUMPTIONS",
         changed_execution_assumptions=differences,
-        oos="NOT_ACCESSED", independent_custody="NOT_VERIFIED"))
+        oos="NOT_ACCESSED", independent_custody="NOT_VERIFIED")
+    if changed_policy:
+        result["comparison_kind"] = "POLICY_SENSITIVITY"
+        result["changed_policy_parameters"] = changed_policy
+    return _freeze(result)
