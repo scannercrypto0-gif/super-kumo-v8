@@ -28,6 +28,7 @@ Depends on: SF-DATA-01 (PR #57, commit cf4339e83d8ce2fe30cc727b6c470f1fb0bf63bb)
 """
 from __future__ import annotations
 
+import math
 import hashlib
 import json
 from dataclasses import dataclass, field
@@ -265,6 +266,18 @@ class IndicatorManifest:
         return (
             len(results) == self.result_count
             and self.computation_hash == self._hash_results(results)
+            and all(
+                isinstance(item, IndicatorResult)
+                and item.verify_integrity()
+                and item.indicator_id == self.indicator_id
+                and item.dataset_id == self.dataset_id
+                and item.dataset_version == self.dataset_version
+                and item.dataset_manifest_hash == self.dataset_manifest_hash
+                and item.decision_cutoff_ms == self.decision_cutoff_ms
+                and item.parameters == self.parameter_set
+                and item.warmup_bars_consumed == self.warmup_policy
+                for item in results
+            )
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -476,7 +489,7 @@ class EMAIndicator(_BaseIndicator):
         if not isinstance(p.get("period"), int) or p["period"] < 2:
             raise ValueError(f"EMA period must be int >= 2, got {p.get('period')!r}")
         s = p.get("smoothing", 2.0)
-        if not isinstance(s, (int, float)) or s <= 0:
+        if type(s) not in (int, float) or not math.isfinite(s) or not 0 < s <= p["period"] + 1:
             raise ValueError(f"EMA smoothing must be > 0, got {s!r}")
 
     def _compute_values(
@@ -547,6 +560,19 @@ class RSIIndicator(_BaseIndicator):
             out[i] = self._rsi(avg_g, avg_l)
 
         return out
+
+
+class RSIIndicatorV2(RSIIndicator):
+    """Neutral zero/zero RSI, with immutable new identity; V1 replay untouched."""
+
+    indicator_id = "RSI_v2"
+    version = "2"
+
+    @staticmethod
+    def _rsi(avg_gain: float, avg_loss: float) -> float:
+        if avg_gain == 0.0 and avg_loss == 0.0:
+            return 50.0
+        return RSIIndicator._rsi(avg_gain, avg_loss)
 
 
 # ---------------------------------------------------------------------------
@@ -621,6 +647,7 @@ class IndicatorLibrary:
         "SMA_v1": SMAIndicator,
         "EMA_v1": EMAIndicator,
         "RSI_v1": RSIIndicator,
+        "RSI_v2": RSIIndicatorV2,
         "ATR_v1": ATRIndicator,
     }
 
