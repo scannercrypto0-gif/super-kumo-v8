@@ -42,6 +42,8 @@ class SweepProgress:
         self.db.execute("BEGIN IMMEDIATE")
         try:
             current = self.state(instance, symbol, interval)
+            if expected_generation is not None and self.generation(instance, symbol, interval) != expected_generation:
+                raise ProofError("stale sweep generation")
             if current != expected:
                 raise ProofError("stale sweep checkpoint update")
             if current is not None and (high_water != current[1] or cursor < current[0]):
