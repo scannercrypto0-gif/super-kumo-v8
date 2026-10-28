@@ -104,3 +104,21 @@ def test_static_inventory_reproduces_pinned_tree():
     existing=json.loads((ROOT/'source-inventory.json').read_text())
     assert inventory(existing['commit'])==existing
     assert existing['dynamic_completeness'] is False
+
+def test_overlay_difference_requires_explicit_sensitivity():
+    dna, events, config = fixture()
+    manifest = freeze_manifest(dna, events)
+    left_protocol = freeze_protocol(manifest, expected_manifest_digest=manifest.digest, config=config)
+    left = run_route(manifest, left_protocol, expected_manifest_digest=manifest.digest,
+                     expected_protocol_digest=left_protocol.digest, arm='ALWAYS')
+    right_config = deepcopy(config)
+    right_config['overlay'] = {'name': 'MAX_CONCURRENT', 'version': '1', 'max_concurrent': 1}
+    right_protocol = freeze_protocol(manifest, expected_manifest_digest=manifest.digest, config=right_config)
+    right = run_route(manifest, right_protocol, expected_manifest_digest=manifest.digest,
+                      expected_protocol_digest=right_protocol.digest, arm='ALWAYS')
+    with pytest.raises(ValueError, match='sensitivity'):
+        compare_routes(left, right)
+    result = compare_routes(left, right, sensitivity=True).spec
+    assert result['comparison_kind'] == 'SENSITIVITY'
+    assert result['changed_execution_assumptions'] == ['overlay']
+    assert compare_routes(left, left).spec['comparison_kind'] == 'MATCHED_ASSUMPTIONS'
