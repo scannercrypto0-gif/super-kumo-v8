@@ -89,6 +89,7 @@ def run_sweep_slice(journal, registry, progress, *, symbol, interval,
     started = time.monotonic_ns()
     instance = journal.instance_id
     state = progress.state(instance, symbol, interval)
+    generation = progress.generation(instance, symbol, interval)
     if state is None:
         state = (0, journal.startup_entry_boundary())
         progress.save(instance, symbol, interval, *state, expected=None,
