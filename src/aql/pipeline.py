@@ -323,7 +323,7 @@ def run_pipeline(
             "inserted": recovery_result["recovery_inserted"],
             "skipped_dup": recovery_result["recovery_skipped_dup"],
             "errors": recovery_result["recovery_errors"],
-            "ack_pending": recovery_result["recovery_ack_pending"],
+            "ack_pending": recovery_result.get("recovery_ack_pending", 0),
         }
 
     result = {
