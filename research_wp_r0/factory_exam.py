@@ -359,7 +359,7 @@ def compare_routes(left, right, *, sensitivity=False):
     a, b = _comparison_input(left), _comparison_input(right)
     if a["manifest_digest"] != b["manifest_digest"]:
         raise ValueError("Family identity alone is insufficient: different source manifest")
-    controlled = ("capital", "notional", "fee_bps", "spread_bps", "slippage_bps", "latency_ms", "holding_ms", "exit_policy", "protection_required")
+    controlled = ("capital", "notional", "fee_bps", "spread_bps", "slippage_bps", "latency_ms", "holding_ms", "exit_policy", "protection_required", "overlay")
     differences = [k for k in controlled if a["assumptions"][k] != b["assumptions"][k]]
     if differences and not sensitivity:
         raise ValueError("Unmatched execution assumptions; explicit sensitivity required")
