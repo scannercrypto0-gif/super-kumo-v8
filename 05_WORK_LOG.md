@@ -229,3 +229,29 @@ locally by LF→CRLF conversion. Added path-scoped `.gitattributes -text` to ret
 archive bytes, preserved original manifest hashes and strict raw-byte assertions,
 and added attribute changes to the workflow trigger. New exact-head CI required;
 the earlier failed run is not acceptance evidence for the corrected commit.
+
+
+## 2026-10-28 — AQL-CORE-WORK-OBSERVATION-AUTHORITY-E2E-001 / Draft #144
+
+Starting head6cb17079b71e7aaa33de756b60ad59686b260aad, main dbc191df.
+Scoped direct owner authority; continuity #144/6465387750, UTC B owner
+#144/6465335332, #128 through6463127686, Council #134 through6465410783;
+unseen-chat coverage gap disclosed. Existing open stack preserved.
+Automatic observer local snapshot queue, process-local expiring UTC diagnostic
+with event/session binding, separate optional rclone Guardian full readback
+before ACK, read-only verifier, Windows1/Windows2 runbooks delivered.
+Baseline tests24 PASS after correcting local import setup; dependency install
+resolved missing websocket-client in new integration test collection, no assertion
+weakening. Final targeted34 PASS/0.58s, Core proof53 PASS/3.31s, JUnit retained.
+Historical starting SHA six workflows SUCCESS, no rerun. Changed-source CI and
+final exact SHA to be linked from PR #144 final delivery/Council #134 request.
+Actual Linux capture4 Binance REST versions, WS timeout GAP and UTC DNS failure
+UNKNOWN. Actual Drive raw upload/download23148 bytes verified SHA256
+05e0f25a13b633f50e4f870ac79943414111c8a19fee717c2c4259144a9bad10;
+file1RuR86eEZ3NaASymm3oz698N7uJQbOtau, verified ledger/raw/version/envelope.
+No Windows owner-device/rclone runtime or physical power-loss test. Guardian
+stop/restart is synthetic/fault injection only. No finite UTC bound established;
+no independent custody/issuer timestamp, no empirical/PIT promotion.
+See docs/core/observation_authority_e2e_001.md and evidence/observation-e2e-20261028.
+No merge/OOS/PAPER/LIVE/final G0. Owner executes device runbooks; independent
+Council S safety and R scientific comparison requested against final SHA.

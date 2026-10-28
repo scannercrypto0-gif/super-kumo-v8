@@ -212,15 +212,31 @@ def verify_bundle(bundle, pinned_head):
     previous = '0'*64
     observations = []
     receives = {}
+    utc_samples = {}
     for e in bundle['evidence']:
         if e['previous'] != previous or e['hash'] != digest({'previous': previous, 'body': canonical(e['body'])}):
             raise ProofError('bundle chain mismatch')
         previous = e['hash']
         body = e['body']
+        if body['kind'] == 'UTC_DIAGNOSTIC':
+            utc_samples[e['hash']] = body['data']
         if body['kind'] == 'RECEIVE':
             d = body['data']
             if hashlib.sha256(d['raw'].encode()).hexdigest() != d['raw_sha256']:
                 raise ProofError('raw digest mismatch')
+            metadata = d.get('metadata', {})
+            if 'utc_diagnostic' in metadata:
+                from aql.utc_evidence import ClockSample, assess
+                stored = utc_samples.get(metadata.get('utc_sample_ref'))
+                sample = None
+                if stored:
+                    if stored['session'] != d['session'] or stored['authenticated'] is not False or stored['issuer_attestation'] is not False:
+                        raise ProofError('UTC session or trust scope mismatch')
+                    sample = ClockSample(**stored['sample'])
+                expected = assess(sample, d['monotonic_ns'],
+                    metadata['utc_policy_max_uncertainty_ms'], now_wall_ms=d['wall_ms'])
+                if metadata['utc_diagnostic'] != expected:
+                    raise ProofError('UTC diagnostic binding mismatch')
             receives[e['hash']] = d
         if body['kind'] == 'VERSION':
             d = body['data']; v = ObservationVersion(**d['observation'])

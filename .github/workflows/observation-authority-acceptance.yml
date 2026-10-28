@@ -9,6 +9,10 @@ on:
       - 'src/aql/binance_observer.py'
       - 'tests/test_observer_outbox_integration.py'
       - 'src/aql/utc_evidence.py'
+      - 'src/aql/evidence_guardian.py'
+      - 'scripts/binance_independent_observer.py'
+      - 'scripts/evidence_guardian.py'
+      - 'tests/test_observation_operational_e2e.py'
       - 'tests/test_utc_evidence.py'
       - '.github/workflows/observation-authority-acceptance.yml'
   workflow_dispatch:
@@ -23,9 +27,20 @@ jobs:
       PYTHONPATH: src
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install declared runtime and test dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Operational callpath fault injection (synthetic)
+        run: python -m pytest -q tests/test_observation_operational_e2e.py --junitxml=operational-e2e.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: operational-e2e-${{ matrix.os }}
+          path: operational-e2e.xml
       - name: Fail-closed authority regression
         run: python -m unittest discover -s tests -p test_observation_authority.py -v
       - name: Binance ledger to optional outbox integration

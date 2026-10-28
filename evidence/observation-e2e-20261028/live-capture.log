@@ -1,0 +1,4 @@
+{"outbox_sha256": "10a86511edeff07ecea75272696d33c07f3b313e2efac70320963e874289050e", "status": "LOCAL_PENDING"}
+{"outbox_sha256": "7e2391668c588c10c6b217ed7a018bf97a2a9be2f7cf7598d1357533e3a6003d", "status": "LOCAL_PENDING"}
+{"outbox_sha256": "05e0f25a13b633f50e4f870ac79943414111c8a19fee717c2c4259144a9bad10", "status": "LOCAL_PENDING"}
+{"bundle": "/tmp/aql-real-capture/bundle-8e22850e-6ad2-4e66-9ff7-c360f20262dd.json", "head": "9f517a06aedf12c1496ba7fd0510302ca41bc2cdc3ad62b844d893270769d58f", "versions": 4}

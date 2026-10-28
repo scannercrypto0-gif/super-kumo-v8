@@ -141,3 +141,15 @@ Unseen chat addenda remain UNVERIFIED; no conflicting authority was discovered
 in accessible records. Independent S/R and broader external timing/custody remain
 unresolved. Branch publication and exact-head validation are reported in the PR
 and Council thread; this entry does not assert merge or acceptance.
+
+
+## 2026-10-28 — AQL-CORE-WORK-OBSERVATION-AUTHORITY-E2E-001
+
+Directly received execution request; not an invented cross-chat submission.
+Last explicitly owner-confirmed cross-chat submitted baseline remains
+AQL-HO-20261021-002/#14; current code delivery baseline #144/6465387750 at
+6cb17079. Accessible GitHub delta inventoried in continuity.json, earlier
+D1/D2/D3/Factory work already documented; automatic outbox/UTC/Guardian/Drive
+roundtrip included in current report. Unseen chats/addenda UNRESOLVED/COVERAGE
+GAP; no exhaustive unified handoff or final G0 claim. Existing Draft #144 updated,
+not merged. Windows owner runs and independent Council S/R remain pending.

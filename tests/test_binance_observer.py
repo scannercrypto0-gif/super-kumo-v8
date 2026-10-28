@@ -149,3 +149,15 @@ def test_atomic_failure_does_not_publish_partial_version(tmp_path):
     assert l.verify()==initial and l.versions()==()
     l._append=append; observe(l); assert len(l.versions())==1
     l.close()
+
+def test_current_operational_capture_drive_backup_still_denied_by_factory(tmp_path):
+    root=Path('evidence/observation-e2e-20261028')
+    manifest=json.loads((root/'capture-manifest.json').read_text())
+    raw=(root/manifest['file']).read_bytes()
+    assert hashlib.sha256(raw).hexdigest()==manifest['sha256']
+    bundle=json.loads(raw)
+    versions=verify_bundle(bundle,manifest['ledger_head'])
+    review=factory_bridge(tmp_path)
+    receipts=review(bundle['envelope'],pinned_digest=bundle['envelope']['manifest_sha256'],
+        cutoff_ms=max(v.first_local_seen_ms for v in versions))
+    assert receipts and all(not r.empirical_eligible and not r.real_pit_accepted for r in receipts)

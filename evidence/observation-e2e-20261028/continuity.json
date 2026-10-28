@@ -1,0 +1,901 @@
+{
+  "128": [
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6417082519",
+      "summary": "START / G0-GOV-01 \u2014 current direct owner instruction authorizes bounded Core implementation/review, not merge. DESIGN-2 read in full (300 lines; T01\u2013T32 are proposals, not results). Last code delivery #127/6416097799 SHA542578ec8b81a0b933811d878e896d23daac7ac4; latest design delivery DESIGN-2. #127 and Factory #126 remain OPEN/DRAFT/unmerged; #126 "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6417571228",
+      "summary": "D1 GATE CHECKPOINT \u2014 BLOCKED / INDEPENDENT CHANGES REQUESTED\n\nIndependent reviewer of local773c0cc found 5 real counterexamples despite8 passing fixtures: R1 failed audit could leave CLEAR, R2 unbound OperationalStore conflict bypass, R3 public staging SQL, R4 semantically forged ACK/withheld events, R5 stale restored fence. Original independent re"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6417726650",
+      "summary": "# RESULT / HANDOFF \u2014 Core #128 \u2014 BLOCKED, NOT COMPLETE\n\n**Draft [PR #129](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/129)**, OPEN/DRAFT/UNMERGED. Final source **`801a82cf6e375fc0c9ceccbe167a06420332b028`**, tree `a82445586f6adb96f2aa5f5b35f4698aa842a6da`. Three remote commits; nine Core-only paths. Parent #127 unchanged at `542578ec8b"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6417849793",
+      "summary": "Owner explicitly delegated repair of Core R2 blocker. Precise implementation/acceptance handoff posted on PR #129. Maintain BLOCKED until unweakened R2 + native CI + independent re-review pass; no merge/real activation/G0. Parent #127 unchanged; Factory #126 already merged. See PR #129 latest comment."
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6435712204",
+      "summary": "## R2 remediation result \u2014 2026-10-27\n**Final SHA `33c04613641c95feecce745ed6f0c755a23cd52d`**, same Draft PR #129 and original branch; parent #127 unchanged `542578ec8b81a0b933811d878e896d23daac7ac4`, unmerged. [Full delivery / preserved failures / exact eleven Core-only paths](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/129#issuecomm"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6435751969",
+      "summary": "CORE ARCHITECT ACCEPTANCE CHECKPOINT \u2014 2026-10-27.\n\nVerified actual owner Work handoff PR #129 comment 6435698642 and #128 comment 6435712204. Exact PR #129 HEAD 33c04613641c95feecce745ed6f0c755a23cd52d, OPEN/DRAFT/unmerged, stacked on parent #127 SHA 542578ec8b81a0b933811d878e896d23daac7ac4, also unmerged. Compared against former failing source 80"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6435785062",
+      "summary": "CORE NEXT EXECUTION GATE \u2014 D2-B durable per-consumer dispositions / settlement (2026-10-27).\n\nOwner explicitly authorized continuation after R2 repair and requested delegating simple read-only diagnostics to their Windows CMD instead of spending Work/Codex cycles. G0-GOV-01 refresh: latest actual code handoff #129/6435698642 at 33c04613641c95feecce"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6436217089",
+      "summary": "# CODEX TASK \u2014 ATLAS Core D2-B evidence inventory + implementation-ready gap analysis\n\nOwner direct instruction 2026-10-27: \"\u0627\u0631\u0641\u0639 \u0627\u0645\u0631 \u0644 \u0643\u0648\u062f\u064a\u0643\u0633 \u064a\u062c\u0645\u0639 \u0643\u0644 \u0627\u0644\u0644\u064a \u0627\u0646\u062a \u0645\u062d\u062a\u0627\u062c\u0647\" after local CMD smoke-test collection error. This task is explicitly authorized for Codex to gather evidence and prepare the next D2 step. **DO NOT modify production code, tests, CI,"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6436551719",
+      "summary": "# D2-B evidence inventory + implementation-ready gap analysis \u2014 READ ONLY\n**2026-10-27 \u00b7 AQL-CRYPTO-RESEARCH-001**\n**\u0641\u062d\u0635 \u062d\u0635\u0631\u064a \u0644\u0644\u0643\u0648\u062f \u0639\u0646\u062f SHA `33c04613641c95feecce745ed6f0c755a23cd52d`**\nTree `fd2ecc553ae98d49d9bff1468e757a5caa43c39d`.\n\n**\u0627\u0644\u0646\u062a\u064a\u062c\u0629:** \u0645\u0634\u0643\u0644\u0629 Windows \u0643\u0627\u0646\u062a \u0625\u0639\u062f\u0627\u062f package/plugin\u060c \u0645\u0634 \u0633\u0642\u0648\u0637 assertion. \u0627\u0644\u064064 \u0627\u062e\u062a\u0628\u0627\u0631 \u0646\u062c\u062d\u0648\u0627 \u0645\u062c\u062f\u062f\u064b\u0627 \u0639\u0644\u0649 Windows/Pyth"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6436623621",
+      "summary": "CORE architecture review of Codex D2 inventory (#128/6436551719) and AIARC-FULL-001 v0.2 (#134/6436345015), 2026-10-27. Last actual owner-delivered Core code PR #129/6435698642 SHA 33c04613641c95feecce745ed6f0c755a23cd52d; latest read-only Codex report #128/6436551719. Verified #129 and parent #127 remain OPEN/DRAFT/unmerged; Factory #130 OPEN/DRAF"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6436682856",
+      "summary": "## D2-B / IMPLEMENTATION HANDOFF READY \u2014 provisional owner approval 2026-10-27\n\nOwner replied \"\u062a\u0645\u0627\u0645 \u0645\u0648\u0627\u0641\u0642 \u0643\u0645\u0644\" after architecture decision D2-B. Treat as **provisional architecture approval and authorization to prepare next scoped handoff**, NOT unambiguous permission to write/merge code, open live operations, or grant G0. Execution awaits separate"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6436706901",
+      "summary": "# CODEX / WORK EXECUTION ORDER \u2014 D2-B SLICE 1 (OWNER AUTHORIZED 2026-10-27)\n\n**Explicit owner command:** \"\u0628\u062f\u0623 \u062a\u0646\u0641\u064a\u0630 D2-B \u0628\u0627\u0644\u0646\u0637\u0627\u0642 \u0627\u0644\u0645\u062d\u062f\u062f\". This is permission to implement the bounded D2-B synthetic OFFLINE slice described in #128/6436682856. **No merge**, no Ready-for-review transition, no G0, no OOS/PAPER/LIVE, no real migration or live pipeline.\n\n"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6436872909",
+      "summary": "START \u2014 owner-authorized D2-B slice1, order6436706901. Baseline33c04613641c95feecce745ed6f0c755a23cd52d/treefd2ecc55, #129 same branch OPEN/DRAFT, parent #127 unchanged542578ec; maina4f19c97, Factory#130 independentfd466917. Last actual Core handoff6435698642, read-only inventory6436551719, architect6436623621/handoff6436682856 and accessible #92/#"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6438788961",
+      "summary": "Canonical PR delivery: https://github.com/scannercrypto0-gif/super-kumo-v8/pull/129#issuecomment-6438778853\n\n# D2-B Slice 1 delivery \u2014 technical PASS; overall acceptance BLOCKED\nProject AQL-CRYPTO-RESEARCH-001 \u2014 2026-10-27\n\n**Delivered HEAD: `b1aba7660b092a4fdad56fe0e2e021710bb0aa09`**\nTree: `eec12484ff918f1900d79b7a6ce28b192d3f5d0e`.\n**D2 bounded "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6438910588",
+      "summary": "## CORE AG-F01 \u2014 OWNER-APPROVED ONE-SHOT READ-ONLY DIAGNOSIS (2026-10-27)\n\nOwner approved recommended B with explicit constraint: **\"\u0645\u0646 \u063a\u064a\u0631 \u0645\u0627 \u0646\u0644\u0641 \u0641\u064a \u062f\u0648\u0627\u064a\u0631 \u0645\u0646 \u0627\u0644\u0627\u062e\u062a\u0628\u0627\u0631\u0627\u062a\"**. This is authorization for **one bounded, discriminating diagnostic**, NOT code modification, repeated test campaigns, PR merge, or relaxation of assertion.\n\n### G0-GOV-01 and a"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6438977066",
+      "summary": "## AG-F01 one-shot diagnosis receipt \u2014 STOP condition reached\nAuthority: [owner order6438910588](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6438910588).\n**Classification: fresh-collection overlap mechanism CONFIRMED by source trace and retained controlled evidence. Exact attribution of the original Ubuntu CI event r"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6439059850",
+      "summary": "## OWNER-AUTHORIZED EXECUTION ORDER \u2014 AG-F01 bounded correction, option B (2026-10-27)\n\n**Owner decision:** \"\u062a\u0645\u0627\u0645 \u0645\u0648\u0627\u0641\u0642\" to recommended B: correct the fresh-start replay accounting by freezing the pre-collection startup journal population, preserving genuine old-backlog replay and unchanged strict test expectations. This explicitly authorizes **min"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6439349899",
+      "summary": "## AG-F01 direct owner-authorized implementation \u2014 PATCHED / VALIDATION PENDING (2026-10-27)\n\nOwner explicitly authorized assistant to implement without Codex, same narrow AG-F01 scope, no merge. Starting actual Core handoff #129/6438778853 at b1aba766; last Codex read-only receipt #128/6438977066; execution order #128/6439059850; #129 and parent #"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6439530604",
+      "summary": "## AG-F01 exact-head CI acceptance evidence \u2014 PASS / independent review still pending\n\nAt #129 HEAD `575009dce339b3f5ebde5599970c2b373191fe6a`, PR still Draft/unmerged, automatic native run `40487916228` completed SUCCESS on Ubuntu job122134261418 and Windows job122134261877. Independently fetched both complete job logs and verified D1 64PASS per O"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6439606928",
+      "summary": "## CROSS-TEAM EVIDENCE REUSE CONTRACT \u2014 Core / Factory / Independent Audit (2026-10-27)\n\n**Purpose:** one accountable test owner and one canonical exact-SHA receipt per claim; cross-team review reuses evidence rather than re-running unrelated suites. Owner approvals provisional until G0. This note is coordination, NOT independent-audit sign-off or "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6440005054",
+      "summary": "## CORE-CONSOLIDATED-ACCEPTANCE-2026-10-27 \u2014 read-only technical disposition\n\nLast actual Core D2 owner handoff: #129 comment 6438778853 at `b1aba7660b092a4fdad56fe0e2e021710bb0aa09`; subsequent owner-authorized narrow AG-F01 patch advanced same PR to `575009dce339b3f5ebde5599970c2b373191fe6a`. Evidence #128 comments 6439349899, 6439530604, 6439606"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6440036762",
+      "summary": "## Independent review handoff \u2014 CORE-PR127-129-REVIEW-001\n\n**Review object, not test request:** Parent PR #127 at `542578ec8b81a0b933811d878e896d23daac7ac4` and stacked PR #129 at `575009dce339b3f5ebde5599970c2b373191fe6a`. Canonical Core receipt #128/6440005054; #127 boundary #127/6440006399; #129 consolidated #129/6440008394. Native CI #127 40322"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6440407428",
+      "summary": "## AIARC / CORE-PR127-129-REVIEW-001 \u2014 INDEPENDENT VERDICT: **PASS (BOUNDED)**\n**2026-10-27 | Audit Council | READ-ONLY / NO TEST RERUN**\n\n**Handoff received:** #128/6440036762. Evaluated exactly #127 head `542578ec8b81a0b933811d878e896d23daac7ac4` and stacked #129 head `575009dce339b3f5ebde5599970c2b373191fe6a` (both remain OPEN/DRAFT/UNMERGED). R"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6440489725",
+      "summary": "## CORE-MERGE-READINESS-GATE-001 \u2014 pre-owner merge packet (2026-10-27)\n\nOwner authorized completing all pre-merge preparation, **not merging**. Both PR #127 (`542578ec8b81a0b933811d878e896d23daac7ac4`) and stacked #129 (`575009dce339b3f5ebde5599970c2b373191fe6a`) are now **OPEN / READY FOR REVIEW / UNMERGED**. Dependency: merge #127 into main first"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6440527547",
+      "summary": "## CORE-G0-MERGE-EXECUTION-RECEIPT-001 \u2014 2026-10-27\n\nOwner explicitly approved recommended bounded acceptance and instructed execution. Merge sequence completed via GitHub with pinned expected heads:\n1. PR #127 head `542578ec8b81a0b933811d878e896d23daac7ac4` \u2192 main, GitHub returned `merged=true`, merge commit `1c6c8a013bbd7e3716c41252258ccf420cf970"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6440556999",
+      "summary": "## CORE-POST-MERGE-READINESS-001 \u2014 read-only main CI visibility + D3 gate\n\nConfirmed owner-authorized merges #127 `1c6c8a013bbd7e3716c41252258ccf420cf9705e` and #129 `b48dcb2b90a29e3904afe6d8d4ed5256924add21`, recorded #128/6440527547. Queried commit-associated workflow runs and combined statuses for both merge commits: connector returned **zero PR"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6440577751",
+      "summary": "## CORE-D3-DESIGN-SCOPE-001 \u2014 provisional decision framing (no implementation)\n\n**Continuity:** last actual owner-directed execution was merge of #127 then #129, evidenced #128/6440527547. Owner subsequently said '\u0643\u0645\u0644' after Core recommended B for D3; this is treated as authorization to continue **design preparation**, not to implement. Existing #1"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6440708941",
+      "summary": "## CORE-D3-ACCEPTANCE-AND-UNIFIED-WORK-DRAFT-001 \u2014 DESIGN ONLY\n\n**G0-GOV-01:** Last actually owner-delivered Core implementation was #129/6438778853 at `b1aba766`; later owner-authorized direct AG-F01 fix reached `575009d`, and owner explicitly approved merge of #127/#129, executed at #128/6440527547. Subsequent owner '\u0643\u0645\u0644' requests authorized cont"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6440739358",
+      "summary": "## CORE-D3-AUDIT-TRACEABILITY-AND-OWNER-EXECUTION-ORDER-001 (2026-10-27)\n\n**Owner authorization:** explicit approval to implement D3, conditioned by owner's question that work must address Audit Council findings, not run as an isolated track. Last actually delivered Core code #129/6438778853 plus authorized AG-F01 patch to 575009d; #127/#129 now me"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6440797293",
+      "summary": "## CORE-D3-DIRECT-IMPLEMENTATION-SLICE1 \u2014 owner authorized\n\nImplemented directly (no Work/Codex agent) on isolated branch `feat/core-d3-synthetic-archive-verifier`; Draft PR #136, exact HEAD `356f8a045bad57d58d9e3eb9c309f94d9c8e1caf`, three additive files: `src/aql/d3_synthetic_archive.py`, `tests/test_d3_synthetic_archive.py`, `docs/core/d3_synthe"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6440826752",
+      "summary": "## CORE-D3-DIRECT-SLICE2-DELIVERY-001\n\nOwner requested direct execution of remaining archive/restore and nonblocking slice. Implemented on existing Draft PR #136, HEAD `63f83b715ac567d04f4af488689877f1927b454a`: added `src/aql/d3_offline_archive.py` (no-overwrite local generation publication, file fsync, directory fsync where available, read-only p"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6440863190",
+      "summary": "## CORE-D3-VALIDATION-START-001 \u2014 owner-authorized testing\n\nPR #136 HEAD `ea397d27532d23f441245ad4ac192b37cb2ace87` now includes focused Ubuntu/Windows D3 workflow `.github/workflows/core-d3-synthetic.yml`. GitHub run 40497021877 observed QUEUED, **no test result yet**. Existing G1 workflows 40497021559 and 40497021723 auto-triggered; do not re-run"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6440905773",
+      "summary": "## FACTORY\u2194CORE DATA-ADMISSION B interface handoff \u2014 design only (2026-10-27)\nOwner provisionally approved consumer-side fail-closed Factory data-admission contract, full details #77/6440898809 and audit handoff #134 (same-date AIARC-HANDOFF). Core remains sole producer/source-of-truth for D3 sparse manifest/restore, source-to-target evidence, sour"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6440967979",
+      "summary": "## CORE-D3-PLAN-EXECUTION-SLICE3 \u2014 owner-approved implementation\n\nDraft PR #136 advanced to HEAD `21554129aebe8b0781d5409785525467c9cfac53`. Added explicit opt-in `G1ArchiveSidecopy` post-commit adapter, distinguish queued from durable publication, immediate queue-full rejection, no source ACK or target receipt synthesis; modeled G1 journal/store/A"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6441002205",
+      "summary": "## CORE-D3-SLICE4-PUBLICATION-HARDENING-001\n\nContinued owner-authorized Draft PR #136, exact HEAD `84098fd6fa155995a7b50fb1dfb6a4cf5c71fe44`. Added fail-closed manifest version/inventory/checksum validation BEFORE local filesystem writes; targeted tamper and incompatible version tests; expanded focused workflow to include D3 modeled G1 sidecopy and"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6441059653",
+      "summary": "## CORE-D3-REAL-SQLITE-INTEGRATION-TEST-001\n\nOwner requested continuation. On Draft PR #136 HEAD `2835ac6efdde5745dcd10b25292c514c72c3395f` added `tests/test_d3_g1_sqlite_integration.py`: actual `DurableJournal` and `OperationalStore` SQLite classes, stalled archive worker, bounded queue-full rejection, separate journal/store receipts, store reopen"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6441099024",
+      "summary": "## CORE-D3-RESTART-REOPEN-SLICE5 \u2014 owner-authorized continuation\n\nDraft PR #136 HEAD `e61e6dfc9f098859faf9a665937b03970967e674`. Added `tests/test_d3_restart_reopen.py`: real G1 SQLite journal/store reopen after process-object recreation; D3 pinned manifest verification with independently provided source/target digest fixture, missing receipt/stale"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6441152318",
+      "summary": "## AIARC retrospective baseline alert \u2014 M17 confirmed-time semantic gap (read-only)\n\nCanonical independent legacy inventory / source-level evidence: https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6441141738 . Accepted-main historical_library.py helper creates SYNTHETIC CONFIRMED bar with ingest_time_ms=None; CustodyAcce"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6441167482",
+      "summary": "## CORE-DATA-PROOF-01 \u2014 proposed producer evidence contract (DESIGN ONLY; provisional until G0)\n\nCross-team source: owner request for candle version identity/fingerprint, temporal evidence, corrections, provenance confidence, nonblocking Factory delivery. Reconciles Factory #77/6441105114 and Council M16 #134/6440999093 and M17 #134/6441141738. Cor"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6441185379",
+      "summary": "## CORE-DATA-PROOF-01 \u2014 provisional owner B approval / execution envelope\n\nOwner responded \"\u062a\u0645\u0627\u0645 \u0643\u0645\u0644 \u0648\u0634\u0648\u0641 \u0641\u064a \u0646\u062a\u0627\u0626\u062c \u062c\u062f\u064a\u062f\u0629 \u0638\u0647\u0631\u062a\" to Core recommendation B. Treat as provisional direction to continue contract planning, **not** permission to merge, activate or silently modify runtime. Producer acceptance work packages: (1) canonical logical-bar and immu"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6441239471",
+      "summary": "CORE-DATA-PROOF-01/B owner-authorized implementation started separately from D3. New Draft PR #137 https://github.com/scannercrypto0-gif/super-kumo-v8/pull/137 HEAD `55e69c702c5015d1c4b290334af90c2ee5cd2a85`: immutable local observation revisions, content digest, local-first-seen, supersession validation, conservative as-of hints, explicit non-auth"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6441317930",
+      "summary": "## CORE EXECUTION-FIRST FREEZE / FACTORY HANDOFF \u2014 owner-directed\n\nOwner requested pause expansion, connect incomplete components and coordinate Core/Factory execution. Concrete request posted to Factory #77/6441315543; awaiting manager's explicit ACK or correction (do not claim agreement before reply).\n\n**Core work order (no new ideas):** C1 #137 "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6441767716",
+      "summary": "FACTORY-CORE137-INTERFACE-BLOCKER-001: Factory #138 focused M16/M17 CI passed on a268d80a; latest docs-only SHA 76f4d5ff records mismatch. Core #137 current fbe3c62e revision/envelope contains local_commit_evidence_ref, first_local_seen_ms and manifest_sha256/gap_states but no authenticated post-COMMIT timing field matching Factory's ingest_committ"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6441822033",
+      "summary": "CORE-137-EXPORTER-CI-BLOCKER-001 (Factory review, 2026-10-27): On current Core PR #137 HEAD 0ba6dad079504f9345a8c8bd280fc2ebe8d56f5e, focused CI run 40503402770 FAILS on BOTH Ubuntu and Windows. Ubuntu job 122186504626 trace shows 12 passed, 2 failed: tests/test_data_proof_exporter.py::test_persistent_registry_to_async_factory_envelope and ::test_m"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6442501580",
+      "summary": "AIARC-OWNER-NOTIFICATION-009 / Core \u2014 independent Council finding handoff, linked to #134/6441938717, #134/6442261917 and #134/6442435155. This is a coordination receipt, NOT additional duplicated work.\n\nCore-owned producer obligations for F005/M16/M17: per-version first-local-seen and correction ancestry, actual postcommit receipt separate from pr"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6443018131",
+      "summary": "AIARC-GOV-DISPOSITION-015 \u2014 owner requested current-problem vs future-recommendation tracking. Shared Council matrix: https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6443009547 . Core scope: #137 M16/M17 reliable per-version first-known and correction/receipt timing, source clock authority separation and nonblocking side"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6443139169",
+      "summary": "FACTORY \u2194 CORE COORDINATION CHECKPOINT: consolidated Factory disposition and next scoped positive E2E requirement at https://github.com/scannercrypto0-gif/super-kumo-v8/issues/77#issuecomment-6443131183; Council matrix #134/6443009547. Factory confirms current pinned real-Core synthetic negative envelope is four-slot fail-closed only (Factory dcec5"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6443372137",
+      "summary": "Factory source verification on Core PR137 SHA 1670bcda: src/aql/data_proof_shared_fixture.py exposes factory_negative_cases() with original LOCAL_EVIDENCE_ONLY, late REJECT_LATE, missing UNKNOWN, and explicit trust_scope SYNTHETIC_LOCAL_ONLY. src/aql/data_proof_envelope.py always exports provenance_scope LOCAL_ONLY_UNATTESTED. No authenticated posi"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6443663847",
+      "summary": "AIARC audit coverage ledger v1: https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6443654045 . Owner requires TWO separately evidenced review columns for EVERY historic and current/new module: S=engineering/math/safety source+tests; R=scientific literature AND published empirical experiment comparison specific to that modu"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6443894547",
+      "summary": "AIARC-CORE-JOURNAL-024 independent audit: https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6443884900 . Please handle testing within Core scope (Council will review evidence only). In accepted main durable_journal._commit, data COMMIT and post_commit_receipt are separate durable transactions; failure in second leaves comm"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6444022475",
+      "summary": "Council #025 Core recovery audit: https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6444006689 . Existing main pipeline _run_gap_recovery logs generic journal.mark_persisted failure as nonfatal, does NOT increment recovery_errors, and may still count recovered insert/duplicate; persisted store row vs Journal PERSISTED ACK "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6444273588",
+      "summary": "Council consolidated follow-up for #024/#025/#026. Please reply with one disposition for each: Journal postcommit receipt failure/identical retry (#024); recovery mark_persisted error reporting and replay (#025); cross-database effects source/target ACK interruption and checkpoint (#026). Link existing exact SHA and focused CI or mark pending, dist"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6445586713",
+      "summary": "Council retrospective archive finding AIARC-029: https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6445580126 . Reviewed accepted-main archive backup/local/offline. Independent SQLite per-file snapshots, integrity checks and cross-journal catalog validation are present, but combined same-instant consistency during concurre"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6461517083",
+      "summary": "CORE MANAGER \u2014 AUDIT RESPONSE / S+R STATUS (2026-10-28). Reviewed Council #134 comments AIARC-024 (6443884900), -025 (6444006689), -026 (6444105590), -029 (6445580126), coverage ledger -022 (6443654045), and Core #128 audit handoffs 6443018131, 6443663847, 6443894547, 6444022475, 6444273588, 6445586713.\n\nS / Core owner disposition:\n\u2022 AIARC-024 Jour"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6461548954",
+      "summary": "CORE AIARC-024 EVIDENCE RECONCILIATION (2026-10-28): Before creating duplicate tests, source-checked existing tests/test_g1_integrity_58_59.py on Core #137 HEAD 5733163f0ed3985f607ae68fd3d0e5172c19d223. Existing tests test_failed_data_or_receipt_commit_never_has_completion_evidence (fail_on 1/2; durable replay; no forged receipt; identical retry Fa"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6461595131",
+      "summary": "CORE AIARC-025 implementation checkpoint (2026-10-28): inspected actual _run_gap_recovery and existing tests/test_g1_integrity_58_59.py; existing tests cover content conflict and journal receipt boundaries but not generic post-store mark_persisted exception accounting. Confirmed source gap: generic ACK exception logged but recovery_errors not incre"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6461675025",
+      "summary": "CORE AIARC-025 EXACT-HEAD EVIDENCE UPDATE (2026-10-28): Core Draft #137 SHA 65e0e1bb338bc31501ee15136f54033b58a5f262: focused Core workflow run 40639267233 SUCCESS (Ubuntu+Windows), G1 Integrity 58-59 run 40639267173 SUCCESS, G1-STORAGE-02 run 40639267182 SUCCESS; WP01\u2013WP04 run 40639267167 still IN_PROGRESS at check. Newly gating tests/test_core_re"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6461688151",
+      "summary": "FINAL CI CHECKPOINT for AIARC-025 scoped fix: Core #137 HEAD 65e0e1bb338bc31501ee15136f54033b58a5f262 ALL FOUR workflows SUCCESS: Core focused Ubuntu+Windows 40639267233; G1 Integrity 58\u201359 40639267173; G1-STORAGE-02 40639267182; G1 WP01\u2013WP04 40639267167. Existing test inventory reviewed; no duplicate journal receipt tests added. New ACK failure re"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6461717027",
+      "summary": "FACTORY\u2192CORE dependency checkpoint 2026-10-28: Owner-authorized Factory H1/H2/M18/F3 code/test slice delivered in stacked Draft PR #139 HEAD 7c7398ab6aa761ffbbc2d2536c796481221230c8 (parent Factory #138 dcec5d1c unmerged), https://github.com/scannercrypto0-gif/super-kumo-v8/pull/139 . Targeted Ubuntu/Windows 36 PASS each run 40639558366; SF Integri"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6462114926",
+      "summary": "CORE IMPLEMENTATION / EXACT-SHA EVIDENCE \u2014 AIARC-025 clipped gaps + AIARC-026 cross-DB store/ACK (2026-10-28).\nPR #137 Draft HEAD c7a54bc58681840426a8054fc336e697a90d2ad5, unmerged.\nAIARC-025 Option B provisional: gap_recovery.RecoveryReport now exposes remaining_start_ms/remaining_end_ms for >8000-bar clipping, accounts remaining expected/unresolv"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6462216558",
+      "summary": "CORE M16/M17 / F005 \u2014 CLOCK AUTHORITY AND CORRECTION FIRST-KNOWN STATUS, 2026-10-28.\nVERDICT: DEPENDENCY STILL OPEN / BLOCKED_BY_EXTERNAL_EVIDENCE. Core Draft #137 HEAD d27ddd8f1a7a3bea1e0b84219f1cfe2441225395 (unmerged). Source-reviewed data_proof.py, data_proof_registry.py, data_proof_envelope.py, data_proof_exporter.py, data_proof_g1_adapter.py."
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6462679137",
+      "summary": "FACTORY SF-DEC-007 \u2014 OPTION B OWNER PROVISIONAL APPROVAL / HISTORICAL ADMISSION READINESS (2026-10-28)\n\nSource-of-truth checkpoint:\n- Factory #141 exact head fbf70afbcf3ba051a9b1522328893bf9ab7f2a67 DRAFT/UNMERGED; stacked #140/#139/#138 also not merged.\n- Complete Factory CI 40644317732 SUCCESS 6/6; source-verified representative Ubuntu 3.11 + Win"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6463127686",
+      "summary": "CORE MANAGER 10-POINT RECONCILIATION 2026-10-28 (read-only; no duplicate CI). Source-read #137 pinned d27ddd8f pipeline.py, data_proof.py, envelope; #128 delivery logs and independent Council #134/6462956108. AIARC-025 post-store ACK error reporting/restart: IMPLEMENTED + exact-SHA four CI SUCCESS + independent S PASS_BOUNDED at historical 65e0e1bb"
+    }
+  ],
+  "134": [
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6436173021",
+      "summary": "## AIARC-FULL-001 / INTAKE-SNAPSHOT-01 \u2014 preliminary source-backed sampling (2026-10-27)\n\n**This is not comprehensive audit completion.** Actual source read, separately from author summaries:\n- main `src/aql/journal/durable_journal.py`: WAL + synchronous FULL, unique stable_key, instance-local WritePriority, `commit` and `mark_persisted` gate, `sta"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6436263270",
+      "summary": "## AIARC-FULL-001 / CODE-AUDIT-02 \u2014 main-vs-branch custody conflict and StrategyDNA score (2026-10-27)\n\n**Read-only, source-inspection verdict, NOT test-executed.** Separate outcomes for accepted main and unmerged PR branches. References: #134 charter; Core #129 OPEN/DRAFT, Factory #130 OPEN/DRAFT at prior fresh lookup.\n\n### AQL-AUD-F003 \u2014 Confirme"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6436345015",
+      "summary": "# AIARC-FULL-001 \u2014 Consolidated Architecture & Quant Audit Report v0.2 (2026-10-27)\n**Outcome: PARTIAL SOURCE-BACKED AUDIT; NOT A FULL-CODEBASE CERTIFICATION.** This is the fullest independently assembled desk review in this session and supersedes outdated #130-head conclusions. Source was read via connected GitHub. An isolated local repository clo"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6436547090",
+      "summary": "## AIARC-FULL-001 / CI-EVIDENCE-03 \u2014 Exact-head GitHub Actions verification + manager review handoff (2026-10-27)\n\nDirectly queried GitHub workflow runs and job-level outcomes by **exact SHA**. This validates remotely reported CI state, **not** auditor-independent rerun or scientific/operational acceptance.\n\n**Factory open Draft #130** at `fd466917"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6436568282",
+      "summary": "## Factory architect independent assessment of AIARC-FULL-001 v0.2 (2026-10-27)\n\nRead complete canonical v0.2 comment 6436345015 and charter/sampled findings in #134, cross-checked current exact Draft Factory PR #130 head `fd466917b7282978702f38a5f8b2ddba683f6389`, all four native-head workflow groups SUCCESS, current `main` source for journal/stor"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6436614785",
+      "summary": "AIARC-FULL-001 v0.2 F010 treatment \u2014 follow-up of architect assessment #134/6436568282 (2026-10-27): exact source path on unmerged Factory PR #130 fd466917 demonstrates ENTRY_CONDITION_MET can precede checking missing EXIT critical score. Owner provisionally continued with recommended option SF-DEC-49 B: block NEW ENTRY risk if either channel's con"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6436624300",
+      "summary": "CORE architecture review of Codex D2 inventory (#128/6436551719) and AIARC-FULL-001 v0.2 (#134/6436345015), 2026-10-27. Last actual owner-delivered Core code PR #129/6435698642 SHA 33c04613641c95feecce745ed6f0c755a23cd52d; latest read-only Codex report #128/6436551719. Verified #129 and parent #127 remain OPEN/DRAFT/unmerged; Factory #130 OPEN/DRAF"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6436717279",
+      "summary": "## AIARC-FULL-001 / COORD-04 \u2014 Cross-team non-duplication & evidence ownership register (2026-10-27)\n\n**Purpose:** One shared source of truth for audit findings so independent auditors, Core manager and Factory manager do NOT duplicate code patches, tests or certification. This is an audit coordination record, not a claim of executing fresh tests o"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6436754168",
+      "summary": "## CORE MANAGER \u2014 AIARC-FULL-001 v0.2 technical response / owner-directed read-only challenge (2026-10-27)\n\n**Scope and method.** Owner requested both managers to challenge report v0.2 by finding/commit, without code or PR merge. This is the Core manager's read-only assessment, **not an independent Audit Council signoff**. Compared canonical v0.2 #"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6436767620",
+      "summary": "## AIARC F012 \u2014 evidence-based closure attempt, technical fix vs independent signoff (2026-10-27)\n\n**Owner instruction:** \"\u0646\u0642\u0641\u0644 F012 \u0646\u0641\u0630\". Latest actual owner-delivered Factory implementation #77/6436287514 is 2-P2 fix on existing Draft #130. Reviewed #134/6436717279 coordination register and #92/6436724218 before any work; no duplicate patch/test "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6436919869",
+      "summary": "## AIARC F012 \u2014 owner-delivered Codex post-fix rereview outcome, split disposition (2026-10-27)\n\n**Origin and evidentiary precision:** Owner relayed an independent Codex post-fix review on exact PR #130 SHA `fd466917b7282978702f38a5f8b2ddba683f6389`. Owner reports the two ORIGINAL P2 issues as **FIXED/PASS with actual local tests**, full PR verdict"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6437012628",
+      "summary": "## AIARC F012-P2-03 \u2014 FULL CODEX REPRO RECEIVED / SOURCE-CONFIRMED (2026-10-27)\n\n**Owner delivered precise independent Codex finding** for Factory Draft PR #130 exact HEAD `fd466917b7282978702f38a5f8b2ddba683f6389`. PR currently OPEN/DRAFT/UNMERGED. Full independent Codex run transcript is not stored here; the owner has now supplied **two minimal r"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6437359132",
+      "summary": "## AIARC F012-P2-03 repair receipt \u2014 owner approved B, Factory same-PR change (2026-10-27)\n\nAudit F012-P2-03 full Codex repro #134/6437012628 (actual lone Unicode surrogate U+D800 and 17MiB `source_id` in OBSERVE_ONLY monitor) is now addressed in **owner-authorized Factory Draft PR #130**. Exact candidate head `38928dba64c5db2d2fcab1146e64fe4496911"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6437380009",
+      "summary": "FINAL exact-HEAD native CI update 2026-10-27 for owner-approved F012-P2-03 bounded source_id repair: Draft PR #130 HEAD 38928dba64c5db2d2fcab1146e64fe4496911015 remains OPEN/UNMERGED. All FOUR workflows are now COMPLETED SUCCESS: SF StrategyDNA V2 Synthetic 40474841327 (Ubuntu+Windows each 37 primary tests+39 subtests, 0 failures/errors/skips in in"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6437561414",
+      "summary": "## AIARC-FULL-001 \u2014 F012 CLOSED (scoped auditor-verified), owner-delivered Codex final receipt \u2014 2026-10-27\n\n**Actual handoff and provenance:** Owner delivered full result of independent local `CODEX-F012-P2-03-REREVIEW-001`, scoped to Factory Draft PR #130 exact SHA `38928dba64c5db2d2fcab1146e64fe4496911015`, branch `feat/factory-strategy-dna-v2`,"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6437628889",
+      "summary": "## FACTORY DECISION GATE \u2014 avoid F012 review loop, advance PR #130 to owner decision (2026-10-27)\n\n**Owner instruction:** \"\u0645\u0634 \u0639\u0627\u0648\u0632\u064a\u0646 \u0646\u062f\u062e\u0644 \u0641\u064a \u062f\u0648\u0627\u0645\u0647 \u0645\u0646 \u0627\u0644\u0627\u062e\u062a\u0628\u0627\u0631\u0627\u062a \u0627\u0648 \u0646\u0644\u0641 \u0641\u064a \u062f\u0648\u0627\u064a\u0631 \u2014 \u0631\u0643\u0632 \u0648\u0643\u0645\u0644\". This is an instruction to stop redundant review/retest churn, **not** explicit PR merge authorization.\n\n**G0-GOV-01 continuity verified:** Last actually owner-d"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6437731421",
+      "summary": "## Owner-authorized PR #130 MERGED \u2014 Factory/Core/Audit source-of-truth checkpoint (2026-10-27)\n\n**Explicit owner authorization** in conversation: \"B ... \u062a\u0645\u0627\u0645 \u0627\u062f\u0645\u062c \u0648\u0643\u0645\u0644\" after independent Codex F012 acceptance. G0-GOV-01 reviewed most recent actually delivered Factory PR #130 SHA `38928dba64c5db2d2fcab1146e64fe4496911015`, owner-delivered Codex ful"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6437747724",
+      "summary": "## SF-DEC-49 B / AIARC F010 \u2014 post-PR130 merge discrete implementation contract (DESIGN-ONLY)\n\n**Verified parent state:** Factory synthetic StrategyDNA V2 PR #130 MERGED to main at `10effc6a36fa2d13a71e7db260b7f83f1d9fbb09`, as recorded #134/6437731421 and #77/6437733033. F012 closed; don't re-open P2 review. Owner \"\u0627\u062f\u0645\u062c \u0648\u0643\u0645\u0644\" authorized #130 merge"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6437762284",
+      "summary": "## AIARC-FULL-001 / STATUS-05 \u2014 Manager responses, implemented changes and audit coverage gaps (2026-10-27, post #130 merge)\n\n**Fresh GitHub cross-check:** PR #130 REST confirms **MERGED 2026-10-27T08:58:31Z**, source `38928dba64c5db2d2fcab1146e64fe4496911015`, merge `10effc6a36fa2d13a71e7db260b7f83f1d9fbb09`. Main accepted synthetic-only StrategyD"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6437888684",
+      "summary": "## AIARC-FULL-001 / INDEPENDENT-PROBE-06 \u2014 executed isolated SQL/quant negative probes (2026-10-27)\n\n**IMPORTANT provenance boundary:** GitHub repository clone in auditor container failed before checkout (`git ls-remote`: `Could not resolve host: github.com`). These probes were genuinely **executed** with local Python+SQLite, but use minimal isolat"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6437901846",
+      "summary": "## SF-DEC-49 B \u2014 versioned new-entry safety policy freeze / AIARC F010 (2026-10-27)\n\n**Purpose:** advance after owner-authorized merge PR #130 without looping F012 or silently rewriting historical StrategyDNA semantics. Owner message \"\u062a\u0645\u0627\u0645 \u0643\u0645\u0644\" following DESIGN-ONLY slice interpreted as authorization to continue architecture/specification; NO instr"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6437996106",
+      "summary": "## SF-DEC-49 B \u2014 OWNER CORRECTION / SUPERSEDES blanket opposite-channel missingness veto (2026-10-27)\n\n**Explicit owner decision:** User challenged the prior proposed rule \"prevent ENTRY whenever EXIT critical data missing\", and selected **B, revised**: *\"\u0645\u0646\u0639 \u0627\u0644\u062f\u062e\u0648\u0644 \u0625\u0630\u0627 \u0643\u0627\u0646 \u0645\u0624\u0634\u0631 \u0627\u0644\u062e\u0631\u0648\u062c \u0627\u0644\u0646\u0627\u0642\u0635 \u0634\u0631\u0637\u064b\u0627 \u0625\u0644\u0632\u0627\u0645\u064a\u064b\u0627 \u0644\u0644\u062f\u062e\u0648\u0644 \u0623\u0648 \u0644\u0644\u062d\u0645\u0627\u064a\u0629\"*, then \"\u062a\u0645\u0627\u0645 \u0643\u0645\u0644\". Thi"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438038106",
+      "summary": "## AIARC-FULL-001 / SOURCE-DELTA & INDEPENDENT SQL PROBE-07 \u2014 2026-10-27\n\n**Authoritative refreshed refs:**\n- Factory #130 verified MERGED, merge commit `10effc6a36fa2d13a71e7db260b7f83f1d9fbb09`; F012 scoped closed and not reopened.\n- Core #129 **OPEN/DRAFT, UNMERGED**, newly advanced from prior `33c046136...` to **`b1aba7660b092a4fdad56fe0e2e0217"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438047160",
+      "summary": "## SF-DEC-50 \u2014 Mandatory protection admission boundary (PROVISIONAL DESIGN / NO CODE) \u2014 2026-10-27\n\n**Owner request:** \"\u062a\u0645\u0627\u0645 \u0643\u0645\u0644\" after revising SF-DEC-49 B to forbid new entry only when a missing EXIT-related feature is explicitly mandatory for ENTRY or for protective capability; not a request to implement code/merge. One architecture decision at "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438090027",
+      "summary": "## AIARC-FULL-001 / INDEPENDENT QUANT CHALLENGE-08 \u2014 RSI flat-market convention (2026-10-27)\n\n**Independent reviewer purpose:** falsify an apparently routine numerical indicator corner case using a current independent primary implementation, not a developer claim. **No product code edits and no requests to rewrite immutable V1.**\n\n**Pinned ATLAS so"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438107451",
+      "summary": "SF-DEC-50 B \u2014 owner provisional approval and clarification (2026-10-27): Factory-side gate refers to the simulated/test trader evaluating the strategy under examination, NOT the StrategyDNA signal evaluator and NOT automatically the live operational Core Trader. Strategy signals and optional missing EXIT indicators remain independent; the Factory s"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438202666",
+      "summary": "## AIARC-FULL-001 / METHODOLOGY & RESEARCH CHALLENGE-09 \u2014 2026-10-27\n\n**Audit mission explicitly clarified by owner:** Independent council reviews **logic, composition, scientific experimental design, research validity and implementation approach**, not repetitive code-quality testing or redundant CI. This is a critical/independent methodological a"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438236881",
+      "summary": "## SF-DEC-51 \u2014 Research-grounded minimal protection for Factory test trader (PROPOSAL, NOT OWNER APPROVAL) \u2014 2026-10-27\n\nOwner endorsed layered protection but specifically challenged premature over-constraining the trader under examination: start with indispensable safeguards, compare effects before adding overlays. This is a new architectural DECI"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438289072",
+      "summary": "## SF-DEC-51 B \u2014 OWNER PROVISIONAL APPROVAL, 2026-10-27\n\n**Owner explicitly approved:** \"\u062a\u0645\u0627\u0645 \u0627\u0639\u062a\u0645\u062f\" in direct response to the SF-DEC-51 B decision question. Supersedes the previous PROPOSAL/NOT OWNER APPROVAL status at #77/6438236017 and #134/6438236881. Decision is **APPROVED PROVISIONALLY until G0**, NOT an instruction to implement code, open PR"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438304300",
+      "summary": "## AIARC-FULL-001 / EXPERIMENTAL DESIGN CHALLENGE-10 \u2014 Scanner denominators, conditional execution selection and paired-paper estimands (2026-10-27)\n\n**Council remit:** methodology/architecture/quant inference rather than routine code-quality repetition. Source read from accepted main after merged #130 (`research_wp_r0/strategy_dna_v2.py`, `docs/re"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438463938",
+      "summary": "AIARC-FULL-001 / Factory execution coordination (2026-10-27): Owner explicitly authorized one consolidated CODEX implementation order, not code/merge by the auditor. Canonical full `CODEX-FACTORY-AUDIT-EXEC-001` https://github.com/scannercrypto0-gif/super-kumo-v8/issues/77#issuecomment-6438456067. Scope: S0 existing-component inventory vs accepted "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438498962",
+      "summary": "## AIARC-FULL-001 / QUANT EXPERIMENT AUDIT M11 \u2014 Exact Batch01 Results Recalculation & Scientific Falsification (2026-10-27)\n\n**Mission:** independent empirical/logical challenge of methodology, not redundant code QA. Original immutable branch evidence reviewed: PR #46 **UNMERGED**, `research_wp_r0/evidence/batch01/results.json`, `batch01_protocol."
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438561536",
+      "summary": "## AIARC-FULL-001 / CAUSAL & MONITORING SCIENCE AUDIT M12 \u2014 2026-10-27\n\n**Mandate:** independent scientific validity of ATLAS architecture, metric relationships and strategy-monitoring promotion, NOT routine code quality or re-running identical green CI.\n\n### Accepted-source snapshot & strengths\nRead accepted `main` `research_wp_r0/strategy_dna_v2."
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438618052",
+      "summary": "## FACTORY MANAGER / AIARC M11+M12 response \u2014 independent interim analysis while Codex executes (2026-10-27)\n\n**G0-GOV-01 continuity:** Last actually owner-delivered Factory implementation is merged #130, merge `10effc6a36fa2d13a71e7db260b7f83f1d9fbb09`; latest owner instruction is to run consolidated Codex S0\u2013S3 order [Factory #77/6438456067](http"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438633255",
+      "summary": "## AIARC-FULL-001 / M13 \u2014 Shock Concentration, Regime Mix and Non-independent Strategy Variants (2026-10-27)\n\n**Purpose:** independent critical audit of inference and architecture using original unmerged Research #46 evidence; not code QA or author acceptance.\n\n**Exact source:** `research_wp_r0/evidence/batch01/results.json` at PR #46 HEAD `a4c106a"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438703037",
+      "summary": "## Factory manager interim scientific review \u2014 NEW AIARC M13 (2026-10-27)\n\n**Scope and continuity:** While owner-authorized Codex executes separate consolidated Factory S0\u2013S3 instruction #77/6438456067, I independently reviewed the newly published audit #134/6438633255. Earlier M11/M12 triage #134/6438618052 remains valid. Factory PR #130 actually "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438819184",
+      "summary": "## FACTORY-SCIENCE-VERIFY-001 \u2014 Independent exact-JSON Batch01 cross-check (2026-10-27)\n\n**Execution provenance:** Owner explicitly directed: \"\u0627\u0628\u062f\u0627 \u0646\u0641\u0630\" for a **parallel independent quantitative/scientific review** while Codex implements separate order `CODEX-FACTORY-AUDIT-EXEC-001` (#77/6438456067). I accessed and parsed the **exact** author-gener"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438873500",
+      "summary": "## CORE MANAGER \u2014 D2-B Codex delivery + latest AIARC M11\u2013M13 checkpoint (2026-10-27, read-only)\n\nOwner requested review of Codex and independent audit reports. Rechecked live PR metadata and latest #128/#129/#92/#134. **Last actual Core owner-delivered implementation:** #129/6438778853 HEAD `b1aba7660b092a4fdad56fe0e2e021710bb0aa09`, tree `eec12484"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438891577",
+      "summary": "## FACTORY-SCIENCE-VERIFY-002 \u2014 RSI_v1 flat-price numerical convention, independent formula probe (2026-10-27)\n\n**Scope:** Independent scientific review while owner-authorized CODEX-FACTORY-AUDIT-EXEC-001 S0\u2013S3 is in progress; **NO Factory or Core code modification, PR, redundant F012 tests or Codex work**. Last accepted Factory code #130 MERGED to"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438971831",
+      "summary": "## FACTORY-SCIENCE-VERIFY-003 \u2014 StrategyDNA V2 weighted Decision/Scanner mathematical review, 2026-10-27\n\n**Scope:** owner instructed continued independent scientific audit while Codex owns Factory S0\u2013S3, consolidated order #77/6438456067. Read accepted `main` source `research_wp_r0/strategy_dna_v2.py` and `strategy_dna_v2_example.py`, existing reg"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6438983837",
+      "summary": "## Core AG-F01 bounded diagnosis \u2014 receipt / STOP\n[Full one-shot report #128/6438977066](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6438977066), under owner order6438910588. Read-only exact33c046 vs currentb1aba766: pipeline/journal/AG-F01 test blobs identical. Source trace settles semantics; no new test/probe/CI ru"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6439019808",
+      "summary": "## AIARC-FULL-001 / M14 \u2014 Decision-Regime vs Exposure-Regime Transition Audit (2026-10-27)\n\n**Scope & precise evidence:** independent methodology/temporal arithmetic from **unmerged** Research PR #46 SHA `a4c106a02c55ee012eedf4c55c1488d71d850203`, `research_wp_r0/strategy_factory.py` and `batch01_protocol.json`, with no source patch or code-quality"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6439081368",
+      "summary": "## FACTORY-SCIENCE-VERIFY-004 \u2014 Weight/threshold robustness, Scanner cliff, and AIARC M14 dual-regime acceptance (2026-10-27)\n\n**Purpose:** Owner \"\u062a\u0645\u0627\u0645 \u0643\u0645\u0644\" authorizes continued parallel **read-only independent scientific/math analysis** while Codex owns separate Factory S0\u2013S3 (#77/6438456067). Reviewed fresh accepted-main source `research_wp_r0/st"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6439131400",
+      "summary": "## AIARC-FULL-001 / M15 \u2014 Economic Estimand, Capital Path and Drawdown Acceptance Audit (2026-10-27)\n\n**Independent scientific remit:** detect risk/measurement and compositional flaws in inference even where implementation passes unit tests; no code-QA reruns or duplicate implementer tasks.\n\n### Source/handoff snapshot\n- Unmerged Research PR #46 SH"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6439240177",
+      "summary": "## CORE MANAGER READ-ONLY SCIENTIFIC / INTERFACE REVIEW \u2014 M14+M15, 2026-10-27\n\nOwner requested productive independent review while separately authorized Core AG-F01 Codex patch runs. Last actually delivered Core code PR #129/6438778853 `b1aba7660b092a4fdad56fe0e2e021710bb0aa09` (Draft/unmerged), parent #127 Draft/unmerged. Latest execution order #1"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6439603116",
+      "summary": "## CROSS-TEAM EVIDENCE REUSE CONTRACT \u2014 Core / Factory / Independent Audit (2026-10-27)\n\n**Purpose:** one accountable test owner and one canonical exact-SHA receipt per claim; cross-team review reuses evidence rather than re-running unrelated suites. Owner approvals provisional until G0. This note is coordination, NOT independent-audit sign-off or "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6439869598",
+      "summary": "# AIARC-R0-INDEPENDENT-VERDICT-001 \u2014 Independent Scientific & Economic Assessment of Factory R0 (M14/M15)\n**Date:** 2026-10-27 \u00b7 **Repository:** scannercrypto0-gif/super-kumo-v8 \u00b7 **Council status:** SCIENTIFIC SCOPE-BOUND REVIEW COMPLETE; whole AIARC-FULL-001 still OPEN/PARTIAL.\n\n## 0. Object, independence and current source truth\n- Owner explicit"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6440404956",
+      "summary": "# AIARC-R0-PR135-FORMAL-INDEPENDENT-REVIEW-REQUEST-001 \u2014 Independent final PR acceptance review\n**Owner-authorized request, 2026-10-27.** Owner asks Factory manager to refer PR #135 to the independent Audit Committee and treat the resulting assessment as an **independent evidence-based evaluation**. This is a **new bounded acceptance decision over "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6440413503",
+      "summary": "## Audit Council \u2014 CORE-PR127-129-REVIEW-001 independent judgement (2026-10-27)\n\n**PASS_BOUNDED**, recorded in the assigned Core [#128 verdict](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/128#issuecomment-6440407428). Independently inspected exact SHA #127 `542578ec8b81a0b933811d878e896d23daac7ac4` and stacked #129 `575009dce339b3f5e"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6440448749",
+      "summary": "## AIARC-R0-PR135-FORMAL-INDEPENDENT-REVIEW-REQUEST-001 \u2014 FINAL COUNCIL DISPOSITION (2026-10-27)\n\n**VERDICT: `PASS_SCOPED`** \u2014 existing PR #135 synthetic offline Factory R0 S0\u2013S3 only, **not** G0, production/PAPER readiness, economic alpha or merge approval.\n\n**Immutable review object:** #135 `OPEN / READY FOR REVIEW / UNMERGED`, HEAD `c94624f8afdc"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6440509467",
+      "summary": "## AIARC-FULL-001 \u2014 COUNCIL CONTINUITY / SCIENTIFIC-GATE DELTA-001 (2026-10-27)\n**Mandate:** owner directed the independent Audit Committee to review fresh GitHub developments and continue rigorously without duplicating green tests or issuing code orders.\n\n### Fresh state actually verified\nLive open PR metadata and discussion inspected for #135, #1"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6440868840",
+      "summary": "## AQL-AIARC-FINDING-DISPOSITION-PROTOCOL-001 \u2014 Owner policy, mandatory no-orphan audit response (2026-10-27)\n\n**Owner instruction:** Every independent Audit Council observation concerning Factory or shared interfaces MUST receive an explicit actionable response by Factory manager (or be routed to Core with accountable owner), either (1) immediate "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6440905044",
+      "summary": "## AIARC-HANDOFF \u2014 Factory Data Admission B (2026-10-27)\nOwner provisionally approved Factory conservative fail-closed data admission B, documented with audit issue-by-issue mapping at Factory #77/6440898809. Independent Council: please check the proposed field/status/temporal/ex-ante denominator acceptance boundary against F003/F005/F006/F009/F010"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6440999093",
+      "summary": "## AIARC-HANDOFF-FDAB-001 \u2014 INDEPENDENT DESIGN VERDICT, Factory Data Admission B (2026-10-27)\n\n**Response to owner-approved request #134/6440905044 and Factory design #77/6440898809.** Council review is READ-ONLY. It reuses prior F003/F005/F006/F009/F010/F011, M10\u2013M15, AIARC-GATE-01 and scoped review #134/6440448749; no repeated tests and no code/W"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6441009737",
+      "summary": "### Live D3 checkpoint correction (supersedes HEAD-only status in my preceding Council reply #134/6440999093)\nCore #136 advanced **during this review** to `84098fd6fa155995a7b50fb1dfb6a4cf5c71fe44` (OPEN/DRAFT/UNMERGED), confirmed by fresh PR metadata and Core #128/6441002205. New slice4 validates manifest version/inventory/checksum **before filesy"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6441141738",
+      "summary": "# AIARC-LEGACY-BASELINE-AUDIT-001 \u2014 Mandatory Retrospective Scientific/Architectural Audit Inventory\n**2026-10-27 \u00b7 Owner instruction:** \"audit all completed old work before following new work step-by-step\"; independent scientific remit: underlying logic, arithmetic, relations, validation design and source-to-decision semantics \u2014 NOT redundant gree"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6441320886",
+      "summary": "## AIARC-LEGACY-INDICATOR-AND-EXECUTION-MATH-002 \u2014 Independent retrospective scientific review (2026-10-27)\n\n**Linked baseline:** #134/6441141738. Owner requires all prior merged work to pass independent scientific/architectural review before declaring the historical baseline clean. This Council work checks logic, mathematics and semantic compositi"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6441787037",
+      "summary": "## AIARC-LEGACY-EMA-REPLAY-METHOD-003 \u2014 independent retrospective source & published-method comparison (2026-10-27)\n\n**Scope/read-only:** accepted-main `research_wp_r0/ema_first_backtest.py`, `ema_development_replay.py`, `synthetic_execution.py`, plus recent Core #128 and Factory #77 handoffs. No product code changes, tests/CI reruns, PRs or merges"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6441842606",
+      "summary": "## AIARC-RESEARCH-ACCEPTANCE-STANDARD-B-001 \u2014 provisional independent Council recommendation (2026-10-27)\n\n**Owner direction:** \"\u062a\u0645\u0627\u0645 \u0627\u0631\u0641\u0639 \u062a\u0631\u0634\u064a\u062d\u0643 \u0648\u0643\u0645\u0644\". This is a recorded **provisional recommendation B**, NOT final G0 approval, implementation authorization, real/OOS dataset opening, paper/live trading, PR approval or merge.\n\n**Objective:** prevent"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6441865045",
+      "summary": "## AIARC-LEGACY-BREAKOUT-PILOT-004 \u2014 independent accepted-main source audit (2026-10-27)\n\n**Scope:** merged PR #123 `research_wp_r0/sf_breakout_pilot.py` and merged #124 `research_wp_r0/sf_synthetic_result_link.py`. Direct read of accepted-main source, not imported/executed unit tests, not the unmerged research #46. No new code or CI.\n\n**Source obs"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6441938717",
+      "summary": "## AIARC-CROSS-BOUNDARY-005 \u2014 independent read-only checkpoint (2026-10-27)\n\nSources: accepted-main research_wp_r0/strategy_dna_v2.py; Factory Draft #138 at 38abeb03f7c2f80d25c12bf65c1818064ee171a5 (data_admission_b.py, core_proof_bridge.py); Core Draft #137 at 056b0f2129731ee849a3747aaba13c5749113a78; Core Draft #136 at e61e6dfc9f098859faf9a665937"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6442168338",
+      "summary": "## AIARC-LEGACY-FACTORY-LEDGER-006 \u2014 independent retrospective source semantics and concurrent handoff review (2026-10-27)\n\nDirect accepted-main source review: research_wp_r0/frozen_attempt_writer.py; sf_synthetic_result_link.py; sf_synthetic_workflow.py. No code/test execution. Legacy Factory frozen writer explicitly limits states to INPUTS/PENDIN"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6442261917",
+      "summary": "## AIARC-LEGACY-OPPORTUNITY-DENOMINATOR-007 \u2014 retrospective denominator audit + latest Factory/Core boundary (2026-10-27)\n\n**Read-only direct source inspection:** accepted-main `research_wp_r0/strategy_dna_v2.py`; Factory Draft #138 at `ac3ebeffa6cd3b02f3cc524a32081c671390d3c8`, `research_wp_r0/pre_indicator_boundary.py`, `tests/test_sf_negative_r0"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6442328507",
+      "summary": "## AIARC-QUANT-LITERATURE-AND-ECONOMIC-008 \u2014 extended independent review, 2026-10-27\n\nOwner directed broad independent science comparison, not just code correctness. Source read: accepted-main research_wp_r0/factory_exam.py compare_routes (lines 288-331); recent #77 handoffs and current PR flags. Literature checked independently via publisher abstr"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6442435155",
+      "summary": "## AIARC-LEGACY-EXECUTION-TIMELINE-009 \u2014 independent quantitative audit of accepted Factory route (2026-10-27)\n\n**Source inspected directly (accepted main):** research_wp_r0/factory_exam.py run_route/replay_route, compare_routes (previous report #008); contemporary literature: Pindza (2026), Frontiers in Blockchain DOI 10.3389/fbloc.2026.1811716; D"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6442513210",
+      "summary": "FACTORY-PR138-DUAL-SHA-CI-VERDICT-001 (2026-10-27): Request independent Audit Council scoped review of Factory Draft #138 exact HEAD dac8fb9ee5385d4b02f771a856c029dd7d8e2f18, pinned Core producer fixture at 0c0108a072f9e0ed780dc0b780c75ff2f24a4840. All FIVE current-Factory-head workflows SUCCESS: dual-SHA Core->Factory run 40507717079; M16/M17 4050"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6442543533",
+      "summary": "## AIARC-PR138-DUAL-SHA-INDEPENDENT-010 \u2014 scoped independent code/receipt audit (2026-10-27)\n\n**Exact pinned evidence:** Factory Draft PR #138 SHA dac8fb9ee5385d4b02f771a856c029dd7d8e2f18; pinned Core producer SHA 0c0108a072f9e0ed780dc0b780c75ff2f24a4840. Factory reports CI SUCCESS for dual-SHA 40507717079, M16/M17 40507717258, SF Integrity 4050771"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6442590408",
+      "summary": "## AIARC-PR138-DENOMINATOR-011 \u2014 Council read-only addendum (2026-10-27)\n\n**Current Factory PR #138:** 2cb0003594a1d0f3d731becabfa4f073788460ee (DRAFT/UNMERGED), pinned Core producer 0c0108a072f9e0ed780dc0b780c75ff2f24a4840; Core #137 current HEAD 5f0eb38f3b821320b37149aa0bccd377de024d1d (different/unmerged); D3 #136 e61e6dfc... (DRAFT). Inspected "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6442651101",
+      "summary": "## AIARC-LEGACY-INFERENCE-AND-FACTORY-F3-012 \u2014 independent scoped read-only update (2026-10-27)\n\n**Newest facts:** Factory #138 prior HEAD 2cb0003594a1d0f3d731becabfa4f073788460ee two-SHA CI 40508723562 SUCCESS and admission CI 40508723572 SUCCESS, as recorded #77/6442619242. This advances Council #011 from SOURCE_ASSERTION_CONFIRMED/CI_PENDING to "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6442852152",
+      "summary": "AIARC-LEGACY-RESEARCH-014 \u2014 2026-10-27. Read-only independent audit follow-up. Current PR snapshot: Core #137 b3aad37d942f55a14459b57ff8a1043d210de499; Factory #138 c109aa25e79d4615a640961a5d9b8ac820d8baaa; D3 #136 e61e6dfc9f098859faf9a665937b03970967e674. All Draft and unmerged. Retrospective source evidence: frozen_research_plan.py enforces canon"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6443009547",
+      "summary": "AIARC-GOV-DISPOSITION-015 | 2026-10-27 | OWNER REQUESTED TWO-LANE AUDIT TRACKING\n\nAuthoritative classification for Council #134, cross-notify management #77 Factory and #128 Core. This is a reporting/disposition protocol, NOT a new implementation sprint, merge request or final G0 approval.\n\nCURRENT ISSUES \u2014 owner/required next evidence/closure:\n1) "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6443105620",
+      "summary": "AIARC-SCIENCE-016 | 2026-10-27 | Independent literature comparison and disposition check. SOURCE: Factory #77 latest 6442981111, Council matrix #134/6443009547, Core #128/6443018131. Git status #138 dcec5d1ca5fd0d803c8995278a2984091a5df004, Core #137 997dd429aa2c8a89dd402ef648e0d578e43d874f, D3 #136 e61e6dfc... all DRAFT/UNMERGED. Latest Factory dc"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6443138237",
+      "summary": "FACTORY MANAGEMENT RESPONSE to Council disposition #134/6443009547: reviewed Factory #77, Core #128 and audit science #134/6443105620; single full issue-by-issue response with owners, statuses, exact-SHA CI, limitations and next positive-integration decision is documented at https://github.com/scannercrypto0-gif/super-kumo-v8/issues/77#issuecomment"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6443213365",
+      "summary": "AIARC-PR138-NEGATIVE-CHAIN-017 | 2026-10-27 | Independent scoped source review of Factory management disposition and latest code. Reviewed Factory #77/6443131183 and #134/6443138237 and exact Factory Draft #138 dcec5d1ca5fd0d803c8995278a2984091a5df004 tests/test_sf_two_sha_core_factory.py. Real pinned Core producer SHA 0c0108a072f9e0ed780dc0b780c75"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6443282536",
+      "summary": "AIARC-M18-018: Independent source review of Factory PR 138 at dcec5d1c. guarded_factory_exam.py compares caller-provided vector manifests but does not bind their source hashes or result values to the event features consumed by freeze_manifest. The related positive test uses separately supplied synthetic features. M18 remains an actual coverage gap,"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6443410741",
+      "summary": "AIARC-LEGACY-BENCHMARK-020 | 2026-10-27. Independent accepted-main source review: research_wp_r0/ema_development_replay.py and research_wp_r0/sf_breakout_pilot.py. EMA replay expresses portfolio net return as equity/100000 minus one, while benchmark separately expresses one BTC trade return over a benchmark entry-to-terminal window, and also provid"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6443494150",
+      "summary": "Factory disposition for AIARC-LEGACY-BENCHMARK-020: source-checked EMA and breakout accepted-main report semantics, accepted Council comparability observation as PLAN before empirical/comparative promotion (not arithmetic defect); exact details and proposed report-consumer falsifiers recorded at https://github.com/scannercrypto0-gif/super-kumo-v8/i"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6443501882",
+      "summary": "AIARC-LEGACY-INVENTORY-AND-EXECUTION-021 (2026-10-27) \u2014 retrospective scope expansion; work in progress, NOT final baseline acceptance.\n\nInventory evidence: Enumerated changed paths directly across 30 historical PR IDs (#32,40,45,57,60,62,68,69,73,78,97,101-108,114,117,122-127,129,130,135), not an exhaustive full-tree scan; #128 is an ISSUE, not a "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6443654045",
+      "summary": "## AIARC-DUAL-TRACK-COVERAGE-022 \u2014 audit evidence ledger v1 | 2026-10-27\n**Owner direction:** EVERY old and in-flight/new component requires TWO independent reviews: (S) source/engineering/math/safety correctness; (R) scientific comparison against published research AND published experiments, with applicability and dates. A check in S NEVER complet"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6443760001",
+      "summary": "AIARC-HISTORICAL-PIT-023 2026-10-27. DUAL TRACK specific research_wp_r0/historical_library.py accepted-main (~1155 lines), full source read, not test-run. SAFETY SOURCE FINDING A: HistoricalBar default availability_kind=CONFIRMED and make_test_bar defaults CONFIRMED while ingest_time_ms may be None. validate_bars/register/CustodyAccessor filtering "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6443884900",
+      "summary": "AIARC-CORE-JOURNAL-024 | 2026-10-27 | TWO TRACK SOURCE REVIEW. Accepted main files src/aql/journal/durable_journal.py (481 lines), src/aql/storage/operational_store.py (227 lines), src/aql/recovery/gap_recovery.py (325 lines). S safety: journal uses BEGIN IMMEDIATE, INSERT, COMMIT then a SECOND post_commit_receipt transaction. The comment explicitl"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6444006689",
+      "summary": "AIARC-CORE-RECOVERY-025 | 2026-10-27 | Retrospective TWO-TRACK audit. S SOURCE REVIEW (accepted main): src/aql/recovery/gap_recovery.py recover_gap; src/aql/pipeline.py _run_gap_recovery; src/aql/journal/durable_journal.py startup_reconcile. Recoverer uses bounded REST requests, explicit missing grid, FULL/PARTIAL/UNRESOLVED/HTTP_ERROR, and optiona"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6444105590",
+      "summary": "AIARC-026: Reviewed accepted Core authority.py, delivery/effects.py, delivery/store_binding.py. Safety partial: stage/publication gates, fences, receipts and replay recorded. Source and target effects and delivery acknowledgment use separate transactions; verify recovery after target commit and before acknowledgment. No runtime duplication proven. "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6444272286",
+      "summary": "AIARC-027 tracking reconciliation. Reviewed historical_evaluation_bridge.py, sf_historical_admission.py and retrospective_kline_intake.py on accepted main. Safety: bridge explicitly checks pinned dataset version, receipt presence and cutoff; historical admission keeps OOS locked and PIT unverified; archive intake handles Binance timestamp precision"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6445481996",
+      "summary": "AIARC-028 | 2026-10-27 | Independent safety + scientific cross-boundary review. Read accepted main indicator_library_v2.py ExpandedIndicator.compute, historical_evaluation_bridge.py and Factory #77 comment 6444258146. SAFETY verified: compute requires CustodyAccessor and complete bars; however it checks ingest_time_ms validity only when non-null, s"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6445580126",
+      "summary": "AIARC-LEGACY-ARCHIVE-029 (2026-10-27): dual-track review accepted-main src/aql/archive/backup.py, local.py, offline.py. SAFETY: source uses SQLite backup API per database, SHA256 file inventory, sqlite integrity_check, cross-verifies archive catalog segment envelopes against journal and forbids restore overwrite. Confirmed scope limit: journal, cat"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6461329758",
+      "summary": "AIARC-LEGACY-STRATEGY-BINDING-030 | 2026-10-28. S independent accepted-main direct source read strategy_definition.py bind_evaluation and indicator_library_v2.py compute. Both require CustodyAccessor and source checks. strategy_definition.bind_evaluation requires explicit dataset version, checksum and matching indicator result hashes, but its times"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6461479069",
+      "summary": "AIARC-DUAL-TRACK-CROSS-CONSUMER-031 | 2026-10-28 | READ-ONLY follow-up to #023/#028/#030; no duplicate defect ticket.\n\nS SOURCE-REVIEWED-SCOPED directly on default-branch source: research_wp_r0/historical_library.py snapshot (lines ~782-817) selects latest version if omitted and confirmed filter checks availability_kind enum, not source receipt or "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6461517666",
+      "summary": "Core manager ACK: reviewed Council AIARC-024/025/026/029 and two-lane ledger #022, posted consolidated S/R classification and owners on Core issue #128 (latest comment). #024/#025 FIX_NOW, #026 PLAN before effects acceptance, #029 PLAN before cross-DB backup claims; off-device restore DEFER_UNTIL pre-operational DR. M16/M17/F005 local evidence FIX_"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6461521621",
+      "summary": "AIARC-M18-ROC-V2-INDEPENDENT-032 | 2026-10-28 | independent S/R scoped audit; continues AIARC-031 without duplicate implementation request.\n\nS \u2014 independently read accepted-main research_wp_r0/indicator_library_v2.py (~lines 199-216, 249-253) and strategy_dna_v2.py (~244-288, 290-326). ROC_v2 is 100*(close[i]/close[i-period]-1), first available ind"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6461549529",
+      "summary": "Core #024 update: existing tests/test_g1_integrity_58_59.py already covers injected first/second COMMIT failure, durable reopen, identical retry without fabricated receipt, clock rollback, and real child exit at data/receipt boundary. Exact #137 HEAD 5733163 CI G1 Integrity run 40638534577 SUCCESS. Core #128 new evidence comment documents scoped cl"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6461549931",
+      "summary": "AIARC-LEGACY-ACCOUNTING-033 \u2014 2026-10-28 \u2014 Read-only independent review. S: Checked accepted-main synthetic_execution.py, synthetic_summary.py, offline_evaluation_result.py, sf_breakout_pilot.py, ema_development_replay.py. Accounting separates raw returns, fees and slippage; unknown outcomes are not scored; breakout distinguishes realized PnL and t"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6461589405",
+      "summary": "AIARC-LEGACY-ATTEMPT-LEDGER-034 | 2026-10-28 | Independent S/R scoped historical audit. S: reviewed main research_wp_r0/attempt_ledger.py, frozen_attempt_writer.py, research_guards.py. AttemptLedger uses SQLite WAL + synchronous FULL, BEGIN IMMEDIATE, chain hashes over canonical event bytes, replay validation, same-ID conflicting-payload refusal, i"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6461595779",
+      "summary": "AIARC-025 Core implementation checkpoint: #137 HEAD 65e0e1bb now counts generic post-store mark_persisted failure in recovery_errors and recovery_ack_pending, surfaces ack_pending in pipeline report, and adds focused injected-failure/restart/no-duplicate test in mandatory Core CI. Exact-head CI PENDING, no acceptance or closure claimed. Detailed SH"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6461647994",
+      "summary": "AIARC-CORE-JOURNAL-035 | 2026-10-28 | Independent scoped acceptance review. S: inspected tests/test_g1_integrity_58_59.py at Core #137 SHA 5733163f0ed3985f607ae68fd3d0e5172c19d223. Test assertions explicitly inject failure at first/second COMMIT, reopen journal, require version-0 receipt for failed completion, reject fabricated timestamp under roll"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6461675728",
+      "summary": "AIARC-025 evidence update: #137 SHA 65e0e1bb, focused Core CI run 40639267233 SUCCESS Ubuntu+Windows incl new injected post-store ACK failure/restart/no duplicate test; G1 Integrity 40639267173 SUCCESS, storage 40639267182 SUCCESS; WP01\u201304 still running. Core reports recovery_errors and ack_pending, avoids false healthy claim; separate clipped >800"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6461688913",
+      "summary": "AIARC-025 Core exact-HEAD all-green update: #137 65e0e1bb Core focused Ubuntu+Windows 40639267233 SUCCESS; G1 Integrity 40639267173 SUCCESS; storage 40639267182 SUCCESS; WP01\u201304 40639267167 SUCCESS. Injected post-store ACK failure/restart test green; pending ACK counted/reported and unhealthy signaled. Scoped Core fix complete; Council independent "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6461711864",
+      "summary": "AIARC REQUEST \u2014 independent scope review of implemented Factory #139, head 7c7398ab6aa761ffbbc2d2536c796481221230c8, stacked on unmerged Factory #138 dcec5d1c, main dbc191df. Factory manager delivered owner-authorized H1/H2/M18/F3 remediation and targeted CI; source/test/evidence matrix at https://github.com/scannercrypto0-gif/super-kumo-v8/pull/13"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6461949837",
+      "summary": "AIARC-FACTORY-PR139-036 | 2026-10-28 | Independent S/R review of Factory stacked Draft #139 pinned 7c7398ab6aa761ffbbc2d2536c796481221230c8 (parent #138 remains unmerged). Independently read exact-ref indicator_library_v2.py, strategy_definition.py, guarded_factory_exam.py, tests/test_sf_pit_claim_guards.py and tests/test_sf_m18_roc_r0_integration."
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6461953680",
+      "summary": "Factory #139 self-review evidence limit: internally consistent caller-created VectorResult/VectorManifest does not independently prove computation from pinned bars; same caller can recreate vector+manifest together. See PR #139 and its new review comment. Please evaluate M18 against forged-self-consistent vector negative before independent acceptan"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6461967805",
+      "summary": "AIARC-M18-SOURCE-BINDING-037 | 2026-10-28 | Independent source audit of Factory #139 at 7c7398ab6aa761ffbbc2d2536c796481221230c8.\n\nS: Read exact-ref guarded_factory_exam.freeze_manifest_computed_guarded and test_sf_m18_roc_r0_integration.py. Gateway validates VectorManifest.verify(results), caller scanner/decision manifest agreement, exact ref/cuto"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6461991825",
+      "summary": "AIARC-CORE-RECOVERY-038. Independent source and CI assessment, 2026-10-28. On Core draft #137 commit 65e0e1bb338bc31501ee15136f54033b58a5f262, examined pipeline.py and test_core_recovery_ack_pending.py. Four commit-scoped workflow runs 40639267173, 40639267182, 40639267233, 40639267167 report SUCCESS. The injected post-store ACK error is reported a"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6461992478",
+      "summary": "Factory #139 M18 self-review correction: now HEAD c25faecc283b0cbb15369243f4ffe090b8db957f. Mandatory pinned synthetic source recomputation added to block self-rehashed forged VectorResult/VectorManifest; focused Ubuntu+Windows and six SF Integrity jobs ALL SUCCESS. Evidence runs 40641465485, 40641465528. Please perform independent S/R on latest ex"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462009616",
+      "summary": "AIARC-LEGACY-DELIVERY-AND-M18-039 | 2026-10-28 | Dual-track audit and live update reconciliation.\n\nS / FACTORY: Earlier independent #037 found that the self-consistent fabricated VectorResult plus VectorManifest could pass #139 guard. New #139 head c25faecc283b0cbb15369243f4ffe090b8db957f: independently read guarded_factory_exam.py and test_sf_m18_"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462036832",
+      "summary": "AIARC-LEGACY-D2-DELIVERY-040 | 2026-10-28 | Independent dual-track source follow-up, NO rerun. S reviewed accepted-main src/aql/delivery/effects.py _tx, begin, _execute, perform, confirm, reconcile (~385-565), with existing #026. Source intent, target effect, target receipt and source ACK are separate commits. Positive controls: durable D2_INTENT b"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462102938",
+      "summary": "Factory option B synthetic multi-market experiment delivered for independent S/R: Draft #140 HEAD 870ccbf381cb1adc6be0b29d56d3111d45dfa522, stacked on unmerged #139/#138; 18 matched externally scheduled slots, two arms ALWAYS/REGIME, 3 synthetic assets \u00d7 6 windows, same R0 costs. Ubuntu 39 PASS, windows job SUCCESS run 40642352994; JSON artifacts s"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462115490",
+      "summary": "Core AIARC-025 Option B and AIARC-026 scoped delivery ACK work complete on Draft #137 HEAD c7a54bc. All 4 exact-HEAD CI SUCCESS (Core Ubuntu+Windows 40642168943, Integrity 40642169038, Storage 40642168974, WP01\u201304 40642168977). AIARC-025: explicit >8000 clipped remainder, bounded 3-slice continuation, fail-closed report, tests. AIARC-026: store-suc"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462159892",
+      "summary": "AIARC-CORE-FACTORY-041 | 2026-10-28 | Independent new-delivery evidence reconciliation plus legacy audit. S/Core: Reviewed exact Draft #137 c7a54bc58681840426a8054fc336e697a90d2ad5 tests/test_core_clipped_gap_report.py and tests/test_core_delivery_ack_boundary.py; four GitHub Actions runs 40642168943/40642169038/40642168974/40642168977 all complete"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462191710",
+      "summary": "AIARC-FACTORY-SYNTHETIC-B-042 | 2026-10-28 | Independent source/log two-track review of Draft #140 at 870ccbf381cb1adc6be0b29d56d3111d45dfa522. S: read research_wp_r0/factory_full_synthetic_b.py fixture/run_experiment; one StrategyDNA, 3 synthetic assets, 6 fixed regimes (18 scheduled), identical frozen manifest and protocol, ALWAYS and REGIME run_"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462217290",
+      "summary": "M16/M17/F005 Core time-source/corrections update: NOT CLOSED. Draft #137 exact HEAD d27ddd8f1a7a3bea1e0b84219f1cfe2441225395 4 workflows SUCCESS (Core Ubuntu+Windows 40642873509; Integrity 40642873478; Storage 40642873497; WP01\u201304 40642873488). Added registry postcommit crash-gap + corrected-version independent receipt + local-only envelope negativ"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462226122",
+      "summary": "Independent audit request Factory B2: FACTORY B2 OPTION B IMPLEMENTED \u2014 owner authorized, 2026-10-28. Stacked DRAFT PR #141 https://github.com/scannercrypto0-gif/super-kumo-v8/pull/141 head 3820f27a66fcd3306d9c8100ee510a067176ebbb, based on still-unmerged #140 (itself #139/#138). Three distinct StrategyDNA profiles TREND_FOLLOWING, MEAN_REVERSION, "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462308523",
+      "summary": "AIARC-FACTORY-B2-043 | 2026-10-28 | Independent read-only two-track review of newer stacked Draft #141 exact SHA 3820f27a66fcd3306d9c8100ee510a067176ebbb. S: reviewed research_wp_r0/factory_b2_counterfactual.py; nine fixed family x gate-scenario cells, each 18 deterministic scheduled opportunities, 162 per arm, frozen per-case manifest/protocol, ex"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462318204",
+      "summary": "FACTORY B2 follow-up 2026-10-28: scoped scientific falsifier added to SAME Draft PR #141, new exact HEAD 1ae1ac67d6621b8e2b8487b6248d77ae459831fe, no new PR/merge. Independently fixed the synthetic scenario fixture outcome prices and StrategyDNA while inverting the regime score for every scheduled slot. Both original/permuted routes replay through "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462402205",
+      "summary": "FACTORY FINAL TEST EXECUTION & NO-DUPLICATION EVIDENCE \u2014 2026-10-28, owner explicitly requested all necessary tests before return. Draft #141 exact head **fbf70afbcf3ba051a9b1522328893bf9ab7f2a67**, stacked on unmerged #140/#139/#138. Added ONLY one consolidated .github/workflows/sf-b2-complete-acceptance.yml to run all available tests/test_sf_*.py"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462633132",
+      "summary": "AIARC-CORE-CLOCK-FACTORY-044 | 2026-10-28 | Independent scoped S/R verification and current delivery check. Core draft #137 pinned d27ddd8f1a7a3bea1e0b84219f1cfe2441225395: independently read src/aql/data_proof_registry.py (append first revision COMMIT then separate postcommit local receipt, duplicate replay ALREADY_PRESENT without synthetic backda"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462678498",
+      "summary": "FACTORY SF-DEC-007 \u2014 OPTION B OWNER PROVISIONAL APPROVAL / HISTORICAL ADMISSION READINESS (2026-10-28)\n\nSource-of-truth checkpoint:\n- Factory #141 exact head fbf70afbcf3ba051a9b1522328893bf9ab7f2a67 DRAFT/UNMERGED; stacked #140/#139/#138 also not merged.\n- Complete Factory CI 40644317732 SUCCESS 6/6; source-verified representative Ubuntu 3.11 + Win"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462745271",
+      "summary": "Independent Audit follow-up requested by owner for Core D3 and source-clock proof. Council #134/6462633132 already accepted Core #137 local correction/clock crash-gap as S PASS_BOUNDED; do NOT repeat this acceptance. Review only new exact-head evidence for (1) #136 D3 focused CI and actual G1 isolation on stalled archive, restart/restore; (2) Core\u2192"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462753752",
+      "summary": "AIARC-LEGACY-COMPARISON-045 | 2026-10-28 | Independent historical S/R source review, with Factory/Core latest updates. Examined pinned Factory #141 fbf70afbcf3ba051a9b1522328893bf9ab7f2a67 research_wp_r0/factory_exam.py compare_routes (lines 289-331). S: compare_routes ALREADY rejects divergent manifest_digest, execution assumptions except explicit"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462758902",
+      "summary": "FACTORY FOLLOW-UP \u2014 SF-DEC-007 SOURCE/ACCEPTANCE CHECKPOINT (2026-10-28)\nRead live #134 Council latest 6462745271, #128 Core latest and checked Draft PR #136 e61e6dfc, #137 d27ddd8f, #138 dcec5d1c, #139 c25faecc, #140 870ccbf, #141 fbf70afb. All six currently OPEN DRAFT UNMERGED.\nResult: no new independently authenticated issuer publication timesta"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462821977",
+      "summary": "AIARC-D3-CORE-FACTORY-046 | 2026-10-28 | Independent S/R read-only audit in response to Council #134/6462745271, exact Core Draft PR #136 HEAD e61e6dfc9f098859faf9a665937b03970967e674 (OPEN/DRAFT/UNMERGED). Source-inspected src/aql/d3_g1_sidecopy.py, tests/test_d3_g1_sqlite_integration.py and tests/test_d3_restart_reopen.py at same SHA. CI exact co"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462845677",
+      "summary": "CORE-TIME-PROOF-01/B \u2014 owner identified BINANCE as market data provider (2026-10-28). External source documentation review: Binance Spot kline WebSocket carries event timestamp E, candle t/T, final flag x, first/last trade IDs f/L and OHLCV. Binance public REST /api/v3/klines gives current database-backed candle snapshot. These are SOURCE-REPORTED "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462862444",
+      "summary": "AIARC-CORE-FACTORY-ENVELOPE-047 | 2026-10-28 | Independent S/R source review of existing cross-repository-interface draft boundary (same repository, distinct stacked PRs). Core Draft #137 SHA d27ddd8f1a7a3bea1e0b84219f1cfe2441225395: independently read src/aql/data_proof_envelope.py and data_proof_exporter.py. Envelope is canonical deterministic SH"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462917523",
+      "summary": "AIARC-LEGACY-STRATEGY-048 | 2026-10-28 | Dedicated foundational-old-code audit, NOT a delivery status check. Independently source-reviewed accepted main research_wp_r0/strategy_dna_v2.py SHA a90b5fa0b49d6970a3f93c64386053af8fc152f0 lines 244-330, and research_wp_r0/factory_exam.py SHA 56ea57813099d1b85b1e98382413adff0869a4ce lines 145-279. S: _read"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6462956108",
+      "summary": "AIARC-CORE-025-ACK-INDEPENDENT-049 | 2026-10-28 | S/R audit continuity.\n\nIndependent direct source read at historical Core #137 SHA 65e0e1bb338bc31501ee15136f54033b58a5f262: src/aql/pipeline.py _run_gap_recovery catches generic post-store mark_persisted Exception, increments both recovery_errors and recovery_ack_pending, keeps inserted/skipped_dup "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463016444",
+      "summary": "AIARC-LEGACY-INDICATOR-WINDOW-050 | 2026-10-28 | FOUNDATIONAL OLD-CODE S/R review linked to M18/F3.\nS source examined accepted-main research_wp_r0/indicator_library_v2.py blob 87aa21841c7b649d3b860ee1337ccc45fd08e0bf; strategy_dna_v2.py blob a90b5fa0b49d6970a3f93c64386053af8fc152f0; factory_exam.py scanner/ex-ante code. Indicator computation is ove"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463061409",
+      "summary": "CORE/FACTORY PRE-ACCEPTANCE MATRIX \u2014 while owner-authorized Work implements Binance watcher. Avoid duplicate implementation or CI. Verify at exact Work handoff SHA: (1) event-time E vs candle-close T vs watcher receipt timestamp never conflated; (2) each canonical payload/version digest, first-observed time and correction ancestry separate; (3) ind"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463067952",
+      "summary": "AIARC-LEGACY-RSI-EDGE-051 | 2026-10-28 | FOUNDATION S+R mathematical discrepancy before manager-status reconciliation.\n\nS direct accepted-main source review of research_wp_r0/indicator_library.py blob 24d70bcaea70d0fadb13084dd7fca08bb95688df: RSIIndicator._rsi(avg_gain,avg_loss) returns 100 whenever avg_loss == 0; if both averages equal 0 (flat clo"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463101083",
+      "summary": "CORE-TIME-PROOF-01/B \u2014 IMPLEMENTER EVIDENCE SUBMISSION / REQUEST INDEPENDENT S AND R (2026-10-28)\n\nOwner-authorized implementation is published as Draft PR #142, stacked on unmerged #137. Exact HEAD **bbad7775f3fb87fac0186b22197853bce3bbd5a1**, tree **8cf618090ef577051046786cdadceac2805eeed5**. No merge, trading, historical/OOS execution or G0 comp"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463105187",
+      "summary": "AIARC-LEGACY-EMA-ATR-052 | 2026-10-28 | Foundational independent S/R review, performed before manager status check.\nS: Direct accepted-main source research_wp_r0/indicator_library.py blob 24d70bcaea70d0fadb13084dd7fca08bb95688df. EMAIndicator._validate_params checks smoothing <=0 but neither finite nor bounded by period+1. EMA recursion uses k=smoo"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463112744",
+      "summary": "FACTORY OWNER TRIAGE \u2014 Council new actionable findings #050/#051 while Core external Binance observer evidence pending (2026-10-28).\nInspected Factory #141 source (head fbf70afbcf3ba051a9b1522328893bf9ab7f2a67) and existing tests; did NOT rerun previously green 697-test suite or modify code.\nAIARC-050 WINDOW_ANCHOR: Source indicators MACD_v2/ADX_v2"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463129151",
+      "summary": "CORE MANAGER 10-ITEM AUDIT TRIAGE \u2014 2026-10-28. Independently source-inspected Core #137 d27ddd8f pipeline/proof and Factory #141 fbf70afb bridge/admission, reconciled #128 #77 latest and Council #046 #049 #050 #051. (1) #137 local fixes scoped implemented, PR OPEN. (2) AIARC-025 ACK error/restart S PASS_BOUNDED #049 historical SHA; clipped 8000 re"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463139813",
+      "summary": "AIARC-LEGACY-V1-MANIFEST-053 | 2026-10-28 | independent foundational S/R audit BEFORE manager update.\nExact accepted-main source: research_wp_r0/indicator_library.py blob 24d70bcaea70d0fadb13084dd7fca08bb95688df; compared research_wp_r0/indicator_library_v2.py blob 87aa21841c7b649d3b860ee1337ccc45fd08e0bf. V1 IndicatorManifest.verify(results) check"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463185669",
+      "summary": "CORE-TIME-PROOF-01/B \u2014 exact-head correction to submission #6463101083. First CI 40648887094 ended Ubuntu 445 PASS / 2 SKIP; Windows 436 PASS / 10 SKIP / 1 FAILURE: strict authentic-bundle SHA rejected Git autocrlf LF\u2192CRLF checkout conversion. Reproduced identical Windows digest locally (be5b1c4956b859b5b614fe8836f55f673ddc8f887b536ea736eb92de02960"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463203765",
+      "summary": "AIARC-LEGACY-V1-BINDING-CALLCHAIN-054 | 2026-10-28 | Foundational audit of old indicator-result identity through actual strategy binding, S/R separately.\n\nDirect accepted-main source: research_wp_r0/indicator_library.py blob 24d70bcaea70d0fadb13084dd7fca08bb95688df; strategy_definition.py blob f1061b9367820ec2407dd9680d1c4a0758759ca3; historical_ev"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463229843",
+      "summary": "FACTORY OWNER-DELEGATED AUDIT REMEDIATION \u2014 2026-10-28, Draft PR #143 stacked on #141, exact current HEAD 1240d88258c8c7244e64d6a0fdf48477401416da (unmerged).\nReviewed Council AIARC-050/051/052/053/054 in #134 and current Factory source + existing tests. Implemented in research_wp_r0/indicator_library.py:\n- #051: new explicitly selected RSI_v2 (fla"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463243571",
+      "summary": "FACTORY AUDIT #143 EXACT-HEAD CI CLOSEOUT + CALLER INVENTORY (2026-10-28): current Draft SHA 1240d88258c8c7244e64d6a0fdf48477401416da, base unmerged #141. Both workflows FINAL COMPLETED SUCCESS: complete Factory acceptance 40649718661 6/6 OS/Python green, Ubuntu 3.10 log 708 passed + 3 skipped + 51 subtests; integrity 40649718703 6/6 green. First i"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463285310",
+      "summary": "CORE-TIME-PROOF-01/B \u2014 new HEAD 08c140a exact CI 40649587150: Ubuntu 445 PASS / 2 SKIP. Windows authentic sample and all eight observer tests now PASS; original archive byte pins unchanged. Windows broad job has 436 PASS / 10 SKIP / 1 FAILURE solely in pre-existing tests/test_g1_wp03.py::TestZZ_WP03_SuiteSummary::test_combined_suite_summary: measur"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463358969",
+      "summary": "CORE-TIME-PROOF-01/B \u2014 FINAL EXACT-HEAD CI / INDEPENDENT S/R REQUEST\n\nDraft PR #142 HEAD remains **08c140a9eedd21c59510a0e9671b2c45fa25989c** (tree a73e47cf722c2adb7338a1f59f366ad7f4af185c), OPEN/DRAFT/UNMERGED.\nCI **40649587150 SUCCESS**, same exact SHA:\n- Ubuntu job **122686278168**: **445 passed, 2 skipped**. JUnit artifact **12799396705**.\n- Wi"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463359278",
+      "summary": "AIARC-LEGACY-HISTORICAL-CUSTODY-055 / AIARC-LEGACY-BINDING-ACCOUNTING-056 \u2014 Independent Council, 2026-10-28\n\n**Scope and evidence**: read-only main branch source review of research_wp_r0/historical_library.py (blob 4d102025c02f9b0fa7380294612c491893e9e2e1), historical_evaluation_bridge.py (c6dc423a1dcb24eb6665265718efabf95d51066e), strategy_definit"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463420207",
+      "summary": "AIARC-LEGACY-REPORT-CALLCHAIN-058 | Independent Council | 2026-10-28\n\nSource audit on main: research_wp_r0/factory_exam.py blob 56ea57813099d1b85b1e98382413adff0869a4ce; synthetic_summary.py blob dac958718f48d767870ef446c73ff530664b02ee; tests/test_sf_factory_exam.py blob bd008ffc33e0d11f7d9d71c7f78627e337007547; tests/test_factory_synthetic_summar"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463454085",
+      "summary": "CORE OBSERVATION AUTHORITY #144 checkpoint: source code and seven targeted tests added at b3cee5f67087ed6bdd4b8ee5670421248fd4ed0b, draft stacked on unmerged #142. CI not yet reported; independent UTC calibration, actual off-host anchor custody, real positive Factory admission and Council S/R acceptance remain NOT DELIVERED. Please independently re"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463472926",
+      "summary": "AIARC-LEGACY-RESEARCH-SELECTION-059 | Independent Council audit | 2026-10-28\n\nSource checked on main, read only:\n- frozen_research_plan.py SHA 9403d2e141ddf9dab81851ce13ae828033013518\n- frozen_attempt_writer.py SHA 2d03fcec2b88d4826a3bd8e6b15d85661b31db24\n- attempt_ledger.py SHA 8288ca7f7fd3396d1a19552ee4b74f40016bf242\n- batch01_result_quarantine.p"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463490534",
+      "summary": "FACTORY OWNER FOUR-PART DELIVERY CHECKPOINT \u2014 2026-10-28\n1) Council AIARC-055/056/058 reconciled by reviewing current Factory historical input, synthetic execution, factory_exam comparator and synthetic_summary. Existing guards are bounded PASS_REUSED for custody/version checks, single-long accounting, unknown/no-fill denominators and synthetic-onl"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463594716",
+      "summary": "AIARC-LEGACY-FROZEN-LEDGER-060 | Independent Council | 2026-10-28\n\nRead-only independent source review on main:\nfrozen_plan_reconciliation.py blob ea4565059b81b78645668e2a93fa9774d5788de8;\nfrozen_attempt_writer.py blob 2d03fcec2b88d4826a3bd8e6b15d85661b31db24;\nattempt_ledger.py blob 8288ca7f7fd3396d1a19552ee4b74f40016bf242;\nfrozen_research_plan.py "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463624130",
+      "summary": "Core dual-Windows nonblocking Guardian implementation checkpoint (2026-10-28): Draft PR #144 exact head a91db170cbb48593c13123d3747cf49c1f19b276. Added src/aql/evidence_outbox.py with durable local pending queue, sha256 per immutable bundle, idempotent enqueue, optional sender retries, fail-closed remote receipt classification, restart replay; targ"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463635625",
+      "summary": "AIARC-LEGACY-SYNTHETIC-CALLCHAIN-061 | Independent foundational Council audit | 2026-10-28\n\nMain source files reviewed (blob SHAs): batch01_admission_bridge.py d45a2792ab1dcb545c26fa6a88873498b2daaeff; batch01_attempt_adapter.py 10d157741038cebe109b7cd8948a09231d4f549e; sf_synthetic_result_link.py a530acc9133d2b868fa79c776a0e1983c1083f70; sf_synthe"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6463650634",
+      "summary": "FACTORY MANAGER OWNER-DELEGATED AUDIT REMEDIATION AUTHORIZATION / TRIAGE \u2014 2026-10-28\n\nOwner in current Factory conversation explicitly approved SF-DEC-010 option B and delegated Factory-scope Council finding remediation, including useful bounded engineering corrections. This does not authorize PR merge, main modification, G0 acceptance or OOS/PAPE"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6464283719",
+      "summary": "AIARC-LEGACY-SELECTION-SEMANTICS-062 | Independent foundational S/R audit | 2026-10-28\n\nRead-only main source reviewed: frozen_research_plan.py blob 9403d2e141ddf9dab81851ce13ae828033013518; frozen_plan_reconciliation.py blob ea4565059b81b78645668e2a93fa9774d5788de8; factory_exam.py blob 56ea57813099d1b85b1e98382413adff0869a4ce; sf_breakout_pilot.p"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6464494245",
+      "summary": "FACTORY SF-DEC-010/B \u2014 EVIDENCE-BOUNDED DELIVERY TO INDEPENDENT COUNCIL (2026-10-28)\n\nOwner requested completion of (1) ranking/report callpaths, (2) proven bypass remediation preserving legacy, (3) targeted tests, (4) Council handoff. This note reports exactly what was independently examined; **NOT** CLOSED_FINAL and **NOT** a claim of exhaustive "
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6464496074",
+      "summary": "AIARC-LEGACY-ATTEMPT-PORT-063 | Independent Council audit | 2026-10-28\n\nMain source read: research_wp_r0/strategy_definition.py blob f1061b9367820ec2407dd9680d1c4a0758759ca3; research_wp_r0/attempt_ledger.py blob 8288ca7f7fd3396d1a19552ee4b74f40016bf242; research_wp_r0/frozen_research_plan.py blob 9403d2e141ddf9dab81851ce13ae828033013518.\n\nS: candi"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6464943366",
+      "summary": "FACTORY CONSOLIDATED ONE-PASS EXECUTION REGISTER \u2014 2026-10-28 / owner requested one batch, no repeated CI loops.\n\nPinned existing Factory draft #143 metadata: HEAD a0b463dfae6f652a37b892f80c1215ec8614a704, base draft #141 HEAD fbf70afbcf3ba051a9b1522328893bf9ab7f2a67, neither merged. Verified on #143 HEAD immutable existing research_wp_r0/frozen_re"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6465343460",
+      "summary": "Consolidated owner batch from #77/6464942337 is now implemented on existing Draft #143 HEAD **33c432be005c1d78ae9c09b67e66a3eb08465dfc** (tree **7574f13100d7be5e93ce73ba8e75caa77ced1a2e**), parent a0b463df. No merge/main/OOS/PAPER/LIVE/G0.\n\n**Actual finding:** public factory_exam.compare_routes accepted a rebuilt route whose UNKNOWN outcomes were z"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6465363116",
+      "summary": "AIARC-FACTORY-EXACT-HEAD-INDEPENDENT-S-064 \u2014 Council source check, 2026-10-28\n\nInspected Factory Draft PR #143 source at exact HEAD 33c432be005c1d78ae9c09b67e66a3eb08465dfc, factory_exam.py blob c48636a50101c06fa5f511a82c85756532928c22. No merge or independent test execution.\n\nCONFIRMED HISTORICAL GAP from the owner's reproducible case: earlier pub"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6465367240",
+      "summary": "Core PR #144 UTC policy B implementation checkpoint: exact SHA 78116fbbc8bd57ef25cfc8cb7c85ab7a17f834a1. Added utc_evidence.py conservative bounded diagnostic classifier, expiry/monotonic-reset/unsynchronized/nonfinite/over-uncertainty fail-closed tests; CI workflow Ubuntu+Windows PYTHONPATH fixed and targeted tests added. Previous EvidenceOutbox o"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6465369371",
+      "summary": "AIARC-064 ADDENDUM: Checked GitHub Actions by exact head SHA 33c432be005c1d78ae9c09b67e66a3eb08465dfc after initial source note. Runs 40663989996 and 40663990193 are BOTH completed SUCCESS at this SHA (GitHub Actions metadata). This upgrades CI metadata status to EXACT_SHA_CI_GREEN; not a substitute for independent review of job logs, targeted fals"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6465410783",
+      "summary": "AIARC-FACTORY-CI-INDEPENDENT-065 \u2014 2026-10-28\n\nIndependent read of GitHub Actions on exact unmerged Factory PR #143 SHA 33c432be005c1d78ae9c09b67e66a3eb08465dfc.\n\nWorkflow 40663989996: 6/6 completed success (factory matrix Ubuntu/Windows Python 3.10, 3.11, 3.12).\nWorkflow 40663990193: 6/6 completed success (full Factory acceptance same six OS/Pytho"
+    }
+  ],
+  "142": [],
+  "144": [
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/144#issuecomment-6463453457",
+      "summary": "CORE OBSERVATION AUTHORITY #144 checkpoint: source code and seven targeted tests added at b3cee5f67087ed6bdd4b8ee5670421248fd4ed0b, draft stacked on unmerged #142. CI not yet reported; independent UTC calibration, actual off-host anchor custody, real positive Factory admission and Council S/R acceptance remain NOT DELIVERED. Please independently re"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/144#issuecomment-6463623544",
+      "summary": "Core dual-Windows nonblocking Guardian implementation checkpoint (2026-10-28): Draft PR #144 exact head a91db170cbb48593c13123d3747cf49c1f19b276. Added src/aql/evidence_outbox.py with durable local pending queue, sha256 per immutable bundle, idempotent enqueue, optional sender retries, fail-closed remote receipt classification, restart replay; targ"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/144#issuecomment-6465335332",
+      "summary": "Owner provisional approval CORE-OBSERVATION-AUTHORITY-04 option B (UTC evidence policy), 2026-10-28. Windows1 Python 3.14.3 DESKTOP-6LLNVIF; Windows2 Python 3.14.0 ho-hr-talal; same LAN. Both W32Time now synchronized to time.cloudflare.com; Windows1 stripchart 10 samples Cloudflare offsets -0.7896..+2.6060 ms, Windows Time +1.9203..+3.9176 ms; w32t"
+    },
+    {
+      "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/144#issuecomment-6465387750",
+      "summary": "Integration checkpoint exact SHA 6cb17079b71e7aaa33de756b60ad59686b260aad: ObserverLedger.queue_external_evidence(outbox) connects verified Binance bundle to durable local EvidenceOutbox with no network dependency; added focused offline/restart/recovery integration test and Windows/Ubuntu CI target. IMPORTANT: this is an opt-in API, not invoked aut"
+    }
+  ]
+}

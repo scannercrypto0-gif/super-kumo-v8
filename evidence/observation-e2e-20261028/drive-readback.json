@@ -1,0 +1,12 @@
+{
+  "file_id": "1RuR86eEZ3NaASymm3oz698N7uJQbOtau",
+  "folder_id": "1WeOdQ4COL89w4uqX-BnGGM4_xFYZHB9q",
+  "local_sha256": "05e0f25a13b633f50e4f870ac79943414111c8a19fee717c2c4259144a9bad10",
+  "download_sha256": "05e0f25a13b633f50e4f870ac79943414111c8a19fee717c2c4259144a9bad10",
+  "bytes": 23148,
+  "versions": 4,
+  "ledger_head": "9f517a06aedf12c1496ba7fd0510302ca41bc2cdc3ad62b844d893270769d58f",
+  "method": "connected Drive upload and raw download; Python SHA256 and verify_bundle",
+  "independent_custody": false,
+  "issuer_attestation": false
+}

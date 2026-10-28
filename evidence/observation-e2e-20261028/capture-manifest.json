@@ -1,0 +1,12 @@
+{
+  "sha256": "05e0f25a13b633f50e4f870ac79943414111c8a19fee717c2c4259144a9bad10",
+  "file": "05e0f25a13b633f50e4f870ac79943414111c8a19fee717c2c4259144a9bad10.json",
+  "ledger_head": "9f517a06aedf12c1496ba7fd0510302ca41bc2cdc3ad62b844d893270769d58f",
+  "versions": 4,
+  "environment": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "python": "3.12.14",
+  "actual_transport": "BINANCE_REST",
+  "ws_result": "TIMEOUT_GAP",
+  "utc_result": "UNKNOWN_DNS_FAILURE",
+  "owner_windows_executed": false
+}

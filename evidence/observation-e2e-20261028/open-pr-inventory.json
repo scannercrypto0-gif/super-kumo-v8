@@ -1,0 +1,272 @@
+[
+  {
+    "number": 144,
+    "head": "6cb17079b71e7aaa33de756b60ad59686b260aad",
+    "base": "main",
+    "draft": true
+  },
+  {
+    "number": 143,
+    "head": "33c432be005c1d78ae9c09b67e66a3eb08465dfc",
+    "base": "factory/b2-multistrategy-counterfactual-20261028",
+    "draft": true
+  },
+  {
+    "number": 142,
+    "head": "08c140a9eedd21c59510a0e9671b2c45fa25989c",
+    "base": "feat/core-data-proof-v1",
+    "draft": true
+  },
+  {
+    "number": 141,
+    "head": "fbf70afbcf3ba051a9b1522328893bf9ab7f2a67",
+    "base": "factory/synthetic-full-exam-b-20261028",
+    "draft": true
+  },
+  {
+    "number": 140,
+    "head": "870ccbf381cb1adc6be0b29d56d3111d45dfa522",
+    "base": "factory/h1-h2-m18-f3-bound-20261028",
+    "draft": true
+  },
+  {
+    "number": 139,
+    "head": "c25faecc283b0cbb15369243f4ffe090b8db957f",
+    "base": "feat/factory-data-admission-m16-m17",
+    "draft": true
+  },
+  {
+    "number": 138,
+    "head": "dcec5d1ca5fd0d803c8995278a2984091a5df004",
+    "base": "main",
+    "draft": true
+  },
+  {
+    "number": 137,
+    "head": "d27ddd8f1a7a3bea1e0b84219f1cfe2441225395",
+    "base": "main",
+    "draft": true
+  },
+  {
+    "number": 136,
+    "head": "e61e6dfc9f098859faf9a665937b03970967e674",
+    "base": "main",
+    "draft": true
+  },
+  {
+    "number": 119,
+    "head": "621db5d8905608dda1c12c312d1dd79c666735a5",
+    "base": "feat/g2-bounded-observation-worker",
+    "draft": true
+  },
+  {
+    "number": 118,
+    "head": "3b1d02f64f1986eebfa782d368f1f6cd20966147",
+    "base": "main",
+    "draft": true
+  },
+  {
+    "number": 116,
+    "head": "3d83f1b43d8f735db9684b2baeb10c46104176ca",
+    "base": "feat/issue71-backup-automation",
+    "draft": true
+  },
+  {
+    "number": 115,
+    "head": "fa6f38e67c494fb2336e26f2b8ce6e86d5bbd070",
+    "base": "main",
+    "draft": true
+  },
+  {
+    "number": 112,
+    "head": "5341c3a7bb8a19dffae8956c9ada1591070dfcb7",
+    "base": "main",
+    "draft": true
+  },
+  {
+    "number": 111,
+    "head": "5f6f2592b3d24592525d48d078c8e4fcaad1299b",
+    "base": "main",
+    "draft": true
+  },
+  {
+    "number": 110,
+    "head": "7ec2ba7f0145ca1c7fcb52191e18a32d95b1e205",
+    "base": "main",
+    "draft": true
+  },
+  {
+    "number": 109,
+    "head": "9491c334c162cd2527b52f1adfb3144a6935f060",
+    "base": "main",
+    "draft": true
+  },
+  {
+    "number": 93,
+    "head": "2d53fc0616a4848ce2ee26fc4022aabc075b27fe",
+    "base": "main",
+    "draft": true
+  },
+  {
+    "number": 83,
+    "head": "5f7423f2d59745364e56a80dc1ac0b60ba3a2b03",
+    "base": "main",
+    "draft": true
+  },
+  {
+    "number": 46,
+    "head": "a4c106a02c55ee012eedf4c55c1488d71d850203",
+    "base": "fix/research-r41-checkpoint-export-sync-20261022",
+    "draft": false
+  },
+  {
+    "number": 43,
+    "head": "0a3d900d5d85a6d987f1e26eac8f99660f05b2e5",
+    "base": "test/research-wp-r40-offline-checkpoint-handoff-20261022",
+    "draft": false
+  },
+  {
+    "number": 41,
+    "head": "06d1c2c218aeb3553b0c761c659fd0a8a143d93c",
+    "base": "fix/research-r19-read-boundaries-20261022",
+    "draft": false
+  },
+  {
+    "number": 39,
+    "head": "4e0c909b386f7348668302d0e7a68bc77b2b4b7c",
+    "base": "ci/research-r18-targeted-performance-20261022",
+    "draft": false
+  },
+  {
+    "number": 38,
+    "head": "51b7d8c82ea05fb9438aeb25d9053eb481c0d9c0",
+    "base": "ci/research-wp-r17-fast-path-20261022",
+    "draft": false
+  },
+  {
+    "number": 37,
+    "head": "ca24bd10f5d88d1782c94878f0a82908c5c009a9",
+    "base": "ci/research-unified-fast-suite-20261022",
+    "draft": false
+  },
+  {
+    "number": 36,
+    "head": "aa479403d1cf7ba0b450929ee5b4a0f1672023da",
+    "base": "test/research-wp-r16-telemetry-backpressure-20261022",
+    "draft": false
+  },
+  {
+    "number": 35,
+    "head": "649e66d8ff68fc080acda19f47615c5831cf0685",
+    "base": "feat/research-wp-r15-isolated-telemetry-20261022",
+    "draft": false
+  },
+  {
+    "number": 34,
+    "head": "387196133152d1b8b7b5fcb54a59b31c99850ab5",
+    "base": "experiment/research-wp-r14-group-commit-20261022",
+    "draft": false
+  },
+  {
+    "number": 33,
+    "head": "062d9be1ab291a9fa3c110ae74e76b4843c188f3",
+    "base": "perf/research-wp-r13-journal-replay-20261022",
+    "draft": false
+  },
+  {
+    "number": 31,
+    "head": "4cd132e344a803e17803cfd2e09b41c7d869ee9a",
+    "base": "feat/research-wp-r12-measured-e2e-20261022",
+    "draft": false
+  },
+  {
+    "number": 30,
+    "head": "c69965945b50403557d2b18f1e26f955513500f4",
+    "base": "feat/research-wp-r11-external-custody-contract-20261022",
+    "draft": false
+  },
+  {
+    "number": 29,
+    "head": "1c61ee80808413405a5a57edc05bded4ef1928de",
+    "base": "feat/research-wp-r10-owner-checkpoints-20261022",
+    "draft": false
+  },
+  {
+    "number": 28,
+    "head": "e9a3650c6f3a16e5646e85c0631ae03b591d59af",
+    "base": "fix/research-wp-r9-windows-audit-20261022",
+    "draft": false
+  },
+  {
+    "number": 27,
+    "head": "2c3f5893eeb76093b4962f75c78c2e2ea94d37e8",
+    "base": "fix/research-wp-r8-journal-hardening-20261022",
+    "draft": false
+  },
+  {
+    "number": 26,
+    "head": "1c14b7367c243658acd538442c8e3408fd093758",
+    "base": "feat/research-wp-r7-durable-evidence-20261022",
+    "draft": false
+  },
+  {
+    "number": 25,
+    "head": "d6259aa6436ca03a688b6242d150a1f007f7fa24",
+    "base": "feat/research-wp-r6-trial-holdout-20261022",
+    "draft": false
+  },
+  {
+    "number": 24,
+    "head": "3f028b13237863ec33d54176e2d02f5c56fe48b4",
+    "base": "feat/research-wp-r5-temporal-contract-20261022",
+    "draft": false
+  },
+  {
+    "number": 23,
+    "head": "d64446a0431d952cb501c2bcac20c6d83c4376d4",
+    "base": "fix/research-wp-r4-statistical-audit-20261022",
+    "draft": false
+  },
+  {
+    "number": 22,
+    "head": "372eca5c18fec6c8d341d6296d586d5cdfb4d668",
+    "base": "feat/research-wp-r3-opportunity-clusters-20261022",
+    "draft": false
+  },
+  {
+    "number": 21,
+    "head": "13575869949beb52bea2cb80a422edf18327d1ae",
+    "base": "feat/research-wp-r2-evaluation-20261022",
+    "draft": false
+  },
+  {
+    "number": 20,
+    "head": "59507e0ffe4d93ca6d03a5ef9fc6e16d2ace2f76",
+    "base": "feat/research-wp-r1-statistics-20261022",
+    "draft": false
+  },
+  {
+    "number": 19,
+    "head": "04041b1a07ba3c701a3daa33da348ce78a54968b",
+    "base": "feat/research-wp-r0-synthetic-20261022",
+    "draft": false
+  },
+  {
+    "number": 18,
+    "head": "d790b0fe7b5e07c54f5368f6223a3e555d0df2cb",
+    "base": "main",
+    "draft": false
+  },
+  {
+    "number": 17,
+    "head": "fbb6ce5dde6e2018e24d320f1792aecd780974a4",
+    "base": "main",
+    "draft": false
+  },
+  {
+    "number": 16,
+    "head": "828ed10b7c775dcb56627426789057d73e8c5342",
+    "base": "docs/g1-indicator-quality-observability",
+    "draft": false
+  }
+]
