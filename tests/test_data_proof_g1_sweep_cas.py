@@ -87,3 +87,36 @@ def test_snapshot_returns_coherent_state_and_generation(tmp_path):
     finally:
         a.close()
         b.close()
+
+
+def test_sweep_stale_worker_fails_closed_without_claiming_complete(tmp_path, monkeypatch):
+    import aql.data_proof_g1_sweep_progress as module
+
+    key = ("instance", "BTCUSDT", "1m")
+    worker = SweepProgress(tmp_path / "sweep.sqlite")
+    winner = SweepProgress(tmp_path / "sweep.sqlite")
+
+    class Journal:
+        instance_id = key[0]
+
+        def startup_entry_boundary(self):
+            return 100
+
+    def racing_page(*args, **kwargs):
+        state, generation = winner.snapshot(*key)
+        assert state == (0, 100)
+        winner.save(*key, 50, 100, expected=state,
+                    expected_generation=generation)
+        return {"added": 0, "existing": 0, "next_cursor": 10,
+                "failed_key": None, "complete": True}
+
+    try:
+        monkeypatch.setattr(module, "reconcile_persisted_page", racing_page)
+        with pytest.raises(ProofError, match="stale sweep checkpoint update"):
+            module.run_sweep_slice(Journal(), object(), worker,
+                                   symbol=key[1], interval=key[2],
+                                   page_size=10, max_pages=1)
+        assert winner.state(*key) == (50, 100)
+    finally:
+        worker.close()
+        winner.close()
