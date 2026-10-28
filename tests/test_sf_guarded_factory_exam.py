@@ -12,16 +12,12 @@ def vector():
                 decision_cutoff_ms=1000,start_ms=1,end_ms=1000,warmup_policy=28,
                 input_bar_hash="b"*64,result_hashes=["c"*64],output_fields=["macd","signal","hist"])
 
-def test_equal_opt_in_manifests_use_existing_synthetic_r0_path():
-    dna,events,config=fixture()
-    manifest,identities=freeze_manifest_guarded(dna,events,
-        scanner_vectors={"trend":vector()},decision_vectors={"trend":copy.deepcopy(vector())})
-    assert "trend" in identities
-    protocol=freeze_protocol(manifest,expected_manifest_digest=manifest.digest,config=config)
-    results=run_route(manifest,protocol,expected_manifest_digest=manifest.digest,
-                      expected_protocol_digest=protocol.digest,arm="ALWAYS").spec
-    assert len(results["outcomes"])==len(events)
-    assert any(o["status"]=="EXECUTED" for o in results["outcomes"])
+def test_equal_caller_manifests_alone_cannot_admit_r0():
+    dna,events,_=fixture()
+    with pytest.raises(ValueError,match="M18 calculated feature evidence required"):
+        freeze_manifest_guarded(dna,events,
+            scanner_vectors={"trend":vector()},
+            decision_vectors={"trend":copy.deepcopy(vector())})
 
 def test_mismatched_window_prevents_scanner_decision_run():
     dna,events,_=fixture()
