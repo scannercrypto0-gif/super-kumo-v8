@@ -31,7 +31,8 @@ def freeze_manifest_computed_guarded(dna, events, *, computed_by_event,
     }
     Receipt timestamps are caller-provided SYNTHETIC evidence only. Never real PIT.
     """
-    from .strategy_definition import canonical, reference_digest
+    from .strategy_definition import canonical
+    from .strategy_dna_v2 import reference_digest
     from .indicator_library_v2 import VectorManifest
     if type(computed_by_event) is not dict or type(events) is not list:
         raise ValueError("M18 computed feature proof required")
