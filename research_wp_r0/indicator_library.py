@@ -47,6 +47,7 @@ __all__ = [
     "SMAIndicator",
     "EMAIndicator",
     "RSIIndicator",
+    "RSIIndicatorV2",
     "ATRIndicator",
 ]
 
