@@ -64,7 +64,9 @@ class RecoveryReport:
     status: str  # "FULL" | "PARTIAL" | "UNRESOLVED_DATA_GAP" | "HTTP_ERROR"
     weight_cost: int           # cost = requests_made * KLINES_WEIGHT_PER_REQUEST
     last_seen_window_weight: int  # last X-MBX-USED-WEIGHT-1M value (cumulative, for observation)
-    http_error: Optional[str]  # set when REST fetch failed entirely (traceable unresolved evidence)\n    remaining_start_ms: Optional[int] = None  # clipped continuation, never silently FULL\n    remaining_end_ms: Optional[int] = None
+    http_error: Optional[str]  # set when REST fetch failed entirely
+    remaining_start_ms: Optional[int] = None  # clipped continuation
+    remaining_end_ms: Optional[int] = None
 
 
 def _binance_interval_ms(interval: str) -> int:
@@ -319,6 +321,8 @@ def recover_gap(
         weight_cost=weight_cost,
         last_seen_window_weight=last_seen_window_weight,
         http_error=http_error,
+        remaining_start_ms=remaining_start_ms,
+        remaining_end_ms=remaining_end_ms,
     )
 
     logger.info(
