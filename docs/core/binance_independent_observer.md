@@ -86,3 +86,9 @@ not proven by this run. The watcher is optional and not wired into G1 production
 Existing Factory fail-closed admission remains the boundary; no historical/OOS,
 paper/live activation, merge or G0 closure. Request separate S and R verdicts
 only for these evidenced claims; broader acceptance remains pending.
+
+Windows initial CI 40648887094 detected Git checkout CRLF conversion of the
+pinned JSON archive (436 passed, 10 skipped, one strict byte-pin failure).
+`.gitattributes` now marks only the raw bundle paths `-text`, retaining original
+bytes across platforms. Manifest pins and strict byte checks are unchanged;
+the failure is retained in WORK_LOG. Acceptance must use the subsequent commit.

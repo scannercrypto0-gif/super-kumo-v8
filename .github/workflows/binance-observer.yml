@@ -2,6 +2,7 @@ name: Binance independent observer exact-head acceptance
 on:
   pull_request:
     paths:
+      - '.gitattributes'
       - 'src/aql/**'
       - 'tests/test_binance_observer.py'
       - 'scripts/binance_independent_observer.py'
