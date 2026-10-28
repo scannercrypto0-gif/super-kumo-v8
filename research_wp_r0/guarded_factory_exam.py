@@ -8,7 +8,7 @@ from .indicator_calculation_identity import require_same_calculation
 
 
 def freeze_manifest_guarded(dna, events, *, scanner_vectors, decision_vectors,
-                            computed_by_event=None):
+                            computed_by_event=None, calculation_inputs=None):
     """Strict M18 gateway: manifest agreement alone cannot admit a decision."""
     if computed_by_event is None:
         # Retain legacy manifest-only checks for their diagnostic tests, but
@@ -17,7 +17,8 @@ def freeze_manifest_guarded(dna, events, *, scanner_vectors, decision_vectors,
         raise ValueError("M18 calculated feature evidence required")
     return freeze_manifest_computed_guarded(
         dna, events, computed_by_event=computed_by_event,
-        scanner_vectors=scanner_vectors, decision_vectors=decision_vectors)
+        scanner_vectors=scanner_vectors, decision_vectors=decision_vectors,
+        calculation_inputs=calculation_inputs)
 
 
 def _compare_manifest_identities(scanner_vectors, decision_vectors):
@@ -34,7 +35,8 @@ def _compare_manifest_identities(scanner_vectors, decision_vectors):
     return identities
 
 def freeze_manifest_computed_guarded(dna, events, *, computed_by_event,
-                                     scanner_vectors, decision_vectors):
+                                     scanner_vectors, decision_vectors,
+                                     calculation_inputs=None):
     """M18 strict opt-in: validate independently computed results before Scanner.
 
     computed_by_event[event_id][reference] = {
@@ -45,9 +47,12 @@ def freeze_manifest_computed_guarded(dna, events, *, computed_by_event,
     """
     from .strategy_definition import canonical
     from .strategy_dna_v2 import reference_digest
-    from .indicator_library_v2 import VectorManifest
-    if type(computed_by_event) is not dict or type(events) is not list:
-        raise ValueError("M18 computed feature proof required")
+    from .indicator_library_v2 import VectorManifest, IndicatorRegistryV2
+    if (type(computed_by_event) is not dict or type(events) is not list
+            or type(calculation_inputs) is not dict):
+        raise ValueError("M18 independently recomputable input proof required")
+    if set(calculation_inputs) != set(computed_by_event):
+        raise ValueError("M18 calculation input event coverage mismatch")
     if set(computed_by_event) != {e["event_id"] for e in events}:
         raise ValueError("M18 event evidence coverage mismatch")
     if set(scanner_vectors) != set(decision_vectors):
@@ -68,7 +73,23 @@ def freeze_manifest_computed_guarded(dna, events, *, computed_by_event,
                 "results", "manifest", "as_of_ms", "observed_at_ms", "available_at_ms"
             }:
                 raise ValueError("M18 invalid computed evidence")
+            calc = calculation_inputs[event["event_id"]].get(name)
+            if (type(calc) is not dict or set(calc) !=
+                {"accessor", "dataset_id", "version", "start_ms", "end_ms"}):
+                raise ValueError("M18 source calculator inputs missing")
+            if type(calc["version"]) is not int or calc["version"] < 1:
+                raise ValueError("M18 explicit dataset vintage required")
+            ind = IndicatorRegistryV2().get(
+                expected_refs[name]["indicator_id"], **expected_refs[name]["parameters"])
+            recomputed, verified_manifest = ind.compute(
+                calc["accessor"], calc["dataset_id"], calc["start_ms"],
+                calc["end_ms"], event["cutoff_ms"], version=calc["version"])
+            if not verified_manifest.verify(recomputed):
+                raise ValueError("M18 recomputed calculation is not verifiable")
             manifest, results = proof["manifest"], proof["results"]
+            if (manifest.to_dict() != verified_manifest.to_dict()
+                    or [r.to_dict() for r in results] != [r.to_dict() for r in recomputed]):
+                raise ValueError("M18 self-consistent caller vector not backed by calculator")
             if not isinstance(manifest, VectorManifest) or not isinstance(results, (list, tuple)):
                 raise ValueError("M18 calculated vector required")
             if not manifest.verify(results):
