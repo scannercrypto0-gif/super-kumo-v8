@@ -1,5 +1,12 @@
 # AQL-CORE-WORK-OBSERVATION-AUTHORITY-E2E-001
 
+**2026-10-28 Issue151 supersession:** all owner execution commands below are
+historical, not a new authorization to repeat capture/SMB/Drive or start Guardian.
+Current Guardian CLI is local-preflight-only; continuous and once starts are
+HOLD. See [Guardian151 closure/runbook](guardian_closure_151.md). Historical
+owner 14-ACK transport was subsequently accepted boundedly (AIARC-079/081/086);
+AIARC-088 deferred one negative-access test, never granted operational release.
+
 Disposition: **PARTIAL / owner-host acceptance and independent S/R pending**.
 No PR merge, trading, OOS opening or final G0 approval. This report supersedes the
 operational description at checkpoint 325cad5; its original evidence is retained.
@@ -148,12 +155,15 @@ rclone version
 rclone config
 rclone lsf atlas: --drive-root-folder-id 1WeOdQ4COL89w4uqX-BnGGM4_xFYZHB9q
 Set-Location C:\ATLAS-OBS-E2E
-.\.venv\Scripts\python.exe scripts\evidence_guardian.py --outbox \\DESKTOP-6LLNVIF\ATLAS-EVIDENCE-OUTBOX --remote atlas: --once
+# HISTORICAL command only; superseded by Issue151 launch HOLD.
+# Current CLI rejects delivery/continuous starts. Do not execute this old form.
+# See docs/core/guardian_closure_151.md for local-only controlled preflight.
+# .\.venv\Scripts\python.exe scripts\evidence_guardian.py --outbox \\DESKTOP-6LLNVIF\ATLAS-EVIDENCE-OUTBOX --remote atlas: --once
 ```
 
-For the disconnect/restart acceptance, keep a longer bounded Windows1 capture
-running (`--seconds 600`), run Windows2 Guardian continuously without `--once`,
-stop it with Ctrl+C for 60 seconds, then restart it. On Windows1, before and after:
+Historical disconnect/restart plan (DO NOT REPEAT under Issue151) used a longer
+Windows1 capture and Windows2 Guardian stop/restart. The old continuous invocation
+is now rejected; operator commands below are retained only as historical context:
 
 ```powershell
 Get-Item C:\ATLAS-EVIDENCE-RUN\observer.sqlite3* | Select-Object Name,Length,LastWriteTimeUtc

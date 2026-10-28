@@ -22,7 +22,7 @@ class FakeRclone:
         if not self.online: raise subprocess.CalledProcessError(1,cmd)
         target=cmd[3] if cmd[1]=='copyto' else cmd[2]
         if cmd[1]=='cat':
-            if target not in self.remote: raise subprocess.CalledProcessError(3,cmd)
+            if target not in self.remote: raise subprocess.CalledProcessError(4,cmd)
             return SimpleNamespace(stdout=b'corrupt' if self.corrupt else self.remote[target])
         assert cmd[1]=='copyto' and '--immutable' in cmd
         if target in self.remote: raise subprocess.CalledProcessError(1,cmd)

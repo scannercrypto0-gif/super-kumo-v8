@@ -9,6 +9,7 @@ from aql.evidence_outbox import EvidenceOutbox, digest, encode
 from aql.evidence_guardian import RcloneDriveSender
 from aql.observer_runtime import atomic_json, clock_metadata, queue_snapshot
 from aql.utc_evidence import ClockSample
+from tests.guardian_fixtures import receipt
 
 
 def test_event_clock_binding_expiry_restart_and_step(tmp_path):
@@ -57,7 +58,7 @@ def test_guardian_download_tamper_retry_and_no_duplicate(tmp_path):
             return SimpleNamespace(stdout=b'')
         if op == 'cat':
             if not remote:
-                raise subprocess.CalledProcessError(3, args)
+                raise subprocess.CalledProcessError(4, args)
             return SimpleNamespace(stdout=b'tampered' if bad[0] else remote['blob'])
         raise AssertionError(op)
     sender.runner = run
@@ -78,7 +79,7 @@ def test_ack_tamper_cannot_silently_suppress_enqueue(tmp_path):
     q = EvidenceOutbox(tmp_path/'q')
     bundle = {'a': 1}
     sha = q.enqueue(bundle)
-    q.deliver(lambda b, h: dict(sha256=h, remote_id='fake-test-only'))
+    q.deliver(lambda b, h: receipt(h))
     ack = tmp_path/'q'/'acknowledged'/(sha+'.json')
     ack.write_text('{}')
     with pytest.raises(OutboxError):

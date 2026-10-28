@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 from aql.binance_observer import ObserverLedger, verify_bundle
 from aql.evidence_outbox import EvidenceOutbox
+from tests.guardian_fixtures import receipt
 
 class LedgerOutboxIntegrationTests(unittest.TestCase):
     def test_snapshot_offline_restart_then_recover(self):
@@ -18,7 +19,7 @@ class LedgerOutboxIntegrationTests(unittest.TestCase):
             restarted = EvidenceOutbox(Path(d) / "outbox")
             def sender(bundle, sha):
                 verify_bundle(bundle, bundle["ledger_head"])
-                return {"sha256": sha, "remote_id": "remote-copy"}
+                return receipt(sha)
             result = restarted.deliver(sender)
             self.assertEqual("REMOTE_RECEIPT_RECORDED_NOT_INDEPENDENTLY_VERIFIED",
                              result[0][1])

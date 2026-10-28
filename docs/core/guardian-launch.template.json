@@ -1,0 +1,25 @@
+{
+  "schema": "aql-guardian-launch-review-v1",
+  "remote": "atlas_vault:",
+  "vault_id": "1WeOdQ4COL89w4uqX-BnGGM4_xFYZHB9q",
+  "alias_target": "atlas:ATLAS-EVIDENCE-VAULT",
+  "working_directory": "C:\\REVIEWED\\checkout",
+  "outbox": "\\\\DESKTOP-6LLNVIF\\ATLAS-EVIDENCE-OUTBOX",
+  "log_path": "C:\\RESTRICTED\\logs\\guardian.jsonl",
+  "service_identity": "OPERATOR_MUST_DECLARE_ACTUAL_IDENTITY",
+  "rclone_config": {"path": "C:\\RESTRICTED\\rclone.conf", "sha256": "UNISSUED_OPERATOR_REVIEW_REQUIRED"},
+  "rclone_executable": {"path": "C:\\REVIEWED\\rclone.exe", "sha256": "UNISSUED_OPERATOR_REVIEW_REQUIRED"},
+  "python_executable": {"path": "C:\\REVIEWED\\python.exe", "sha256": "UNISSUED_OPERATOR_REVIEW_REQUIRED"},
+  "python_version": "OPERATOR_MUST_PIN_ACTUAL_VERSION",
+  "code_files": {
+    "src/aql/guardian_launch.py": "UNISSUED",
+    "src/aql/guardian_receipt.py": "UNISSUED",
+    "src/aql/evidence_guardian.py": "UNISSUED",
+    "src/aql/evidence_outbox.py": "UNISSUED",
+    "src/aql/archive/local.py": "UNISSUED",
+    "scripts/evidence_guardian.py": "UNISSUED"
+  },
+  "operator_declaration_ref": "PENDING_NOT_APPROVED",
+  "audit_approval_ref": "NOT_GRANTED",
+  "continuous_enablement": "HOLD"
+}
