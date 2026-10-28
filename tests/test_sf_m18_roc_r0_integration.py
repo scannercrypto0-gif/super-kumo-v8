@@ -60,7 +60,9 @@ def test_real_calculated_roc_value_flows_to_synthetic_r0():
     vectors={"trend":manifest.to_dict()}
     frozen,_=freeze_manifest_computed_guarded(
         dna,[event],computed_by_event={"ROC1":{"trend":proof}},
-        scanner_vectors=vectors,decision_vectors=deepcopy(vectors))
+        scanner_vectors=vectors,decision_vectors=deepcopy(vectors),
+        calculation_inputs={"ROC1":{"trend":dict(accessor=accessor,dataset_id="ROC_TEST",
+            version=1,start_ms=bars[0].bar_open,end_ms=bars[-1].bar_open)}})
     assert frozen.spec["rows"][0]["decision"]["signal"]=="ENTRY_CONDITION_MET"
     config=dict(schema="factory-exam-protocol-1",seed=7,capital=1000,notional=100,
                 fee_bps=0,spread_bps=0,slippage_bps=0,latency_ms=1,
