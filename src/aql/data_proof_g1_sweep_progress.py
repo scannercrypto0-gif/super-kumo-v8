@@ -37,12 +37,14 @@ class SweepProgress:
         return int(row[0]) if row else 0
 
     def save(self, instance, symbol, interval, cursor, high_water, *, expected=None, expected_generation=None):
+        if type(expected_generation) is not int or expected_generation < 0:
+            raise ProofError("sweep generation token required")
         if any(type(x) is not int or x < 0 for x in (cursor, high_water)):
             raise ProofError("invalid sweep checkpoint")
         self.db.execute("BEGIN IMMEDIATE")
         try:
             current = self.state(instance, symbol, interval)
-            if expected_generation is not None and self.generation(instance, symbol, interval) != expected_generation:
+            if self.generation(instance, symbol, interval) != expected_generation:
                 raise ProofError("stale sweep generation")
             if current != expected:
                 raise ProofError("stale sweep checkpoint update")
@@ -62,7 +64,9 @@ class SweepProgress:
             self.db.execute("ROLLBACK")
             raise
 
-    def clear(self, instance, symbol, interval, *, expected, expected_generation=None):
+    def clear(self, instance, symbol, interval, *, expected, expected_generation):
+        if type(expected_generation) is not int or expected_generation < 0:
+            raise ProofError("sweep generation token required")
         self.db.execute("BEGIN IMMEDIATE")
         try:
             if expected_generation is not None and self.generation(instance, symbol, interval) != expected_generation:
