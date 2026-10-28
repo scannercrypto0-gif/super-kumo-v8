@@ -40,16 +40,15 @@ def test_unchanged_manifests_but_mutated_consumed_value_rejected_before_scanner(
     event = copy.deepcopy(events[0])
     proof, manifests = make_proofs(dna,event)
     event["features"]["trend"]["values"]["value"] += 1
-    with pytest.raises(ValueError, match="M18 consumed feature differs"):
+    with pytest.raises(ValueError, match="M18 independently recomputable input proof required"):
         freeze_manifest_computed_guarded(dna,[event],computed_by_event={event["event_id"]:proof},
             scanner_vectors=manifests,decision_vectors=copy.deepcopy(manifests))
 
-def test_valid_synthetic_values_pass_proof_boundary():
+def test_self_consistent_manufactured_proof_without_independent_source_rejected():
     dna,events,_ = fixture()
     event=copy.deepcopy(events[0])
     proof, manifests=make_proofs(dna,event)
-    frozen, identities=freeze_manifest_computed_guarded(dna,[event],
-        computed_by_event={event["event_id"]:proof},
-        scanner_vectors=manifests,decision_vectors=copy.deepcopy(manifests))
-    assert len(frozen.spec["rows"])==1
-    assert set(identities)==set(manifests)
+    with pytest.raises(ValueError,match="M18 independently recomputable input proof required"):
+        freeze_manifest_computed_guarded(dna,[event],
+            computed_by_event={event["event_id"]:proof},
+            scanner_vectors=manifests,decision_vectors=copy.deepcopy(manifests))
