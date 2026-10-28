@@ -255,3 +255,15 @@ no independent custody/issuer timestamp, no empirical/PIT promotion.
 See docs/core/observation_authority_e2e_001.md and evidence/observation-e2e-20261028.
 No merge/OOS/PAPER/LIVE/final G0. Owner executes device runbooks; independent
 Council S safety and R scientific comparison requested against final SHA.
+
+
+### E2E first-head CI correction (not a rerun)
+
+Source325cad581dcb4222ec007338294c6001971fc921 published in existing #144.
+Authority40666205121 both OS green; observer Ubuntu446PASS/2SKIP. Core proof
+40666205102 Windows122741211366 genuinely failed59PASS/1FAIL: time-budget
+resume fixture assumed real250ms disk completion. Source explicitly allows soft
+incomplete slices. Repaired test clock in resume phase; original assertions
+retained and cleared-progress assertion added, no production thresholds changed.
+Optional benchmark SQLite lock/WinError32 remains OPEN, no SLO acceptance.
+Original failure retained, new revision required, no manual CI retry.

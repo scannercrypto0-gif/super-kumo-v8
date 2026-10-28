@@ -30,8 +30,14 @@ def test_sweep_soft_time_budget_preserves_cursor(tmp_path):
             max_pages=3, max_elapsed_ms=1)
     assert partial["pages"] == 1 and not partial["complete"]
     assert progress.state(journal.instance_id, "BTCUSDT", "1m")[0] > 0
-    resumed = run_sweep_slice(journal, registry, progress,
-        symbol="BTCUSDT", interval="1m", page_size=2, max_pages=3)
+    # This checks cursor recovery, not a 250ms disk-performance requirement.
+    # Real Windows fsync can exhaust the default soft budget before EOF;
+    # control elapsed time for the resume phase just as for the stop phase.
+    with patch("aql.data_proof_g1_sweep_progress.time.monotonic_ns",
+               return_value=0):
+        resumed = run_sweep_slice(journal, registry, progress,
+            symbol="BTCUSDT", interval="1m", page_size=2, max_pages=3)
     assert resumed["complete"] and resumed["added"] == 2
+    assert progress.state(journal.instance_id, "BTCUSDT", "1m") is None
     progress.close()
     registry.close()

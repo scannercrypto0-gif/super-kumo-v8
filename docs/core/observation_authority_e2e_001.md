@@ -172,3 +172,26 @@ scale/retention/physical durability requires separate evidence, no guarantee her
 Independent custodian/time authority remains external; no code can manufacture it.
 Council #134: separate S safety challenge and R scientific comparison requested
 against final SHA, tests and provenance; no self-issued acceptance or task closure.
+
+
+## Preserved CI failure and deterministic test repair
+
+First implementation head325cad581dcb4222ec007338294c6001971fc921:
+Core proof40666205102 Windows job122741211366 failed59PASS/1FAIL on
+`test_sweep_soft_time_budget_preserves_cursor`. Stop phase already used a fake
+monotonic clock, but resume phase used real clock and demanded completion within
+the default250ms soft slice. Source intentionally returns incomplete at the budget
+boundary; Windows fsync is not guaranteed below250ms. This is a test-contract
+mismatch, not evidence lost progress or a production sweep defect. Resume now uses
+deterministic monotonic time too; original complete/added==2 assertion retained,
+plus cleared-progress assertion. No production budget/threshold/skip changed.
+New code revision justifies new CI; original red run remains linked, no retry.
+
+Same Windows job's optional benchmark separately reported SQLite database locked
+and subsequent temporary-directory WinError32 cleanup failure. Remains
+PERFORMANCE/CONTENTION OPEN; no performance/SLO acceptance. It is not the gating
+pytest failure and is not concealed by changing benchmark behavior. Owner/Core
+performance follow-up should preserve this counterevidence before production.
+New-source authority40666205121 passed on both OS; observer Ubuntu job122741212261
+446PASS/2SKIP. Some legacy CI uses GitHub virtual mergeafbb0666, not an actual
+repository merge; its tree0980dd2e matched the implementation tree exactly.

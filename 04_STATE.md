@@ -1,3 +1,10 @@
+## E2E CI correction checkpoint (2026-10-28)
+
+First implementation325cad5: authority CI green both OS; Core proof40666205102
+Windows59PASS/1FAIL. Deterministic resume-clock test repair preserves assertions;
+production sweep unchanged. Optional benchmark lock/cleanup failure remains OPEN.
+New revision CI pending; original red run retained. Owner Windows still unexecuted.
+
 ## 2026-10-28 — Observation authority E2E #144 (unmerged, PARTIAL)
 
 Direct owner task AQL-CORE-WORK-OBSERVATION-AUTHORITY-E2E-001 implemented
