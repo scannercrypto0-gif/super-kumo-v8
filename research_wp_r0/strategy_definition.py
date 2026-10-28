@@ -276,6 +276,11 @@ def bind_evaluation(definition, accessor, dataset_id, version, start_ms, end_ms,
            b.bar_close >= decision_cutoff_ms or b.observation_cutoff_ms > decision_cutoff_ms
            for b in bars):
         raise ValueError("Unconfirmed/future/corrupt input")
+    # HistoricalLibrary's parent_version records lineage but not independently
+    # authenticated first-known-at; do not backdate corrected real vintages.
+    if any(b.source != SourceType.SYNTHETIC for b in bars) and (
+            accessor._library.get_manifest(dataset_id, version).parent_version is not None):
+        raise ValueError("PIT corrected vintage first-known evidence unavailable")
     if any(b.source != SourceType.SYNTHETIC and
            (type(b.ingest_time_ms) is not int or
             b.ingest_time_ms < b.bar_close + 1 or
