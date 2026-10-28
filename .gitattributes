@@ -1,0 +1,2 @@
+# Pinned archive/golden bytes must survive Windows checkout without conversion.
+evidence/factory-consolidated-20261028/*.json -text

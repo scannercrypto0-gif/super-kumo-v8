@@ -1129,3 +1129,17 @@ This records implementation choices under that scope, not production approval.
 - Retain R09 and deferred full Inbox/off-device backup requirements. PR16's MVP
   plan is superseded; its deferred obligations remain. No PR closure is executed.
 Parameters and measured evidence/limits are in docs/operations/G1_COMPLETION_20261024.md.
+
+## SF-DEC-010/B consolidated boundary execution — 2026-10-28
+
+Owner directly supplied #77/6464942337. Preserve research-plan-1 bytes/hashes
+and existing synthetic NO_SELECTION contract. Source-tree inventory establishes
+an actual public synthetic compare_routes aggregation port, with reproducible
+UNKNOWN-zero-fill and invalid-cost direct-input acceptance. Add compatibility-safe
+validation there using the existing protocol-v1 validator; do not create a new
+scoring engine. Candidate research outcome selector/publisher NOT_IMPLEMENTED;
+V2 synthetic asset scanner ranking remains its own validated contract. Keep
+candidate trial states distinct from opportunity denominators, sampled DD and
+conditional summaries. Details and static/dynamic coverage limits are canonical
+in docs/research/FACTORY_CONSOLIDATED_BOUNDARY_AUDIT.md. Independent Council S/R
+required; no merge, OOS/PAPER/LIVE or G0 authority.
