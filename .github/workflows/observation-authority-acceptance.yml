@@ -6,6 +6,8 @@ on:
       - 'tests/test_observation_authority.py'
       - 'src/aql/evidence_outbox.py'
       - 'tests/test_evidence_outbox.py'
+      - 'src/aql/binance_observer.py'
+      - 'tests/test_observer_outbox_integration.py'
       - 'src/aql/utc_evidence.py'
       - 'tests/test_utc_evidence.py'
       - '.github/workflows/observation-authority-acceptance.yml'
@@ -26,6 +28,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Fail-closed authority regression
         run: python -m unittest discover -s tests -p test_observation_authority.py -v
+      - name: Binance ledger to optional outbox integration
+        run: python -m unittest discover -s tests -p test_observer_outbox_integration.py -v
       - name: UTC uncertainty and expiry policy
         run: python -m unittest discover -s tests -p test_utc_evidence.py -v
       - name: Offline Guardian and replay recovery
