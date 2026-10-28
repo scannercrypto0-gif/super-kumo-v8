@@ -182,6 +182,40 @@ class FactoryExamTests(unittest.TestCase):
         self.assertIn('notional',r['changed_execution_assumptions'])
         self.assertLess(r['right']['portfolio']['net_quote'],r['left']['portfolio']['net_quote'])
 
+    def test_regime_policy_comparability_explicit_only(self):
+        m, base = self.build()
+        always = self.run_arm(m, base, "ALWAYS")
+        regime = self.run_arm(m, base, "REGIME")
+        matched = compare_routes(always, regime).spec
+        self.assertEqual(matched["comparison_kind"], "MATCHED_ASSUMPTIONS")
+        self.assertNotIn("changed_policy_parameters", matched)
+
+        for changes, expected in [
+            (dict(regime_threshold=.7), ["regime_threshold"]),
+            (dict(regime_max_age_ms=20), ["regime_max_age_ms"]),
+            (dict(regime_threshold=.7, regime_max_age_ms=20),
+             ["regime_threshold", "regime_max_age_ms"]),
+        ]:
+            _, altered = self.build(config=dict(self.config, trial_id="POLICY_VARIANT", **changes))
+            other_regime = self.run_arm(m, altered, "REGIME")
+            for left in (regime, always):
+                with self.assertRaises(ValueError):
+                    compare_routes(left, other_regime)
+                result = compare_routes(left, other_regime, sensitivity=True).spec
+                self.assertEqual(result["comparison_kind"], "POLICY_SENSITIVITY")
+                self.assertEqual(result["changed_policy_parameters"], expected)
+                self.assertEqual(result["changed_execution_assumptions"], [])
+                self.assertEqual(result["inference"],
+                                 "DESCRIPTIVE_SYNTHETIC_NO_P_VALUES_NO_PROMOTION")
+                self.assertEqual(result["left"]["scheduled"], result["right"]["scheduled"])
+
+        _, overlay = self.build(config=dict(self.config, trial_id="OVERLAY_ONLY",
+            overlay=dict(name="MAX_CONCURRENT", version="1", max_concurrent=1)))
+        overlay_result = compare_routes(always, self.run_arm(m, overlay), sensitivity=True).spec
+        self.assertEqual(overlay_result["comparison_kind"], "SENSITIVITY")
+        self.assertIn("overlay", overlay_result["changed_execution_assumptions"])
+        self.assertNotIn("changed_policy_parameters", overlay_result)
+
     def test_single_overlay_excludes_overlap_and_counts_trials(self):
         self.events=self.events[:2];e=self.events[1];e['cutoff_ms']=1050
         for obs in e['features'].values():obs.update(as_of_ms=1040,observed_at_ms=1041,available_at_ms=1042)
