@@ -38,7 +38,9 @@ def strategy(family):
     profile=spec["decision_profile"]
     if family=="MEAN_REVERSION":
         profile["entry"]["terms"]=[dict(term_id="mr_trend",reference="trend",
-            field="value",max_age_ms=100,weight=1,lower=0,upper=100,direction="LOW")]
+            field="value",max_age_ms=100,weight=1,lower=0,upper=100,direction="LOW"),
+            dict(term_id="mr_strength",reference="strength",field="value",
+                 max_age_ms=100,weight=1,lower=0,upper=100,direction="HIGH")]
         profile["entry"]["threshold"]=.7
         profile["entry"]["mandatory"]=[]
         profile["exit"]["terms"]=[dict(term_id="mr_exit",reference="trend",
