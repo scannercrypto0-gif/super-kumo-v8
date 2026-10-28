@@ -124,3 +124,20 @@ At 2026-10-21T06:42:12Z / 09:42:12 Asia/Riyadh (UTC+03:00), GitHub verifies [PR 
 ### G0-REV-01/C addendum to AQL-HO-20261021-003 documentary proposal
 
 Owner approved C documentary remediation on PR #15: sixteen future executable fixtures T29–T44, authoritative revision/reconnect/fencing acceptance, measurement uncertainty and trace criteria, evidence schemas, risks and review log. Existing PR #15 remains Draft, no merge/code/runtime tests; last owner-actually-submitted Work handoff still AQL-HO-20261021-002 / PR #14. G0 OPEN.
+
+## 2026-10-28 — CORE-TIME-PROOF-01/B directly received execution checkpoint
+
+Current owner instruction directly authorizes Binance observer implementation,
+tests, PR and Council #134 evidence submission, with no merge/live/G0 completion.
+Last explicitly owner-confirmed cross-chat submitted baseline in this register
+remains AQL-HO-20261021-002 / PR #14; no later cross-chat submission is inferred.
+Current scope is a directly received execution task, not a claim of exhaustive
+cross-chat handoff. Accessible GitHub since-baseline history is reconciled against
+main dbc191df, open #136 e61e6df, #137 d27ddd8f and Factory #141 fbf70afb, plus
+Council #134 latest #6462862444. #136 bounded D3 and prior #137 crash-gap tests
+are already documented/reused, not repeated as new work. All new observer scope
+is included in work_packages/CORE-TIME-PROOF-01-B.md and associated evidence.
+Unseen chat addenda remain UNVERIFIED; no conflicting authority was discovered
+in accessible records. Independent S/R and broader external timing/custody remain
+unresolved. Branch publication and exact-head validation are reported in the PR
+and Council thread; this entry does not assert merge or acceptance.

@@ -1,0 +1,2 @@
+# Evidence archive byte pins must survive Windows checkout without CRLF conversion.
+evidence/binance-observer-20261028/bundle-*.json -text

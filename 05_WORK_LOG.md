@@ -204,3 +204,28 @@ No orders, production DB, credentials, research changes or merges.
 See docs/operations/G1_COMPLETION_20261024.md and evidence/g1_completion_public_smoke.json.
 Final-head local/CI evidence belongs to the resulting consolidated Draft PR.
 R09 unresolved; PR16 left open with a scoped supersession recommendation.
+
+## 2026-10-28 — CORE-TIME-PROOF-01/B observer implementation, branch only
+
+Reconciled owner task, last registered submitted baseline, main dbc191df, Core
+#136/#137 and Council #134 through #6462862444; reused prior D3/local proof.
+Added separate-process Binance WS/REST watcher, canonical ObservationVersion,
+WAL/FULL raw+revision evidence, hash-chain/pinned envelope verification, conservative
+as-of selection, UNKNOWN clock/coverage and existing pinned Factory E2E tests.
+Two real cumulative captures across restart retained; six unique versions,
+22 REST and two final WS receives. No natural correction/issuer attestation,
+independent UTC or continuous immutable off-host custody proven. Eight focused
+tests pass locally. Broad local run initially 436 pass/two skip/one missing
+user-site dependency in isolated child; rerun in dedicated venv recorded in PR.
+Exact-head Ubuntu/Windows CI and Council independent S/R are required; no merge,
+historical/OOS, paper/live, final acceptance or G0 completion authorized.
+
+### CORE-TIME-PROOF-01/B — Windows byte-custody correction
+
+First CI run 40648887094 on bbad777: Ubuntu 445 pass / 2 skip; Windows
+436 pass / 10 skip / 1 failure. The real-capture file pin correctly rejected
+Git autocrlf-transformed evidence bytes. Reproduced the exact failing SHA256
+locally by LF→CRLF conversion. Added path-scoped `.gitattributes -text` to retain
+archive bytes, preserved original manifest hashes and strict raw-byte assertions,
+and added attribute changes to the workflow trigger. New exact-head CI required;
+the earlier failed run is not acceptance evidence for the corrected commit.

@@ -1,0 +1,47 @@
+{
+  "schema": "binance-bounded-capture-manifest-v1",
+  "captures": [
+    {
+      "file": "bundle-2ea1be4d-46f1-477d-b770-2b54544fa02e.json",
+      "sha256": "10b4877c9bcf36ee029458bb1ece21cc32d9ead3bccc2783cf97371ed4394be9",
+      "ledger_head": "96893d7056ca7363cf772a31ee65fa6352fb31c3a50d7a6bea6a51fbfc2ec36e",
+      "counts": {
+        "SESSION_START": 2,
+        "CLOCK_SAMPLE": 6,
+        "RECEIVE": 24,
+        "VERSION": 6,
+        "POSTCOMMIT": 6,
+        "GAP": 2,
+        "CONNECTED": 1,
+        "SESSION_STOP": 2
+      },
+      "transports": {
+        "REST": 22,
+        "WS": 2
+      },
+      "versions": 6
+    },
+    {
+      "file": "bundle-c658bdd1-423e-446b-9b5b-065747a7fd49.json",
+      "sha256": "e5e3d50cac6c01c020cba0fa8f95ea3e428a6715418a61c10e77a502216cdd6e",
+      "ledger_head": "73a8a494567bc26cd61bead218e1df1b96718583265c2a135a759e5f0848779d",
+      "counts": {
+        "SESSION_START": 1,
+        "CLOCK_SAMPLE": 5,
+        "RECEIVE": 20,
+        "VERSION": 6,
+        "POSTCOMMIT": 6,
+        "GAP": 1,
+        "CONNECTED": 1,
+        "SESSION_STOP": 1
+      },
+      "transports": {
+        "REST": 18,
+        "WS": 2
+      },
+      "versions": 6
+    }
+  ],
+  "utc_status": "UNKNOWN",
+  "issuer_status": "UNATTESTED"
+}
