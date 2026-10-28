@@ -1,5 +1,7 @@
 """Actual ROC_v2 -> calculated manifest -> StrategyDNA -> R0 synthetic proof."""
 from copy import deepcopy
+import pytest
+from research_wp_r0.indicator_library_v2 import VectorResult, VectorManifest
 from research_wp_r0.historical_library import (
     HistoricalLibrary, CustodyAccessor, make_test_bar, validate_bars
 )
@@ -76,3 +78,30 @@ def test_real_calculated_roc_value_flows_to_synthetic_r0():
     assert any(x["kind"]=="SIMULATED_ENTRY" for x in route.spec["ledger"])
     assert any(x["kind"]=="SIMULATED_EXIT" for x in route.spec["ledger"])
     assert replay_route(frozen,protocol,route,arm="ALWAYS").digest==route.digest
+    # Same original vectors, altered consumed feature: reject before Scanner.
+    tampered=deepcopy(event)
+    tampered["features"]["trend"]["values"]["roc"] = value + 1
+    calc={"ROC1":{"trend":dict(accessor=accessor,dataset_id="ROC_TEST",
+        version=1,start_ms=bars[0].bar_open,end_ms=bars[-1].bar_open)}}
+    with pytest.raises(ValueError,match="consumed feature differs"):
+        freeze_manifest_computed_guarded(
+            dna,[tampered],computed_by_event={"ROC1":{"trend":proof}},
+            scanner_vectors=vectors,decision_vectors=deepcopy(vectors),
+            calculation_inputs=calc)
+    # A forged matching feature + rehashed VectorResult/VectorManifest
+    # must still fail because independent calculator recomputes original ROC.
+    fake_value=value+1
+    fake=VectorResult.create(**{
+        k:v for k,v in results[-1].to_dict().items() if k not in ("provenance_hash","value")
+    },value=(("roc",fake_value),))
+    fake_manifest=VectorManifest.create({
+        k:v for k,v in manifest.to_dict().items()
+        if k not in ("result_hashes","result_count","manifest_hash")
+    },[fake])
+    fakeproof=dict(proof,results=[fake],manifest=fake_manifest)
+    fakevectors={"trend":fake_manifest.to_dict()}
+    with pytest.raises(ValueError,match="not backed by calculator"):
+        freeze_manifest_computed_guarded(
+            dna,[tampered],computed_by_event={"ROC1":{"trend":fakeproof}},
+            scanner_vectors=fakevectors,decision_vectors=deepcopy(fakevectors),
+            calculation_inputs=calc)
