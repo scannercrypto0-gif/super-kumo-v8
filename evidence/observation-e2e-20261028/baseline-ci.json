@@ -1,0 +1,50 @@
+[
+  {
+    "id": 40664387919,
+    "name": "G1 Integrity 58-59 Focused Acceptance",
+    "sha": "6cb17079b71e7aaa33de756b60ad59686b260aad",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40664387919"
+  },
+  {
+    "id": 40664387927,
+    "name": "Binance independent observer exact-head acceptance",
+    "sha": "6cb17079b71e7aaa33de756b60ad59686b260aad",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40664387927"
+  },
+  {
+    "id": 40664387918,
+    "name": "Observation authority bounded acceptance",
+    "sha": "6cb17079b71e7aaa33de756b60ad59686b260aad",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40664387918"
+  },
+  {
+    "id": 40664387914,
+    "name": "G1 WP01–WP04 Tests",
+    "sha": "6cb17079b71e7aaa33de756b60ad59686b260aad",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40664387914"
+  },
+  {
+    "id": 40664387928,
+    "name": "G1-STORAGE-02 Local archive acceptance",
+    "sha": "6cb17079b71e7aaa33de756b60ad59686b260aad",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40664387928"
+  },
+  {
+    "id": 40664387904,
+    "name": "Core data proof focused",
+    "sha": "6cb17079b71e7aaa33de756b60ad59686b260aad",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40664387904"
+  }
+]

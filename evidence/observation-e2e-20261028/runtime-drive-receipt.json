@@ -1,0 +1,22 @@
+{
+  "receipt": {
+    "sha256": "36b7c8ca2d5354aa7d3b4484091593daddf456e7a083f47ba1e4258099b34015",
+    "remote_id": "15-3KbuiR_n88YeSwVtZ2GR5YgIjjqTIC",
+    "download_sha256": "36b7c8ca2d5354aa7d3b4484091593daddf456e7a083f47ba1e4258099b34015",
+    "vault_id": "1WeOdQ4COL89w4uqX-BnGGM4_xFYZHB9q",
+    "independent_custody": false,
+    "issuer_attestation": false,
+    "transport": "CONNECTED_DRIVE_CONNECTOR_NOT_WINDOWS_RCLONE",
+    "bytes": 22877
+  },
+  "outcomes": [
+    [
+      "36b7c8ca2d5354aa7d3b4484091593daddf456e7a083f47ba1e4258099b34015",
+      "REMOTE_RECEIPT_RECORDED_NOT_INDEPENDENTLY_VERIFIED"
+    ],
+    [
+      "ab90a935001df29df2ec1ccdb7cde08d2e49b38bd46ef0ed043112a0ce5364fd",
+      "PENDING_EXTERNAL_ANCHOR"
+    ]
+  ]
+}

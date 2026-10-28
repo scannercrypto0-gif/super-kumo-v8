@@ -1,3 +1,36 @@
+## E2E CI correction checkpoint (2026-10-28)
+
+First implementation325cad5: authority CI green both OS; Core proof40666205102
+Windows59PASS/1FAIL. Deterministic resume-clock test repair preserves assertions;
+production sweep unchanged. Optional benchmark lock/cleanup failure remains OPEN.
+New revision CI pending; original red run retained. Owner Windows still unexecuted.
+
+## 2026-10-28 — Observation authority E2E #144 (unmerged, PARTIAL)
+
+Direct owner task AQL-CORE-WORK-OBSERVATION-AUTHORITY-E2E-001 implemented
+on existing Draft #144, starting 6cb17079. Automatic local outbox checkpoints,
+session-bound unauthenticated UTC diagnostics, separate optional Guardian Drive
+readback verifier and Windows runbooks. Actual Work Linux Binance REST capture
+4 versions; actual Drive upload/download SHA256 and bundle verification passed.
+No owner Windows access; WS timeout, UTC DNS failure => UNKNOWN, no finite
+UTC accuracy certified. Same-account Drive is mutable backup. Pinned Factory
+rejects empirical/real-PIT promotion. Local final targeted 34 PASS, proof
+regression 53 PASS; CI for changed SHA to be recorded in PR/Council report.
+No merge/trading/OOS/final G0 action. Owner-device and Council S/R acceptance
+pending. [Single report/runbooks](docs/core/observation_authority_e2e_001.md).
+
+## 2026-10-28 — Binance observer branch checkpoint (not merged)
+
+Owner-authorized CORE-TIME-PROOF-01/B is implemented as a standalone process,
+stacked on Core #137 d27ddd8f. Genuine Binance WS/REST evidence across restart
+is in `evidence/binance-observer-20261028/capture_manifest.json`; six distinct
+versions, no naturally observed correction. UTC status UNKNOWN, timing class
+FIRST_INDEPENDENT_OBSERVED; issuer time UNATTESTED. Existing Factory #141 pinned
+bridge remains fail-closed; no empirical PIT admission or trading activation.
+See `docs/core/binance_independent_observer.md` for tests, limits and deployment.
+Exact-head CI and independent Council S/R are tracked by the resulting PR and
+Issue #134; no completion/merge/G0 declaration is made by this checkpoint.
+
 ## Current execution addendum - 2026-10-24 (Draft PR, not merged)
 
 Verified main baseline: 8e8690e58451e4fdd38f3e5e5f3cc89817e59c26. G0 is

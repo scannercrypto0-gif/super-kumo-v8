@@ -1129,3 +1129,18 @@ This records implementation choices under that scope, not production approval.
 - Retain R09 and deferred full Inbox/off-device backup requirements. PR16's MVP
   plan is superseded; its deferred obligations remain. No PR closure is executed.
 Parameters and measured evidence/limits are in docs/operations/G1_COMPLETION_20261024.md.
+
+## CORE-TIME-PROOF-01/B — independent Binance observation (2026-10-28)
+
+Owner-authorized implementation scope, reference Council #134/6462845677:
+reuse ObservationVersion and envelope-v1; separate-process public Binance Spot
+WS final-kline observations plus REST snapshot comparison. Append raw content,
+wall/monotonic clocks, source-reported E, identity/session, digest and revision
+ancestry. FIRST_INDEPENDENT_OBSERVED is a transport receipt observation, never
+ISSUER_ATTESTED publication. REST content changes are observed snapshot revisions;
+no completeness between polls or backdated correction knowledge is asserted.
+Local/transport/source clock evidence without independently validated UTC bounds
+keeps temporal status UNKNOWN. Gaps and restarts remain UNKNOWN; Factory's
+existing empirical refusal is preserved. Hash chain plus Git commit pin provides
+bounded tamper evidence, not WORM custody, independent timestamp authority, or
+proof of host-loss survival before off-host publication. No G0 closure/merge.

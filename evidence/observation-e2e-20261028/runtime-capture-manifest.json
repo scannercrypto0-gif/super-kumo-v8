@@ -1,0 +1,29 @@
+{
+  "file": "36b7c8ca2d5354aa7d3b4484091593daddf456e7a083f47ba1e4258099b34015.json",
+  "sha256": "36b7c8ca2d5354aa7d3b4484091593daddf456e7a083f47ba1e4258099b34015",
+  "ledger_head": "12c459761b1b8cb7a886efd1e7d4bfe85953d6a82134b75a1bfc795e2291f2cd",
+  "versions": 4,
+  "counts": {
+    "SESSION_START": 1,
+    "CLOCK_SAMPLE": 1,
+    "RECEIVE": 4,
+    "VERSION": 4,
+    "POSTCOMMIT": 4,
+    "GAP": 1,
+    "SESSION_STOP": 1
+  },
+  "utc_status": "UNKNOWN",
+  "issuer_status": "UNATTESTED",
+  "receipt": {
+    "sha256": "36b7c8ca2d5354aa7d3b4484091593daddf456e7a083f47ba1e4258099b34015",
+    "remote_id": "15-3KbuiR_n88YeSwVtZ2GR5YgIjjqTIC",
+    "download_sha256": "36b7c8ca2d5354aa7d3b4484091593daddf456e7a083f47ba1e4258099b34015",
+    "vault_id": "1WeOdQ4COL89w4uqX-BnGGM4_xFYZHB9q",
+    "independent_custody": false,
+    "issuer_attestation": false,
+    "transport": "CONNECTED_DRIVE_CONNECTOR_NOT_WINDOWS_RCLONE",
+    "bytes": 22877
+  },
+  "source_baseline": "325cad581dcb4222ec007338294c6001971fc921",
+  "source_state": "working-tree additive runtime revision; final commit linked from PR delivery"
+}
