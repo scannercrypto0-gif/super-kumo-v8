@@ -74,6 +74,7 @@ def _run_gap_recovery(
     inserted = 0
     skipped_dup = 0
     errors = 0
+    ack_pending = 0
 
     for bar in recovered_bars:
         if stop_event is not None and stop_event.is_set():
@@ -122,9 +123,11 @@ def _run_gap_recovery(
             continue
         except Exception as exc:
             logger.warning(
-                "mark_persisted failed for %s (non-fatal): %s",
+                "mark_persisted failed for %s (ACK pending; retry on restart): %s",
                 bar.stable_key(), exc,
             )
+            errors += 1
+            ack_pending += 1
 
         if upserted:
             inserted += 1
@@ -136,6 +139,7 @@ def _run_gap_recovery(
         "recovery_inserted": inserted,
         "recovery_skipped_dup": skipped_dup,
         "recovery_errors": errors,
+        "recovery_ack_pending": ack_pending,
     }
 
 
