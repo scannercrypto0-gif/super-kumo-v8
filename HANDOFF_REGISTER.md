@@ -153,3 +153,9 @@ D1/D2/D3/Factory work already documented; automatic outbox/UTC/Guardian/Drive
 roundtrip included in current report. Unseen chats/addenda UNRESOLVED/COVERAGE
 GAP; no exhaustive unified handoff or final G0 claim. Existing Draft #144 updated,
 not merged. Windows owner runs and independent Council S/R remain pending.
+
+Additive same-task reconciliation: concurrent 325cad5 fetched/preserved;
+Council accessible through6465513488 included. Separate snapshot/UTC processes,
+actual final runtime Drive roundtrip and Windows runbooks included in the single
+report. Owner-host tests and unseen cross-chat baseline remain unresolved;
+no new global submission or acceptance inferred.

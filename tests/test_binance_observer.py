@@ -150,9 +150,10 @@ def test_atomic_failure_does_not_publish_partial_version(tmp_path):
     l._append=append; observe(l); assert len(l.versions())==1
     l.close()
 
-def test_current_operational_capture_drive_backup_still_denied_by_factory(tmp_path):
+@pytest.mark.parametrize("manifest_name", ["capture-manifest.json", "runtime-capture-manifest.json"])
+def test_current_operational_capture_drive_backup_still_denied_by_factory(tmp_path, manifest_name):
     root=Path('evidence/observation-e2e-20261028')
-    manifest=json.loads((root/'capture-manifest.json').read_text())
+    manifest=json.loads((root/manifest_name).read_text())
     raw=(root/manifest['file']).read_bytes()
     assert hashlib.sha256(raw).hexdigest()==manifest['sha256']
     bundle=json.loads(raw)

@@ -3,9 +3,9 @@ import argparse
 import json
 import os
 from pathlib import Path
-from dataclasses import asdict
+import multiprocessing
+from aql.observer_runtime import atomic_json, clock_metadata, snapshot_loop
 from aql.evidence_outbox import EvidenceOutbox
-from aql.utc_evidence import measure_sntp, assess
 import time
 import urllib.request
 import websocket
@@ -33,31 +33,26 @@ def checkpoint(ledger, outbox):
         return None
 
 
-def run(directory, seconds, *, utc_source="time.cloudflare.com", max_uncertainty_ms=100):
+def run(directory, seconds, *, max_uncertainty_ms=100, clock_sample=None):
     directory = Path(directory); directory.mkdir(parents=True, exist_ok=True)
     ledger = ObserverLedger(directory/'observer.sqlite3')
-    outbox = EvidenceOutbox(directory/'outbox')
-    checkpoint(ledger, outbox)  # Recover prior committed history even without network.
-    sample = None; sample_ref = None; next_utc = 0
+    atomic_json(directory/'runtime-session.json', {'observer_session': ledger.session})
+    ctx = multiprocessing.get_context('spawn')
+    stop = ctx.Event()
+    worker = ctx.Process(target=snapshot_loop,
+        args=(directory/'observer.sqlite3', directory/'outbox', stop), daemon=True)
+    try:
+        worker.start()
+    except Exception as exc:
+        print(json.dumps(dict(status='LOCAL_QUEUE_WORKER_FAILED', error=type(exc).__name__)), flush=True)
+    clock_sample = clock_sample or directory/'utc-sample.json'
     deadline = time.monotonic()+seconds if seconds is not None else None
     sock = None; next_poll = 0; retry = 1; clock_ref = None
     try:
         while deadline is None or time.monotonic() < deadline:
-            if time.monotonic() >= next_utc:
-                next_utc = time.monotonic()+30
-                sample = None; sample_ref = None
-                try:
-                    sample = measure_sntp(utc_source)
-                    sample_ref = ledger.record('UTC_DIAGNOSTIC', dict(
-                        sample=asdict(sample), session=ledger.session,
-                        authenticated=False, issuer_attestation=False))
-                except Exception as exc:
-                    ledger.record('UTC_DIAGNOSTIC_UNAVAILABLE', dict(
-                        session=ledger.session, status='UNKNOWN', error=type(exc).__name__))
             def utc_metadata(wall, mono):
-                return dict(utc_sample_ref=sample_ref, utc_diagnostic=assess(
-                    sample, mono, max_uncertainty_ms, now_wall_ms=wall),
-                    utc_policy_max_uncertainty_ms=max_uncertainty_ms)
+                return clock_metadata(ledger, clock_sample, wall, mono,
+                                      maximum_ms=max_uncertainty_ms)
             if time.monotonic() >= next_poll:
                 next_poll = time.monotonic()+30
                 try:
@@ -72,7 +67,6 @@ def run(directory, seconds, *, utc_source="time.cloudflare.com", max_uncertainty
                             monotonic_ns=timing['monotonic_ns'], clock_ref=clock_ref,
                             metadata=dict(symbol='BTCUSDT', interval='1m', timing=timing,
                                 **utc_metadata(timing['wall_ms'], timing['monotonic_ns'])))
-                    checkpoint(ledger, outbox)
                 except Exception as e:
                     ledger.record('GAP', dict(reason='REST_OR_CLOCK_FAILURE', error=str(e), coverage='UNKNOWN'))
             try:
@@ -85,7 +79,6 @@ def run(directory, seconds, *, utc_source="time.cloudflare.com", max_uncertainty
                 if p:
                     ledger.observe(p, raw=raw, endpoint=WS, transport='WS', wall_ms=wall, monotonic_ns=mono,
                         clock_ref=clock_ref, source_event_ms=msg['E'], metadata=dict(f=msg['k']['f'], L=msg['k']['L'], x=True, **utc_metadata(wall, mono)))
-                    checkpoint(ledger, outbox)
             except websocket.WebSocketTimeoutException:
                 ledger.record('GAP', dict(reason='RECEIVE_TIMEOUT', coverage='UNKNOWN'))
             except Exception as e:
@@ -95,7 +88,13 @@ def run(directory, seconds, *, utc_source="time.cloudflare.com", max_uncertainty
     finally:
         if sock: sock.close()
         ledger.record('SESSION_STOP', dict(coverage='UNKNOWN', reason='bounded_capture_end'))
-        checkpoint(ledger, outbox)
+        stop.set()
+        if worker.pid:
+            worker.join(2)
+            if worker.is_alive():
+                worker.terminate()
+                worker.join()
+                print(json.dumps(dict(status='LOCAL_QUEUE_FINAL_SNAPSHOT_PENDING')), flush=True)
         bundle = ledger.bundle(); out = directory/f'bundle-{ledger.session}.json'
         with out.open('x') as f:
             f.write(canonical(bundle)+'\n'); f.flush(); os.fsync(f.fileno())
@@ -105,8 +104,8 @@ def run(directory, seconds, *, utc_source="time.cloudflare.com", max_uncertainty
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser(); p.add_argument('--directory', required=True); p.add_argument('--seconds', type=int, default=None)
-    p.add_argument('--utc-source', default='time.cloudflare.com')
+    p.add_argument('--clock-sample', default=None)
     p.add_argument('--max-uncertainty-ms', type=float, default=100)
     args = p.parse_args()
     if args.seconds is not None and args.seconds < 1: p.error('positive duration required')
-    run(args.directory, args.seconds, utc_source=args.utc_source, max_uncertainty_ms=args.max_uncertainty_ms)
+    run(args.directory, args.seconds, clock_sample=args.clock_sample, max_uncertainty_ms=args.max_uncertainty_ms)

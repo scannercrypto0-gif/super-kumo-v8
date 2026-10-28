@@ -35,7 +35,9 @@ class RcloneDriveSender:
         # Check an existing copy first: recovery after upload-before-local-ack exit.
         try:
             downloaded = self.command(['cat', target])
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as exc:
+            if exc.returncode not in (3, 4):
+                raise
             with tempfile.TemporaryDirectory() as directory:
                 local = Path(directory)/'bundle.json'
                 local.write_bytes(blob)

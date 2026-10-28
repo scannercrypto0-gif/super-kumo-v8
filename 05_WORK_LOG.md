@@ -267,3 +267,15 @@ incomplete slices. Repaired test clock in resume phase; original assertions
 retained and cleared-progress assertion added, no production thresholds changed.
 Optional benchmark SQLite lock/WinError32 remains OPEN, no SLO acceptance.
 Original failure retained, new revision required, no manual CI retry.
+### E2E additive reconciliation after concurrent 325cad5
+
+Fetched and preserved concurrent #144 runtime delivery; reused its canonical UTC
+parser, verifier and Guardian instead of duplicating APIs. Moved snapshot work to
+read-only child process and UTC network collection to separate Windows1 process;
+added W32Time dispersion fail-closed parsing and corrupted-ACK detection. Local
+reconciled 39 PASS, then 8 affected runtime cases PASS including three added
+W32Time cases. New actual Linux REST capture 4 versions, final Drive object
+15-3KbuiR_n88YeSwVtZ2GR5YgIjjqTIC 22877 bytes SHA36b7c8ca… matched after
+full download; canonical bundle verified before local ACK. Windows owner devices
+and rclone live deployment remain NOT EXECUTED; no finite UTC bound. Updated
+single report/runbooks and Python3.14 CI; exact delivery SHA/CI in PR comment.

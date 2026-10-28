@@ -37,13 +37,27 @@ def test_real_cli_callpath_local_export_guardian_off_restart_and_readback(tmp_pa
         def close(self): pass
     tick=iter([0,0,0,0,0,0,2])
     monkeypatch.setattr(watcher.time, 'monotonic', lambda: next(tick,2))
-    monkeypatch.setattr(watcher, 'measure_sntp', lambda *_: (_ for _ in ()).throw(OSError()))
+    # Child exporter uses a separate process in production. A deterministic
+    # stand-in snapshots the same DB after SESSION_STOP for this injected feed.
+    from aql.observer_runtime import snapshot_loop
+    class Worker:
+        pid = 1
+        def __init__(self, target, args, **kw): self.target, self.args = target, args
+        def start(self): pass
+        def join(self, *a): self.target(*self.args)
+        def is_alive(self): return False
+    class Context:
+        def Event(self):
+            import threading
+            return threading.Event()
+        Process = Worker
+    monkeypatch.setattr(watcher.multiprocessing, 'get_context', lambda *_: Context())
     monkeypatch.setattr(watcher.websocket, 'create_connection', lambda *a,**k: Socket())
     monkeypatch.setattr(watcher,'get',lambda path: (
         json.dumps(dict(serverTime=100000)) if 'time' in path else json.dumps([ROW]),
         dict(wall_ms=100000,monotonic_ns=100000000000)))
     watcher.run(tmp_path,1)
-    q=EvidenceOutbox(tmp_path/'outbox'); assert q.pending_count()>=2
+    q=EvidenceOutbox(tmp_path/'outbox'); assert q.pending_count()>=1
     backend=FakeRclone(); sender=RcloneDriveSender('atlas:',runner=backend)
     assert all(s=='PENDING_EXTERNAL_ANCHOR' for _,s in q.deliver(sender))
     # Durable Core evidence exists and verifies while Guardian is disconnected.

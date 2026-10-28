@@ -33,7 +33,15 @@ class EvidenceOutbox:
         blob=encode(bundle)
         key=digest(blob)
         target=self.pending/(key+".json")
-        if (self.acked/(key+".json")).exists():
+        acknowledged = self.acked/(key+".json")
+        if acknowledged.exists():
+            try:
+                ack = json.loads(acknowledged.read_bytes())
+                if (ack['sha256'] != key or ack['receipt']['sha256'] != key
+                        or not ack['remote_id'] or ack['remote_id'] != ack['receipt']['remote_id']):
+                    raise ValueError('invalid receipt')
+            except (ValueError, KeyError, TypeError):
+                raise OutboxError('local acknowledgement tampered')
             return key
         if target.exists():
             if digest(target.read_bytes()) != key:
