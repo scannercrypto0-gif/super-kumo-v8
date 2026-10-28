@@ -2,9 +2,7 @@
 from unittest.mock import patch
 
 from aql.journal.durable_journal import DurableJournal
-from aql.models.bar import MarketBar
 from aql.pipeline import _run_gap_recovery
-from aql.recovery.gap_recovery import RecoveryReport
 from aql.storage.operational_store import OperationalStore
 
 
@@ -13,8 +11,6 @@ def test_store_write_with_failed_ack_reports_pending_and_restart_replays(tmp_pat
     store_path = str(tmp_path / "store.sqlite")
     journal = DurableJournal(journal_path)
     store = OperationalStore(store_path)
-    bar = MarketBar("BTCUSDT", "1m", 0, 59999, 100., 101., 99., 100.,
-                    1., True, "synthetic", 60000).with_checksum()
 
     # A successful REST fetch is injected; this test does not use the network.
     # Use the actual recover_gap implementation with an injected provider response.
