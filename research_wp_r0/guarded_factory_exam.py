@@ -7,8 +7,21 @@ from .factory_exam import freeze_manifest
 from .indicator_calculation_identity import require_same_calculation
 
 
-def freeze_manifest_guarded(dna, events, *, scanner_vectors, decision_vectors):
-    """Reject mismatched feature calculation identities before Scanner/Decision."""
+def freeze_manifest_guarded(dna, events, *, scanner_vectors, decision_vectors,
+                            computed_by_event=None):
+    """Strict M18 gateway: manifest agreement alone cannot admit a decision."""
+    if computed_by_event is None:
+        # Retain legacy manifest-only checks for their diagnostic tests, but
+        # never permit an unbound feature to reach Scanner / Decision.
+        _compare_manifest_identities(scanner_vectors, decision_vectors)
+        raise ValueError("M18 calculated feature evidence required")
+    return freeze_manifest_computed_guarded(
+        dna, events, computed_by_event=computed_by_event,
+        scanner_vectors=scanner_vectors, decision_vectors=decision_vectors)
+
+
+def _compare_manifest_identities(scanner_vectors, decision_vectors):
+    """Compare frozen calculation metadata only; NOT feature admission."""
     if (type(scanner_vectors) is not dict or type(decision_vectors) is not dict
             or not scanner_vectors or set(scanner_vectors) != set(decision_vectors)):
         raise ValueError("M18 complete paired vector manifests required")
@@ -18,8 +31,7 @@ def freeze_manifest_guarded(dna, events, *, scanner_vectors, decision_vectors):
             raise ValueError("M18 invalid feature reference")
         identities[reference] = require_same_calculation(
             scanner_vectors[reference], decision_vectors[reference])
-    # Existing accepted R0 path, still purely synthetic and no actual provenance.
-    return freeze_manifest(dna, events), identities
+    return identities
 
 def freeze_manifest_computed_guarded(dna, events, *, computed_by_event,
                                      scanner_vectors, decision_vectors):
@@ -95,5 +107,6 @@ def freeze_manifest_computed_guarded(dna, events, *, computed_by_event,
             if (type(observed) is not dict or set(observed) != set(values)
                     or canonical(observed) != canonical(values)):
                 raise ValueError("M18 consumed feature differs from computed vector")
-    return freeze_manifest_guarded(dna, events, scanner_vectors=scanner_vectors,
-                                   decision_vectors=decision_vectors)
+    identities = _compare_manifest_identities(scanner_vectors, decision_vectors)
+    # Existing accepted R0 engine, after independent computed-value binding.
+    return freeze_manifest(dna, events), identities
