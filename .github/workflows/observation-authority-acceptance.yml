@@ -15,6 +15,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         python-version: ['3.11']
+    env:
+      PYTHONPATH: src
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -24,5 +26,3 @@ jobs:
         run: python -m unittest discover -s tests -p test_observation_authority.py -v
       - name: Offline Guardian and replay recovery
         run: python -m unittest discover -s tests -p test_evidence_outbox.py -v
-        env:
-          PYTHONPATH: src
