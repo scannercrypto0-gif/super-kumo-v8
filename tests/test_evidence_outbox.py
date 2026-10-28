@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from aql.evidence_outbox import EvidenceOutbox
+from tests.guardian_fixtures import receipt
 
 class EvidenceOutboxTests(unittest.TestCase):
     def test_offline_then_recovery_without_core_block(self):
@@ -16,7 +17,7 @@ class EvidenceOutboxTests(unittest.TestCase):
             reopened=EvidenceOutbox(d)
             sent=[]
             result=reopened.deliver(lambda b,h:(sent.append((b,h)) or
-                {"sha256":h,"remote_id":"guardian-1"}))
+                receipt(h)))
             self.assertEqual(1,len(sent))
             self.assertEqual(0,reopened.pending_count())
             self.assertEqual("REMOTE_RECEIPT_RECORDED_NOT_INDEPENDENTLY_VERIFIED",result[0][1])

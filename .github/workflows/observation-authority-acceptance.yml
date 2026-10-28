@@ -10,6 +10,12 @@ on:
       - 'tests/test_observer_outbox_integration.py'
       - 'src/aql/utc_evidence.py'
       - 'src/aql/evidence_guardian.py'
+      - 'src/aql/guardian_receipt.py'
+      - 'src/aql/guardian_launch.py'
+      - 'tests/test_guardian_hardening.py'
+      - 'tests/test_guardian_launch.py'
+      - 'tests/guardian_fixtures.py'
+      - 'scripts/guardian_preflight.ps1'
       - 'src/aql/observer_runtime.py'
       - 'src/aql/utc_sampler.py'
       - 'scripts/sample_utc.py'
@@ -53,6 +59,13 @@ jobs:
         run: python -m unittest discover -s tests -p test_utc_evidence.py -v
       - name: Offline Guardian and replay recovery
         run: python -m unittest discover -s tests -p test_evidence_outbox.py -v
+      - name: Guardian closure faults and local-only launch HOLD
+        run: python -m pytest -q tests/test_guardian_hardening.py tests/test_guardian_launch.py --junitxml=guardian-closure.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: guardian-closure-${{ matrix.os }}-${{ matrix.python-version }}
+          path: guardian-closure.xml
       - name: Separate snapshot process and Guardian recovery boundaries
         run: python -m pytest -q tests/test_observer_runtime.py --junitxml=runtime-acceptance.xml
       - uses: actions/upload-artifact@v4

@@ -273,3 +273,15 @@ Owner provisionally approved G1-ARCH-29–44, all option C, since last actually 
 ## G0-REV-01 / C — Review remediation state
 
 Draft PR #15 documentation clarification authorized and applied on its existing branch: test fixture/trigger/expected/forbidden cases T29–T44; revision-safe notification/restart protocol; clock-aware stage latency acceptance and evidence fields. Documentary clarification only, executable tests NOT TESTED, no merge, no final G0. Last owner-actually-submitted Work handoff remains AQL-HO-20261021-002 / PR #14; PR #15 is directly authorized GitHub documentation work.
+
+## 2026-10-28 — Guardian151 isolated DRAFT checkpoint
+
+Direct owner Issue151 execution authority; branch core/guardian-closure-151 starts
+at unmerged #144 SHA3fc035b7ae70693e952976e2dcb2fe165a7e1826. Main unchanged.
+Guardian-only ACK/readback validation, replay-safe immutable ACK, nonblocking OS
+lock and local-only controlled launch preflight; see docs/core/guardian_closure_151.md.
+Exact new SHA/local/CI evidence in Issue151 RESULT and linked Draft PR, not a
+merge/independent acceptance. Existing bounded owner14ACK accepted; AIARC-088
+negative-access DEFERRED, future launch NOT_PROVEN, continuous HOLD, PIT/UTC/
+independent custody UNVERIFIED. #148/#149/#150 untouched. No owner-host/cloud/ACL
+operation, G0/trading activation or new Work launch. Unseen chats coverage gap.

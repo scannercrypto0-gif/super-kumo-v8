@@ -1,0 +1,22 @@
+{
+  "scope": "LOCAL_SYNTHETIC_WINDOWS_ONLY",
+  "base_sha": "3fc035b7ae70693e952976e2dcb2fe165a7e1826",
+  "python": "3.14.3",
+  "system": "Windows",
+  "tests": 82,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "seconds": "13.427",
+  "junit_sha256": "47d8e62ec96beb1bceee00940b46dc00f8966a3235d4afb6dcaa4f535d29c5b7",
+  "command": "python -m pytest -q tests/test_guardian_hardening.py tests/test_guardian_launch.py tests/test_evidence_outbox.py tests/test_observer_outbox_integration.py tests/test_observer_runtime.py tests/test_observation_operational_e2e.py tests/test_observation_authority.py tests/test_utc_evidence.py",
+  "historical_failures": [
+    "collection:4 helper import errors, corrected tests package import",
+    "66 pass/1 fail: Windows lock contention surfaced PermissionError, corrected classification",
+    "65 pass/3 fail: Windows fsync read-only descriptor, corrected r+b without byte edits"
+  ],
+  "owner_hosts": "NOT_EXECUTED",
+  "cloud": "NOT_ACCESSED",
+  "continuous": "HOLD",
+  "independent_acceptance": "PENDING"
+}

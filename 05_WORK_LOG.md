@@ -279,3 +279,19 @@ W32Time cases. New actual Linux REST capture 4 versions, final Drive object
 full download; canonical bundle verified before local ACK. Windows owner devices
 and rclone live deployment remain NOT EXECUTED; no finite UTC bound. Updated
 single report/runbooks and Python3.14 CI; exact delivery SHA/CI in PR comment.
+
+## 2026-10-28 — Issue151 Guardian closure execution (DRAFT, not operational closure)
+
+Owner task151 scoped code/tests/docs/new Draft authorized. Reproduced baseline
+incomplete sender ACK deleting pending and committed ACK replay invoking sender
+again/overwriting receipt. Added strict legacy/v1 Guardian receipt checks, fixed
+OS lock, durable ACK recovery, missing-file vs directory distinction, sanitized
+codes, local config/executable/identity pin preflight and hard continuous HOLD.
+Local Windows interpreter3.14.3; focused synthetic/local tests, no installs.
+Initial helper import collection error and Windows lock PermissionError / rb
+fsync incompatibility were corrected narrowly; exact final counts/SHA/CI in
+Issue151 RESULT and Draft PR. Full runbook/threat/evidence/recovery/operator gates
+in docs/core/guardian_closure_151.md. Latest delivered Work147 MISSING_BYTES
+reviewed; no duplicate source fetch/Factory/Guardian14-object E2E. AIARC-079/081/
+086/088 preserved, Council independent exact-SHA S/R requested separately. No
+main mutation, merge, operator service/task/ACL/cloud changes or final closure.
