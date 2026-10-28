@@ -1,3 +1,15 @@
+## 2026-10-28 — Binance observer branch checkpoint (not merged)
+
+Owner-authorized CORE-TIME-PROOF-01/B is implemented as a standalone process,
+stacked on Core #137 d27ddd8f. Genuine Binance WS/REST evidence across restart
+is in `evidence/binance-observer-20261028/capture_manifest.json`; six distinct
+versions, no naturally observed correction. UTC status UNKNOWN, timing class
+FIRST_INDEPENDENT_OBSERVED; issuer time UNATTESTED. Existing Factory #141 pinned
+bridge remains fail-closed; no empirical PIT admission or trading activation.
+See `docs/core/binance_independent_observer.md` for tests, limits and deployment.
+Exact-head CI and independent Council S/R are tracked by the resulting PR and
+Issue #134; no completion/merge/G0 declaration is made by this checkpoint.
+
 ## Current execution addendum - 2026-10-24 (Draft PR, not merged)
 
 Verified main baseline: 8e8690e58451e4fdd38f3e5e5f3cc89817e59c26. G0 is
