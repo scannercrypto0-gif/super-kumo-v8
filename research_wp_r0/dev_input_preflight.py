@@ -7,7 +7,7 @@ from hashlib import sha256
 from io import BytesIO, StringIO
 import csv, json, math, re, zipfile
 from .historical_dev_exits_v1 import Config, digest, _validate as validate_engine_inputs
-_SAFE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\\Z")
+_SAFE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\Z")
 _REQUIRED = frozenset({"issued_receipt_sha256","symbol","interval_ms","start_ms","end_exclusive_ms","code_sha","policy_id","scenario_id","warmup_bars","source_kind"})
 START_MS, END_MS = 1704067200000, 1704153600000
 RAW_SHA = "4ec2915e610ab4e9a4d5e86a5ada1c15bbf6b5db343cdb385681d6ac97166a4e"
