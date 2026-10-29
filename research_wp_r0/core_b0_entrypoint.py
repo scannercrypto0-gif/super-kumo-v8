@@ -9,6 +9,7 @@ admission credentials.
 from __future__ import annotations
 
 from hashlib import sha256
+import json
 from typing import Any
 
 from .historical_dev_exits_v1 import Config, digest
@@ -179,12 +180,31 @@ def run_one_study(*args: Any, **kwargs: Any) -> None:
     raise B0AdmissionDenied("OWNER_AUTHENTICATED_SINGLE_USE_PERMIT_REQUIRED")
 
 
-def admit_one_study_run(permit: dict[str, Any]) -> dict[str, Any]:
-    """Consume the owner's authenticated one-run permit for this exact clean checkout.
+def admit_one_study_run(
+    permit: dict[str, Any],
+    *,
+    archive_bytes: bytes,
+    issued_receipt_bytes: bytes,
+) -> dict[str, Any]:
+    """Preflight the original inputs, then consume the owner's permit exactly once.
 
-    This function only creates the admission record. Factory may begin the
-    authorized run only after this succeeds; a failed/missing permit must stop
-    before replay or result creation.
+    This function only creates an admission record. Factory may begin the
+    authorized run only after this succeeds; a failed preflight or missing
+    permit must stop before replay or result creation.
     """
-    from .core_b0_admission import admit_current_checkout_one_run
-    return admit_current_checkout_one_run(permit)
+    from .core_b0_admission import AdmissionDenied, admit_current_checkout_one_run
+
+    report = run_input_preflight(
+        archive_bytes=archive_bytes,
+        issued_receipt_bytes=issued_receipt_bytes,
+    )
+    if report["status"] != "INPUT_PREFLIGHT_PASS_NOT_STUDY_AUTHORITY":
+        raise AdmissionDenied("INPUT_PREFLIGHT_FAILED")
+    if report["passed"] != 12 or report["failed"] != 0:
+        raise AdmissionDenied("INPUT_PREFLIGHT_MATRIX_INCOMPLETE")
+    report_bytes = json.dumps(
+        report, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False
+    ).encode("ascii")
+    return admit_current_checkout_one_run(
+        permit, preflight_report_sha256=sha256(report_bytes).hexdigest()
+    )
