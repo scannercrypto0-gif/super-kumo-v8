@@ -157,7 +157,9 @@ def run_authorized_b0_study(
             "correction_evidence": "PINNED_VERSION_ONLY",
         }
         config = _scenario_config(values)
-        result = replay_after_factory_start(\n            bars, source=source, config=config, start_receipt=started\n        )
+        result = replay_after_factory_start(
+            bars, source=source, config=config, start_receipt=started
+        )
         if not verify_receipt(result):
             raise FactoryStudyDenied("ENGINE_RECEIPT_VERIFICATION_FAILED")
         if set(result.get("paths", {})) != {"FACTUAL", "TARGET_FIRST", "STOP_FIRST"}:
