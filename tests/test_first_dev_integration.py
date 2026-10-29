@@ -81,7 +81,8 @@ def test_synthetic_preflight_replay_and_bundle_are_cross_bound(tmp_path):
     raw, issued, bars, source, commitment = synthetic_inputs()
     config = Config(initial_cash=1000, quantity=0.001, warmup_bars=252,
                     latency_ms=1000, spread_bps=2, slippage_bps=5,
-                    fee_bps=10, tp_fraction=None, sl_fraction=None)
+                    fee_bps=10, tp_fraction=None, sl_fraction=None,
+                    indicator_exit=True)
     preflight = validate_historical_dev_inputs(
         archive_bytes=raw, issued_receipt_bytes=issued, bars=bars,
         source=source, config=config, commitment=commitment,
