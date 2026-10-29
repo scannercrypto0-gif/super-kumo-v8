@@ -358,7 +358,7 @@ def verify_receipt(receipt):
     try:
         cfg = Config(**receipt['config'])
         if receipt['strategy'] == STRATEGY:
-            expected = replay(receipt['input_rows'], source=receipt['source'], config=cfg)
+            expected = _replay_impl(receipt['input_rows'], source=receipt['source'], config=cfg)
         elif receipt['strategy'] == 'CONTRACT_FIXTURE_ONLY_1':
             expected = replay_contract_fixture(receipt['input_rows'], source=receipt['source'],
                                                 signals=receipt['signals'], config=cfg)
