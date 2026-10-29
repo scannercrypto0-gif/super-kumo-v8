@@ -119,9 +119,11 @@ def run_authorized_b0_study(
     # Mandatory one-time start authorization; do not replay or write results
     # until this returns a valid started record.
     started = authorize_factory_execution(admission_path)
-    if not isinstance(started, dict) or started.get("state") not in (
-        "START_AUTHORIZED", "FACTORY_EXECUTION_AUTHORIZED", "STARTED"
-    ):
+    if (not isinstance(started, dict)
+            or started.get("schema") != "aql-owner-admission-start-v1"
+            or started.get("max_runs") != 1
+            or not isinstance(started.get("start_record_sha256"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", started["start_record_sha256"])):
         raise FactoryStudyDenied("FACTORY_START_AUTHORIZATION_INVALID")
 
     normalized, normalized_sha, normalized_size = _parse_archive(archive_bytes)
