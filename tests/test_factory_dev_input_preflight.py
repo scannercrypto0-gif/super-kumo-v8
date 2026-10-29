@@ -11,7 +11,7 @@ END=1704153600000
 def bars():
     return [{"open_ms":START+i*60000,"close_ms":START+(i+1)*60000-1,"open":100.0,"high":101.0,"low":99.0,"close":100.5,"volume":1.0,"available_ms":START+(i+1)*60000+1000,"modeled_quote":True} for i in range(1440)]
 def archive_bytes(rows):
-    out=BytesIO(); text=StringIO(); w=csv.writer(text,lineterminator="\\n")
+    out=BytesIO(); text=StringIO(); w=csv.writer(text,lineterminator="\n")
     for b in rows:
         w.writerow([b["open_ms"],b["open"],b["high"],b["low"],b["close"],b["volume"],b["close_ms"],"0",1,"0","0",0])
     with zipfile.ZipFile(out,"w",zipfile.ZIP_DEFLATED) as z: z.writestr("BTCUSDT-1m-2024-01-01.csv",text.getvalue())
