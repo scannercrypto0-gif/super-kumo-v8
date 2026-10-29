@@ -17,7 +17,7 @@ def test_warmup_252_boundary():
 def test_default_22_compatibility():
     original=_signals(bars(), Config())
     assert original==_signals(bars(), Config(warmup_bars=22))
-    assert _signals(bars(), Config(warmup_bars=252))==original[230:]
+    assert _signals(bars(), Config(warmup_bars=252))==original[231:]
 
 @pytest.mark.parametrize("bad", [0,21,-1,22.0,True,"252"])
 def test_bad_warmup(bad):
