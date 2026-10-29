@@ -365,3 +365,17 @@ def test_synthetic_delayed_prefix_and_legacy_confirmed_gate(factory148):
     with pytest.raises(HistoricalDataError):
         CustodyAccessor(lib).range_query(history.envelope.source_id, START, START+STEP,
                                        args["decision_cutoff_ms"])
+
+
+def test_h01_current_factory_head_only_and_stale_head_fails_closed():
+    current = "eacb5e50150c6e6c64c8a41b8eaa410aebd71532"
+    stale = "dee0f088d70122d143118df2e0a0549a564f2380"
+    assert FACTORY_SHA == current
+    args = arguments()
+    candidate = bind_dev(**args, factory_sha=current)
+    assert candidate.package["factory_sha"] == current
+    assert verify_candidate(candidate)
+    with pytest.raises(BinderError, match="CODE_VERSION"):
+        bind_dev(**args, factory_sha=stale)
+    with pytest.raises(BinderError, match="CODE_VERSION"):
+        bind_dev(**args, factory_sha="0" * 40)
