@@ -24,8 +24,8 @@ _REQUIRED = frozenset({
     "head_sha", "policy_id", "symbol", "interval_ms", "start_ms",
     "end_exclusive_ms", "scenario_ids", "signature",
 })
-_HEX40 = re.compile(r"[0-9a-f]{40}\\Z")
-_SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{7,95}\\Z")
+_HEX40 = re.compile(r"[0-9a-f]{40}")
+_SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{7,95}")
 _SCHEMA = "aql-owner-single-run-permit-v1"
 
 
