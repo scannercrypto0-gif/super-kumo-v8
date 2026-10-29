@@ -21,7 +21,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/checkout@v4
         with:
-          ref: dee0f088d70122d143118df2e0a0549a564f2380
+          ref: eacb5e50150c6e6c64c8a41b8eaa410aebd71532
           path: .factory148
       - uses: actions/checkout@v4
         with:
