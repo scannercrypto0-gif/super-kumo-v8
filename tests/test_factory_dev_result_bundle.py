@@ -166,7 +166,7 @@ def _b0_runner_files(tmp_path):
 def test_b0_orchestrator_admission_failure_stops_all_downstream_work(tmp_path, monkeypatch):
     archive, receipt_file, store = _b0_runner_files(tmp_path)
     calls = []
-    def denied(**kwargs):
+    def denied(permit, **kwargs):
         calls.append("admission")
         raise PermissionError("denied")
     monkeypatch.setattr(_b0_runner, "admit_one_study_run", denied)
@@ -184,7 +184,7 @@ def test_b0_orchestrator_start_failure_stops_replay_and_persistence(tmp_path, mo
     archive, receipt_file, store = _b0_runner_files(tmp_path)
     calls = []
     monkeypatch.setattr(_b0_runner, "admit_one_study_run",
-                        lambda **kw: {"admission_record_path": "signed.json"})
+                        lambda permit, **kw: {"admission_record_path": "signed.json"})
     def denied(path):
         calls.append(("start", path))
         raise PermissionError("start denied")
