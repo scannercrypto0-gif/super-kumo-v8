@@ -115,6 +115,26 @@ def test_missing_entry_quote_and_full_denominator():
     assert p['cash']==1000 and p['held_quantity']==0
 
 
+@pytest.mark.parametrize('branch', PATHS)
+def test_missing_entry_quote_masks_policy_totals_and_future_capacity(branch):
+    bs = bars()
+    bs[1]['modeled_quote'] = False
+    r = run(bs, ((0, 'ENTER_LONG'), (1, 'ENTER_LONG')), Config(latency_ms=0))
+    p = path(r, branch)
+    assert p['scheduled_denominator'] == 2
+    assert p['opportunities'][0]['status'] == 'UNKNOWN_ENTRY_QUOTE'
+    assert p['opportunities'][0]['scored_return'] is None
+    assert p['opportunities'][1]['status'] == 'BLOCKED_PRIOR_UNKNOWN'
+    assert p['status'] == 'UNKNOWN_UNRESOLVED'
+    assert p['realized_pnl'] is None
+    assert p['settled_equity'] is None
+    assert p['modeled_equity_return'] is None
+    assert p['sampled_mtm_drawdown'] is None
+    assert p['known_realized_pnl'] == 0
+    assert p['cash'] == 1000 and p['held_quantity'] == 0
+    assert verify_receipt(r)
+
+
 def test_missing_exit_open_is_unknown_not_zero():
     r=run(actions=((0,'ENTER_LONG'),(5,'EXIT_LONG')))
     p=path(r)
