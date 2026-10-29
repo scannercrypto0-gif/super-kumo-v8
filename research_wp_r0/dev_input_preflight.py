@@ -15,6 +15,9 @@ ISSUED_SHA = "ffce2bbe7890414d84360be80a0ac478795ae8d1a28085f8bb34075faca83386"
 SOURCE_ID = "binance-vision:spot:BTCUSDT:1m:2024-01-01"
 RECEIPT_ID = "AQL-CORE-WORK152-BTCUSDT-20240101-001"
 MEMBER = "BTCUSDT-1m-2024-01-01.csv"
+ENGINE_PIN = "20928693f30b1730f0693a293bbf4a1f8ab21c88"
+POLICY_ID = "DEV-B0-v1"
+SCENARIOS = frozenset({f"S{i:02d}" for i in range(12)})
 class InputGateRejected(ValueError): pass
 def sha256_hex(raw: bytes) -> str: return sha256(raw).hexdigest()
 def _require(condition, reason):
@@ -49,6 +52,9 @@ def validate_historical_dev_inputs(*,archive_bytes: bytes,issued_receipt_bytes: 
     _require(isinstance(issued_receipt_bytes,bytes) and bool(issued_receipt_bytes), "MISSING_ISSUED_RECEIPT_BYTES")
     _require(isinstance(commitment,dict) and set(commitment)==_REQUIRED, "MISSING_OR_EXTRA_INPUT_COMMITMENT")
     for k in ("code_sha","policy_id","scenario_id"): _require(isinstance(commitment[k],str) and _SAFE.fullmatch(commitment[k]), "INVALID_"+k.upper())
+    _require(commitment["code_sha"]==ENGINE_PIN, "UNPINNED_ENGINE_CODE_SHA")
+    _require(commitment["policy_id"]==POLICY_ID, "UNAPPROVED_POLICY_ID")
+    _require(commitment["scenario_id"] in SCENARIOS, "UNAPPROVED_SCENARIO_ID")
     _require(commitment["symbol"]=="BTCUSDT", "UNEXPECTED_SYMBOL")
     _require(commitment["interval_ms"]==60000 and config.interval_ms==60000, "UNEXPECTED_INTERVAL")
     _require((commitment["start_ms"],commitment["end_exclusive_ms"])==(START_MS,END_MS), "UNEXPECTED_WINDOW")
