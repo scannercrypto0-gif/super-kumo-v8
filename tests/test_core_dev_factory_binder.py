@@ -232,7 +232,7 @@ def factory148():
     # Git working-tree CRLF can differ; commit blob is authoritative.
     blob = subprocess.check_output(["git", "rev-parse", "HEAD:research_wp_r0/historical_dev_exits_v1.py"],
                                    cwd=root, text=True).strip()
-    assert blob == "bbeae9d7f16f4d2b0738072ec35ea4dd9345639b"
+    assert blob == "3a8560f97473f5ec8e5133e575fab94e4297f8da"
     assert data
     package = types.ModuleType("_binder159_factory148")
     package.__path__ = [str(root / "research_wp_r0")]
