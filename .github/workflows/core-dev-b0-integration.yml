@@ -1,0 +1,32 @@
+name: Core DEV-B0 Integrated Candidate
+on:
+  pull_request:
+    paths:
+      - 'src/aql/historical/**'
+      - 'research_wp_r0/core_dev_b0_integration.py'
+      - 'research_wp_r0/realdev_research_data.py'
+      - 'research_wp_r0/dev_input_preflight.py'
+      - 'research_wp_r0/dev_result_bundle.py'
+      - 'research_wp_r0/historical_dev_exits_v1.py'
+      - 'tests/test_core_dev_b0_integration.py'
+      - '.github/workflows/core-dev-b0-integration.yml'
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pytest
+      - name: Integrated synthetic source-to-bundle contract (no private data)
+        run: python -B -m pytest -q --tb=short tests/test_core_dev_b0_integration.py tests/test_research_handoff_174.py tests/test_core_178_synthetic_adapter.py tests/test_core_178_sensitivity.py tests/test_factory_dev_input_preflight.py tests/test_factory_dev_result_bundle.py tests/test_factory_dev_b0_warmup_252.py tests/test_factory_terminal_unknown_entry.py tests/test_factory_182_legacy_receipts.py
