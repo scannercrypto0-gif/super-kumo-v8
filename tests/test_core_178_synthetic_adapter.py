@@ -81,7 +81,7 @@ def test_owner_permit_is_signed_pinned_and_single_use(tmp_path):
     now = datetime(2026, 10, 29, 12, 0, tzinfo=timezone.utc)
     admission = consume_owner_one_run_permit(
         permit, admission_dir=tmp_path / "admissions", secret=secret,
-        runtime_head=head, worktree_clean=True, now=now,
+        runtime_head=head, worktree_clean=True, preflight_report_sha256="a" * 64, now=now,
     )
     assert admission["state"] == "ADMITTED_NOT_STARTED"
     assert admission["max_runs"] == 1
@@ -89,7 +89,7 @@ def test_owner_permit_is_signed_pinned_and_single_use(tmp_path):
     with pytest.raises(AdmissionDenied, match="PERMIT_ALREADY_CONSUMED"):
         consume_owner_one_run_permit(
             permit, admission_dir=tmp_path / "admissions", secret=secret,
-            runtime_head=head, worktree_clean=True, now=now,
+            runtime_head=head, worktree_clean=True, preflight_report_sha256="a" * 64, now=now,
         )
 
 
@@ -106,15 +106,15 @@ def test_owner_permit_rejects_signature_head_and_dirty_checkout(tmp_path):
     with pytest.raises(AdmissionDenied, match="INVALID_PERMIT_SCENARIOS|PERMIT_SCENARIO_SET_MISMATCH|OWNER_SIGNATURE_INVALID"):
         consume_owner_one_run_permit(
             tampered, admission_dir=tmp_path / "tampered", secret=secret,
-            runtime_head=head, worktree_clean=True, now=now,
+            runtime_head=head, worktree_clean=True, preflight_report_sha256="a" * 64, now=now,
         )
     with pytest.raises(AdmissionDenied, match="CHECKOUT_HEAD_MISMATCH"):
         consume_owner_one_run_permit(
             permit, admission_dir=tmp_path / "wrong-head", secret=secret,
-            runtime_head="e" * 40, worktree_clean=True, now=now,
+            runtime_head="e" * 40, worktree_clean=True, preflight_report_sha256="a" * 64, now=now,
         )
     with pytest.raises(AdmissionDenied, match="WORKTREE_NOT_CLEAN"):
         consume_owner_one_run_permit(
             permit, admission_dir=tmp_path / "dirty", secret=secret,
-            runtime_head=head, worktree_clean=False, now=now,
+            runtime_head=head, worktree_clean=False, preflight_report_sha256="a" * 64, now=now,
         )
