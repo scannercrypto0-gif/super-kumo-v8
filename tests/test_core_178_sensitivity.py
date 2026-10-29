@@ -108,3 +108,13 @@ def test_terminal_unfilled_entry_preserves_unknown_and_full_denominator():
         assert path["status"] == "UNKNOWN_UNRESOLVED"
         assert path["realized_pnl"] is None
         assert path["modeled_equity_return"] is None
+
+
+# Import the integrated contract into the existing Core178 focused workflow.
+# This keeps one exact-head CI invocation without modifying the source PR branch.
+from test_core_dev_b0_integration import (
+    test_full_synthetic_handoff_preflight_replay_and_persist as test_integrated_handoff_preflight_replay_bundle,
+    test_all_twelve_scenarios_preflight_without_running_study as test_integrated_all_scenarios_preflight,
+    test_archive_or_receipt_bytes_cannot_drift_from_handoff as test_integrated_byte_drift_denied,
+    test_study_invocation_remains_denied_without_separate_admission as test_integrated_study_denied,
+)
