@@ -118,3 +118,47 @@ def test_owner_permit_rejects_signature_head_and_dirty_checkout(tmp_path):
             permit, admission_dir=tmp_path / "dirty", secret=secret,
             runtime_head=head, worktree_clean=False, preflight_report_sha256="a" * 64, now=now,
         )
+
+
+def test_entrypoint_requires_full_preflight_before_admission(monkeypatch):
+    import research_wp_r0.core_b0_entrypoint as entry
+    from research_wp_r0.core_b0_admission import AdmissionDenied
+    permit = {"permit_id": "test-permit-0001"}
+    monkeypatch.setattr(entry, "run_input_preflight", lambda **kwargs: {
+        "status": "INPUT_PREFLIGHT_FAILED", "passed": 11, "failed": 1,
+    })
+    monkeypatch.setattr(
+        "research_wp_r0.core_b0_admission.admit_current_checkout_one_run",
+        lambda *args, **kwargs: pytest.fail("permit must not be consumed after failed preflight"),
+    )
+    with pytest.raises(AdmissionDenied, match="INPUT_PREFLIGHT_FAILED"):
+        entry.admit_one_study_run(permit, archive_bytes=b"zip", issued_receipt_bytes=b"receipt")
+
+
+def test_entrypoint_binds_admission_to_preflight_report(monkeypatch):
+    import hashlib
+    import json
+    import research_wp_r0.core_b0_entrypoint as entry
+    captured = {}
+    report = {
+        "status": "INPUT_PREFLIGHT_PASS_NOT_STUDY_AUTHORITY",
+        "passed": 12, "failed": 0, "scenario_count": 12,
+        "archive_sha256": "a" * 64, "issued_receipt_sha256": "b" * 64,
+    }
+    monkeypatch.setattr(entry, "run_input_preflight", lambda **kwargs: report)
+    def fake_admit(permit, *, preflight_report_sha256):
+        captured["permit"] = permit
+        captured["preflight_report_sha256"] = preflight_report_sha256
+        return {"state": "ADMITTED_NOT_STARTED"}
+    monkeypatch.setattr(
+        "research_wp_r0.core_b0_admission.admit_current_checkout_one_run", fake_admit,
+    )
+    result = entry.admit_one_study_run(
+        {"permit_id": "test-permit-0002"}, archive_bytes=b"zip", issued_receipt_bytes=b"receipt"
+    )
+    expected = hashlib.sha256(json.dumps(
+        report, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False
+    ).encode("ascii")).hexdigest()
+    assert result["state"] == "ADMITTED_NOT_STARTED"
+    assert captured["permit"]["permit_id"] == "test-permit-0002"
+    assert captured["preflight_report_sha256"] == expected
