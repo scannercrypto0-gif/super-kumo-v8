@@ -97,13 +97,17 @@ def _runtime_identity(expected_head: str) -> dict[str, Any]:
             ["git", "status", "--porcelain"], check=True, capture_output=True, text=True,
             timeout=5,
         ).stdout
+        root = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"], check=True, capture_output=True, text=True,
+            timeout=5,
+        ).stdout.strip()
     except (OSError, subprocess.SubprocessError) as exc:
         raise AdmissionDenied("GIT_RUNTIME_IDENTITY_UNAVAILABLE") from exc
     if head != expected_head:
         raise AdmissionDenied("CHECKOUT_HEAD_MISMATCH")
     if status.strip():
         raise AdmissionDenied("WORKTREE_NOT_CLEAN")
-    return {"head_sha": head, "worktree_clean": True}
+    return {"head_sha": head, "worktree_clean": True, "repo_root": str(Path(root).resolve())}
 
 
 def _fsync_parent_directory(path: Path) -> None:
@@ -204,6 +208,13 @@ def admit_current_checkout_one_run(permit: dict[str, Any], *, preflight_report_s
     if not isinstance(head, str):
         raise AdmissionDenied("INVALID_PERMIT_HEAD")
     runtime = _runtime_identity(head)
+    admission_dir = Path(os.environ["AQL_B0_ADMISSION_DIR"]).resolve()
+    try:
+        admission_dir.relative_to(Path(runtime["repo_root"]))
+    except ValueError:
+        pass
+    else:
+        raise AdmissionDenied("ADMISSION_DIRECTORY_MUST_BE_OUTSIDE_CHECKOUT")
     return _consume_owner_one_run_permit(
         permit,
         admission_dir=os.environ["AQL_B0_ADMISSION_DIR"],
@@ -244,6 +255,12 @@ def authorize_factory_execution(admission_record_path: str | os.PathLike[str]) -
     runtime = _runtime_identity(record.get("head_sha", ""))
     if runtime["head_sha"] != record.get("head_sha"):
         raise AdmissionDenied("CHECKOUT_HEAD_MISMATCH")
+    try:
+        path.resolve().relative_to(Path(runtime["repo_root"]))
+    except ValueError:
+        pass
+    else:
+        raise AdmissionDenied("ADMISSION_DIRECTORY_MUST_BE_OUTSIDE_CHECKOUT")
     if record.get("state") != "ADMITTED_NOT_STARTED" or record.get("max_runs") != 1:
         raise AdmissionDenied("ADMISSION_STATE_INVALID")
     if record.get("policy_id") != POLICY_ID or set(record.get("scenario_ids", [])) != set(SCENARIOS):
