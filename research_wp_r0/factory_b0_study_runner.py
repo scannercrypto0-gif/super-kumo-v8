@@ -28,7 +28,7 @@ from .dev_input_preflight import (
 from .historical_dev_exits_v1 import Config, digest, replay_after_factory_start, verify_receipt
 from .dev_result_bundle import persist_bundle, verify_bundle
 
-_SAFE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\\Z")
+_SAFE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\Z")
 EXPECTED_SCENARIOS = tuple(f"S{i:02d}" for i in range(12))
 
 
