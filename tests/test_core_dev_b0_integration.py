@@ -25,7 +25,7 @@ def synthetic_inputs():
         rows.append([START+i*60000, START+(i+1)*60000-1, float(px), float(px+0.2),
                      float(px-0.2), float(px), 1.0])
     csv_text = StringIO()
-    writer = csv.writer(csv_text, lineterminator="\\n")
+    writer = csv.writer(csv_text, lineterminator="\n")
     for row in rows:
         writer.writerow([row[0], row[2], row[3], row[4], row[5], row[6], row[1], "0", 1, "0", "0", 0])
     out = BytesIO()
