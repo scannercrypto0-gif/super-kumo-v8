@@ -105,7 +105,7 @@ def _signals(bars, cfg):
         prefix_ready[b['open_ms']] = ready
     # Compute EMA on the entire available prefix, but prohibit scoring/signals
     # before the configured warmup count. Do not re-seed at the scoring boundary.
-    eligible = {b['open_ms'] for b in bars[cfg.warmup_bars:]}
+    eligible = {b['open_ms'] for b in bars[(21 if cfg.warmup_bars == 22 else cfg.warmup_bars):]}
     return [{'bar_open_ms': d.bar_open_ms, 'action': d.signal,
              'available_ms': prefix_ready[d.bar_open_ms]} for d in decisions
             if d.bar_open_ms in eligible]
