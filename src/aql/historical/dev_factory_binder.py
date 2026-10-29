@@ -14,7 +14,8 @@ from .dev_source import DevSourceEnvelope, MAX_BYTES, import_bytes
 
 SCHEMA = "core-factory-dev-map-1"
 CORE_SHA = "752d7cd6d652860134918a35727853b5ba52f876"
-FACTORY_SHA = "dee0f088d70122d143118df2e0a0549a564f2380"
+# Exact reviewed Factory143 U160-01 contract; stale and unknown heads fail closed.
+FACTORY_SHA = "eacb5e50150c6e6c64c8a41b8eaa410aebd71532"
 INSPECTOR_SHA = "9251d5f31ed06ecf87abf53ea604cf1d975923eb"
 MAX_MS = 2**53 - 1
 

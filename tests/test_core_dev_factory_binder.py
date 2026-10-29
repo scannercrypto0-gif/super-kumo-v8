@@ -232,7 +232,7 @@ def factory148():
     # Git working-tree CRLF can differ; commit blob is authoritative.
     blob = subprocess.check_output(["git", "rev-parse", "HEAD:research_wp_r0/historical_dev_exits_v1.py"],
                                    cwd=root, text=True).strip()
-    assert blob == "bbeae9d7f16f4d2b0738072ec35ea4dd9345639b"
+    assert blob == "3a8560f97473f5ec8e5133e575fab94e4297f8da"
     assert data
     package = types.ModuleType("_binder159_factory148")
     package.__path__ = [str(root / "research_wp_r0")]
@@ -365,3 +365,17 @@ def test_synthetic_delayed_prefix_and_legacy_confirmed_gate(factory148):
     with pytest.raises(HistoricalDataError):
         CustodyAccessor(lib).range_query(history.envelope.source_id, START, START+STEP,
                                        args["decision_cutoff_ms"])
+
+
+def test_h01_current_factory_head_only_and_stale_head_fails_closed():
+    current = "eacb5e50150c6e6c64c8a41b8eaa410aebd71532"
+    stale = "dee0f088d70122d143118df2e0a0549a564f2380"
+    assert FACTORY_SHA == current
+    args = arguments()
+    candidate = bind_dev(**args, factory_sha=current)
+    assert candidate.package["factory_sha"] == current
+    assert verify_candidate(candidate)
+    with pytest.raises(BinderError, match="CODE_VERSION"):
+        bind_dev(**args, factory_sha=stale)
+    with pytest.raises(BinderError, match="CODE_VERSION"):
+        bind_dev(**args, factory_sha="0" * 40)
