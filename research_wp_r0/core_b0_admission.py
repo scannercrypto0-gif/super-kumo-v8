@@ -106,6 +106,21 @@ def _runtime_identity(expected_head: str) -> dict[str, Any]:
     return {"head_sha": head, "worktree_clean": True}
 
 
+def _fsync_parent_directory(path: Path) -> None:
+    """Persist the directory entry on POSIX; document narrower Windows guarantee."""
+    if os.name == "nt":
+        # Windows' Python stdlib does not expose a portable directory-handle
+        # FlushFileBuffers operation. The record file itself is flushed below;
+        # do not claim power-loss durability of the directory entry on Windows.
+        return
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    fd = os.open(str(path.parent), flags)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
 def _write_exclusive(path: Path, data: bytes) -> None:
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     fd = os.open(str(path), flags, 0o400)
@@ -114,13 +129,14 @@ def _write_exclusive(path: Path, data: bytes) -> None:
             stream.write(data)
             stream.flush()
             os.fsync(stream.fileno())
+        _fsync_parent_directory(path)
     except Exception:
         # Do not remove the exclusive marker: failure after consumption must
         # fail closed rather than make the permit reusable.
         raise
 
 
-def consume_owner_one_run_permit(
+def _consume_owner_one_run_permit(
     permit: dict[str, Any],
     *,
     admission_dir: str | os.PathLike[str],
@@ -166,6 +182,7 @@ def consume_owner_one_run_permit(
         "consumed_at": current.isoformat(),
         "max_runs": 1,
     }
+    record["record_signature"] = hmac.new(secret, _canonical(record), sha256).hexdigest()
     try:
         _write_exclusive(marker, _canonical(record))
     except FileExistsError as exc:
@@ -187,7 +204,7 @@ def admit_current_checkout_one_run(permit: dict[str, Any], *, preflight_report_s
     if not isinstance(head, str):
         raise AdmissionDenied("INVALID_PERMIT_HEAD")
     runtime = _runtime_identity(head)
-    return consume_owner_one_run_permit(
+    return _consume_owner_one_run_permit(
         permit,
         admission_dir=os.environ["AQL_B0_ADMISSION_DIR"],
         secret=secret,
