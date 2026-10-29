@@ -75,7 +75,8 @@ any future runnable engine still needs its own independently reviewed gate.
 core-factory-research-prefix-1 metadata binds exact new actual code SHA/runtime,
 base173 pin, contextual Factory143 SHA, mapping2/profile, source/receipt SHA+size,
 retained archive version0, fresh173 report SHA, full normalized7 SHA and separate
-prefix SHA, consumer/experiment, UTC source/prefix/cutoff/input-count parameters.
+prefix SHA, explicit source/issued-receipt IDs, consumer/experiment, UTC
+source/prefix/cutoff/input-count parameters.
 Factory143 is the compatibility-context pin, not a claim its runnable engine was
 called. New consumer code is part of the new actual HEAD, explicitly in metadata.
 
@@ -101,8 +102,10 @@ equality against separately retained result digest.
 ## Tests / private local evidence
 
 `python -B -m pytest tests/test_research_handoff_174.py -q --tb=short`
-New47-case synthetic suite only: first47PASS0.86s, then caller-snapshot isolation
-added during source review and final47PASS/0FAIL/0SKIP0.97s WindowsPython3.12.10.
+New synthetic suite only: first47PASS0.86s, then caller-snapshot isolation
+added during source review and47PASS/0FAIL/0SKIP0.97s WindowsPython3.12.10.
+Final source explicitly retains source/issued-receipt IDs, with two additional
+identity refusal cases (49 total); final execution evidence is reported on174.
 No red failures hidden. Native Ubuntu/Windows focused CI contains synthetic
 fixtures only; no private source files or rows are uploaded. Existing48/17/66
 tests are reused, not rerun. New tests cover two independent scope denials,

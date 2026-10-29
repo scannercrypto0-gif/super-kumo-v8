@@ -70,7 +70,8 @@ def handoff_local_pair(raw_path,receipt_path,*,checkout,capability=None,request=
     # a file replacement between the metadata check and this read cannot slip in.
     raw,_=read_pinned_file(raw_path,68923,RAW_SHA)
     issued,_=read_pinned_file(receipt_path,4203,RECEIPT_SHA)
-    validate_receipt(json.loads(issued),raw_sha=RAW_SHA,raw_size=len(raw),pinned_original=True)
+    receipt=json.loads(issued)
+    validate_receipt(receipt,raw_sha=RAW_SHA,raw_size=len(raw),pinned_original=True)
     envelope=DevSourceEnvelope(dict(schema="core-dev-source-1",scope="DEV_ONLY",origin="BINANCE_VISION",
         market="SPOT",symbol="BTCUSDT",interval="1m",start_ms=START,end_ms_exclusive=END,
         bytes_ref="chatgpt-library:file_00000000084c8208b5d65c8fc803426c:version0",
@@ -92,7 +93,7 @@ def handoff_local_pair(raw_path,receipt_path,*,checkout,capability=None,request=
         decision_cutoff_ms=capability.decision_cutoff_ms,warmup_input_count=capability.warmup_input_count,
         raw_archive_sha256=RAW_SHA,raw_archive_size=68923,issued_receipt_sha256=RECEIPT_SHA,
         issued_receipt_size=4203,retained_archive_version=0,inspection_report_sha256=inspection.digest,
-        full_normalized7_sha256=full_hash)
+        full_normalized7_sha256=full_hash,source_id=receipt["source_id"],issued_receipt_id=receipt["receipt_id"])
     expected=dict(code_sha=runtime.head,runtime_sha256=digest(asdict(runtime)),raw_archive_sha256=RAW_SHA,
         issued_receipt_sha256=RECEIPT_SHA,inspection_report_sha256=inspection.digest,
         full_normalized7_sha256=full_hash,prefix_normalized7_sha256=digest(rows))

@@ -92,7 +92,7 @@ def accept_prefix(normalized7, *, metadata, expected, permit=None, request=None)
         "source_start_ms","source_end_ms_exclusive","prefix_start_ms","prefix_end_ms_exclusive",
         "decision_cutoff_ms","warmup_input_count","raw_archive_sha256","raw_archive_size",
         "issued_receipt_sha256","issued_receipt_size","retained_archive_version",
-        "inspection_report_sha256","full_normalized7_sha256"}
+        "inspection_report_sha256","full_normalized7_sha256","source_id","issued_receipt_id"}
     require(type(metadata) is dict and set(metadata)==fields,"FACTORY_METADATA_SHAPE")
     require(type(expected) is dict and set(expected)=={
         "code_sha","runtime_sha256","raw_archive_sha256","issued_receipt_sha256",
@@ -115,8 +115,12 @@ def accept_prefix(normalized7, *, metadata, expected, permit=None, request=None)
     if m["source_kind"]=="ORIGINAL_LOCAL_PAIR":
         require(m["raw_archive_sha256"]==RAW and m["raw_archive_size"]==68923
             and m["issued_receipt_sha256"]==ISSUED and m["issued_receipt_size"]==4203
-            and m["source_start_ms"]==1704067200000 and m["source_end_ms_exclusive"]==1704153600000,
+            and m["source_start_ms"]==1704067200000 and m["source_end_ms_exclusive"]==1704153600000
+            and m["source_id"]=="binance-vision:spot:BTCUSDT:1m:2024-01-01"
+            and m["issued_receipt_id"]=="AQL-CORE-WORK152-BTCUSDT-20240101-001",
             "FACTORY_ORIGINAL_PIN")
+    require(all(type(m[k]) is str and bool(m[k]) for k in ("source_id","issued_receipt_id")),
+            "FACTORY_SOURCE_RECEIPT_ID")
     require(m["symbol"]=="BTCUSDT" and type(m["interval_ms"]) is int and m["interval_ms"]==60000
         and m["timezone"]=="UTC" and type(m["retained_archive_version"]) is int
         and m["retained_archive_version"]==0,"FACTORY_STREAM_IDENTITY")

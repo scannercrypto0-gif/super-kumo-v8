@@ -32,7 +32,8 @@ def fixture():
         prefix_start_ms=START,prefix_end_ms_exclusive=START+24*60000,decision_cutoff_ms=START+24*60000,
         warmup_input_count=22,raw_archive_sha256="b"*64,raw_archive_size=100,
         issued_receipt_sha256="c"*64,issued_receipt_size=100,retained_archive_version=0,
-        inspection_report_sha256="d"*64,full_normalized7_sha256=digest(rows))
+        inspection_report_sha256="d"*64,full_normalized7_sha256=digest(rows),
+        source_id="synthetic:contract-only",issued_receipt_id="synthetic:not-original")
     expected=dict(code_sha=m["code_sha"],runtime_sha256=digest(runtime),raw_archive_sha256="b"*64,
         issued_receipt_sha256="c"*64,inspection_report_sha256="d"*64,
         full_normalized7_sha256=digest(rows),prefix_normalized7_sha256=digest(rows[:24]))
@@ -84,7 +85,8 @@ def test_independent_core_and_factory_execution_refusal(scope_name):
     ("timezone","LOCAL"),("code_sha","b"*40),("factory_sha","old"),
     ("raw_archive_sha256","f"*64),("issued_receipt_sha256","f"*64),
     ("inspection_report_sha256","f"*64),("decision_cutoff_ms",START),
-    ("warmup_input_count",21),("warmup_input_count",True),("prefix_start_ms",START+60000)])
+    ("warmup_input_count",21),("warmup_input_count",True),("prefix_start_ms",START+60000),
+    ("source_id",None),("issued_receipt_id",None)])
 def test_wrong_source_receipt_schema_code_profile_or_cutoff(field,value):
     f=fixture();f[1][field]=value
     with pytest.raises(ValueError):accept(f)
