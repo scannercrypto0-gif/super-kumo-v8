@@ -177,3 +177,14 @@ def run_one_study(*args: Any, **kwargs: Any) -> None:
     before this function can ever delegate to the engine.
     """
     raise B0AdmissionDenied("OWNER_AUTHENTICATED_SINGLE_USE_PERMIT_REQUIRED")
+
+
+def admit_one_study_run(permit: dict[str, Any]) -> dict[str, Any]:
+    """Consume the owner's authenticated one-run permit for this exact clean checkout.
+
+    This function only creates the admission record. Factory may begin the
+    authorized run only after this succeeds; a failed/missing permit must stop
+    before replay or result creation.
+    """
+    from .core_b0_admission import admit_current_checkout_one_run
+    return admit_current_checkout_one_run(permit)
