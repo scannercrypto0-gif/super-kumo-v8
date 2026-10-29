@@ -107,6 +107,7 @@ def test_scenario_cost_or_source_lag_mismatch_fails_closed():
     args=list(inputs("S03")); args[2]=list(args[2]); args[2][10]=dict(args[2][10],available_ms=args[2][10]["available_ms"]+1)
     with pytest.raises(InputGateRejected,match="SOURCE_AVAILABILITY_ASSUMPTION_MISMATCH"):
         run(tuple(args))
-    args=list(inputs("S03")); args[4]=dict(args[4]); args[4]["scenario_id"]="S00"
+    args=list(inputs("S03"))
+    raw,issued,rows,source,commitment=args
     with pytest.raises(InputGateRejected,match="SCENARIO_EXECUTION_CONFIG_MISMATCH"):
-        run(tuple(args))
+        validate_historical_dev_inputs(archive_bytes=raw,issued_receipt_bytes=issued,bars=rows,source=source,config=config_for("S00"),commitment=commitment)
