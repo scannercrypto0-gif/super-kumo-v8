@@ -15,6 +15,9 @@ import re
 from .historical_dev_exits_v1 import verify_receipt, digest
 
 SCHEMA = "sf-dev-run-bundle-local-v1"
+ENGINE_PIN = "20928693f30b1730f0693a293bbf4a1f8ab21c88"
+POLICY_ID = "DEV-B0-v1"
+SCENARIOS = frozenset(f"S{i:02d}" for i in range(12))
 _SAFE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\Z")
 _PATHS = frozenset(("FACTUAL", "TARGET_FIRST", "STOP_FIRST"))
 
@@ -102,6 +105,10 @@ def _validate_preflight_binding(preflight, receipt, evidence):
     }
     if not isinstance(preflight, dict) or any(preflight.get(k) != v for k, v in required.items()):
         raise ValueError("INVALID_OR_NON_B0_INPUT_PREFLIGHT")
+    if (preflight.get("code_sha") != ENGINE_PIN
+            or preflight.get("policy_id") != POLICY_ID
+            or preflight.get("scenario_id") not in SCENARIOS):
+        raise ValueError("UNPINNED_ENGINE_OR_UNAPPROVED_POLICY_SCENARIO")
     if (preflight.get("archive_sha256") != receipt.get("source", {}).get("archive_sha256")
             or preflight.get("normalized_rows_sha256") != digest(receipt.get("input_rows"))
             or preflight.get("issued_receipt_sha256") != evidence.get("issued_receipt_sha256")
