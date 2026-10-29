@@ -264,5 +264,8 @@ def authorize_factory_execution(admission_record_path: str | os.PathLike[str]) -
         "started_at": datetime.now(timezone.utc).isoformat(),
         "max_runs": 1,
     }
-    _write_exclusive(started_path, _canonical(started))
+    try:
+        _write_exclusive(started_path, _canonical(started))
+    except FileExistsError as exc:
+        raise AdmissionDenied("ADMISSION_ALREADY_STARTED") from exc
     return {**started, "start_record_path": str(started_path), "start_record_sha256": sha256(_canonical(started)).hexdigest()}
