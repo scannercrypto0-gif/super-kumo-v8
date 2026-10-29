@@ -1,0 +1,22 @@
+name: Core 178 Synthetic Contract
+on:
+  pull_request:
+    paths:
+      - 'research_wp_r0/core_dev_b0_*.py'
+      - 'tests/test_core_178_*.py'
+      - '.github/workflows/core-178-synthetic.yml'
+  workflow_dispatch:
+jobs:
+  focused:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pytest
+      - run: python -m pytest -q tests/test_core_178_synthetic_adapter.py tests/test_core_178_sensitivity.py
