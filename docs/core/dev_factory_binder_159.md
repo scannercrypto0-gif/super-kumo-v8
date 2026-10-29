@@ -28,7 +28,7 @@ Branch `core/159-dev-factory-binder` starts **exactly** at unmerged155
 `dbc191df72f4b4d1ebb7d490926dcad4325dac12`. Draft159 targets155's branch,
 not main. Do not merge independently or assume155 accepted. No cherry-pick,
 silent merge, or modification of155 paths. Factory143 is read in an isolated
-detached checkout at `dee0f088d70122d143118df2e0a0549a564f2380`, never imported
+detached checkout at `eacb5e50150c6e6c64c8a41b8eaa410aebd71532` (H01 U160-01 upgrade from `dee0f088`), never imported
 as Git ancestry.143/144/155 were OPEN/unmerged when checked.144 remains
 `3fc035b7ae70693e952976e2dcb2fe165a7e1826`. Their independent S/R is separate.
 
@@ -131,7 +131,7 @@ pin, source.archive_sha256 remains raw SHA and source.rows_sha256 hashes full
 rows. correction_evidence=PINNED_VERSION_ONLY means pinned payload only.
 
 Important correction to156 prose: actual Factory148 `digest` at blob
-`bbeae9d7f16f4d2b0738072ec35ea4dd9345639b` uses default **ensure_ascii=True**,
+`3a8560f97473f5ec8e5133e575fab94e4297f8da` uses default **ensure_ascii=True**,
 not False. Non-ASCII reference regression checks actual code compatibility.
 Core149 source_id and legacy manifest digests remain distinct/unchanged.
 
