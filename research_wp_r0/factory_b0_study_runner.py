@@ -25,7 +25,7 @@ from .core_b0_admission import authorize_factory_execution
 from .dev_input_preflight import (
     ENGINE_PIN, POLICY_ID, SCENARIO_CONFIG, START_MS, END_MS, _parse_archive,
 )
-from .historical_dev_exits_v1 import Config, digest, replay, verify_receipt
+from .historical_dev_exits_v1 import Config, digest, replay_after_factory_start, verify_receipt
 from .dev_result_bundle import persist_bundle, verify_bundle
 
 _SAFE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\\Z")
@@ -157,7 +157,7 @@ def run_authorized_b0_study(
             "correction_evidence": "PINNED_VERSION_ONLY",
         }
         config = _scenario_config(values)
-        result = replay(bars, source=source, config=config)
+        result = replay_after_factory_start(\n            bars, source=source, config=config, start_receipt=started\n        )
         if not verify_receipt(result):
             raise FactoryStudyDenied("ENGINE_RECEIPT_VERIFICATION_FAILED")
         if set(result.get("paths", {})) != {"FACTUAL", "TARGET_FIRST", "STOP_FIRST"}:
