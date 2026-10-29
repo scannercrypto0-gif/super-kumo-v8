@@ -13,6 +13,9 @@ import pytest
 from research_wp_r0.historical_dev_exits_v1 import Config, digest, replay
 from research_wp_r0.dev_input_preflight import validate_historical_dev_inputs
 from research_wp_r0.dev_result_bundle import persist_bundle, verify_bundle
+from research_wp_r0.realdev_research_data import (
+    accept_prefix, ResearchPermit, CONSUMER, OWNER, EXPERIMENT, SCOPE,
+)
 
 
 START = 1704067200000
@@ -79,6 +82,53 @@ def synthetic_inputs(n=1440):
 
 def test_synthetic_preflight_replay_and_bundle_are_cross_bound(tmp_path):
     raw, issued, bars, source, commitment = synthetic_inputs()
+    # Exercise the actual Core174 -> Factory data-only object contract. This is a
+    # synthetic fixture; the 1,000 ms availability and modeled quote below are
+    # explicit hypothetical execution inputs, not claimed source-timing evidence.
+    normalized7 = [[b[k] for k in ("open_ms", "close_ms", "open", "high", "low", "close", "volume")]
+                   for b in bars]
+    handoff_code = "c" * 40
+    runtime = {"host": "synthetic-ci", "account": "fixture", "python": "CPython",
+               "python_version": "3.12", "checkout": "fixture", "head": handoff_code}
+    raw_sha = sha256(raw).hexdigest()
+    issued_sha = sha256(issued).hexdigest()
+    inspection_sha = "d" * 64
+    rows_sha = digest(normalized7)
+    metadata = {
+        "schema": "core-factory-research-prefix-1", "experiment_id": EXPERIMENT,
+        "consumer_id": CONSUMER, "source_kind": "SYNTHETIC_CONTRACT_FIXTURE",
+        "runtime": runtime, "code_sha": handoff_code,
+        "base_core_sha": "22d03f4d3434fbce149c4d66349b33149789613a",
+        "factory_sha": "eacb5e50150c6e6c64c8a41a8eaa410aebd71532",
+        "mapping_schema": "core-factory-dev-map-2",
+        "compatibility_profile": "factory148-u160-whole-policy-null-1",
+        "symbol": "BTCUSDT", "interval_ms": 60000, "timezone": "UTC",
+        "source_start_ms": START, "source_end_ms_exclusive": END,
+        "prefix_start_ms": START, "prefix_end_ms_exclusive": END,
+        "decision_cutoff_ms": END, "warmup_input_count": 252,
+        "raw_archive_sha256": raw_sha, "raw_archive_size": len(raw),
+        "issued_receipt_sha256": issued_sha, "issued_receipt_size": len(issued),
+        "retained_archive_version": 0, "inspection_report_sha256": inspection_sha,
+        "full_normalized7_sha256": rows_sha,
+        "source_id": "fixture:synthetic-integration",
+        "issued_receipt_id": "fixture-receipt",
+    }
+    expected = {
+        "code_sha": handoff_code, "runtime_sha256": digest(runtime),
+        "raw_archive_sha256": raw_sha, "issued_receipt_sha256": issued_sha,
+        "inspection_report_sha256": inspection_sha,
+        "full_normalized7_sha256": rows_sha, "prefix_normalized7_sha256": rows_sha,
+    }
+    permit = ResearchPermit(EXPERIMENT, OWNER, CONSUMER, handoff_code, digest(runtime))
+    research_data = accept_prefix(
+        normalized7, metadata=metadata, expected=expected, permit=permit, request=SCOPE,
+    )
+    bars = [{
+        "open_ms": row[0], "close_ms": row[1], "open": row[2], "high": row[3],
+        "low": row[4], "close": row[5], "volume": row[6],
+        "available_ms": row[1] + 1 + 1000, "modeled_quote": True,
+    } for row in research_data.rows]
+    source["rows_sha256"] = digest(bars)
     config = Config(initial_cash=1000, quantity=0.001, warmup_bars=252,
                     latency_ms=1000, spread_bps=2, slippage_bps=5,
                     fee_bps=10, tp_fraction=None, sl_fraction=None,
