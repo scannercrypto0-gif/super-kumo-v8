@@ -281,9 +281,17 @@ def _path(bars, scheduled, cfg, path):
     last_open = bars[-1]['open_ms']
     for s in scheduled:
         if s['scheduled_ms'] > last_open:
-            opportunities.append({**s, 'status': 'UNKNOWN_NO_ELIGIBLE_OPEN', 'scored_return': None})
-            if quantity and s['action'] == 'EXIT_LONG' and cfg.indicator_exit and not uncertain:
-                unknown(s['scheduled_ms'], 'UNKNOWN_NO_EXIT_OPEN')
+            # An entry with no observable next OPEN is not an abstention or a
+            # zero-return trade. It leaves the whole-policy outcome unknown.
+            # A terminal exit likewise cannot be counted as a realized fill.
+            terminal_entry = s['action'] == 'ENTER_LONG' and not quantity
+            terminal_exit = s['action'] == 'EXIT_LONG' and cfg.indicator_exit and bool(quantity)
+            terminal_unknown = (terminal_entry or terminal_exit) and not s['stale']
+            opportunities.append({**s, 'status': ('UNKNOWN_NO_ELIGIBLE_OPEN' if terminal_unknown
+                else 'STALE_INDICATOR' if s['stale'] else 'NO_TERMINAL_ACTION'),
+                'scored_return': None})
+            if terminal_unknown and not uncertain:
+                unknown(s['scheduled_ms'], 'UNKNOWN_NO_ENTRY_OPEN' if terminal_entry else 'UNKNOWN_NO_EXIT_OPEN')
     status = 'UNKNOWN_UNRESOLVED' if uncertain else 'OPEN_UNRESOLVED' if quantity else 'SETTLED_MODELED'
     return {'path': path, 'scenario': path != 'FACTUAL', 'status': status,
             'scheduled_denominator': len(scheduled), 'opportunities': opportunities,
