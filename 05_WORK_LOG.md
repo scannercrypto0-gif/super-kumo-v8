@@ -204,3 +204,46 @@ No orders, production DB, credentials, research changes or merges.
 See docs/operations/G1_COMPLETION_20261024.md and evidence/g1_completion_public_smoke.json.
 Final-head local/CI evidence belongs to the resulting consolidated Draft PR.
 R09 unresolved; PR16 left open with a scoped supersession recommendation.
+
+## 2026-10-28 — SF-DEC-010/B consolidated Factory execution, branch only
+
+Owner order #77/6464942337 received directly; reconciled #143 a0b463df, #141
+fbf70afb, main dbc191df and AIARC-062/063; no global cross-chat handoff asserted.
+Parsed all 84 pinned non-test Python files, 6199 calls and 19 getattr sites, then
+manually traced concrete sinks and output contracts. Existing opaque V1 plan
+identity/replay preserved (blob 9403d2e1); no candidate research ranker found.
+Confirmed direct compare_routes accepted scored UNKNOWN zeros and negative
+cost metadata; added structural input guard and reused protocol-v1 validation.
+New targeted falsifier file plus immutable V1 golden/census evidence prepared;
+shared comparator's existing configured matrix is used once at changed HEAD.
+Historical 708/3/51 and integrity CI are prior evidence, not new mechanisms.
+See docs/research/FACTORY_CONSOLIDATED_BOUNDARY_AUDIT.md; results/exact changed SHA
+and independent S/R request will be attached to PR #143 and Issues #77/#134.
+No merge, empirical/OOS/PAPER/LIVE, CLOSED_FINAL or G0 acceptance.
+
+Local pre-publication targeted batch: `python -m pytest -q
+ tests/test_sf_boundary_onepass.py tests/test_sf_factory_exam.py
+ tests/test_sf_factory_full_synthetic_b.py tests/test_sf_b2_counterfactual.py
+ tests/test_sf_b2_gate_permutation.py tests/test_sf_synthetic_outcome_receipt.py
+ --junitxml=/tmp/factory-consolidated-targeted.xml` — **70 passed**, no skips,
+5.84 seconds. Test collection initially unavailable in this refreshed runtime;
+installed pytest/pytest-timeout before the single successful test batch. Runtime
+or tests were not weakened. Final remote SHA/matrix IDs are recorded in #143,
+#77 and #134 after publication; these lines are not a prior claim of CI success.
+
+## 2026-10-28 — AQL-SF-WORK-DEV-EXIT-THREE-PATHS-001 / Issue #148
+
+Direct owner execution received in Work. Existing Factory Draft #143 confirmed
+OPEN/unmerged at a6aa5fdd; #77/#134 latest source comments and #150 separation read.
+Added standalone historical_dev_exits_v1: fixed EMA8/21 V2 prefix availability,
+latency, native exits/optional overlays, no forced close, independent three-path
+cash/inventory/eligibility replay, fail-closed UNKNOWN and canonical chain receipt.
+Published synthetic arithmetic fixture and new proposed study v2; original Work146
+proposal and legacy fixed horizon/locked-plan bytes unchanged. No real-source
+performance replay/download, source authority upgrade or Core change.
+Final local focused command (new file + test_sf_factory_exam.py): 63 passed,
+no skips/failures, Python 3.12. Dependency guard passed. Initial environment needed
+pytest/pytest-timeout installation. Existing final-head complete/integrity CI is
+observed separately in #148/#77/#134; not claimed green in advance here.
+[Contract and evidence](docs/research/work148/README.md). Pending independent
+S/R judgment, no implementer acceptance or closure; no merge/OOS/Paper/Live.

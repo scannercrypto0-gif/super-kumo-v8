@@ -1,0 +1,38 @@
+{
+  "correction_lineage": null,
+  "cost_model_freeze": null,
+  "date_windows": null,
+  "empirical_gates": "BLOCKED_EXTERNAL_EVIDENCE_AND_COUNCIL_REVIEW",
+  "episodes": null,
+  "execution_contract": "SF-HISTORICAL-DEV-EXITS-1",
+  "exit": {
+    "ambiguous_primary": "UNKNOWN_EXIT_ORDER",
+    "independent_scenarios": [
+      "TARGET_FIRST",
+      "STOP_FIRST"
+    ],
+    "indicator_exit": true,
+    "indicator_overlay_collision": "UNKNOWN_ALL_PATHS",
+    "overlay_parameters_require_explicit_freeze": true,
+    "scenarios_are_guaranteed_bounds": false,
+    "sl_fraction": null,
+    "tp_fraction": null,
+    "unresolved_terminal": "OPEN_UNRESOLVED"
+  },
+  "forced_max_holding_ms": null,
+  "independent_anchor": null,
+  "issuer_timing": null,
+  "ledger_receipts": null,
+  "live": "CLOSED",
+  "mode": "HISTORICAL_DEV_ONLY",
+  "observation_checkpoint_ms": 86400000,
+  "oos": "CLOSED",
+  "original_bytes_modified": false,
+  "paper": "CLOSED",
+  "regime_labels": null,
+  "schema": "AQL-WORK146-STUDY-PROPOSAL-2-DEV-EXITS",
+  "source_vintage": null,
+  "status": "PROPOSED_NOT_FROZEN_NOT_EMPIRICAL",
+  "strategy": "EMA8_21_SMA_SEED_FSUM_V2_CROSS_LONG_1",
+  "supersedes_design_only_sha256": "dd756b785f3ca27d8591c68f42a570a075a90c8a9f4c7e0c513b7c9d976e484f"
+}

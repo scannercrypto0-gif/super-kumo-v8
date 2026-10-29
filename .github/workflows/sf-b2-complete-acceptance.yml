@@ -21,6 +21,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -30,11 +31,13 @@ jobs:
           git rev-parse HEAD
           python -m compileall -q research_wp_r0 tests integration_tests
       - name: Complete Factory tests and explicit cross-module integration
-        run: python -c "import pathlib,pytest,sys; paths=sorted(str(p) for p in pathlib.Path('tests').glob('test_sf_*.py')); sys.exit(pytest.main(['-p','no:cacheprovider','-q',*paths,'integration_tests/test_sf_strat_ind02.py']))"
+        run: python -c "import pathlib,pytest,sys; paths=sorted(str(p) for p in pathlib.Path('tests').glob('test_sf_*.py')); sys.exit(pytest.main(['-p','no:cacheprovider','-q',*paths,'integration_tests/test_sf_strat_ind02.py','--junitxml=factory-batch-tests.xml']))"
       - name: Full synthetic B2 nine-case replay and report
         run: python -m research_wp_r0.factory_b2_counterfactual > factory-b2-all-cases.json
       - uses: actions/upload-artifact@v4
         with:
           name: b2-complete-${{ matrix.os }}-${{ matrix.python-version }}
-          path: factory-b2-all-cases.json
+          path: |
+            factory-b2-all-cases.json
+            factory-batch-tests.xml
           if-no-files-found: error

@@ -115,14 +115,14 @@ def freeze_manifest(dna, events):
                         rows=rows, monitoring=monitoring))
 
 
-def freeze_protocol(manifest, *, expected_manifest_digest, config):
-    _check(manifest, expected_manifest_digest)
+def _validate_config(config, first_cutoff_ms):
+    """Shared versioned synthetic execution contract, not a research selector."""
     keys(config, "schema seed capital notional fee_bps spread_bps slippage_bps latency_ms holding_ms exit_policy protection_required regime_threshold regime_max_age_ms trial_id registered_at_ms parameter_count overlay")
     if config["schema"] != "factory-exam-protocol-1" or config["exit_policy"] != "DNA_EXIT_OR_NATIVE_HORIZON_LONG":
         raise ValueError("Explicit supported native exit contract required")
     integer(config["seed"], 0, 2**31-1); identifier(config["trial_id"])
     integer(config["parameter_count"], 0, 10000)
-    integer(config["registered_at_ms"], 0, manifest.spec["rows"][0]["cutoff_ms"])
+    integer(config["registered_at_ms"], 0, first_cutoff_ms)
     number(config["capital"], 1, 1e9); number(config["notional"], 0.01, config["capital"])
     for name in ("fee_bps", "spread_bps", "slippage_bps"):
         number(config[name], 0, 1000)
@@ -137,6 +137,11 @@ def freeze_protocol(manifest, *, expected_manifest_digest, config):
         if overlay["name"] != "MAX_CONCURRENT" or overlay["version"] != "1":
             raise ValueError("Exactly one opt-in supported overlay")
         integer(overlay["max_concurrent"], 1, 256)
+
+
+def freeze_protocol(manifest, *, expected_manifest_digest, config):
+    _check(manifest, expected_manifest_digest)
+    _validate_config(config, manifest.spec["rows"][0]["cutoff_ms"])
     return _freeze(dict(manifest_digest=manifest.digest, config=config,
                         leverage=1, margin="CASH_ONLY", funding="NOT_APPLICABLE_SPOT_LONG",
                         seed_policy="RECORDED_NO_RANDOMNESS_EXPLICIT_FILL_FRACTIONS"))
@@ -286,19 +291,80 @@ def replay_route(manifest, protocol, receipt, *, arm):
     return actual
 
 
+def _comparison_input(receipt):
+    """Refuse inconsistent claims at the actual public aggregation boundary.
+
+    Structural validation is not replay, independent custody or empirical
+    admission. Authenticity still requires replay_route and retained inputs.
+    """
+    if not isinstance(receipt, FrozenExam):
+        raise ValueError("Frozen synthetic route required")
+    spec = receipt.spec
+    keys(spec, "schema arm manifest_digest protocol_digest outcomes ledger ledger_head assumptions window portfolio execution")
+    if (spec["schema"] != "factory-route-1" or spec["arm"] not in ("ALWAYS", "REGIME")
+            or spec["execution"] != "SYNTHETIC_ONLY_NO_ORDER_IO"):
+        raise ValueError("Unsupported synthetic route claims")
+    keys(spec["window"], "first_cutoff_ms last_cutoff_ms final_native_exit_ms")
+    _validate_config(spec["assumptions"], spec["window"]["first_cutoff_ms"])
+    rows = spec["outcomes"]
+    if type(rows) is not list or not 1 <= len(rows) <= 256:
+        raise ValueError("Scheduled opportunity inventory required")
+    ids = set()
+    for row in rows:
+        keys(row, "event_id family_id source_fingerprint status reason net_quote net_per_requested_notional executed_net_return gross_quote")
+        identifier(row["event_id"])
+        if row["event_id"] in ids:
+            raise ValueError("Duplicate opportunity denominator")
+        ids.add(row["event_id"])
+        status = row["status"]
+        values = [row[k] for k in ("net_quote", "net_per_requested_notional", "gross_quote")]
+        if status == "UNKNOWN":
+            if any(v is not None for v in values) or row["executed_net_return"] is not None:
+                raise ValueError("UNKNOWN cannot be zero-filled or scored")
+        elif status in ("NO_FILL", "ZERO_EXPOSURE"):
+            if any(type(v) not in (int, float) or v != 0 for v in values) or row["executed_net_return"] is not None:
+                raise ValueError("Unexecuted exposure cannot claim a conditional executed return")
+            if status == "NO_FILL" and row["reason"] != "EXPLICIT_SYNTHETIC_NO_FILL":
+                raise ValueError("No-fill requires explicit synthetic evidence")
+        elif status == "EXECUTED":
+            for value in values + [row["executed_net_return"]]:
+                number(value)
+            expected = row["net_quote"] / spec["assumptions"]["notional"]
+            if not math.isclose(row["net_per_requested_notional"], expected, rel_tol=1e-12, abs_tol=1e-12):
+                raise ValueError("Requested-notional estimand mismatch")
+        else:
+            raise ValueError("Unknown outcome state")
+    portfolio = spec["portfolio"]
+    keys(portfolio, "currency initial_capital final_equity net_quote sampled_mtm_drawdown_fraction drawdown_complete unknown_opportunities halted")
+    unknown = sum(row["status"] == "UNKNOWN" for row in rows)
+    if (type(portfolio["unknown_opportunities"]) is not int
+            or portfolio["unknown_opportunities"] != unknown
+            or type(portfolio["drawdown_complete"]) is not bool
+            or type(portfolio["halted"]) is not bool
+            or portfolio["drawdown_complete"] != (not portfolio["halted"])
+            or portfolio["currency"] != "SYNTHETIC_QUOTE_UNITS"):
+        raise ValueError("Inconsistent coverage/denominator claims")
+    number(portfolio["sampled_mtm_drawdown_fraction"], 0, 1)
+    if portfolio["halted"] and (portfolio["net_quote"] is not None or portfolio["final_equity"] is not None):
+        raise ValueError("Halted execution cannot claim complete portfolio outcome")
+    return spec
+
+
 def compare_routes(left, right, *, sensitivity=False):
     """Keep universe policy mean separate from conditional both-executed mean.
 
     Missing outcomes are never zero-filled. Universe mean is null unless all
     slots are known. Conditional subset is explicitly selection-sensitive.
     """
-    a, b = left.spec, right.spec
+    a, b = _comparison_input(left), _comparison_input(right)
     if a["manifest_digest"] != b["manifest_digest"]:
         raise ValueError("Family identity alone is insufficient: different source manifest")
-    controlled = ("capital", "notional", "fee_bps", "spread_bps", "slippage_bps", "latency_ms", "holding_ms", "exit_policy", "protection_required")
+    controlled = ("capital", "notional", "fee_bps", "spread_bps", "slippage_bps", "latency_ms", "holding_ms", "exit_policy", "protection_required", "overlay")
     differences = [k for k in controlled if a["assumptions"][k] != b["assumptions"][k]]
-    if differences and not sensitivity:
-        raise ValueError("Unmatched execution assumptions; explicit sensitivity required")
+    policy_fields = ("regime_threshold", "regime_max_age_ms")
+    changed_policy = [k for k in policy_fields if a["assumptions"][k] != b["assumptions"][k]]
+    if (differences or changed_policy) and not sensitivity:
+        raise ValueError("Unmatched execution or REGIME policy assumptions; explicit sensitivity required")
     if len(a["outcomes"]) != len(b["outcomes"]):
         raise ValueError("Opportunity denominator mismatch")
     matched = []
@@ -319,7 +385,7 @@ def compare_routes(left, right, *, sensitivity=False):
             observed_net_quote=math.fsum(x["net_quote"] for x in rows if x["net_quote"] is not None),
             ex_ante_policy_mean_per_requested_notional=math.fsum(vals)/len(rows) if len(vals)==len(rows) else None,
             observed_sum_per_requested_notional=math.fsum(vals), portfolio=spec["portfolio"])
-    return _freeze(dict(schema="factory-comparison-1", manifest_digest=a["manifest_digest"],
+    result = dict(schema="factory-comparison-1", manifest_digest=a["manifest_digest"],
         left_protocol=a["protocol_digest"], right_protocol=b["protocol_digest"],
         left=arm_summary(a), right=arm_summary(b),
         conditional_both_executed_count=len(matched),
@@ -327,4 +393,8 @@ def compare_routes(left, right, *, sensitivity=False):
         conditional_selection_sensitive=True, inference="DESCRIPTIVE_SYNTHETIC_NO_P_VALUES_NO_PROMOTION",
         comparison_kind="SENSITIVITY" if sensitivity else "MATCHED_ASSUMPTIONS",
         changed_execution_assumptions=differences,
-        oos="NOT_ACCESSED", independent_custody="NOT_VERIFIED"))
+        oos="NOT_ACCESSED", independent_custody="NOT_VERIFIED")
+    if changed_policy:
+        result["comparison_kind"] = "POLICY_SENSITIVITY"
+        result["changed_policy_parameters"] = changed_policy
+    return _freeze(result)

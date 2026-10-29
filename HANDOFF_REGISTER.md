@@ -124,3 +124,18 @@ At 2026-10-21T06:42:12Z / 09:42:12 Asia/Riyadh (UTC+03:00), GitHub verifies [PR 
 ### G0-REV-01/C addendum to AQL-HO-20261021-003 documentary proposal
 
 Owner approved C documentary remediation on PR #15: sixteen future executable fixtures T29–T44, authoritative revision/reconnect/fencing acceptance, measurement uncertainty and trace criteria, evidence schemas, risks and review log. Existing PR #15 remains Draft, no merge/code/runtime tests; last owner-actually-submitted Work handoff still AQL-HO-20261021-002 / PR #14. G0 OPEN.
+
+## AQL-SF-WORK-DEV-EXIT-THREE-PATHS-001 — owner invocation 2026-10-28
+
+- Direct owner submitted #148 in this Work session; not merely a queued issue.
+  Prior delivered baseline #146/6469407856 per #148, addenda #77/6470243101,
+  6470247381 and bounded execution #148. Scope: Factory DEV exits only.
+- Branch-confirmed parent a6aa5fdd, existing Draft #143 OPEN/unmerged. New source,
+  35 targeted cases, synthetic receipt and proposed study v2 included; 28 old
+  fixed-horizon cases reused unchanged. Full local targeted result 63 passed.
+- Accessed current owner task, #148/#77/#134, #143 head/ancestry and repository
+  governance. Cross-chat history inaccessible; no exhaustive coverage assertion.
+  #150 provenance inspector and Core Guardian deliberately outside this delivery.
+- Publication SHA/CI URLs and independent S/R request are appended to existing
+  #148/#77/#134 after push/observed results. No additional automatic review ticket,
+  merge, OOS, Paper, Live or self-close. Council accept/reject is next exact action.

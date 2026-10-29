@@ -296,7 +296,7 @@ class TestIndicatorManifest(unittest.TestCase):
         rs = self._rs()
         m = IndicatorManifest.create(
             indicator_id="SMA_v1", dataset_id="DS1", dataset_version=1,
-            dataset_manifest_hash="mh", decision_cutoff_ms=99999,
+            dataset_manifest_hash="mh", decision_cutoff_ms=rs[0].decision_cutoff_ms,
             parameter_set=(("period", 3),), warmup_policy=2, results=rs,
         )
         self.assertTrue(m.verify(rs))
@@ -305,7 +305,7 @@ class TestIndicatorManifest(unittest.TestCase):
         rs = self._rs()
         m = IndicatorManifest.create(
             indicator_id="SMA_v1", dataset_id="DS1", dataset_version=1,
-            dataset_manifest_hash="mh", decision_cutoff_ms=99999,
+            dataset_manifest_hash="mh", decision_cutoff_ms=rs[0].decision_cutoff_ms,
             parameter_set=(("period", 3),), warmup_policy=2, results=rs,
         )
         self.assertFalse(m.verify(rs + [rs[0]]))
@@ -314,7 +314,7 @@ class TestIndicatorManifest(unittest.TestCase):
         rs = self._rs(3)
         m = IndicatorManifest.create(
             indicator_id="SMA_v1", dataset_id="DS1", dataset_version=1,
-            dataset_manifest_hash="mh", decision_cutoff_ms=99999,
+            dataset_manifest_hash="mh", decision_cutoff_ms=rs[0].decision_cutoff_ms,
             parameter_set=(("period", 3),), warmup_policy=2, results=rs,
         )
         m2 = IndicatorManifest.from_dict(m.to_dict())

@@ -1,3 +1,26 @@
+## 2026-10-28 — Work148 Factory DEV exit delivery (branch only)
+
+Project AQL-CRYPTO-RESEARCH-001; verified existing Draft #143 head a6aa5fdd,
+OPEN/UNMERGED, main dbc191df. Owner-authorized Issue #148 adds versioned offline
+native exits and three independent ledger paths; 63 targeted tests passed locally
+(35 new + 28 legacy). [Contract, fixtures and proposed study v2](docs/research/work148/README.md).
+Exact final commit and observed CI results are recorded in #148/#77/#134 after
+publication. Council independent S engineering / R scientific verdict PENDING;
+no self-close, merge, OOS, Paper, Live or change to Core/#150. Historical headers
+below remain historical; no new G0 approval is asserted. Next exact action:
+independent Audit #134 accepts/rejects published exact SHA with stated scope.
+
+## 2026-10-28 — Factory consolidated boundary batch (Draft #143 scope)
+
+Direct owner order: https://github.com/scannercrypto0-gif/super-kumo-v8/issues/77#issuecomment-6464942337
+Base #143 a0b463df, unmerged stack. Full pinned non-test Python AST census and
+manual boundary dispositions are in docs/research/FACTORY_CONSOLIDATED_BOUNDARY_AUDIT.md.
+Confirmed synthetic compare_routes UNKNOWN-zero-fill/invalid-cost bypass repaired
+at existing port, legacy research-plan-1 untouched. General candidate research
+ranking/promotion NOT_IMPLEMENTED; no speculative engine or selection contract.
+One changed-head CI batch and independent Council S/R are tracked by #143/#134.
+No merge, historical/OOS, paper/live, G0 or final acceptance.
+
 ## Current execution addendum - 2026-10-24 (Draft PR, not merged)
 
 Verified main baseline: 8e8690e58451e4fdd38f3e5e5f3cc89817e59c26. G0 is
