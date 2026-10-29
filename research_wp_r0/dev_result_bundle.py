@@ -90,7 +90,29 @@ def _validate(receipt, evidence):
         raise ValueError("NOT_DEV_MODELED_ONLY")
 
 
-def persist_bundle(store_dir, *, run_id, receipt, evidence):
+def _validate_preflight_binding(preflight, receipt, evidence):
+    required = {
+        "schema": "sf-dev-input-preflight-v1",
+        "status": "INPUT_BYTES_AND_NORMALIZED_ROWS_VALID_NOT_STUDY_AUTHORITY",
+        "symbol": "BTCUSDT", "interval_ms": 60000,
+        "start_ms": 1704067200000, "end_exclusive_ms": 1704153600000,
+        "bar_count": 1440, "warmup_bars": 252,
+        "receipt_authenticity": "NOT_AUTHENTICATED_BY_THIS_GATE",
+        "point_in_time_provenance": "NOT_ESTABLISHED_BY_THIS_GATE",
+    }
+    if not isinstance(preflight, dict) or any(preflight.get(k) != v for k, v in required.items()):
+        raise ValueError("INVALID_OR_NON_B0_INPUT_PREFLIGHT")
+    if (preflight.get("archive_sha256") != receipt.get("source", {}).get("archive_sha256")
+            or preflight.get("normalized_rows_sha256") != digest(receipt.get("input_rows"))
+            or preflight.get("issued_receipt_sha256") != evidence.get("issued_receipt_sha256")
+            or preflight.get("warmup_bars") != evidence.get("warmup_bars")
+            or preflight.get("policy_id") != evidence.get("policy_id")
+            or preflight.get("scenario_id") != evidence.get("scenario_id")
+            or preflight.get("code_sha") != evidence.get("code_sha")):
+        raise ValueError("INPUT_PREFLIGHT_RECEIPT_BINDING_MISMATCH")
+
+
+def persist_bundle(store_dir, *, run_id, receipt, evidence, input_preflight=None):
     """Persist a verified *already generated* receipt; never run a study.
 
     Each run_id is allocated once; failure leaves the directory as an
@@ -109,6 +131,9 @@ def persist_bundle(store_dir, *, run_id, receipt, evidence):
     meta = _bytes({"schema": SCHEMA, "run_id": run_id,
                    "evidence": evidence, "status": "DEV_ONLY_NOT_PIT"})
     files = {"receipt.json": payload, "evidence.json": meta}
+    if input_preflight is not None:
+        _validate_preflight_binding(input_preflight, receipt, evidence)
+        files["input_preflight.json"] = _bytes(input_preflight)
     manifest = {"schema": SCHEMA, "run_id": run_id,
                 "files": {k: {"sha256": _sha(v), "bytes": len(v)}
                           for k, v in files.items()},
@@ -138,7 +163,9 @@ def verify_bundle(store_dir, run_id):
         manifest = json.loads(raw)
         if manifest.get("schema") != SCHEMA or manifest.get("run_id") != run_id:
             return False
-        if set(manifest.get("files", {})) != {"receipt.json", "evidence.json"}:
+        names = set(manifest.get("files", {}))
+        if names not in ({"receipt.json", "evidence.json"},
+                         {"receipt.json", "evidence.json", "input_preflight.json"}):
             return False
         for name, commitment in manifest["files"].items():
             path = run / name
@@ -153,7 +180,11 @@ def verify_bundle(store_dir, run_id):
         if (evidence_doc.get("run_id") != run_id
                 or evidence_doc.get("schema") != SCHEMA):
             return False
-        _validate(receipt, evidence_doc.get("evidence"))
+        evidence = evidence_doc.get("evidence")
+        _validate(receipt, evidence)
+        if "input_preflight.json" in names:
+            preflight = json.loads((run / "input_preflight.json").read_bytes())
+            _validate_preflight_binding(preflight, receipt, evidence)
         return True
     except (OSError, ValueError, TypeError, KeyError, AttributeError):
         return False
