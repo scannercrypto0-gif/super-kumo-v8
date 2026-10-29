@@ -106,3 +106,43 @@ def test_well_formed_but_wrong_claim_is_refused(field, value, error):
         with pytest.raises(ValueError, match=error):
             persist_bundle(d, run_id="mismatch", receipt=receipt(), evidence=e)
         assert not (Path(d) / "mismatch").exists()
+
+
+def test_resolvable_synthetic_trade_result_is_saved_without_nulling_scored_pnl(tmp_path):
+    rows = []
+    for i in range(24):
+        t = i * 60000
+        px = 100.0 + i
+        rows.append({"open_ms": t, "close_ms": t + 59999,
+                     "open": px, "high": px + 1, "low": px - 1,
+                     "close": px, "volume": 1.0,
+                     "available_ms": t + 61000, "modeled_quote": True})
+    source = {"version": "synthetic", "reference": "fixture:resolved-trade",
+              "archive_sha256": "b" * 64, "rows_sha256": digest(rows),
+              "availability_evidence": "UNKNOWN",
+              "correction_evidence": "PINNED_VERSION_ONLY"}
+    signals = [
+        {"bar_open_ms": rows[20]["open_ms"], "action": "ENTER_LONG",
+         "available_ms": rows[20]["available_ms"]},
+        {"bar_open_ms": rows[21]["open_ms"], "action": "EXIT_LONG",
+         "available_ms": rows[21]["available_ms"]},
+    ]
+    result = replay_contract_fixture(rows, source=source, signals=signals,
+                                     config=Config())
+    factual = result["paths"]["FACTUAL"]
+    assert factual["status"] == "SETTLED_MODELED"
+    assert factual["realized_pnl"] is not None
+    assert factual["realized_pnl"] > 0
+    e = {"policy_id": "DEV-B0-v1",
+         "policy_sha256": digest({"policy_id": "DEV-B0-v1",
+                                  "engine_config": result["config"]}),
+         "source_zip_sha256": source["archive_sha256"],
+         "issued_receipt_sha256": "5" * 64, "code_sha": "a" * 40,
+         "input_prefix_sha256": digest(result["input_rows"]),
+         "scenario_id": "S00", "warmup_bars": 22,
+         "experiment_id": "AQL-SYNTHETIC-RESOLVED-01"}
+    persist_bundle(str(tmp_path), run_id="resolved-run", receipt=result, evidence=e)
+    assert verify_bundle(str(tmp_path), "resolved-run")
+    saved = json.loads((tmp_path / "resolved-run" / "receipt.json").read_text())
+    assert saved["paths"]["FACTUAL"]["realized_pnl"] == factual["realized_pnl"]
+    assert saved["paths"]["FACTUAL"]["scheduled_denominator"] == 2
