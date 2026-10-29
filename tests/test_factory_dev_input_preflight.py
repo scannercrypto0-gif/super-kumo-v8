@@ -74,3 +74,20 @@ def test_preflight_mismatch_fails_before_creating_run_directory(tmp_path):
 def test_unpinned_engine_or_unapproved_policy_scenario_fails_closed(field,value,error):
     args=list(inputs()); args[4]=dict(args[4]); args[4][field]=value
     with pytest.raises(InputGateRejected,match=error): run(tuple(args))
+
+
+@pytest.mark.parametrize("field,value", [
+    ("code_sha", "a"*40),
+    ("policy_id", "DEV-B0-UNREVIEWED"),
+    ("scenario_id", "S12"),
+])
+def test_result_bundle_refuses_forged_preflight_pin_before_creating_run(tmp_path,field,value):
+    raw,issued,rows,source,commitment=inputs()
+    config=Config(warmup_bars=252,latency_ms=1000,quantity=0.001)
+    preflight=validate_historical_dev_inputs(archive_bytes=raw,issued_receipt_bytes=issued,bars=rows,source=source,config=config,commitment=commitment)
+    receipt=replay(rows,source=source,config=config)
+    evidence={"policy_id":"DEV-B0-v1","policy_sha256":digest({"policy_id":"DEV-B0-v1","engine_config":receipt["config"]}),"source_zip_sha256":source["archive_sha256"],"issued_receipt_sha256":commitment["issued_receipt_sha256"],"code_sha":commitment["code_sha"],"input_prefix_sha256":digest(receipt["input_rows"]),"scenario_id":"S00","warmup_bars":252,"experiment_id":"AQL-DEV-FIRST-01"}
+    preflight[field]=value
+    with pytest.raises(ValueError,match="UNPINNED_ENGINE_OR_UNAPPROVED_POLICY_SCENARIO"):
+        persist_bundle(str(tmp_path),run_id="forged-preflight",receipt=receipt,evidence=evidence,input_preflight=preflight)
+    assert not (tmp_path/"forged-preflight").exists()
