@@ -39,11 +39,14 @@ class Config:
     latency_ms: int = 1
     max_signal_age_ms: int = 120000
     checkpoint_ms: int = 86400000
+    warmup_bars: int = 22  # structural default preserved; study policy may require 252
 
     def validate(self):
         for name in ('interval_ms', 'max_signal_age_ms', 'checkpoint_ms'):
             if type(getattr(self, name)) is not int or getattr(self, name) <= 0:
                 raise ValueError('INVALID_CONFIG_' + name)
+        if type(self.warmup_bars) is not int or self.warmup_bars < 22:
+            raise ValueError('INVALID_WARMUP_BARS')
         if type(self.latency_ms) is not int or self.latency_ms < 0:
             raise ValueError('INVALID_LATENCY')
         if (not number(self.initial_cash, 1e-12) or not number(self.quantity, 1e-12)
@@ -100,8 +103,12 @@ def _signals(bars, cfg):
     for b in bars:
         ready = max(ready, b['available_ms'])
         prefix_ready[b['open_ms']] = ready
+    # Compute EMA on the entire available prefix, but prohibit scoring/signals
+    # before the configured warmup count. Do not re-seed at the scoring boundary.
+    eligible = {b['open_ms'] for b in bars[(21 if cfg.warmup_bars == 22 else cfg.warmup_bars):]}
     return [{'bar_open_ms': d.bar_open_ms, 'action': d.signal,
-             'available_ms': prefix_ready[d.bar_open_ms]} for d in decisions]
+             'available_ms': prefix_ready[d.bar_open_ms]} for d in decisions
+            if d.bar_open_ms in eligible]
 
 
 def replay(bars, *, source, config=Config()):
@@ -274,9 +281,17 @@ def _path(bars, scheduled, cfg, path):
     last_open = bars[-1]['open_ms']
     for s in scheduled:
         if s['scheduled_ms'] > last_open:
-            opportunities.append({**s, 'status': 'UNKNOWN_NO_ELIGIBLE_OPEN', 'scored_return': None})
-            if quantity and s['action'] == 'EXIT_LONG' and cfg.indicator_exit and not uncertain:
-                unknown(s['scheduled_ms'], 'UNKNOWN_NO_EXIT_OPEN')
+            # An entry with no observable next OPEN is not an abstention or a
+            # zero-return trade. It leaves the whole-policy outcome unknown.
+            # A terminal exit likewise cannot be counted as a realized fill.
+            terminal_entry = s['action'] == 'ENTER_LONG' and not quantity
+            terminal_exit = s['action'] == 'EXIT_LONG' and cfg.indicator_exit and bool(quantity)
+            terminal_unknown = (terminal_entry or terminal_exit) and not s['stale']
+            opportunities.append({**s, 'status': ('UNKNOWN_NO_ELIGIBLE_OPEN' if terminal_unknown
+                else 'STALE_INDICATOR' if s['stale'] else 'NO_TERMINAL_ACTION'),
+                'scored_return': None})
+            if terminal_unknown and not uncertain:
+                unknown(s['scheduled_ms'], 'UNKNOWN_NO_ENTRY_OPEN' if terminal_entry else 'UNKNOWN_NO_EXIT_OPEN')
     status = 'UNKNOWN_UNRESOLVED' if uncertain else 'OPEN_UNRESOLVED' if quantity else 'SETTLED_MODELED'
     return {'path': path, 'scenario': path != 'FACTUAL', 'status': status,
             'scheduled_denominator': len(scheduled), 'opportunities': opportunities,
