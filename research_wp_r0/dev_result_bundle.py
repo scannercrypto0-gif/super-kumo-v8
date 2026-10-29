@@ -12,7 +12,7 @@ import json
 import os
 import re
 
-from .historical_dev_exits_v1 import verify_receipt
+from .historical_dev_exits_v1 import verify_receipt, digest
 
 SCHEMA = "sf-dev-run-bundle-local-v1"
 _SAFE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\Z")
@@ -66,6 +66,25 @@ def _validate(receipt, evidence):
             raise ValueError("BAD_RUN_IDENTITY_" + k)
     if type(evidence["warmup_bars"]) is not int or evidence["warmup_bars"] < 22:
         raise ValueError("BAD_WARMUP")
+    # Cross-bind independently supplied evidence to the exact replayed payload.
+    # The original issued-receipt SHA and loaded code SHA are external claims:
+    # this writer has no independent authority to authenticate either.
+    source = receipt.get("source", {})
+    if evidence["source_zip_sha256"] != source.get("archive_sha256"):
+        raise ValueError("SOURCE_ARCHIVE_SHA_MISMATCH")
+    if evidence["input_prefix_sha256"] != digest(receipt.get("input_rows")):
+        raise ValueError("INPUT_PREFIX_SHA_MISMATCH")
+    actual_warmup = receipt.get("config", {}).get("warmup_bars")
+    if actual_warmup is None:
+        actual_warmup = 22  # legacy default; not evidence of 252 study warmup
+    if evidence["warmup_bars"] != actual_warmup:
+        raise ValueError("WARMUP_CONFIG_MISMATCH")
+    # Defined local binding: policy SHA commits to this engine config and ID.
+    # It does NOT authenticate the wider policy registry or operator approval.
+    config_pin = digest({"policy_id": evidence["policy_id"],
+                         "engine_config": receipt.get("config")})
+    if evidence["policy_sha256"] != config_pin:
+        raise ValueError("POLICY_CONFIG_SHA_MISMATCH")
     # A receipt is local replay evidence, not proof of the claims in evidence.
     if receipt.get("claims", {}).get("actual_fills") is not False:
         raise ValueError("NOT_DEV_MODELED_ONLY")
