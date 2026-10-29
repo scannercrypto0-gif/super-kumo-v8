@@ -22,7 +22,7 @@ def inputs():
     receipt={"schema":"aql-work152-artifact-handoff-receipt-1","scope":"SYNTHETIC_TEST_ONLY","status":"SYNTHETIC_FIXTURE_NOT_ISSUED","source_id":"fixture:synthetic","receipt_id":"fixture-receipt","strategy_execution":"NOT_PERFORMED","real_pit_accepted":False,"verified_source_timing":False,"acquisition":{"archive":{"sha256":sha256(raw).hexdigest(),"size_bytes":len(raw)}},"normalization":{"bars":1440,"normalization":"binance12-to-7-tuple-python-float-json-v1","normalized_sha256":sha256(nb).hexdigest(),"normalized_size_bytes":len(nb)}}
     issued=json.dumps(receipt,sort_keys=True,separators=(",",":")).encode()
     source={"version":"synthetic-b0","reference":"fixture:input-preflight","archive_sha256":sha256(raw).hexdigest(),"rows_sha256":digest(rows),"availability_evidence":"UNKNOWN","correction_evidence":"PINNED_VERSION_ONLY"}
-    commitment={"issued_receipt_sha256":sha256(issued).hexdigest(),"symbol":"BTCUSDT","interval_ms":60000,"start_ms":START,"end_exclusive_ms":END,"code_sha":"a"*40,"policy_id":"DEV-B0-v1","scenario_id":"S00","warmup_bars":252,"source_kind":"SYNTHETIC_TEST_FIXTURE"}
+    commitment={"issued_receipt_sha256":sha256(issued).hexdigest(),"symbol":"BTCUSDT","interval_ms":60000,"start_ms":START,"end_exclusive_ms":END,"code_sha":"20928693f30b1730f0693a293bbf4a1f8ab21c88","policy_id":"DEV-B0-v1","scenario_id":"S00","warmup_bars":252,"source_kind":"SYNTHETIC_TEST_FIXTURE"}
     return raw,issued,rows,source,commitment
 def run(args):
     raw,issued,rows,source,commitment=args
@@ -65,3 +65,12 @@ def test_preflight_mismatch_fails_before_creating_run_directory(tmp_path):
     evidence={"policy_id":"DEV-B0-v1","policy_sha256":digest({"policy_id":"DEV-B0-v1","engine_config":receipt["config"]}),"source_zip_sha256":source["archive_sha256"],"issued_receipt_sha256":"f"*64,"code_sha":commitment["code_sha"],"input_prefix_sha256":digest(receipt["input_rows"]),"scenario_id":"S00","warmup_bars":252,"experiment_id":"AQL-DEV-FIRST-02"}
     with pytest.raises(ValueError,match="INPUT_PREFLIGHT_RECEIPT_BINDING_MISMATCH"): persist_bundle(str(tmp_path),run_id="mismatched-run",receipt=receipt,evidence=evidence,input_preflight=preflight)
     assert not (tmp_path/"mismatched-run").exists()
+
+@pytest.mark.parametrize("field,value,error", [
+    ("code_sha", "a"*40, "UNPINNED_ENGINE_CODE_SHA"),
+    ("policy_id", "DEV-B0-UNREVIEWED", "UNAPPROVED_POLICY_ID"),
+    ("scenario_id", "S12", "UNAPPROVED_SCENARIO_ID"),
+])
+def test_unpinned_engine_or_unapproved_policy_scenario_fails_closed(field,value,error):
+    args=list(inputs()); args[4]=dict(args[4]); args[4][field]=value
+    with pytest.raises(InputGateRejected,match=error): run(tuple(args))
