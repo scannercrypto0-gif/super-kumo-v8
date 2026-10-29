@@ -112,7 +112,51 @@ def _signals(bars, cfg):
 
 
 def replay(bars, *, source, config=Config()):
-    """Fixed EMA8/21 V2 semantics reused; no caller-supplied market signals."""
+    """Non-production replay API for synthetic/contract development only.
+
+    The original-local-pair production source is accepted only by the Factory
+    post-admission function below, which requires the one-time start marker.
+    """
+    if isinstance(source, dict) and source.get("version") == "original-local-pair-v1":
+        raise PermissionError("PRODUCTION_REPLAY_REQUIRES_FACTORY_START_RECEIPT")
+    return _replay_impl(bars, source=source, config=config)
+
+
+def replay_after_factory_start(bars, *, source, config=Config(), start_receipt):
+    """Internal production replay primitive, callable only with a real start marker.
+
+    This is an application-level boundary, not a defense against hostile code
+    running with the same filesystem identity. Production callers must obtain
+    the receipt from Core authorize_factory_execution immediately before use.
+    """
+    from pathlib import Path
+    if not isinstance(start_receipt, dict) or start_receipt.get("schema") != "aql-owner-admission-start-v1":
+        raise PermissionError("FACTORY_START_RECEIPT_REQUIRED")
+    if start_receipt.get("max_runs") != 1:
+        raise PermissionError("FACTORY_START_RECEIPT_INVALID")
+    marker_path = start_receipt.get("start_record_path")
+    expected_sha = start_receipt.get("start_record_sha256")
+    if not isinstance(marker_path, str) or not Path(marker_path).is_absolute():
+        raise PermissionError("FACTORY_START_MARKER_PATH_INVALID")
+    if not isinstance(expected_sha, str) or len(expected_sha) != 64:
+        raise PermissionError("FACTORY_START_MARKER_HASH_INVALID")
+    try:
+        raw = Path(marker_path).read_bytes()
+        marker = json.loads(raw)
+    except (OSError, ValueError, UnicodeDecodeError) as exc:
+        raise PermissionError("FACTORY_START_MARKER_UNREADABLE") from exc
+    if hashlib.sha256(raw).hexdigest() != expected_sha:
+        raise PermissionError("FACTORY_START_MARKER_HASH_MISMATCH")
+    for key in ("schema", "permit_id", "admission_record_sha256", "head_sha", "started_at", "max_runs"):
+        if marker.get(key) != start_receipt.get(key):
+            raise PermissionError("FACTORY_START_MARKER_BINDING_MISMATCH")
+    if not isinstance(source, dict) or source.get("version") != "original-local-pair-v1":
+        raise PermissionError("FACTORY_PRODUCTION_SOURCE_IDENTITY_REQUIRED")
+    return _replay_impl(bars, source=source, config=config)
+
+
+def _replay_impl(bars, *, source, config=Config()):
+    """Engine primitive. Production callers must use replay_after_factory_start."""
     bars, source = json.loads(json.dumps([bars, source], allow_nan=False))
     _validate(bars, source, config)
     return _receipt(bars, source, config, _signals(bars, config), STRATEGY)
@@ -314,7 +358,7 @@ def verify_receipt(receipt):
     try:
         cfg = Config(**receipt['config'])
         if receipt['strategy'] == STRATEGY:
-            expected = replay(receipt['input_rows'], source=receipt['source'], config=cfg)
+            expected = _replay_impl(receipt['input_rows'], source=receipt['source'], config=cfg)
         elif receipt['strategy'] == 'CONTRACT_FIXTURE_ONLY_1':
             expected = replay_contract_fixture(receipt['input_rows'], source=receipt['source'],
                                                 signals=receipt['signals'], config=cfg)

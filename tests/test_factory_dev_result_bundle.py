@@ -146,3 +146,73 @@ def test_resolvable_synthetic_trade_result_is_saved_without_nulling_scored_pnl(t
     saved = json.loads((tmp_path / "resolved-run" / "receipt.json").read_text())
     assert saved["paths"]["FACTUAL"]["realized_pnl"] == factual["realized_pnl"]
     assert saved["paths"]["FACTUAL"]["scheduled_denominator"] == 2
+
+
+# Production orchestration bypass-resistance regressions are included in this
+# already-required cross-platform CI target.
+from research_wp_r0 import factory_b0_study_runner as _b0_runner
+
+
+def _b0_runner_files(tmp_path):
+    archive = tmp_path / "market.zip"
+    receipt_file = tmp_path / "issued-receipt.json"
+    store = tmp_path / "store"
+    archive.write_bytes(b"fixture archive bytes")
+    receipt_file.write_bytes(b"fixture receipt bytes")
+    store.mkdir()
+    return archive, receipt_file, store
+
+
+def test_b0_orchestrator_admission_failure_stops_all_downstream_work(tmp_path, monkeypatch):
+    archive, receipt_file, store = _b0_runner_files(tmp_path)
+    calls = []
+    def denied(permit, **kwargs):
+        calls.append("admission")
+        raise PermissionError("denied")
+    monkeypatch.setattr(_b0_runner, "admit_one_study_run", denied)
+    monkeypatch.setattr(_b0_runner, "authorize_factory_execution", lambda *a: calls.append("start"))
+    monkeypatch.setattr(_b0_runner, "replay_after_factory_start", lambda *a, **kw: calls.append("replay"))
+    monkeypatch.setattr(_b0_runner, "persist_bundle", lambda *a, **kw: calls.append("persist"))
+    with pytest.raises(PermissionError):
+        _b0_runner.run_authorized_b0_study(
+            permit={}, archive_path=archive, issued_receipt_path=receipt_file,
+            result_store=store, experiment_id="AQL-DEV-FIRST-01")
+    assert calls == ["admission"]
+
+
+def test_b0_orchestrator_start_failure_stops_replay_and_persistence(tmp_path, monkeypatch):
+    archive, receipt_file, store = _b0_runner_files(tmp_path)
+    calls = []
+    monkeypatch.setattr(_b0_runner, "admit_one_study_run",
+                        lambda permit, **kw: {"admission_record_path": "signed.json"})
+    def denied(path):
+        calls.append(("start", path))
+        raise PermissionError("start denied")
+    monkeypatch.setattr(_b0_runner, "authorize_factory_execution", denied)
+    monkeypatch.setattr(_b0_runner, "replay_after_factory_start", lambda *a, **kw: calls.append("replay"))
+    monkeypatch.setattr(_b0_runner, "persist_bundle", lambda *a, **kw: calls.append("persist"))
+    with pytest.raises(PermissionError):
+        _b0_runner.run_authorized_b0_study(
+            permit={}, archive_path=archive, issued_receipt_path=receipt_file,
+            result_store=store, experiment_id="AQL-DEV-FIRST-01")
+    assert calls == [("start", "signed.json")]
+
+
+def test_direct_original_pair_replay_is_denied():
+    from research_wp_r0.historical_dev_exits_v1 import replay, Config
+    with pytest.raises(PermissionError, match="PRODUCTION_REPLAY_REQUIRES_FACTORY_START_RECEIPT"):
+        replay([], source={"version": "original-local-pair-v1"}, config=Config())
+
+
+def test_b0_production_replay_requires_real_start_marker(tmp_path):
+    from research_wp_r0.historical_dev_exits_v1 import replay_after_factory_start, Config
+    fake = {
+        "schema": "aql-owner-admission-start-v1",
+        "max_runs": 1,
+        "start_record_path": str(tmp_path / "missing.started"),
+        "start_record_sha256": "a" * 64,
+    }
+    with pytest.raises(PermissionError, match="FACTORY_START_MARKER_UNREADABLE"):
+        replay_after_factory_start(
+            [], source={"version": "original-local-pair-v1"},
+            config=Config(), start_receipt=fake)
