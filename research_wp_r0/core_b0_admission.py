@@ -212,3 +212,57 @@ def admit_current_checkout_one_run(permit: dict[str, Any], *, preflight_report_s
         worktree_clean=runtime["worktree_clean"],
         preflight_report_sha256=preflight_report_sha256,
     )
+
+
+def authorize_factory_execution(admission_record_path: str | os.PathLike[str]) -> dict[str, Any]:
+    """Sole downstream consumer: verify signed admission and atomically authorize one start.
+
+    Factory must call this immediately before any replay or result creation.
+    The returned record is an execution-start receipt, not strategy output.
+    """
+    secret_text = os.environ.get("AQL_B0_PERMIT_HMAC_KEY", "")
+    if len(secret_text.encode("utf-8")) < 32:
+        raise AdmissionDenied("OWNER_HMAC_KEY_NOT_PROVISIONED")
+    secret = secret_text.encode("utf-8")
+    path = Path(admission_record_path)
+    if not path.is_absolute() or not path.is_file():
+        raise AdmissionDenied("ADMISSION_RECORD_MISSING")
+    try:
+        record_bytes = path.read_bytes()
+        record = json.loads(record_bytes)
+    except (OSError, ValueError, UnicodeDecodeError) as exc:
+        raise AdmissionDenied("ADMISSION_RECORD_UNREADABLE") from exc
+    if not isinstance(record, dict) or record.get("schema") != "aql-owner-admission-record-v1":
+        raise AdmissionDenied("INVALID_ADMISSION_RECORD")
+    signature = record.get("record_signature")
+    if not isinstance(signature, str) or not re.fullmatch(r"[0-9a-f]{64}", signature):
+        raise AdmissionDenied("INVALID_ADMISSION_RECORD_SIGNATURE")
+    unsigned = {key: value for key, value in record.items() if key != "record_signature"}
+    expected_signature = hmac.new(secret, _canonical(unsigned), sha256).hexdigest()
+    if not hmac.compare_digest(expected_signature, signature):
+        raise AdmissionDenied("ADMISSION_RECORD_SIGNATURE_INVALID")
+    runtime = _runtime_identity(record.get("head_sha", ""))
+    if runtime["head_sha"] != record.get("head_sha"):
+        raise AdmissionDenied("CHECKOUT_HEAD_MISMATCH")
+    if record.get("state") != "ADMITTED_NOT_STARTED" or record.get("max_runs") != 1:
+        raise AdmissionDenied("ADMISSION_STATE_INVALID")
+    if record.get("policy_id") != POLICY_ID or set(record.get("scenario_ids", [])) != set(SCENARIOS):
+        raise AdmissionDenied("ADMISSION_POLICY_OR_SCENARIO_MISMATCH")
+    if record.get("start_ms") != START_MS or record.get("end_exclusive_ms") != END_MS:
+        raise AdmissionDenied("ADMISSION_WINDOW_MISMATCH")
+    if not re.fullmatch(r"[0-9a-f]{64}", str(record.get("preflight_report_sha256", ""))):
+        raise AdmissionDenied("PREFLIGHT_REPORT_HASH_MISSING")
+    if path.name != record.get("permit_id", "") + ".consumed.json":
+        raise AdmissionDenied("ADMISSION_RECORD_PATH_MISMATCH")
+    record_sha = sha256(record_bytes).hexdigest()
+    started_path = path.with_name(path.name + ".started")
+    started = {
+        "schema": "aql-owner-admission-start-v1",
+        "permit_id": record["permit_id"],
+        "admission_record_sha256": record_sha,
+        "head_sha": runtime["head_sha"],
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "max_runs": 1,
+    }
+    _write_exclusive(started_path, _canonical(started))
+    return {**started, "start_record_path": str(started_path), "start_record_sha256": sha256(_canonical(started)).hexdigest()}
