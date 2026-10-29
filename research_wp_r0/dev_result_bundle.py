@@ -122,18 +122,19 @@ def persist_bundle(store_dir, *, run_id, receipt, evidence, input_preflight=None
     if not isinstance(run_id, str) or not _SAFE.fullmatch(run_id):
         raise ValueError("INVALID_RUN_ID")
     _validate(receipt, evidence)
+    if input_preflight is not None:
+        _validate_preflight_binding(input_preflight, receipt, evidence)
     root = Path(store_dir)
     if not root.is_dir() or root.is_symlink():
         raise ValueError("MISSING_OR_UNTRUSTED_STORE_DIRECTORY")
     run = root / run_id
-    run.mkdir(mode=0o700)  # FileExistsError => fail-closed, never overwrite
     payload = _bytes(receipt)
     meta = _bytes({"schema": SCHEMA, "run_id": run_id,
                    "evidence": evidence, "status": "DEV_ONLY_NOT_PIT"})
     files = {"receipt.json": payload, "evidence.json": meta}
     if input_preflight is not None:
-        _validate_preflight_binding(input_preflight, receipt, evidence)
         files["input_preflight.json"] = _bytes(input_preflight)
+    run.mkdir(mode=0o700)  # FileExistsError => fail-closed, never overwrite
     manifest = {"schema": SCHEMA, "run_id": run_id,
                 "files": {k: {"sha256": _sha(v), "bytes": len(v)}
                           for k, v in files.items()},
