@@ -46,3 +46,75 @@ def test_b0_entrypoint_study_gate_fails_closed():
         run_input_preflight(archive_bytes=b"", issued_receipt_bytes=b"receipt")
     with pytest.raises(ValueError, match="MISSING_ISSUED_RECEIPT_BYTES"):
         run_input_preflight(archive_bytes=b"archive", issued_receipt_bytes=b"")
+
+
+def _signed_b0_permit(secret, *, permit_id="permit-test-0001", head="f"*40):
+    import hashlib
+    import hmac
+    import json
+    unsigned = {
+        "schema": "aql-owner-single-run-permit-v1",
+        "permit_id": permit_id,
+        "issued_at": "2026-10-29T00:00:00Z",
+        "expires_at": "2026-10-30T00:00:00Z",
+        "max_runs": 1,
+        "head_sha": head,
+        "policy_id": "DEV-B0-v1",
+        "symbol": "BTCUSDT",
+        "interval_ms": 60000,
+        "start_ms": 1704067200000,
+        "end_exclusive_ms": 1704153600000,
+        "scenario_ids": [f"S{i:02d}" for i in range(12)],
+    }
+    canonical = json.dumps(unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode("ascii")
+    return {**unsigned, "signature": hmac.new(secret, canonical, hashlib.sha256).hexdigest()}
+
+
+def test_owner_permit_is_signed_pinned_and_single_use(tmp_path):
+    from datetime import datetime, timezone
+    from research_wp_r0.core_b0_admission import (
+        AdmissionDenied, consume_owner_one_run_permit,
+    )
+    secret = b"test-only-secret-key-at-least-32-bytes"
+    head = "f" * 40
+    permit = _signed_b0_permit(secret, head=head)
+    now = datetime(2026, 10, 29, 12, 0, tzinfo=timezone.utc)
+    admission = consume_owner_one_run_permit(
+        permit, admission_dir=tmp_path / "admissions", secret=secret,
+        runtime_head=head, worktree_clean=True, now=now,
+    )
+    assert admission["state"] == "ADMITTED_NOT_STARTED"
+    assert admission["max_runs"] == 1
+    assert (tmp_path / "admissions" / "permit-test-0001.consumed.json").exists()
+    with pytest.raises(AdmissionDenied, match="PERMIT_ALREADY_CONSUMED"):
+        consume_owner_one_run_permit(
+            permit, admission_dir=tmp_path / "admissions", secret=secret,
+            runtime_head=head, worktree_clean=True, now=now,
+        )
+
+
+def test_owner_permit_rejects_signature_head_and_dirty_checkout(tmp_path):
+    from datetime import datetime, timezone
+    from research_wp_r0.core_b0_admission import (
+        AdmissionDenied, consume_owner_one_run_permit,
+    )
+    secret = b"test-only-secret-key-at-least-32-bytes"
+    head = "f" * 40
+    now = datetime(2026, 10, 29, 12, 0, tzinfo=timezone.utc)
+    permit = _signed_b0_permit(secret, permit_id="permit-test-0002", head=head)
+    tampered = {**permit, "scenario_ids": ["S00"]}
+    with pytest.raises(AdmissionDenied, match="INVALID_PERMIT_SCENARIOS|PERMIT_SCENARIO_SET_MISMATCH|OWNER_SIGNATURE_INVALID"):
+        consume_owner_one_run_permit(
+            tampered, admission_dir=tmp_path / "tampered", secret=secret,
+            runtime_head=head, worktree_clean=True, now=now,
+        )
+    with pytest.raises(AdmissionDenied, match="CHECKOUT_HEAD_MISMATCH"):
+        consume_owner_one_run_permit(
+            permit, admission_dir=tmp_path / "wrong-head", secret=secret,
+            runtime_head="e" * 40, worktree_clean=True, now=now,
+        )
+    with pytest.raises(AdmissionDenied, match="WORKTREE_NOT_CLEAN"):
+        consume_owner_one_run_permit(
+            permit, admission_dir=tmp_path / "dirty", secret=secret,
+            runtime_head=head, worktree_clean=False, now=now,
+        )
