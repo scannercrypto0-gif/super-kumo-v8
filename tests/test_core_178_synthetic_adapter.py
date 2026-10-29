@@ -73,13 +73,13 @@ def _signed_b0_permit(secret, *, permit_id="permit-test-0001", head="f"*40):
 def test_owner_permit_is_signed_pinned_and_single_use(tmp_path):
     from datetime import datetime, timezone
     from research_wp_r0.core_b0_admission import (
-        AdmissionDenied, consume_owner_one_run_permit,
+        AdmissionDenied, _consume_owner_one_run_permit,
     )
     secret = b"test-only-secret-key-at-least-32-bytes"
     head = "f" * 40
     permit = _signed_b0_permit(secret, head=head)
     now = datetime(2026, 10, 29, 12, 0, tzinfo=timezone.utc)
-    admission = consume_owner_one_run_permit(
+    admission = _consume_owner_one_run_permit(
         permit, admission_dir=tmp_path / "admissions", secret=secret,
         runtime_head=head, worktree_clean=True, preflight_report_sha256="a" * 64, now=now,
     )
@@ -87,7 +87,7 @@ def test_owner_permit_is_signed_pinned_and_single_use(tmp_path):
     assert admission["max_runs"] == 1
     assert (tmp_path / "admissions" / "permit-test-0001.consumed.json").exists()
     with pytest.raises(AdmissionDenied, match="PERMIT_ALREADY_CONSUMED"):
-        consume_owner_one_run_permit(
+        _consume_owner_one_run_permit(
             permit, admission_dir=tmp_path / "admissions", secret=secret,
             runtime_head=head, worktree_clean=True, preflight_report_sha256="a" * 64, now=now,
         )
@@ -96,7 +96,7 @@ def test_owner_permit_is_signed_pinned_and_single_use(tmp_path):
 def test_owner_permit_rejects_signature_head_and_dirty_checkout(tmp_path):
     from datetime import datetime, timezone
     from research_wp_r0.core_b0_admission import (
-        AdmissionDenied, consume_owner_one_run_permit,
+        AdmissionDenied, _consume_owner_one_run_permit,
     )
     secret = b"test-only-secret-key-at-least-32-bytes"
     head = "f" * 40
@@ -104,17 +104,17 @@ def test_owner_permit_rejects_signature_head_and_dirty_checkout(tmp_path):
     permit = _signed_b0_permit(secret, permit_id="permit-test-0002", head=head)
     tampered = {**permit, "scenario_ids": ["S00"]}
     with pytest.raises(AdmissionDenied, match="INVALID_PERMIT_SCENARIOS|PERMIT_SCENARIO_SET_MISMATCH|OWNER_SIGNATURE_INVALID"):
-        consume_owner_one_run_permit(
+        _consume_owner_one_run_permit(
             tampered, admission_dir=tmp_path / "tampered", secret=secret,
             runtime_head=head, worktree_clean=True, preflight_report_sha256="a" * 64, now=now,
         )
     with pytest.raises(AdmissionDenied, match="CHECKOUT_HEAD_MISMATCH"):
-        consume_owner_one_run_permit(
+        _consume_owner_one_run_permit(
             permit, admission_dir=tmp_path / "wrong-head", secret=secret,
             runtime_head="e" * 40, worktree_clean=True, preflight_report_sha256="a" * 64, now=now,
         )
     with pytest.raises(AdmissionDenied, match="WORKTREE_NOT_CLEAN"):
-        consume_owner_one_run_permit(
+        _consume_owner_one_run_permit(
             permit, admission_dir=tmp_path / "dirty", secret=secret,
             runtime_head=head, worktree_clean=False, preflight_report_sha256="a" * 64, now=now,
         )
@@ -162,3 +162,26 @@ def test_entrypoint_binds_admission_to_preflight_report(monkeypatch):
     assert result["state"] == "ADMITTED_NOT_STARTED"
     assert captured["permit"]["permit_id"] == "test-permit-0002"
     assert captured["preflight_report_sha256"] == expected
+
+
+def test_factory_consumer_verifies_and_consumes_signed_admission_once(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    import os
+    import research_wp_r0.core_b0_admission as gate
+    secret = b"test-only-secret-key-at-least-32-bytes"
+    head = "f" * 40
+    monkeypatch.setenv("AQL_B0_PERMIT_HMAC_KEY", secret.decode())
+    monkeypatch.setattr(gate, "_runtime_identity", lambda expected: {
+        "head_sha": head, "worktree_clean": True,
+    })
+    permit = _signed_b0_permit(secret, permit_id="permit-test-0003", head=head)
+    admitted = gate._consume_owner_one_run_permit(
+        permit, admission_dir=tmp_path / "admissions", secret=secret,
+        runtime_head=head, worktree_clean=True, preflight_report_sha256="a" * 64,
+        now=datetime(2026, 10, 29, 12, 0, tzinfo=timezone.utc),
+    )
+    started = gate.authorize_factory_execution(admitted["admission_record_path"])
+    assert started["max_runs"] == 1
+    assert started["admission_record_sha256"] == admitted["admission_record_sha256"]
+    with pytest.raises(gate.AdmissionDenied, match="ADMISSION_ALREADY_STARTED"):
+        gate.authorize_factory_execution(admitted["admission_record_path"])
