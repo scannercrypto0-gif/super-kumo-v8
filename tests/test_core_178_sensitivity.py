@@ -110,6 +110,11 @@ def test_terminal_unfilled_entry_preserves_unknown_and_full_denominator():
         assert path["modeled_equity_return"] is None
 
 
+# The workflow invokes this file directly, so explicitly expose sibling test modules.
+from pathlib import Path as _Path
+import sys as _sys
+_sys.path.insert(0, str(_Path(__file__).resolve().parent))
+
 # Import the integrated contract into the existing Core178 focused workflow.
 # This keeps one exact-head CI invocation without modifying the source PR branch.
 from test_core_dev_b0_integration import (
