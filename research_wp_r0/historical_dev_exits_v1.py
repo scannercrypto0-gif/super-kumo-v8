@@ -39,11 +39,14 @@ class Config:
     latency_ms: int = 1
     max_signal_age_ms: int = 120000
     checkpoint_ms: int = 86400000
+    warmup_bars: int = 22  # structural default preserved; study policy may require 252
 
     def validate(self):
         for name in ('interval_ms', 'max_signal_age_ms', 'checkpoint_ms'):
             if type(getattr(self, name)) is not int or getattr(self, name) <= 0:
                 raise ValueError('INVALID_CONFIG_' + name)
+        if type(self.warmup_bars) is not int or self.warmup_bars < 22:
+            raise ValueError('INVALID_WARMUP_BARS')
         if type(self.latency_ms) is not int or self.latency_ms < 0:
             raise ValueError('INVALID_LATENCY')
         if (not number(self.initial_cash, 1e-12) or not number(self.quantity, 1e-12)
@@ -100,8 +103,12 @@ def _signals(bars, cfg):
     for b in bars:
         ready = max(ready, b['available_ms'])
         prefix_ready[b['open_ms']] = ready
+    # Compute EMA on the entire available prefix, but prohibit scoring/signals
+    # before the configured warmup count. Do not re-seed at the scoring boundary.
+    eligible = {b['open_ms'] for b in bars[cfg.warmup_bars:]}
     return [{'bar_open_ms': d.bar_open_ms, 'action': d.signal,
-             'available_ms': prefix_ready[d.bar_open_ms]} for d in decisions]
+             'available_ms': prefix_ready[d.bar_open_ms]} for d in decisions
+            if d.bar_open_ms in eligible]
 
 
 def replay(bars, *, source, config=Config()):
