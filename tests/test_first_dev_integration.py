@@ -99,7 +99,7 @@ def test_synthetic_preflight_replay_and_bundle_are_cross_bound(tmp_path):
         "consumer_id": CONSUMER, "source_kind": "SYNTHETIC_CONTRACT_FIXTURE",
         "runtime": runtime, "code_sha": handoff_code,
         "base_core_sha": "22d03f4d3434fbce149c4d66349b33149789613a",
-        "factory_sha": "eacb5e50150c6e6c64c8a41a8eaa410aebd71532",
+        "factory_sha": "eacb5e50150c6e6c64c8a41b8eaa410aebd71532",
         "mapping_schema": "core-factory-dev-map-2",
         "compatibility_profile": "factory148-u160-whole-policy-null-1",
         "symbol": "BTCUSDT", "interval_ms": 60000, "timezone": "UTC",
