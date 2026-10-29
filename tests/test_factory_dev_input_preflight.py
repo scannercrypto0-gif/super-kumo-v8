@@ -5,7 +5,8 @@ import zipfile
 
 import pytest
 
-from research_wp_r0.historical_dev_exits_v1 import Config, digest
+from research_wp_r0.historical_dev_exits_v1 import Config, digest, replay
+from research_wp_r0.dev_result_bundle import persist_bundle, verify_bundle
 from research_wp_r0.dev_input_preflight import (
     InputGateRejected, validate_historical_dev_inputs,
 )
@@ -106,3 +107,59 @@ def test_row_tampering_fails_closed():
     args[2][100] = dict(args[2][100], open_ms=args[2][100]["open_ms"]+1)
     with pytest.raises(InputGateRejected):
         run(tuple(args))
+
+
+def test_validated_preflight_is_saved_and_reverified_with_result_bundle(tmp_path):
+    raw, issued, rows, source, commitment = inputs()
+    config = Config(warmup_bars=252)
+    preflight = validate_historical_dev_inputs(
+        archive_bytes=raw, issued_receipt_bytes=issued, bars=rows,
+        source=source, config=config, commitment=commitment)
+    receipt = replay(rows, source=source, config=config)
+    evidence = {
+        "policy_id": "DEV-B0-v1",
+        "policy_sha256": digest({"policy_id": "DEV-B0-v1",
+                                 "engine_config": receipt["config"]}),
+        "source_zip_sha256": source["archive_sha256"],
+        "issued_receipt_sha256": commitment["issued_receipt_sha256"],
+        "code_sha": commitment["code_sha"],
+        "input_prefix_sha256": digest(receipt["input_rows"]),
+        "scenario_id": commitment["scenario_id"],
+        "warmup_bars": 252,
+        "experiment_id": "AQL-DEV-FIRST-01",
+    }
+    manifest = persist_bundle(str(tmp_path), run_id="preflighted-run",
+                              receipt=receipt, evidence=evidence,
+                              input_preflight=preflight)
+    assert "input_preflight.json" in manifest["files"]
+    assert verify_bundle(str(tmp_path), "preflighted-run")
+    saved = __import__("json").loads(
+        (tmp_path / "preflighted-run" / "input_preflight.json").read_text())
+    assert saved["archive_sha256"] == source["archive_sha256"]
+    assert saved["bar_count"] == 1440
+
+
+def test_preflight_cannot_be_attached_to_different_receipt_or_policy(tmp_path):
+    raw, issued, rows, source, commitment = inputs()
+    config = Config(warmup_bars=252)
+    preflight = validate_historical_dev_inputs(
+        archive_bytes=raw, issued_receipt_bytes=issued, bars=rows,
+        source=source, config=config, commitment=commitment)
+    receipt = replay(rows, source=source, config=config)
+    evidence = {
+        "policy_id": "DEV-B0-v1",
+        "policy_sha256": digest({"policy_id": "DEV-B0-v1",
+                                 "engine_config": receipt["config"]}),
+        "source_zip_sha256": source["archive_sha256"],
+        "issued_receipt_sha256": "f"*64,
+        "code_sha": commitment["code_sha"],
+        "input_prefix_sha256": digest(receipt["input_rows"]),
+        "scenario_id": commitment["scenario_id"],
+        "warmup_bars": 252,
+        "experiment_id": "AQL-DEV-FIRST-02",
+    }
+    with pytest.raises(ValueError, match="INPUT_PREFLIGHT_RECEIPT_BINDING_MISMATCH"):
+        persist_bundle(str(tmp_path), run_id="mismatched-run",
+                       receipt=receipt, evidence=evidence,
+                       input_preflight=preflight)
+    assert not (tmp_path / "mismatched-run").exists()
