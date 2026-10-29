@@ -34,3 +34,15 @@ def test_refuse_non_synthetic_source_and_legacy_warmup():
 def test_study_always_denied():
     with pytest.raises(ExecutionDenied):
         run_study(approved=True)
+
+
+def test_b0_entrypoint_study_gate_fails_closed():
+    from research_wp_r0.core_b0_entrypoint import (
+        B0AdmissionDenied, run_one_study, run_input_preflight,
+    )
+    with pytest.raises(B0AdmissionDenied, match="OWNER_AUTHENTICATED_SINGLE_USE_PERMIT_REQUIRED"):
+        run_one_study(approved=True, permit=True, token="not-an-authenticated-permit")
+    with pytest.raises(ValueError, match="MISSING_ORIGINAL_ARCHIVE_BYTES"):
+        run_input_preflight(archive_bytes=b"", issued_receipt_bytes=b"receipt")
+    with pytest.raises(ValueError, match="MISSING_ISSUED_RECEIPT_BYTES"):
+        run_input_preflight(archive_bytes=b"archive", issued_receipt_bytes=b"")
