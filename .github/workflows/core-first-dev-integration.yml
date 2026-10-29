@@ -1,0 +1,29 @@
+name: Core First DEV Integration Contract
+on:
+  pull_request:
+    paths:
+      - 'research_wp_r0/dev_input_preflight.py'
+      - 'research_wp_r0/dev_result_bundle.py'
+      - 'research_wp_r0/historical_dev_exits_v1.py'
+      - 'research_wp_r0/realdev_research_data.py'
+      - 'src/aql/historical/research_handoff.py'
+      - 'tests/test_first_dev_integration.py'
+      - '.github/workflows/core-first-dev-integration.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integrated-contract:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pytest
+      - name: Synthetic end-to-end contract only
+        run: python -m pytest -q tests/test_first_dev_integration.py tests/test_research_handoff_174.py
