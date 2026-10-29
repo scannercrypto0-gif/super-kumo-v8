@@ -53,6 +53,7 @@ def validate_historical_dev_inputs(*,archive_bytes: bytes,issued_receipt_bytes: 
     _require(commitment["interval_ms"]==60000 and config.interval_ms==60000, "UNEXPECTED_INTERVAL")
     _require((commitment["start_ms"],commitment["end_exclusive_ms"])==(START_MS,END_MS), "UNEXPECTED_WINDOW")
     _require(commitment["warmup_bars"]==252 and config.warmup_bars==252, "EXPLICIT_252_WARMUP_REQUIRED")
+    _require(config.latency_ms==1000 and config.quantity==0.001 and config.initial_cash==1000 and config.tp_fraction is None and config.sl_fraction is None, "B0_EXECUTION_CONFIG_MISMATCH")
     _require(commitment["source_kind"] in ("ORIGINAL_LOCAL_PAIR","SYNTHETIC_TEST_FIXTURE"), "UNSUPPORTED_SOURCE_KIND")
     archive_sha=sha256_hex(archive_bytes); receipt_sha=sha256_hex(issued_receipt_bytes)
     _require(commitment["issued_receipt_sha256"]==receipt_sha, "ISSUED_RECEIPT_SHA_MISMATCH")
@@ -76,6 +77,7 @@ def validate_historical_dev_inputs(*,archive_bytes: bytes,issued_receipt_bytes: 
     for i,(b,n) in enumerate(zip(bars,normalized)):
         got=[b.get(k) for k in ("open_ms","close_ms","open","high","low","close","volume")]
         _require(got==n, "ARCHIVE_TO_ENGINE_ROW_MISMATCH_"+str(i))
+        _require(b.get("available_ms")==b.get("close_ms")+1001 and b.get("modeled_quote") is True, "SOURCE_AVAILABILITY_ASSUMPTION_MISMATCH_"+str(i))
     try: validate_engine_inputs(bars,source,config)
     except (ValueError,TypeError,KeyError,AttributeError) as exc: raise InputGateRejected("ENGINE_INPUT_VALIDATION:"+str(exc)) from exc
     _require(source.get("rows_sha256")==digest(bars), "NORMALIZED_ROWS_DIGEST_MISMATCH")
