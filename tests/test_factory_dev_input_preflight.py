@@ -26,7 +26,7 @@ def inputs():
     return raw,issued,rows,source,commitment
 def run(args):
     raw,issued,rows,source,commitment=args
-    return validate_historical_dev_inputs(archive_bytes=raw,issued_receipt_bytes=issued,bars=rows,source=source,config=Config(warmup_bars=252),commitment=commitment)
+    return validate_historical_dev_inputs(archive_bytes=raw,issued_receipt_bytes=issued,bars=rows,source=source,config=Config(warmup_bars=252,latency_ms=1000,quantity=0.001),commitment=commitment)
 def test_exact_one_day_preflight_returns_non_authorizing_manifest():
     out=run(inputs())
     assert out["status"]=="INPUT_BYTES_AND_NORMALIZED_ROWS_VALID_NOT_STUDY_AUTHORITY"
@@ -50,7 +50,7 @@ def test_row_tampering_fails_closed():
     args=list(inputs()); args[2]=list(args[2]); args[2][100]=dict(args[2][100],open_ms=args[2][100]["open_ms"]+1)
     with pytest.raises(InputGateRejected,match="ARCHIVE_TO_ENGINE_ROW_MISMATCH"): run(tuple(args))
 def test_validated_preflight_is_saved_and_reverified_with_result_bundle(tmp_path):
-    raw,issued,rows,source,commitment=inputs(); config=Config(warmup_bars=252)
+    raw,issued,rows,source,commitment=inputs(); config=Config(warmup_bars=252,latency_ms=1000,quantity=0.001)
     preflight=validate_historical_dev_inputs(archive_bytes=raw,issued_receipt_bytes=issued,bars=rows,source=source,config=config,commitment=commitment)
     receipt=replay(rows,source=source,config=config)
     evidence={"policy_id":"DEV-B0-v1","policy_sha256":digest({"policy_id":"DEV-B0-v1","engine_config":receipt["config"]}),"source_zip_sha256":source["archive_sha256"],"issued_receipt_sha256":commitment["issued_receipt_sha256"],"code_sha":commitment["code_sha"],"input_prefix_sha256":digest(receipt["input_rows"]),"scenario_id":"S00","warmup_bars":252,"experiment_id":"AQL-DEV-FIRST-01"}
@@ -59,7 +59,7 @@ def test_validated_preflight_is_saved_and_reverified_with_result_bundle(tmp_path
     saved=json.loads((tmp_path/"preflighted-run"/"input_preflight.json").read_text())
     assert saved["archive_sha256"]==source["archive_sha256"] and saved["bar_count"]==1440
 def test_preflight_mismatch_fails_before_creating_run_directory(tmp_path):
-    raw,issued,rows,source,commitment=inputs(); config=Config(warmup_bars=252)
+    raw,issued,rows,source,commitment=inputs(); config=Config(warmup_bars=252,latency_ms=1000,quantity=0.001)
     preflight=validate_historical_dev_inputs(archive_bytes=raw,issued_receipt_bytes=issued,bars=rows,source=source,config=config,commitment=commitment)
     receipt=replay(rows,source=source,config=config)
     evidence={"policy_id":"DEV-B0-v1","policy_sha256":digest({"policy_id":"DEV-B0-v1","engine_config":receipt["config"]}),"source_zip_sha256":source["archive_sha256"],"issued_receipt_sha256":"f"*64,"code_sha":commitment["code_sha"],"input_prefix_sha256":digest(receipt["input_rows"]),"scenario_id":"S00","warmup_bars":252,"experiment_id":"AQL-DEV-FIRST-02"}
