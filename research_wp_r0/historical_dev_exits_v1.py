@@ -39,13 +39,13 @@ class Config:
     latency_ms: int = 1
     max_signal_age_ms: int = 120000
     checkpoint_ms: int = 86400000
-    warmup_bars: int = 22  # structural default preserved; study policy may require 252
+    warmup_bars: int | None = None  # None preserves legacy engine/receipts; B0 must explicitly pin 252
 
     def validate(self):
         for name in ('interval_ms', 'max_signal_age_ms', 'checkpoint_ms'):
             if type(getattr(self, name)) is not int or getattr(self, name) <= 0:
                 raise ValueError('INVALID_CONFIG_' + name)
-        if type(self.warmup_bars) is not int or self.warmup_bars < 22:
+        if self.warmup_bars is not None and (type(self.warmup_bars) is not int or self.warmup_bars < 22):
             raise ValueError('INVALID_WARMUP_BARS')
         if type(self.latency_ms) is not int or self.latency_ms < 0:
             raise ValueError('INVALID_LATENCY')
@@ -105,10 +105,10 @@ def _signals(bars, cfg):
         prefix_ready[b['open_ms']] = ready
     # Compute EMA on the entire available prefix, but prohibit scoring/signals
     # before the configured warmup count. Do not re-seed at the scoring boundary.
-    eligible = {b['open_ms'] for b in bars[(21 if cfg.warmup_bars == 22 else cfg.warmup_bars):]}
+    eligible = None if cfg.warmup_bars is None else {b['open_ms'] for b in bars[cfg.warmup_bars:]}
     return [{'bar_open_ms': d.bar_open_ms, 'action': d.signal,
              'available_ms': prefix_ready[d.bar_open_ms]} for d in decisions
-            if d.bar_open_ms in eligible]
+            if eligible is None or d.bar_open_ms in eligible]
 
 
 def replay(bars, *, source, config=Config()):
@@ -145,8 +145,12 @@ def _receipt(bars, source, cfg, signals, strategy):
         execution = ((ready + cfg.interval_ms - 1) // cfg.interval_ms) * cfg.interval_ms
         scheduled.append({**s, 'scheduled_ms': execution,
                           'stale': execution - (t + cfg.interval_ms) > cfg.max_signal_age_ms})
+    config_payload = asdict(cfg)
+    if cfg.warmup_bars is None:
+        # Legacy receipts predate this opt-in field; preserve canonical hashes.
+        del config_payload['warmup_bars']
     payload = {'schema': VERSION, 'scope': 'HISTORICAL_DEV_ONLY', 'strategy': strategy,
-               'source': source, 'config': asdict(cfg), 'signals_sha256': digest(signals),
+               'source': source, 'config': config_payload, 'signals_sha256': digest(signals),
                'input_rows': bars, 'signals': signals,
                'claims': {'actual_fills': False, 'as_known_at_cutoff': False,
                           'real_pit_accepted': False, 'profitability': False,
