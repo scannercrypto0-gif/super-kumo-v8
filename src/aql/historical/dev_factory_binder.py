@@ -12,9 +12,10 @@ import re
 
 from .dev_source import DevSourceEnvelope, MAX_BYTES, import_bytes
 
-SCHEMA = "core-factory-dev-map-1"
+SCHEMA = "core-factory-dev-map-2"
 CORE_SHA = "752d7cd6d652860134918a35727853b5ba52f876"
-FACTORY_SHA = "dee0f088d70122d143118df2e0a0549a564f2380"
+FACTORY_SHA = "eacb5e50150c6e6c64c8a41b8eaa410aebd71532"
+FACTORY_COMPATIBILITY = "factory148-u160-whole-policy-null-1"
 INSPECTOR_SHA = "9251d5f31ed06ecf87abf53ea604cf1d975923eb"
 MAX_MS = 2**53 - 1
 
@@ -242,6 +243,7 @@ def bind_dev(*, envelope, raw, raw_pin, issued_receipt, receipt_pin,
     body = {
         "schema": SCHEMA, "scope": "SYNTHETIC_CONTRACT_TEST_ONLY",
         "status": "CANDIDATE_NOT_ADMITTED", "core_sha": core_sha, "factory_sha": factory_sha,
+        "factory_compatibility": FACTORY_COMPATIBILITY,
         "core_source_id": envelope.source_id, "envelope": s,
         "raw_archive": asdict(raw_pin), "issued_receipt": asdict(receipt_pin),
         "normalized_seven_field": {"schema": s["normalization"], "size_bytes": len(normalized),
@@ -273,6 +275,10 @@ def verify_candidate(candidate):
         _fail("CANDIDATE_INTEGRITY", "canonical candidate required")
     try:
         p = candidate.package
+        if (p.get("schema") != SCHEMA or p.get("core_sha") != CORE_SHA
+                or p.get("factory_sha") != FACTORY_SHA
+                or p.get("factory_compatibility") != FACTORY_COMPATIBILITY):
+            raise ValueError("unsupported dependency/compatibility contract")
         supplied_sha, source = p.pop("mapping_sha256"), p.pop("factory_source")
         if _sha(_canonical(p)) != supplied_sha:
             raise ValueError("mapping commitment")
