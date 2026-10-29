@@ -109,10 +109,14 @@ def test_synthetic_preflight_replay_and_bundle_are_cross_bound(tmp_path):
     assert set(receipt["paths"]) == {"FACTUAL", "TARGET_FIRST", "STOP_FIRST"}
     for path in receipt["paths"].values():
         assert path["scheduled_denominator"] == len(path["opportunities"])
-    # The fixture must exercise a real modeled/scored outcome, not only UNKNOWN plumbing.
-    assert any(op.get("scored_return") is not None
-               for path in receipt["paths"].values()
-               for op in path["opportunities"])
+    # The fixture must exercise a completed modeled trade, not only UNKNOWN plumbing.
+    assert any(
+        path["status"] == "SETTLED_MODELED"
+        and path["realized_pnl"] is not None
+        and any(event["kind"] == "MODELED_ENTRY" for event in path["ledger"])
+        and any(event["kind"] == "MODELED_INDICATOR_EXIT" for event in path["ledger"])
+        for path in receipt["paths"].values()
+    )
     saved = json.loads((tmp_path / "integrated-synthetic-001" / "input_preflight.json").read_text())
     assert saved["issued_receipt_sha256"] == evidence["issued_receipt_sha256"]
 
