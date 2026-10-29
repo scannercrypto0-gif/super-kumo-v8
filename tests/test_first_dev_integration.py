@@ -17,7 +17,7 @@ from research_wp_r0.dev_result_bundle import persist_bundle, verify_bundle
 
 START = 1704067200000
 END = 1704153600000
-CODE = "a" * 40
+CODE = "20928693f30b1730f0693a293bbf4a1f8ab21c88"
 POLICY = "DEV-B0-v1"
 
 
