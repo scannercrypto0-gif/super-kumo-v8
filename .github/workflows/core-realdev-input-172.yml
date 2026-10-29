@@ -1,0 +1,32 @@
+name: Core172 input integration contract only
+on:
+  pull_request:
+    paths:
+      - 'src/aql/historical/realdev_integration.py'
+      - 'tests/test_realdev_integration_172.py'
+      - '.github/workflows/core-realdev-input-172.yml'
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pytest pytest-timeout
+      - name: New synthetic contract only; no private input
+        run: python -B -m pytest tests/test_realdev_integration_172.py -q --tb=short --junitxml=core172.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core172-${{ matrix.os }}
+          path: core172.xml
