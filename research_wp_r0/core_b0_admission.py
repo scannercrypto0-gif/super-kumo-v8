@@ -127,6 +127,7 @@ def consume_owner_one_run_permit(
     secret: bytes,
     runtime_head: str,
     worktree_clean: bool,
+    preflight_report_sha256: str,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Verify and atomically consume one signed permit; no strategy work occurs here."""
@@ -138,6 +139,8 @@ def consume_owner_one_run_permit(
         raise AdmissionDenied("CHECKOUT_HEAD_MISMATCH")
     if worktree_clean is not True:
         raise AdmissionDenied("WORKTREE_NOT_CLEAN")
+    if not isinstance(preflight_report_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", preflight_report_sha256):
+        raise AdmissionDenied("PREFLIGHT_REPORT_HASH_REQUIRED")
     current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     if current < timing["issued"] or current >= timing["expires"]:
         raise AdmissionDenied("PERMIT_NOT_CURRENT")
@@ -152,6 +155,7 @@ def consume_owner_one_run_permit(
         "state": "ADMITTED_NOT_STARTED",
         "permit_id": permit["permit_id"],
         "permit_sha256": permit_hash,
+        "preflight_report_sha256": preflight_report_sha256,
         "head_sha": runtime_head,
         "policy_id": permit["policy_id"],
         "symbol": permit["symbol"],
@@ -183,6 +187,7 @@ def admit_current_checkout_one_run(permit: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(head, str):
         raise AdmissionDenied("INVALID_PERMIT_HEAD")
     runtime = _runtime_identity(head)
+    raise AdmissionDenied("USE_CORE_ENTRYPOINT_WITH_ORIGINAL_INPUTS")
     return consume_owner_one_run_permit(
         permit,
         admission_dir=os.environ["AQL_B0_ADMISSION_DIR"],
