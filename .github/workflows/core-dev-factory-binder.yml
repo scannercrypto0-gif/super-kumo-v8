@@ -1,0 +1,50 @@
+name: Core159 synthetic Factory binder
+on:
+  pull_request:
+    paths:
+      - 'src/aql/historical/dev_factory_binder.py'
+      - 'tests/test_core_dev_factory_binder.py'
+      - 'tests/test_core_factory_h01.py'
+      - '.github/workflows/core-dev-factory-binder.yml'
+permissions:
+  contents: read
+jobs:
+  focused:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/checkout@v4
+        with:
+          ref: eacb5e50150c6e6c64c8a41b8eaa410aebd71532
+          path: .factory148
+      - uses: actions/checkout@v4
+        with:
+          ref: 9251d5f31ed06ecf87abf53ea604cf1d975923eb
+          path: .factory157
+      - uses: actions/checkout@v4
+        with:
+          ref: b8e4c3e9fece8f66f0614041637640c9849e02b3
+          path: .factory150
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pytest pytest-timeout
+      - name: Synthetic mapping and pinned seam only
+        run: python -B -m pytest tests/test_core_factory_h01.py -q --tb=short --junitxml=core159.xml
+        env:
+          FACTORY148_ROOT: ${{ github.workspace }}/.factory148
+          FACTORY157_ROOT: ${{ github.workspace }}/.factory157
+          FACTORY150_ROOT: ${{ github.workspace }}/.factory150
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core159-${{ matrix.os }}
+          path: core159.xml
+
