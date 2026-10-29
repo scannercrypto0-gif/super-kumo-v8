@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 from typing import Any
 
 from .dev_input_preflight import END_MS, POLICY_ID, SCENARIOS, START_MS
@@ -111,11 +112,10 @@ def _runtime_identity(expected_head: str) -> dict[str, Any]:
 
 
 def _fsync_parent_directory(path: Path) -> None:
-    """Persist the directory entry on POSIX; document narrower Windows guarantee."""
+    """Flush the parent directory entry on POSIX after creating a record."""
     if os.name == "nt":
-        # Windows' Python stdlib does not expose a portable directory-handle
-        # FlushFileBuffers operation. The record file itself is flushed below;
-        # do not claim power-loss durability of the directory entry on Windows.
+        # Windows uses MoveFileExW(MOVEFILE_WRITE_THROUGH) in _write_exclusive;
+        # do not silently treat a normal buffered rename as durable here.
         return
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
     fd = os.open(str(path.parent), flags)
@@ -126,6 +126,44 @@ def _fsync_parent_directory(path: Path) -> None:
 
 
 def _write_exclusive(path: Path, data: bytes) -> None:
+    """Create a one-time marker without replacement and flush it before return.
+
+    POSIX uses O_EXCL + fsync(file) + fsync(parent directory). Windows writes
+    and fsyncs a same-directory temporary file, then uses MoveFileExW with
+    MOVEFILE_WRITE_THROUGH and no replace flag. That makes the final name
+    appear atomically and asks Windows not to return until the move is flushed.
+    Any failure is fail-closed; an already-consumed marker is never removed.
+    """
+    if os.name == "nt":
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, temporary_name = tempfile.mkstemp(prefix=".aql-pending-", dir=str(path.parent))
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+            import ctypes
+            from ctypes import wintypes
+            move_file = ctypes.WinDLL("kernel32", use_last_error=True).MoveFileExW
+            move_file.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD]
+            move_file.restype = wintypes.BOOL
+            MOVEFILE_WRITE_THROUGH = 0x00000008
+            if not move_file(str(temporary), str(path), MOVEFILE_WRITE_THROUGH):
+                error = ctypes.get_last_error()
+                if error in (80, 183):  # ERROR_FILE_EXISTS / ERROR_ALREADY_EXISTS
+                    raise FileExistsError(error, "one-time marker already exists", str(path))
+                raise OSError(error, "MoveFileExW(MOVEFILE_WRITE_THROUGH) failed", str(path))
+        except Exception:
+            # Only remove the staging file. Never remove the destination marker:
+            # it may already have been atomically committed before an OS error.
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise
+        return
+
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     fd = os.open(str(path), flags, 0o400)
     try:
