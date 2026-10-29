@@ -110,11 +110,10 @@ def test_synthetic_preflight_replay_and_bundle_are_cross_bound(tmp_path):
     assert set(receipt["paths"]) == {"FACTUAL", "TARGET_FIRST", "STOP_FIRST"}
     for path in receipt["paths"].values():
         assert path["scheduled_denominator"] == len(path["opportunities"])
-    # The fixture must exercise a completed modeled trade, not only UNKNOWN plumbing.
+    # Strategy replay may remain policy-UNKNOWN due a terminal opportunity, but must
+    # still retain any resolved modeled entry/exit events without fabricating totals.
     assert any(
-        path["status"] == "SETTLED_MODELED"
-        and path["realized_pnl"] is not None
-        and any(event["kind"] == "MODELED_ENTRY" for event in path["ledger"])
+        any(event["kind"] == "MODELED_ENTRY" for event in path["ledger"])
         and any(event["kind"] == "MODELED_INDICATOR_EXIT" for event in path["ledger"])
         for path in receipt["paths"].values()
     )
@@ -143,3 +142,34 @@ def test_terminal_unknown_keeps_null_policy_totals_and_full_denominator():
         assert path["realized_pnl"] is None
         assert path["modeled_equity_return"] is None
         assert path["opportunities"][0]["scored_return"] is None
+
+
+def test_resolvable_synthetic_execution_fixture_scores_trade_and_costs():
+    from research_wp_r0.historical_dev_exits_v1 import replay_contract_fixture
+    bars = synthetic_inputs(40)[2]
+    source = {
+        "version": "synthetic-b0", "reference": "fixture:resolved-contract-trade",
+        "archive_sha256": "b" * 64, "rows_sha256": digest(bars),
+        "availability_evidence": "UNKNOWN", "correction_evidence": "PINNED_VERSION_ONLY",
+    }
+    signals = [
+        {"bar_open_ms": bars[5]["open_ms"], "action": "ENTER_LONG", "available_ms": bars[5]["available_ms"]},
+        {"bar_open_ms": bars[10]["open_ms"], "action": "EXIT_LONG", "available_ms": bars[10]["available_ms"]},
+    ]
+    receipt = replay_contract_fixture(
+        bars, source=source, signals=signals,
+        config=Config(initial_cash=1000, quantity=0.001, warmup_bars=22,
+                      latency_ms=1000, spread_bps=2, slippage_bps=5,
+                      fee_bps=10, indicator_exit=True, tp_fraction=None, sl_fraction=None),
+    )
+    assert receipt["config"]["spread_bps"] == 2
+    assert receipt["config"]["slippage_bps"] == 5
+    assert receipt["config"]["fee_bps"] == 10
+    for path in receipt["paths"].values():
+        assert path["status"] == "SETTLED_MODELED"
+        assert path["scheduled_denominator"] == len(path["opportunities"]) == 2
+        assert path["realized_pnl"] is not None
+        assert path["modeled_equity_return"] is not None
+        assert path["fees_paid"] > 0
+        assert any(event["kind"] == "MODELED_ENTRY" for event in path["ledger"])
+        assert any(event["kind"] == "MODELED_INDICATOR_EXIT" for event in path["ledger"])
