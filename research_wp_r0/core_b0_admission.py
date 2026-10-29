@@ -173,7 +173,7 @@ def consume_owner_one_run_permit(
     return {**record, "admission_record_path": str(marker), "admission_record_sha256": sha256(_canonical(record)).hexdigest()}
 
 
-def admit_current_checkout_one_run(permit: dict[str, Any]) -> dict[str, Any]:
+def admit_current_checkout_one_run(permit: dict[str, Any], *, preflight_report_sha256: str) -> dict[str, Any]:
     """Production boundary: read owner-provisioned key, attest actual Git checkout, consume once."""
     secret_text = os.environ.get("AQL_B0_PERMIT_HMAC_KEY", "")
     if not secret_text:
@@ -187,11 +187,11 @@ def admit_current_checkout_one_run(permit: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(head, str):
         raise AdmissionDenied("INVALID_PERMIT_HEAD")
     runtime = _runtime_identity(head)
-    raise AdmissionDenied("USE_CORE_ENTRYPOINT_WITH_ORIGINAL_INPUTS")
     return consume_owner_one_run_permit(
         permit,
         admission_dir=os.environ["AQL_B0_ADMISSION_DIR"],
         secret=secret,
         runtime_head=runtime["head_sha"],
         worktree_clean=runtime["worktree_clean"],
+        preflight_report_sha256=preflight_report_sha256,
     )
