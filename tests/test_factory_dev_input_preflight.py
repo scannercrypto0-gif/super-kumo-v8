@@ -30,7 +30,9 @@ def config_for(scenario):
     return Config(warmup_bars=252,latency_ms=latency,spread_bps=spread,slippage_bps=slip,fee_bps=fee,quantity=0.001,initial_cash=1000,max_signal_age_ms=120000,indicator_exit=True,tp_fraction=None,sl_fraction=None,checkpoint_ms=86400000)
 def run(args):
     raw,issued,rows,source,commitment=args
-    return validate_historical_dev_inputs(archive_bytes=raw,issued_receipt_bytes=issued,bars=rows,source=source,config=config_for(commitment["scenario_id"]),commitment=commitment)
+    scenario=commitment["scenario_id"]
+    config=config_for(scenario) if scenario in SCENARIO_CONFIG else config_for("S00")
+    return validate_historical_dev_inputs(archive_bytes=raw,issued_receipt_bytes=issued,bars=rows,source=source,config=config,commitment=commitment)
 def test_exact_one_day_preflight_returns_non_authorizing_manifest():
     out=run(inputs())
     assert out["status"]=="INPUT_BYTES_AND_NORMALIZED_ROWS_VALID_NOT_STUDY_AUTHORITY"
