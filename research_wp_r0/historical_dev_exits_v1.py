@@ -186,6 +186,8 @@ def _path(bars, scheduled, cfg, path):
         uncertain = True
         event(t, reason, modeled_fill=False, actual_fill=False, pnl=None)
 
+    # An unobserved entry quote is not evidence that the policy abstained. Keep
+    # the modeled cash path as a conditional subtotal, but mask policy totals.
     due = {}
     for s in scheduled:
         due.setdefault(s['scheduled_ms'], []).append(s)
@@ -207,6 +209,7 @@ def _path(bars, scheduled, cfg, path):
                     status = 'CAPACITY_HELD'
                 elif not b['modeled_quote']:
                     status = 'UNKNOWN_ENTRY_QUOTE'
+                    unknown(t, status)
                 else:
                     execution = b['open'] * (1 + impact)
                     charged = execution * cfg.quantity * fee
