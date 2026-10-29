@@ -171,8 +171,10 @@ def test_factory_consumer_verifies_and_consumes_signed_admission_once(tmp_path, 
     secret = b"test-only-secret-key-at-least-32-bytes"
     head = "f" * 40
     monkeypatch.setenv("AQL_B0_PERMIT_HMAC_KEY", secret.decode())
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
     monkeypatch.setattr(gate, "_runtime_identity", lambda expected: {
-        "head_sha": head, "worktree_clean": True,
+        "head_sha": head, "worktree_clean": True, "repo_root": str(checkout.resolve()),
     })
     permit = _signed_b0_permit(secret, permit_id="permit-test-0003", head=head)
     admitted = gate._consume_owner_one_run_permit(
