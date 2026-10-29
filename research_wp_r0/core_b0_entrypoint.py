@@ -115,7 +115,7 @@ def run_input_preflight(*, archive_bytes: bytes, issued_receipt_bytes: bytes) ->
                     "fee_bps": fee_bps,
                     "engine_config": result_config(config),
                 }),
-                "engine_input_sha256": result["normalized_rows_sha256"],
+                "engine_input_sha256": digest(bars),
             })
         except (ValueError, TypeError, KeyError) as exc:
             outcomes.append({
