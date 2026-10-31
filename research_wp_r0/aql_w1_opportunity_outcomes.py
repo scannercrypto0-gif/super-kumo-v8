@@ -4,7 +4,7 @@ Retrospective market excursions are NOT fills, PIT observations, or realized PnL
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from hashlib import sha256
 import json
 import math
@@ -63,8 +63,28 @@ class RetrospectiveSnapshot:
         return digest({"schema": 1, **asdict(self)})
 
 
+def _source_row(value):
+    """Read actual C2/F1 dataclasses or JSON dictionaries."""
+    if isinstance(value, dict):
+        return value
+    if is_dataclass(value) and not isinstance(value, type):
+        return asdict(value)
+    raise EvidenceError("unsupported source row type")
+
+
+def _source_context_digest(envelope, selection):
+    """Digest only source/predecision lineage, never future market bars."""
+    fields = ("envelope_sha256", "prefix_bar_checksums_sha256",
+              "feature_policy_version", "gap_inventory_sha256",
+              "correction_lineage_sha256")
+    return digest({"envelope": {k: envelope[k] for k in fields},
+                   "selection_prefix": selection["prefix_bar_checksums_sha256"]})
+
+
 def reconcile(envelopes, selections):
     """Exact 1:1 immutable source join; no outcome-based eligibility inference."""
+    envelopes = [_source_row(x) for x in envelopes]
+    selections = [_source_row(x) for x in selections]
     if len(envelopes) != len(selections):
         raise EvidenceError("source/selection count mismatch")
     by_id = {}
@@ -81,7 +101,7 @@ def reconcile(envelopes, selections):
             raise EvidenceError("duplicate or missing envelope/selection")
         seen.add(key)
         s = by_id[key]
-        for field in ("decision_cutoff_ms", "producer_event_id", "opportunity_id"):
+        for field in ("decision_cutoff_ms", "decision_ms", "producer_event_id", "opportunity_id", "trial_id", "prefix_start_ms", "prefix_end_exclusive_ms", "prefix_bar_checksums_sha256", "input_disposition", "strategy_id", "dataset_version"):
             if e.get(field) != s.get(field):
                 raise EvidenceError("conflicting source " + field)
         result.append(RetrospectiveSnapshot(
@@ -92,7 +112,7 @@ def reconcile(envelopes, selections):
             reason_code=s.get("reason_code"), direction=s.get("direction"),
             eligibility=s.get("eligibility", "NOT_ESTABLISHED"),
             eligibility_evidence=s.get("eligibility_evidence"),
-            context_digest=s["context_digest"],
+            context_digest=_source_context_digest(e, s),
         ))
     if len(seen) != len(by_id):
         raise EvidenceError("orphan selection")
@@ -116,7 +136,8 @@ def market_outcome(snapshot, horizon_ms, bars, *, source_version, source_end_exc
            "source_version": source_version, "policy_version": policy_version}
     result = {"outcome_id": digest(key), **key, "due_at_ms": due,
               "reference_kind": "OPEN_AT_CUTOFF_NON_EXECUTABLE",
-              "execution_status": "NOT_OBSERVED", "order_resolution": "UNKNOWN",
+              "execution_status": "NOT_OBSERVED", "order_resolution": "NOT_ASSESSED",
+              "window_quality": "NOT_READY", "excursion_metrics_status": "NOT_EVALUATED",
               "mfe": None, "mae": None, "status": "PENDING", "reason": None}
     if source_end_exclusive_ms < due:
         result.update(status="MISSING_DATA" if archive_finalized else "PENDING",
@@ -156,7 +177,8 @@ def market_outcome(snapshot, horizon_ms, bars, *, source_version, source_end_exc
     lows = [float(b["low"]) for b in ordered]
     favorable = (max(highs) / base - 1) if snapshot.direction == "LONG" else (1 - min(lows) / base)
     adverse = (1 - min(lows) / base) if snapshot.direction == "LONG" else (max(highs) / base - 1)
-    result.update(status="EVALUATED", reason=None, mfe=favorable, mae=adverse,
+    result.update(status="EVALUATED", reason=None, mfe=max(0.0, favorable), mae=max(0.0, adverse),
+                  window_quality="COMPLETE_FINALIZED", excursion_metrics_status="EVALUATED",
                   order_resolution="NOT_APPLICABLE", bar_count=len(ordered),
                   reference_price=base)
     return result
