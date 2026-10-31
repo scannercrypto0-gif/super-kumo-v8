@@ -24,6 +24,9 @@ from __future__ import annotations
 
 import json
 import math
+from decimal import Decimal, InvalidOperation
+
+from .aql_p0_c1_custody import verify_native_bundle, SourceCustodyError
 from dataclasses import dataclass, field
 from hashlib import sha256
 from typing import Any, ClassVar
@@ -162,8 +165,18 @@ def _validate_bar_row(row: Any, index: int, expected_open_ms: int) -> tuple:
     """
     if not isinstance(row, list) or len(row) != 7:
         raise C1SourceRejected(f"BAR_{index}_INVALID_SHAPE: expected 7-element list")
-    open_ms, close_ms = row[0], row[1]
-    o, h, l, c, v = row[2], row[3], row[4], row[5], row[6]
+    # Owner's normalized 15m evidence is [open_ms, open_str, high_str,
+    # low_str, close_str, volume_str, close_ms]; synthetic tests may use
+    # the legacy [open_ms, close_ms, o, h, l, c, v] representation.
+    if isinstance(row[1], str):
+        open_ms, close_ms = row[0], row[6]
+        try:
+            o, h, l, c, v = (float(Decimal(row[k])) for k in (1,2,3,4,5))
+        except (InvalidOperation, ValueError, TypeError) as exc:
+            raise C1SourceRejected(f"BAR_{index}_DECIMAL_INVALID") from exc
+    else:
+        open_ms, close_ms = row[0], row[1]
+        o, h, l, c, v = row[2], row[3], row[4], row[5], row[6]
 
     if not isinstance(open_ms, int):
         raise C1SourceRejected(f"BAR_{index}_OPEN_MS_NOT_INT")
@@ -201,17 +214,14 @@ class AdmittedSource:
 
     TRUST MODEL
     -----------
-    TRUST_MODEL_DECLARATION = "HASH_ONLY_NOT_NESTED_VERIFIED"
+    TRUST_MODEL_DECLARATION = "NATIVE_7DAY_RAW_VERIFIED"
 
-    Only three SHA-256 hashes are verified:
+    Three outer SHA-256 gates and the complete nested raw data are verified:
       1. OUTER_ZIP_SHA256  — the owner's delivery ZIP package as a whole
       2. MANIFEST_SHA256   — manifest.json extracted from that ZIP
       3. NORMALIZED_SHA256 — the normalized JSON used for bar decisions
 
-    The nested structure inside the delivery ZIP (seven daily ZIP archives,
-    individual daily CSV files, and Binance publisher CHECKSUM text files)
-    is NOT independently inspected.  Hash integrity rests on the outer-package
-    and manifest commitments only.
+    Seven daily ZIPs, their CHECKSUM texts, and raw-to-normalized rows are inspected.
 
     Fields
     ------
@@ -223,11 +233,13 @@ class AdmittedSource:
         The outer ZIP hash that matched OUTER_ZIP_SHA256 (audit trail only).
     """
     # Class-level trust model declaration (not an instance field)
-    TRUST_MODEL_DECLARATION: ClassVar[str] = "HASH_ONLY_NOT_NESTED_VERIFIED"
+    TRUST_MODEL_DECLARATION: ClassVar[str] = "NATIVE_7DAY_RAW_VERIFIED"
 
     normalized_bytes: bytes
     manifest_integrity_sha256: str   # verified against MANIFEST_SHA256
     outer_zip_sha256_verified: str   # the hash that matched OUTER_ZIP_SHA256
+    outer_zip_bytes: bytes | None = None
+    manifest_bytes: bytes | None = None
 
 
 def admit_source(
@@ -298,11 +310,18 @@ def admit_source(
             f"got {actual_normalized!r}"
         )
 
-    # All three gates passed — return typed proof token
+    # Verify all seven original ZIPs, publisher checksums and raw-to-normalized rows.
+    try:
+        verify_native_bundle(bytes(outer_zip_bytes), bytes(manifest_bytes), bytes(normalized_bytes))
+    except SourceCustodyError as exc:
+        raise C1SourceRejected(str(exc)) from exc
+
     return AdmittedSource(
         normalized_bytes=normalized_bytes,
         manifest_integrity_sha256=actual_manifest,
         outer_zip_sha256_verified=actual_outer,
+        outer_zip_bytes=bytes(outer_zip_bytes),
+        manifest_bytes=bytes(manifest_bytes),
     )
 
 
@@ -411,9 +430,9 @@ def load_source(
         )
 
     # --- Defense-in-depth: re-verify outer ZIP and manifest pins independently ---
-    # These checks are independent of admit_source() — they guard against
+    # These initial pin checks guard against
     # AdmittedSource objects constructed directly with wrong/arbitrary hashes.
-    # TRUST_MODEL=HASH_ONLY_NOT_NESTED_VERIFIED (nested ZIP/CSV/CHECKSUM not inspected).
+    # Full byte-level verification is repeated below.
     if admitted.outer_zip_sha256_verified != OUTER_ZIP_SHA256:
         raise C1SourceRejected(
             f"LOAD_SOURCE_OUTER_ZIP_PIN_MISMATCH: admitted outer hash "
@@ -427,6 +446,19 @@ def load_source(
             f"LOAD_SOURCE_MANIFEST_PIN_MISMATCH: admitted manifest hash "
             f"{admitted.manifest_integrity_sha256!r} does not match MANIFEST_SHA256 pin"
         )
+
+    if admitted.outer_zip_bytes is None or admitted.manifest_bytes is None:
+        raise C1SourceRejected("RAW_EVIDENCE_REQUIRED_NOT_FORGED_TOKEN")
+    # Constructor is public, so never trust a caller-created AdmittedSource.
+    # Revalidate the real evidence bytes instead of trusting hash-string fields.
+    verified = admit_source(
+        outer_zip_bytes=admitted.outer_zip_bytes,
+        manifest_bytes=admitted.manifest_bytes,
+        normalized_bytes=admitted.normalized_bytes,
+    )
+    if (verified.outer_zip_sha256_verified != admitted.outer_zip_sha256_verified or
+        verified.manifest_integrity_sha256 != admitted.manifest_integrity_sha256):
+        raise C1SourceRejected("ADMITTED_SOURCE_BINDING_MISMATCH")
 
     normalized_json_bytes = admitted.normalized_bytes
     manifest_integrity_sha256 = admitted.manifest_integrity_sha256
