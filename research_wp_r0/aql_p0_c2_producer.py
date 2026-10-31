@@ -116,46 +116,96 @@ class ConsumerJournalEntry:
     consumer_receipt_hash: str | None = None
     source_bytes_sha256: str | None = None
     run_manifest_sha256: str | None = None
+    trial_id: str | None = None
+    strategy_digest: str | None = None
+    policy_id: str | None = None
+    assumptions_digest: str | None = None
 
 
 def _verify_factory_receipt(path: Path, entry: ConsumerJournalEntry) -> str:
-    """Factory contract: receipt and effect must be readable, bound, and pinned."""
-    if not entry.source_bytes_sha256 or not entry.run_manifest_sha256:
-        raise C2ConflictError("ACK_SOURCE_AND_RUN_BINDING_REQUIRED")
+    """Validate Factory's agreed durable per-decision receipt (Issue #180/6542255718).
+
+    Receipt format: aql.p0.factory-consumer-effect-receipt.v1, canonical
+    sha256 commitments for per-decision effect and entire receipt. Optional
+    financial events MUST be read from the actual Factory receipt journal in
+    the SAME directory as the decision receipt (financial_receipts.jsonl).
+    The Factory writer must fsync and read back both stores before acknowledging.
+    """
+    required_entry = (
+        "source_bytes_sha256", "run_manifest_sha256", "trial_id",
+        "strategy_digest", "policy_id", "assumptions_digest",
+    )
+    if any(not getattr(entry, key) for key in required_entry):
+        raise C2ConflictError("ACK_PRODUCER_BINDING_INCOMPLETE")
     try:
-        receipt_bytes = path.read_bytes()
-        receipt = json.loads(receipt_bytes)
-        if receipt.get("schema") != "aql.p0.factory-consumer-receipt.v1":
-            raise C2ConflictError("ACK_RECEIPT_SCHEMA_INVALID")
-        identities = {
+        raw = path.read_bytes()
+        doc = json.loads(raw)
+        if not isinstance(doc, dict) or doc.get("schema") != "aql.p0.factory-consumer-effect-receipt.v1":
+            raise C2ConflictError("ACK_FACTORY_RECEIPT_SCHEMA_MISMATCH")
+        identity = {
             "producer_event_id": entry.producer_event_id,
             "opportunity_id": entry.opportunity_id,
             "envelope_sha256": entry.envelope_sha256,
-            "source_bytes_sha256": entry.source_bytes_sha256,
             "run_manifest_sha256": entry.run_manifest_sha256,
+            "trial_id": entry.trial_id,
+            "strategy_digest": entry.strategy_digest,
+            "policy_id": entry.policy_id,
+            "assumptions_digest": entry.assumptions_digest,
         }
-        if any(receipt.get(k) != v for k, v in identities.items()):
-            raise C2ConflictError("ACK_RECEIPT_IDENTITY_MISMATCH")
-        effect_name = receipt.get("effect_path")
-        effect_sha = receipt.get("effect_sha256")
-        if not isinstance(effect_name, str) or not effect_name or not isinstance(effect_sha, str) or len(effect_sha) != 64:
-            raise C2ConflictError("ACK_EFFECT_REFERENCE_INVALID")
-        effect_path = Path(effect_name)
-        if not effect_path.is_absolute():
-            effect_path = path.parent / effect_path
-        effect_bytes = effect_path.read_bytes()
-        if _sha256_hex(effect_bytes) != effect_sha:
-            raise C2ConflictError("ACK_EFFECT_SHA256_MISMATCH")
-        effect = json.loads(effect_bytes)
-        if any(effect.get(k) != v for k, v in identities.items()):
-            raise C2ConflictError("ACK_EFFECT_IDENTITY_MISMATCH")
-        if effect.get("durable_effect_status") != "PERSISTED_READBACK":
-            raise C2ConflictError("ACK_EFFECT_NOT_CONFIRMED")
-        return _sha256_hex(receipt_bytes)
+        if any(doc.get(k) != v for k, v in identity.items()):
+            raise C2ConflictError("ACK_FACTORY_RECEIPT_BINDING_MISMATCH")
+        disposition = doc.get("effect_disposition")
+        event_ids = doc.get("ordered_financial_event_ids")
+        payload_hashes = doc.get("ordered_financial_payload_hashes")
+        if (not isinstance(disposition, str) or not disposition or
+            not isinstance(event_ids, list) or not isinstance(payload_hashes, list) or
+            len(event_ids) != len(payload_hashes) or len(set(event_ids)) != len(event_ids) or
+            any(not isinstance(v, str) or not v for v in event_ids) or
+            any(not isinstance(v, str) or len(v) != 64 for v in payload_hashes)):
+            raise C2ConflictError("ACK_FACTORY_EFFECT_IDENTITY_INVALID")
+        effect = {
+            "producer_event_id": entry.producer_event_id,
+            "envelope_sha256": entry.envelope_sha256,
+            "run_manifest_sha256": entry.run_manifest_sha256,
+            "opportunity_id": entry.opportunity_id,
+            "effect_disposition": disposition,
+            "ordered_financial_event_ids": event_ids,
+            "ordered_financial_payload_hashes": payload_hashes,
+        }
+        effect_sha = _sha256_hex(_canonical_bytes(effect))
+        if doc.get("consumer_effect_digest") != effect_sha:
+            raise C2ConflictError("ACK_FACTORY_EFFECT_DIGEST_MISMATCH")
+        receipt_payload = {k: v for k, v in doc.items() if k != "receipt_sha256"}
+        if doc.get("receipt_sha256") != _sha256_hex(_canonical_bytes(receipt_payload)):
+            raise C2ConflictError("ACK_FACTORY_RECEIPT_SHA256_MISMATCH")
+        # Verify financial event payloads by reading the REAL persisted journal,
+        # not trusting a supplied list of hashes. For NO_SIGNAL/NO_FILL etc.,
+        # an empty event list is permitted but durable decision receipt required.
+        if event_ids:
+            financial_path = path.parent / "financial_receipts.jsonl"
+            persisted = {}
+            for line in financial_path.read_bytes().splitlines():
+                if not line.strip():
+                    continue
+                event_rec = json.loads(line)
+                event_id = event_rec["event_id"]
+                payload_hash = event_rec["payload_hash"]
+                recomputed = _sha256_hex(_canonical_bytes(
+                    {k: v for k, v in event_rec.items() if k != "payload_hash"}
+                ))
+                if payload_hash != recomputed:
+                    raise C2ConflictError("ACK_FINANCIAL_EVENT_PAYLOAD_TAMPER")
+                if event_id in persisted and persisted[event_id] != payload_hash:
+                    raise C2ConflictError("ACK_FINANCIAL_EVENT_ID_CONFLICT")
+                persisted[event_id] = payload_hash
+            for event_id, payload_hash in zip(event_ids, payload_hashes):
+                if persisted.get(event_id) != payload_hash:
+                    raise C2ConflictError("ACK_FINANCIAL_EVENT_NOT_DURABLE")
+        return _sha256_hex(raw)
     except C2ConflictError:
         raise
     except (OSError, ValueError, TypeError, AttributeError, KeyError) as exc:
-        raise C2ConflictError("ACK_RECEIPT_OR_EFFECT_UNREADABLE") from exc
+        raise C2ConflictError("ACK_FACTORY_RECEIPT_READBACK_INVALID") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -194,6 +244,10 @@ class DurableJournal:
         envelope_sha256: str,
         source_bytes_sha256: str | None = None,
         run_manifest_sha256: str | None = None,
+        trial_id: str | None = None,
+        strategy_digest: str | None = None,
+        policy_id: str | None = None,
+        assumptions_digest: str | None = None,
     ) -> ConsumerJournalEntry:
         """Append PENDING entry to disk + fsync. Returns the entry.
 
@@ -218,6 +272,10 @@ class DurableJournal:
             state="PENDING",
             source_bytes_sha256=source_bytes_sha256,
             run_manifest_sha256=run_manifest_sha256,
+            trial_id=trial_id,
+            strategy_digest=strategy_digest,
+            policy_id=policy_id,
+            assumptions_digest=assumptions_digest,
         )
         self._append_and_fsync(entry)
         self._entries[producer_event_id] = entry
@@ -303,6 +361,10 @@ class DurableJournal:
                 consumer_receipt_hash=digest,
                 source_bytes_sha256=entry.source_bytes_sha256,
                 run_manifest_sha256=entry.run_manifest_sha256,
+                trial_id=entry.trial_id,
+                strategy_digest=entry.strategy_digest,
+                policy_id=entry.policy_id,
+                assumptions_digest=entry.assumptions_digest,
             )
             self._append_and_fsync(new_entry)
             readback = _load_journal_file(self._path).get(entry.producer_event_id)
@@ -326,6 +388,9 @@ class DurableJournal:
             record["source_bytes_sha256"] = entry.source_bytes_sha256
         if entry.run_manifest_sha256 is not None:
             record["run_manifest_sha256"] = entry.run_manifest_sha256
+        for k in ("trial_id", "strategy_digest", "policy_id", "assumptions_digest"):
+            if getattr(entry, k) is not None:
+                record[k] = getattr(entry, k)
         line = json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
         with open(self._path, "ab") as fh:
             fh.write(line.encode("utf-8"))
@@ -372,7 +437,9 @@ def _load_journal_file(path: Path) -> dict[str, ConsumerJournalEntry]:
                 if (existing.envelope_sha256 != rec["envelope_sha256"] or
                     existing.opportunity_id != rec["opportunity_id"] or
                     existing.source_bytes_sha256 != rec.get("source_bytes_sha256") or
-                    existing.run_manifest_sha256 != rec.get("run_manifest_sha256")):
+                    existing.run_manifest_sha256 != rec.get("run_manifest_sha256") or
+                    any(getattr(existing, key) != rec.get(key) for key in
+                        ("trial_id", "strategy_digest", "policy_id", "assumptions_digest"))):
                     raise C2ConflictError(
                         f"JOURNAL_DIGEST_INCONSISTENCY: pid={pid!r} "
                         f"stored={existing.envelope_sha256!r} "
@@ -389,6 +456,10 @@ def _load_journal_file(path: Path) -> dict[str, ConsumerJournalEntry]:
                         consumer_receipt_hash=rec.get("consumer_receipt_hash"),
                         source_bytes_sha256=rec.get("source_bytes_sha256"),
                         run_manifest_sha256=rec.get("run_manifest_sha256"),
+                        trial_id=rec.get("trial_id"),
+                        strategy_digest=rec.get("strategy_digest"),
+                        policy_id=rec.get("policy_id"),
+                        assumptions_digest=rec.get("assumptions_digest"),
                     )
             else:
                 entries[pid] = ConsumerJournalEntry(
@@ -399,6 +470,10 @@ def _load_journal_file(path: Path) -> dict[str, ConsumerJournalEntry]:
                     consumer_receipt_hash=rec.get("consumer_receipt_hash"),
                         source_bytes_sha256=rec.get("source_bytes_sha256"),
                         run_manifest_sha256=rec.get("run_manifest_sha256"),
+                        trial_id=rec.get("trial_id"),
+                        strategy_digest=rec.get("strategy_digest"),
+                        policy_id=rec.get("policy_id"),
+                        assumptions_digest=rec.get("assumptions_digest"),
                 )
         except C2ConflictError:
             raise  # always re-raise digest conflict errors
@@ -643,6 +718,10 @@ def produce_envelopes(
             envelope_sha256=env_sha,
             source_bytes_sha256=manifest.source_bytes_sha256,
             run_manifest_sha256=run_manifest_sha,
+            trial_id=trial_id,
+            strategy_digest=strat_digest,
+            policy_id=POLICY_ID,
+            assumptions_digest=assumptions_digest,
         )
 
         envelope = DecisionEnvelope(
