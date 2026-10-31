@@ -630,49 +630,58 @@ class TestC2JournalLifecycle:
             except OSError:
                 pass
 
-    def test_ack_envelopes_applied_to_acked(self):
-        """ack_envelopes() must transition APPLIED entries to ACKED."""
+    def test_ack_without_factory_receipt_stops(self):
+        """A producer write is NOT a Factory ACK."""
         import os
-        from research_wp_r0.aql_p0_c2_producer import ack_envelopes, load_journal
+        from research_wp_r0.aql_p0_c2_producer import ack_envelopes, C2ConflictError
         manifest = self._make_stub_manifest(22)
-        envelopes, jp, journal = self._produce_with_journal(manifest, trial_id="ACK-TEST")
+        envelopes, jp, journal = self._produce_with_journal(manifest, trial_id="ACK-NO-RECEIPT")
         try:
-            all_pids = [e.producer_event_id for e in envelopes]
-            acked_count = ack_envelopes(all_pids, journal)
-            assert acked_count == len(envelopes), (
-                f"Expected {len(envelopes)} ACKed, got {acked_count}"
-            )
-            # Re-load to verify persisted state
-            journal2 = load_journal(jp)
-            for pid, entry in journal2.entries.items():
-                assert entry.state == "ACKED", (
-                    f"Expected ACKED, got {entry.state!r} for {pid!r}"
-                )
+            with pytest.raises(C2ConflictError, match="ACK_CONSUMER_RECEIPT_REQUIRED"):
+                ack_envelopes([envelopes[0].producer_event_id], journal)
+            assert journal.entries[envelopes[0].producer_event_id].state == "APPLIED"
         finally:
-            try:
-                os.unlink(jp)
-            except OSError:
-                pass
+            os.unlink(jp)
 
-    def test_ack_envelopes_idempotent_for_already_acked(self):
-        """ack_envelopes() on already-ACKED entries must be a no-op (idempotent)."""
+    def test_ack_verified_factory_effect_survives_reopen(self, tmp_path):
+        """Real, persisted receipt+effect bytes are read back; fake hash is refused."""
         import os
-        from research_wp_r0.aql_p0_c2_producer import ack_envelopes
+        from research_wp_r0.aql_p0_c2_producer import ack_envelopes, load_journal, C2ConflictError
         manifest = self._make_stub_manifest(22)
-        envelopes, jp, journal = self._produce_with_journal(manifest, trial_id="ACK-IDEM-TEST")
+        envs, jp, journal = self._produce_with_journal(manifest, trial_id="ACK-DURABLE")
         try:
-            all_pids = [e.producer_event_id for e in envelopes]
-            acked_first = ack_envelopes(all_pids, journal)
-            acked_second = ack_envelopes(all_pids, journal)
-            assert acked_first == len(envelopes)
-            assert acked_second == 0, (
-                f"Expected 0 newly ACKED on second call (idempotent), got {acked_second}"
-            )
+            env = envs[0]
+            pid = env.producer_event_id
+            effect_path = tmp_path / "effect.json"
+            effect = {
+                "producer_event_id": pid,
+                "opportunity_id": env.opportunity_id,
+                "envelope_sha256": env.envelope_sha256,
+                "source_bytes_sha256": manifest.source_bytes_sha256,
+                "run_manifest_sha256": env.run_manifest_sha256,
+                "durable_effect_status": "PERSISTED_READBACK",
+            }
+            effect_path.write_bytes(json.dumps(effect, sort_keys=True).encode("utf-8"))
+            import hashlib
+            receipt_path = tmp_path / "factory-receipt.json"
+            receipt = dict(effect)
+            receipt.pop("durable_effect_status")
+            receipt.update({
+                "schema": "aql.p0.factory-consumer-receipt.v1",
+                "effect_path": str(effect_path),
+                "effect_sha256": hashlib.sha256(effect_path.read_bytes()).hexdigest(),
+            })
+            receipt_path.write_bytes(json.dumps(receipt, sort_keys=True).encode("utf-8"))
+            assert ack_envelopes([pid], journal, consumer_receipts={pid: str(receipt_path)}) == 1
+            restarted = load_journal(jp)
+            assert restarted.entries[pid].state == "ACKED"
+            assert ack_envelopes([pid], restarted, consumer_receipts={pid: str(receipt_path)}) == 0
+            receipt["envelope_sha256"] = "0" * 64
+            receipt_path.write_bytes(json.dumps(receipt, sort_keys=True).encode("utf-8"))
+            with pytest.raises(C2ConflictError, match="ACK_RECEIPT_IDENTITY_MISMATCH"):
+                ack_envelopes([pid], restarted, consumer_receipts={pid: str(receipt_path)})
         finally:
-            try:
-                os.unlink(jp)
-            except OSError:
-                pass
+            os.unlink(jp)
 
     def test_ack_unknown_id_raises_conflict(self):
         """ack_envelopes() with an ID not in journal must raise C2ConflictError."""
@@ -682,7 +691,7 @@ class TestC2JournalLifecycle:
         _, jp, journal = self._produce_with_journal(manifest, trial_id="ACK-ERR-TEST")
         try:
             with pytest.raises(C2ConflictError) as exc_info:
-                ack_envelopes(["nonexistent-id-00000000"], journal)
+                ack_envelopes(["nonexistent-id-00000000"], journal, consumer_receipts={"nonexistent-id-00000000": "nonexistent.json"})
             assert "ACK_UNKNOWN_ID" in str(exc_info.value)
         finally:
             try:
