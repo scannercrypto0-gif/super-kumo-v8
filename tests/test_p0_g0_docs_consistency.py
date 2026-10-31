@@ -27,10 +27,14 @@ class TestP0G0DocsConsistency(unittest.TestCase):
                 self.assertIn("G0", block)
                 self.assertIn("2026-10-22", block)
                 self.assertIn("R09", block)
-                self.assertIn("G1", block)
                 self.assertNotIn("keep G0 OPEN", block)
                 self.assertNotIn("G0 remains OPEN", block)
                 self.assertNotIn("G0 and G0-001 remain OPEN", block)
+        for label, block in (("README current next step", readme_current),
+                             ("START reusable prompt", prompt),
+                             ("START GOV-01 active guidance", gov)):
+            with self.subTest(gate_separation=label):
+                self.assertIn("G1", block)
         self.assertIn("G0 FINAL APPROVED", prompt)
         self.assertIn("G0 FINAL APPROVED", readme_current)
         self.assertIn("G0-GOV-01 rule remains owner-approved provisional", gov)
