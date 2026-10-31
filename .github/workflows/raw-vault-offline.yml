@@ -1,0 +1,91 @@
+name: AQL Raw Vault Offline — Issue #207
+
+on:
+  push:
+    branches:
+      - feat/aql-raw-vault-offline-207
+    paths:
+      - 'tools/raw_vault_offline/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'tools/raw_vault_offline/**'
+
+# ── safety: no secrets, no network, no production access ─────────────────────
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTHONUNBUFFERED: "1"
+  AQL_OFFLINE_ONLY: "1"   # guard read by any code that checks it
+
+jobs:
+  raw-vault-offline-tests:
+    name: RAW Vault Offline Test Suite
+    runs-on: ubuntu-latest
+    # Network is restricted: no exchange/market-data calls are needed or expected
+    # Uncomment the line below if your runner supports it:
+    # network: none
+
+    defaults:
+      run:
+        working-directory: .
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov
+
+      - name: Confirm no protected-namespace imports
+        # Fail fast if any raw_vault_offline module imports from src/aql or research_wp_r0
+        run: |
+          python - <<'EOF'
+          import ast, sys, pathlib
+          FORBIDDEN = {"src.aql", "research_wp_r0"}
+          errors = []
+          for f in pathlib.Path("tools/raw_vault_offline").rglob("*.py"):
+              tree = ast.parse(f.read_text())
+              for node in ast.walk(tree):
+                  mod = None
+                  if isinstance(node, ast.Import):
+                      for alias in node.names:
+                          mod = alias.name
+                  elif isinstance(node, ast.ImportFrom):
+                      mod = node.module or ""
+                  if mod:
+                      for forbidden in FORBIDDEN:
+                          if mod == forbidden or mod.startswith(forbidden + "."):
+                              errors.append(f"{f}: imports {mod!r}")
+          if errors:
+              print("PROTECTED NAMESPACE IMPORT VIOLATIONS:", file=sys.stderr)
+              for e in errors:
+                  print(f"  {e}", file=sys.stderr)
+              sys.exit(1)
+          print("OK: no protected-namespace imports found")
+          EOF
+
+      - name: Run pytest — raw vault offline suite
+        run: |
+          python -m pytest tools/raw_vault_offline/tests/ \
+            -v \
+            --tb=short \
+            --cov=tools/raw_vault_offline \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage-raw-vault-offline.xml \
+            -p no:warnings
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-raw-vault-offline
+          path: coverage-raw-vault-offline.xml
+          retention-days: 14
