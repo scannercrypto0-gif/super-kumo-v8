@@ -5,22 +5,99 @@ on:
     paths:
       - 'src/aql/observation/position_journal.py'
       - 'src/aql/observation/positions.py'
-      - 'tests/test_g2_position_journal.py'
+      - 'tests/test_g2_*journal*.py'
       - '.github/workflows/g2-position-journal.yml'
   workflow_dispatch:
+    inputs:
+      benchmark:
+        description: 'Explicit bounded 250/1000/5000/10000-event + G1 contention diagnostics'
+        type: boolean
+        default: false
+      causal_matrix:
+        description: 'Owner6409676314: B2 bounded-duty causal diagnostic ONLY; B1 retained'
+        type: boolean
+        default: false
+      matched_work:
+        description: 'Owner6409973168: fixed-work/common-window E/F/G only'
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
   journal-tests:
     name: Offline journal (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
     steps:
+      - name: Capture causal job budget start
+        if: github.event_name == 'workflow_dispatch' && (inputs.causal_matrix || inputs.matched_work)
+        shell: bash
+        run: echo "AQL_G2_JOB_START=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: python -m unittest discover -s tests -p test_g2_position_journal.py -v
+      - name: Source and environment
+        shell: bash
+        run: |
+          git rev-parse HEAD | tee g2-source.txt
+          git rev-parse 'HEAD^{tree}' | tee -a g2-source.txt
+          python --version | tee -a g2-source.txt
+      - name: Focused regression (two manual diagnostics intentionally skipped)
+        if: github.event_name != 'workflow_dispatch' || (!inputs.benchmark && !inputs.causal_matrix && !inputs.matched_work)
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s tests -p "test_g2_*journal*.py" -v 2>&1 | tee g2-journal-tests.txt
+          python -B -m unittest discover -s tests -p "test_g2_position_lifecycle.py" -v 2>&1 | tee g2-lifecycle-tests.txt
+      - name: Manual bounded diagnostics (both platforms)
+        if: github.event_name == 'workflow_dispatch' && inputs.benchmark && !inputs.causal_matrix && !inputs.matched_work
+        env:
+          AQL_G2_BENCHMARK: '1'
+          AQL_G2_BENCHMARK_OUTPUT: g2-replay.json
+          AQL_G2_CONTENTION: '1'
+          AQL_G2_CONTENTION_OUTPUT: g2-contention.json
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s tests -p "test_g2_journal_replay_benchmark.py" -v 2>&1 | tee g2-replay.txt
+          python -B -m unittest discover -s tests -p "test_g2_core_journal_contention.py" -v 2>&1 | tee g2-contention.txt
+      - name: Owner-authorized bounded causal matrix only
+        if: github.event_name == 'workflow_dispatch' && inputs.causal_matrix && !inputs.matched_work
+        env:
+          AQL_G2_MATRIX_OUTPUT: g2-causal-matrix.jsonl
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B tests/test_g2_core_journal_contention.py --causal-matrix 2>&1 | tee g2-causal-matrix.txt
+      - name: Matched work and common window comparison only
+        if: github.event_name == 'workflow_dispatch' && inputs.matched_work
+        env:
+          AQL_G2_MATRIX_OUTPUT: g2-matched-matrix.jsonl
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B tests/test_g2_core_journal_contention.py --matched-matrix 2>&1 | tee g2-matched-matrix.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: g2-journal-${{ matrix.os }}-${{ github.run_id }}
+          path: |
+            g2-source.txt
+            g2-journal-tests.txt
+            g2-lifecycle-tests.txt
+            g2-replay.json
+            g2-contention.json
+            g2-contention-cpu.json
+            g2-causal-matrix.jsonl
+            g2-causal-matrix.txt
+            g2-matched-matrix.jsonl
+            g2-matched-matrix.txt
+            g2-replay.txt
+            g2-contention.txt
