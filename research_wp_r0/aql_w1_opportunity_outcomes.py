@@ -246,3 +246,90 @@ class AppendOnlyOutcomeJournal:
             os.fsync(f.fileno())
         self._seen[key] = encoded
         return True
+
+
+class OutcomeTransitionJournal:
+    """Research-only state transitions, serialized by an atomic directory lock.
+
+    Fail closed on lock contention; never guess that a stale lock is safe.
+    Different correction generations are different evaluation_version_id values.
+    """
+
+    TERMINAL = frozenset(("EVALUATED", "MISSING_DATA", "UNKNOWN"))
+
+    def __init__(self, path):
+        self.path = Path(path)
+        self.lock_path = Path(str(self.path) + ".lock")
+        self._states = {}
+        self._events = {}
+        self._reload()
+
+    def _reload(self):
+        self._states = {}
+        self._events = {}
+        if not self.path.exists():
+            return
+        with self.path.open("rb") as f:
+            for line in f:
+                try:
+                    row = json.loads(line)
+                    event = row["event"]
+                    if row["sha256"] != digest(event):
+                        raise EvidenceError("transition checksum mismatch")
+                    self._apply(event)
+                except (ValueError, KeyError, TypeError) as exc:
+                    raise EvidenceError("corrupt transition journal") from exc
+
+    def _apply(self, event):
+        version = event["evaluation_version_id"]
+        state = event["state"]
+        if state not in self.TERMINAL | {"PENDING"}:
+            raise EvidenceError("invalid transition state")
+        sequence = event["sequence"]
+        previous = self._states.get(version)
+        if sequence != (0 if previous is None else previous["sequence"] + 1):
+            raise EvidenceError("transition sequence mismatch")
+        if previous is None and state != "PENDING":
+            raise EvidenceError("initial transition must be PENDING")
+        if previous is not None:
+            if previous["state"] != "PENDING" or state == "PENDING":
+                raise EvidenceError("illegal transition")
+            if event["previous_event_id"] != previous["event_id"]:
+                raise EvidenceError("broken transition chain")
+        elif event["previous_event_id"] is not None:
+            raise EvidenceError("unexpected transition parent")
+        if event["event_id"] != digest({k: v for k, v in event.items() if k != "event_id"}):
+            raise EvidenceError("transition identity mismatch")
+        self._states[version] = {"state": state, "sequence": sequence,
+                                 "event_id": event["event_id"]}
+        self._events[event["event_id"]] = canonical(event)
+
+    def append(self, evaluation_version_id, state):
+        if not evaluation_version_id:
+            raise EvidenceError("missing evaluation version")
+        try:
+            self.lock_path.mkdir()
+        except FileExistsError as exc:
+            raise EvidenceError("transition journal locked; fail closed") from exc
+        try:
+            self._reload()  # never trust an in-memory view across processes
+            previous = self._states.get(evaluation_version_id)
+            if previous is not None and previous["state"] == state:
+                return False
+            if previous is None and state != "PENDING":
+                raise EvidenceError("initial transition must be PENDING")
+            if previous is not None and (previous["state"] != "PENDING" or state not in self.TERMINAL):
+                raise EvidenceError("illegal transition")
+            event = {"evaluation_version_id": evaluation_version_id, "state": state,
+                     "sequence": 0 if previous is None else previous["sequence"] + 1,
+                     "previous_event_id": None if previous is None else previous["event_id"]}
+            event["event_id"] = digest(event)
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with self.path.open("ab") as f:
+                f.write((canonical({"event": event, "sha256": digest(event)}) + "\n").encode())
+                f.flush()
+                os.fsync(f.fileno())
+            self._apply(event)
+            return True
+        finally:
+            self.lock_path.rmdir()
