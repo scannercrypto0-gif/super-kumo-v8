@@ -307,6 +307,7 @@ class OutcomeTransitionJournal:
     def append(self, evaluation_version_id, state):
         if not evaluation_version_id:
             raise EvidenceError("missing evaluation version")
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         try:
             self.lock_path.mkdir()
         except FileExistsError as exc:
