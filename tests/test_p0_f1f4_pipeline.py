@@ -809,9 +809,9 @@ class TestFactoryF4MandatoryLineageAndTamper:
         }
         record = {**fields, "payload_hash": _sha256_hex(_canonical_bytes(fields))}
         path = tmp_path / "financial_receipts.jsonl"
-        path.write_text(json.dumps(record, sort_keys=True) + "\\n")
+        path.write_text(json.dumps(record, sort_keys=True) + "\n")
         assert load_receipts(path)["event-one"] == record["payload_hash"]
         record["cash_delta"] = "-2"
-        path.write_text(json.dumps(record, sort_keys=True) + "\\n")
+        path.write_text(json.dumps(record, sort_keys=True) + "\n")
         with pytest.raises(LedgerReceiptCorrupted, match="RECEIPT_PAYLOAD_TAMPER"):
             load_receipts(path)
