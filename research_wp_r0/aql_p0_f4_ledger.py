@@ -256,8 +256,17 @@ def build_ledger(
     fill_results: list[FillResult],
     *,
     trial_id: str,
+    manifest_sha256: str | None = None,
+    strategy_digest: str | None = None,
+    policy_id: str | None = None,
+    assumptions_digest: str | None = None,
 ) -> tuple[LedgerState, "LedgerReport"]:
     """Apply all fill results to the ledger and produce an immutable report.
+
+    Events are sorted chronologically before application — EXIT_CREDIT fires
+    before ENTRY_DEBIT when two events share the same bar_open_ms.  This
+    ensures that when one opportunity exits and another enters at the identical
+    execution bar, the exit cash is credited first (correct event-time ordering).
 
     Parameters
     ----------
@@ -267,6 +276,14 @@ def build_ledger(
         F3 output (one per opportunity, in matching order).
     trial_id:
         Frozen trial identifier for report identity.
+    manifest_sha256:
+        Optional: SHA-256 of the source manifest (lineage binding).
+    strategy_digest:
+        Optional: digest of the strategy parameters.
+    policy_id:
+        Optional: policy identifier applied during this run.
+    assumptions_digest:
+        Optional: digest of the full assumptions document.
 
     Returns
     -------
@@ -295,19 +312,25 @@ def build_ledger(
     # Track cost_basis per opportunity_id for exit conservation check
     cost_basis_by_opp: dict[str, Decimal] = {}
 
+    # Phase 1: Collect ALL events (without applying) so we can sort before apply.
+    # EXIT_CREDIT must come before ENTRY_DEBIT at the same bar_open_ms so that
+    # cash from a closing position is available when the next entry fires at the
+    # same bar (event-time ordering invariant).
+    all_pending_events: list[LedgerEvent] = []
+
     for opp, fill in zip(opportunities, fill_results):
         # Count denominator — REJECTED is now a first-class bucket
         state_key = fill.signal_state if fill.signal_state in counts else "OTHER"
         counts[state_key] += 1
 
         if fill.signal_state == "TRIGGERED" and fill.entry_price_net is not None:
-            # --- Entry DEBIT ---
+            # --- Entry DEBIT (queued, not applied yet) ---
             entry_qty_fee = fill.entry_fee * POSITION_SIZE_BTC
             entry_qty_price = fill.entry_price_net * POSITION_SIZE_BTC
             entry_cost_basis = entry_qty_price + entry_qty_fee
             entry_cash_delta = -entry_cost_basis
 
-            entry_event = LedgerEvent(
+            all_pending_events.append(LedgerEvent(
                 event_id=_event_id(opp.opportunity_id, "ENTRY_DEBIT", fill.entry_bar_open_ms),
                 opportunity_id=opp.opportunity_id,
                 kind="ENTRY_DEBIT",
@@ -320,20 +343,19 @@ def build_ledger(
                 cumulative_cash=None,
                 held_btc_delta=POSITION_SIZE_BTC,
                 cumulative_held_btc=None,
-            )
-            _apply_event(entry_event, state)
+            ))
             cost_basis_by_opp[opp.opportunity_id] = entry_cost_basis
 
             if fill.exit_price_net is not None:
-                # --- Exit CREDIT ---
+                # --- Exit CREDIT (queued, not applied yet) ---
                 exit_qty_fee = fill.exit_fee * POSITION_SIZE_BTC
                 exit_qty_price = fill.exit_price_net * POSITION_SIZE_BTC
                 exit_cash_delta = exit_qty_price - exit_qty_fee
 
-                # Cost basis for exit = matched entry cost basis (conservation check)
+                # Cost basis matched from entry (conservation check)
                 exit_cost_basis = cost_basis_by_opp.get(opp.opportunity_id)
 
-                exit_event = LedgerEvent(
+                all_pending_events.append(LedgerEvent(
                     event_id=_event_id(opp.opportunity_id, "EXIT_CREDIT", fill.exit_bar_open_ms),
                     opportunity_id=opp.opportunity_id,
                     kind="EXIT_CREDIT",
@@ -346,8 +368,7 @@ def build_ledger(
                     cumulative_cash=None,
                     held_btc_delta=-POSITION_SIZE_BTC,
                     cumulative_held_btc=None,
-                )
-                _apply_event(exit_event, state)
+                ))
 
         elif fill.signal_state == "OPEN_UNRESOLVED":
             # Open position at window end: record ENTRY DEBIT only.
@@ -358,7 +379,7 @@ def build_ledger(
                 entry_cost_basis = entry_qty_price + entry_qty_fee
                 entry_cash_delta = -entry_cost_basis
 
-                entry_event = LedgerEvent(
+                all_pending_events.append(LedgerEvent(
                     event_id=_event_id(opp.opportunity_id, "ENTRY_DEBIT", fill.entry_bar_open_ms),
                     opportunity_id=opp.opportunity_id,
                     kind="ENTRY_DEBIT",
@@ -371,12 +392,23 @@ def build_ledger(
                     cumulative_cash=None,
                     held_btc_delta=POSITION_SIZE_BTC,
                     cumulative_held_btc=None,
-                )
-                _apply_event(entry_event, state)
+                ))
                 cost_basis_by_opp[opp.opportunity_id] = entry_cost_basis
                 open_exposure_btc += POSITION_SIZE_BTC
 
         # REJECTED, NO_SIGNAL, NO_FILL, BLOCKED, UNKNOWN, EXPIRED — no financial events
+
+    # Phase 2: Sort events chronologically.
+    # Primary key: bar_open_ms (ascending).
+    # Secondary key: EXIT_CREDIT (0) before ENTRY_DEBIT (1) — so that when an
+    # exit and a new entry share the same execution bar, the exit cash is applied
+    # first (restoring position availability) before the entry debit is checked.
+    _kind_order = {"EXIT_CREDIT": 0, "ENTRY_DEBIT": 1}
+    all_pending_events.sort(key=lambda ev: (ev.bar_open_ms, _kind_order.get(ev.kind, 2)))
+
+    # Phase 3: Apply sorted events
+    for ev in all_pending_events:
+        _apply_event(ev, state)
 
     # --- Produce immutable report ---
     total_scheduled = len(opportunities)
@@ -408,6 +440,9 @@ def build_ledger(
     # Attach receipts to state for persist_receipts()
     state._receipts = receipts  # type: ignore[attr-defined]
 
+    # Lineage: preserve input ordering of opportunities for report identity
+    ordered_opportunity_ids = tuple(opp.opportunity_id for opp in opportunities)
+
     report = LedgerReport(
         trial_id=trial_id,
         total_scheduled_decisions=total_scheduled,
@@ -422,6 +457,11 @@ def build_ledger(
         settled_equity=settled_equity,
         event_count=len(state.events),
         ordered_receipt_hashes=ordered_receipt_hashes,
+        ordered_opportunity_ids=ordered_opportunity_ids,
+        manifest_sha256=manifest_sha256,
+        strategy_digest=strategy_digest,
+        policy_id=policy_id,
+        assumptions_digest=assumptions_digest,
     )
     return state, report
 
@@ -513,8 +553,10 @@ def reconcile_receipts(
 
 def _load_receipts_file(path: Path) -> dict[str, str]:
     """Read JSON-lines receipt file → {event_id: payload_hash}.
-    Skips corrupted lines (logs but does not raise — corruption during write
-    detected by reconcile, not load). Last-write-wins for same event_id.
+
+    STOP on any corrupted or unparseable line — fail closed.
+    Silently skipping corrupted lines hides data loss; the ledger must
+    know all events are accounted for before proceeding.
     """
     result: dict[str, str] = {}
     for raw_line in path.read_bytes().splitlines():
@@ -526,9 +568,10 @@ def _load_receipts_file(path: Path) -> dict[str, str]:
             event_id = d["event_id"]
             payload_hash = d["payload_hash"]
             result[event_id] = payload_hash
-        except (json.JSONDecodeError, KeyError):
-            # Corrupted line — will be caught at reconcile time
-            continue
+        except (json.JSONDecodeError, KeyError) as exc:
+            raise LedgerReceiptCorrupted(
+                f"RECEIPTS_FILE_CORRUPTED: line could not be parsed — {exc}"
+            ) from exc
     return result
 
 
@@ -560,11 +603,23 @@ def persist_report(
     canonical = json.dumps(d, sort_keys=True, separators=(",", ":"),
                            ensure_ascii=False, allow_nan=False).encode("utf-8")
 
-    # Atomic write via temp file
+    # Atomic write via temp file + parent-dir fsync for crash safety
     tmp_path = path.with_suffix(".tmp")
     try:
         tmp_path.write_bytes(canonical)
         tmp_path.rename(path)
+        # Fsync parent directory to make rename durable across kernel crash.
+        # Without this, the rename may be lost on Linux after a power failure.
+        # Best-effort: Windows does not support directory fsync.
+        parent_dir = path.parent
+        try:
+            parent_fd = os.open(str(parent_dir), os.O_RDONLY)
+            try:
+                os.fsync(parent_fd)
+            finally:
+                os.close(parent_fd)
+        except OSError:
+            pass  # Best-effort; non-fatal on platforms that don't support it
     except Exception as exc:
         if tmp_path.exists():
             tmp_path.unlink(missing_ok=True)
@@ -631,6 +686,12 @@ def _load_report_bytes(raw: bytes) -> "LedgerReport":
             event_count=dc["event_count"],
             # F4 fix: load ordered_receipt_hashes from persisted report
             ordered_receipt_hashes=tuple(dc.get("ordered_receipt_hashes", [])),
+            # F4 lineage fix: optional fields default gracefully for backward compat
+            ordered_opportunity_ids=tuple(dc.get("ordered_opportunity_ids", [])),
+            manifest_sha256=dc.get("manifest_sha256"),
+            strategy_digest=dc.get("strategy_digest"),
+            policy_id=dc.get("policy_id"),
+            assumptions_digest=dc.get("assumptions_digest"),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise LedgerReportCorrupted(f"REPORT_FIELD_ERROR: {exc}") from exc
@@ -668,23 +729,37 @@ class LedgerReport:
     # F4 fix: sorted list of individual FinancialReceipt payload_hashes
     # Covers every event — altering any event changes this list → changes report_sha256
     ordered_receipt_hashes: tuple[str, ...]  # in event-application order
+    # F4 lineage fields: binding this report to its input provenance
+    # All optional with defaults so existing call sites remain backward compatible
+    ordered_opportunity_ids: tuple[str, ...] = ()
+    manifest_sha256: str | None = None
+    strategy_digest: str | None = None
+    policy_id: str | None = None
+    assumptions_digest: str | None = None
 
     def report_sha256(self) -> str:
         """Immutable content hash of this report.
 
         F4 fix: includes ordered_receipt_hashes so that altering any single
         event (even while preserving aggregate totals) changes this digest.
+        F4 lineage fix: also covers lineage fields so that changing source,
+        strategy, policy, or opportunity ordering produces a different digest.
         """
         d = {
+            "assumptions_digest": self.assumptions_digest,
             "average_net_return_closed": str(self.average_net_return_closed) if self.average_net_return_closed is not None else None,
             "closed_trades": self.closed_trades,
             "denominator_counts": self.denominator_counts,
             "event_count": self.event_count,
+            "manifest_sha256": self.manifest_sha256,
             "open_exposure_btc": str(self.open_exposure_btc),
             "open_unresolved": self.open_unresolved,
             # F4 fix: cover individual receipt hashes — not just aggregates
+            "ordered_opportunity_ids": list(self.ordered_opportunity_ids),
             "ordered_receipt_hashes": list(self.ordered_receipt_hashes),
+            "policy_id": self.policy_id,
             "settled_equity": str(self.settled_equity) if self.settled_equity is not None else None,
+            "strategy_digest": self.strategy_digest,
             "terminal_cash": str(self.terminal_cash),
             "terminal_held_btc": str(self.terminal_held_btc),
             "total_net_return_closed": str(self.total_net_return_closed),
@@ -695,15 +770,20 @@ class LedgerReport:
 
     def to_dict(self) -> dict:
         return {
+            "assumptions_digest": self.assumptions_digest,
             "average_net_return_closed": str(self.average_net_return_closed) if self.average_net_return_closed is not None else None,
             "closed_trades": self.closed_trades,
             "denominator_counts": self.denominator_counts,
             "event_count": self.event_count,
+            "manifest_sha256": self.manifest_sha256,
             "open_exposure_btc": str(self.open_exposure_btc),
             "open_unresolved": self.open_unresolved,
+            "ordered_opportunity_ids": list(self.ordered_opportunity_ids),
             "ordered_receipt_hashes": list(self.ordered_receipt_hashes),
+            "policy_id": self.policy_id,
             "report_sha256": self.report_sha256(),
             "settled_equity": str(self.settled_equity) if self.settled_equity is not None else None,
+            "strategy_digest": self.strategy_digest,
             "terminal_cash": str(self.terminal_cash),
             "terminal_held_btc": str(self.terminal_held_btc),
             "total_net_return_closed": str(self.total_net_return_closed),

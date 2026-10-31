@@ -234,8 +234,9 @@ class DurableJournal:
 def _load_journal_file(path: Path) -> dict[str, ConsumerJournalEntry]:
     """Load and reconcile journal from JSON-lines file.
 
-    Later records for the same producer_event_id supersede earlier ones
-    (last-write-wins within the same session, reflecting state progression).
+    State may only PROGRESS (PENDING → APPLIED → ACKED) for a given
+    producer_event_id.  If the same pid appears with a DIFFERENT envelope_sha256
+    the journal has been tampered — STOP immediately with C2ConflictError.
     """
     entries: dict[str, ConsumerJournalEntry] = {}
     with open(path, "r", encoding="utf-8") as fh:
@@ -248,7 +249,15 @@ def _load_journal_file(path: Path) -> dict[str, ConsumerJournalEntry]:
                 pid = rec["producer_event_id"]
                 if pid in entries:
                     existing = entries[pid]
-                    # State can only progress; reject regression
+                    # STOP on digest inconsistency — same pid, different sha256
+                    # indicates history overwrite attempt or data corruption
+                    if existing.envelope_sha256 != rec["envelope_sha256"]:
+                        raise C2ConflictError(
+                            f"JOURNAL_DIGEST_INCONSISTENCY: pid={pid!r} "
+                            f"stored={existing.envelope_sha256!r} "
+                            f"new={rec['envelope_sha256']!r}"
+                        )
+                    # Same digest: state can only progress; ignore regression
                     state_order = {"PENDING": 0, "APPLIED": 1, "ACKED": 2}
                     if state_order.get(rec["state"], -1) >= state_order.get(existing.state, -1):
                         entries[pid] = ConsumerJournalEntry(

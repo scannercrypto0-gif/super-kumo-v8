@@ -189,12 +189,35 @@ def _validate_bar_row(row: Any, index: int, expected_open_ms: int) -> tuple:
     return int(open_ms), int(close_ms), float(o), float(h), float(l), float(c), float(v)
 
 
+@dataclass(frozen=True)
+class AdmittedSource:
+    """Typed proof that admit_source() passed all three SHA-256 gates.
+
+    load_source() requires this object as a mandatory parameter — it is the
+    ONLY way to obtain a P0SourceManifest in production.  Test code may
+    construct one directly ONLY for bar-level unit tests that need to bypass
+    the hash gate; that bypass must be clearly labelled in the test.
+
+    Fields
+    ------
+    normalized_bytes:
+        The raw normalized JSON bytes that passed the NORMALIZED_SHA256 gate.
+    manifest_integrity_sha256:
+        The verified hash of manifest.json — carried through to the manifest.
+    outer_zip_sha256_verified:
+        The outer ZIP hash that matched OUTER_ZIP_SHA256 (audit trail only).
+    """
+    normalized_bytes: bytes
+    manifest_integrity_sha256: str   # verified against MANIFEST_SHA256
+    outer_zip_sha256_verified: str   # the hash that matched OUTER_ZIP_SHA256
+
+
 def admit_source(
     *,
     outer_zip_bytes: bytes | None,
     manifest_bytes: bytes | None,
     normalized_bytes: bytes,
-) -> None:
+) -> AdmittedSource:
     """Fail-closed source admission boundary.
 
     MUST be called in any production path before load_source().
@@ -257,6 +280,13 @@ def admit_source(
             f"got {actual_normalized!r}"
         )
 
+    # All three gates passed — return typed proof token
+    return AdmittedSource(
+        normalized_bytes=normalized_bytes,
+        manifest_integrity_sha256=actual_manifest,
+        outer_zip_sha256_verified=actual_outer,
+    )
+
 
 def _validate_normalized_bars(
     rows: list,
@@ -317,25 +347,25 @@ def _validate_normalized_bars(
 
 def load_source(
     *,
-    normalized_json_bytes: bytes,
+    admitted: AdmittedSource,
     dataset_id: str,
     dataset_version: int = 1,
     raw_generation_id: str = "P0-DEV-2024-01-01-TO-2024-01-08",
     correction_generation_id: str = "UNKNOWN_NOT_ATTESTED",
-    manifest_integrity_sha256: str,
 ) -> P0SourceManifest:
     """Load and validate owner-supplied normalized BTCUSDT 15m source.
 
-    PRODUCTION USE: call admit_source() BEFORE calling this function to
-    verify the outer ZIP and manifest bytes against frozen owner pins.
-    This function validates normalized_json_bytes only — the outer ZIP
-    and manifest admission boundary is in admit_source().
+    PRODUCTION USE: obtain `admitted` from admit_source() which verifies the
+    outer ZIP, manifest.json, and normalized bytes against frozen owner pins.
+    This is the ONLY sanctioned path to a P0SourceManifest.
 
     Parameters
     ----------
-    normalized_json_bytes:
-        Exact bytes of the normalized JSON produced by the owner.
-        MUST match NORMALIZED_SHA256 — fail closed otherwise.
+    admitted:
+        Typed proof token returned by admit_source().  This is the ONLY
+        valid input path — passing raw bytes directly is not possible.
+        Defense-in-depth: load_source() still re-verifies NORMALIZED_SHA256
+        on admitted.normalized_bytes before parsing.
     dataset_id:
         Frozen dataset identifier string.
     dataset_version:
@@ -345,8 +375,6 @@ def load_source(
     correction_generation_id:
         "UNKNOWN_NOT_ATTESTED" — Binance Vision publisher checksums do not
         attest correction history.
-    manifest_integrity_sha256:
-        SHA-256 of the owner's manifest.json bytes (passed in for embedding).
 
     Returns
     -------
@@ -358,12 +386,21 @@ def load_source(
     C1SourceRejected
         On any integrity violation. Fail closed.
     """
+    if not isinstance(admitted, AdmittedSource):
+        raise C1SourceRejected(
+            "LOAD_SOURCE_REQUIRES_ADMITTED_SOURCE: call admit_source() first — "
+            "bypassing the admission gate is not permitted"
+        )
+
+    normalized_json_bytes = admitted.normalized_bytes
+    manifest_integrity_sha256 = admitted.manifest_integrity_sha256
+
     if not isinstance(normalized_json_bytes, (bytes, bytearray)):
         raise C1SourceRejected("NORMALIZED_JSON_MUST_BE_BYTES")
     if not normalized_json_bytes:
         raise C1SourceRejected("NORMALIZED_JSON_EMPTY")
 
-    # --- Hash check FIRST (fail before parsing on mismatch) ---
+    # --- Defense-in-depth: re-verify hash even though admit_source() already checked ---
     actual_sha = _sha256_hex(normalized_json_bytes)
     if actual_sha != NORMALIZED_SHA256:
         raise C1SourceRejected(

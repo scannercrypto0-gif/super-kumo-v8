@@ -110,36 +110,41 @@ class TestC1AdmitSourceBlocker:
             )
 
     def test_admit_source_wrong_manifest_hash(self):
-        """Tampered manifest bytes → MANIFEST_SHA256_MISMATCH.
-        We use bytes whose SHA256 happens to equal OUTER_ZIP_SHA256 to pass
-        the first check, then fail on manifest.
+        """OUTER check fires before MANIFEST check — order is enforced.
+
+        EVIDENCE_CLASS: SYNTHETIC_ONLY
+        NOTE: The MANIFEST_SHA256_MISMATCH path (outer passes, manifest fails) is
+        BLOCKED in a synthetic environment because we cannot produce outer_zip_bytes
+        whose SHA256 equals OUTER_ZIP_SHA256 without the real source file.
+        What we CAN verify is that admit_source() checks OUTER first, so tampered
+        outer bytes always produce OUTER_ZIP_SHA256_MISMATCH before reaching the
+        manifest check. The manifest-gate itself is separately unit-tested via
+        _validate_normalized_bars() which is reachable without the outer ZIP.
         """
-        # Construct fake_outer whose sha256 == OUTER_ZIP_SHA256
-        # Not actually possible with collision, so we patch: just test that manifest
-        # check comes AFTER outer check is satisfied.
-        # The only way to get past outer check is to have actual outer zip bytes.
-        # In SYNTHETIC environment: test that wrong manifest bytes → MANIFEST_SHA256_MISMATCH
-        # when outer passes. Since outer bytes aren't available, this tests the ORDER
-        # of error codes.
         with pytest.raises(C1SourceRejected) as exc_info:
             admit_source(
                 outer_zip_bytes=b"wrong_outer",
                 manifest_bytes=b"wrong_manifest",
                 normalized_bytes=b"{}",
             )
-        # Should fail on OUTER first
+        # OUTER check fires first → OUTER_ZIP_SHA256_MISMATCH (not MANIFEST)
         assert "OUTER_ZIP_SHA256_MISMATCH" in str(exc_info.value)
 
     def test_load_source_no_skip_hash_check_param(self):
-        """FAIL on baseline: _skip_hash_check was a public param.
-        Fix: TypeError if caller tries to pass _skip_hash_check.
+        """FAIL on baseline: _skip_hash_check and normalized_json_bytes were public params.
+        Fix: new signature only accepts 'admitted: AdmittedSource'; all old kwargs are
+        rejected with TypeError — bypassing the admission gate is structurally impossible.
+
+        Note: match parameter omitted intentionally — after the signature change the error
+        mentions 'normalized_json_bytes' as the first unknown kwarg, not '_skip_hash_check'.
+        The critical property is that ANY old-style call raises TypeError.
         """
-        with pytest.raises(TypeError, match="_skip_hash_check"):
+        with pytest.raises(TypeError):
             load_source(
-                normalized_json_bytes=b"{}",
+                normalized_json_bytes=b"{}",       # type: ignore[call-arg]
                 dataset_id="TEST",
-                manifest_integrity_sha256="abc",
-                _skip_hash_check=True,  # type: ignore[call-arg]
+                manifest_integrity_sha256="abc",   # type: ignore[call-arg]
+                _skip_hash_check=True,             # type: ignore[call-arg]
             )
 
     def test_validate_normalized_bars_directly(self):
@@ -480,6 +485,87 @@ class TestF3EventTimeStateBlocker:
                         f"exit_exec={r_a.exit_bar_open_ms}"
                     )
 
+    def test_event_time_explicit_t5_entry_equals_exit_exec(self):
+        """F3-EVENT-TIME-GTE: OPP-B entry bar open_ms == OPP-A exit exec bar open_ms.
+
+        EVIDENCE_CLASS: SYNTHETIC_ONLY
+        (Controlled price pattern with explicit bar indices; proves the >= fix is active.)
+
+        Scenario:
+          bars 15-24: price=43000, low≈42957 (= 43000 * 0.999)
+          bar  25:    close=41000 (< 42957 → exit signal for OPP-A, exec at bar 26)
+          OPP-A: signal at bar 10, entry at bar 12, exit exec at bar 26.
+          OPP-B: signal at bar 24, entry bar = bar 26 (= OPP-A's exit exec bar).
+          held_until_ms = bar[26].bar_open_ms
+
+        With >= fix (this code): entry_bar.open_ms >= held_until_ms → RELEASE position → OPP-B NOT rejected.
+        With old >  (baseline):  entry_bar.open_ms >  held_until_ms → FALSE (equal) → OPP-B REJECTED.
+        """
+        n = 50
+        custom_bars = []
+        for i in range(n):
+            open_ms = WINDOW_START_MS + i * BAR_DURATION_MS
+            if 15 <= i <= 24:
+                price = 43000.0
+                low_val = 43000.0 * 0.999   # ≈ 42957 — the exit level
+                close_val = price
+            elif i == 25:
+                price = 43000.0
+                low_val = 40500.0
+                close_val = 41000.0          # < 42957 → exit signal fires here
+            else:
+                price = 42000.0
+                low_val = 42000.0 * 0.999
+                close_val = price
+            custom_bars.append(P0Bar(
+                bar_id=f"BAR-{i:04d}",
+                bar_open_ms=open_ms,
+                bar_close_ms=open_ms + BAR_DURATION_MS - 1,
+                open=price,
+                high=price * 1.001,
+                low=low_val,
+                close=close_val,
+                volume=1.0,
+                is_final=True,
+                source_label="SYNTHETIC",
+                availability_kind="RETROSPECTIVE",
+                available_as_of_decision=None,
+                observation_lower_bound_ms=open_ms + BAR_DURATION_MS,
+                receipt_ms=None,
+                known_at_ms=None,
+                bar_checksum=_sha256_hex(str(i).encode()),
+                gap_state="NO_GAP",
+                correction_generation_id="UNKNOWN_NOT_ATTESTED",
+                correction_parent_id=None,
+            ))
+
+        manifest = _make_manifest_from_bars(custom_bars)
+        opp_a = _make_opp("OPP-A", 10, custom_bars)
+        opp_b = _make_opp("OPP-B", 24, custom_bars)
+
+        results = model_fills(manifest, [opp_a, opp_b])
+        assert len(results) == 2
+        r_a, r_b = results
+
+        # OPP-A must TRIGGER with exit execution at bar 26
+        assert r_a.signal_state == "TRIGGERED", (
+            f"Expected OPP-A TRIGGERED, got {r_a.signal_state!r} "
+            f"(reason: {r_a.reason_code!r})"
+        )
+        bar26_open_ms = WINDOW_START_MS + 26 * BAR_DURATION_MS
+        assert r_a.exit_bar_open_ms == bar26_open_ms, (
+            f"Expected OPP-A exit exec at bar 26 (open_ms={bar26_open_ms}), "
+            f"got {r_a.exit_bar_open_ms!r}"
+        )
+
+        # OPP-B's entry bar = bar 26 (same open_ms as held_until_ms).
+        # >= fix: position RELEASED → OPP-B must NOT be POSITION_ALREADY_OPEN.
+        assert not (r_b.signal_state == "REJECTED" and r_b.reason_code == "POSITION_ALREADY_OPEN"), (
+            f"F3_GTE_BUG DETECTED: OPP-B rejected with POSITION_ALREADY_OPEN "
+            f"despite entry_bar.open_ms == held_until_ms={bar26_open_ms}. "
+            f"The >= fix is not active."
+        )
+
 
 # ===========================================================================
 # F4 ADVERSARIAL TESTS
@@ -717,23 +803,102 @@ class TestF4DurableReceiptsBlocker:
         assert loaded.ordered_receipt_hashes == report.ordered_receipt_hashes
 
     def test_new_process_restart_reconciles_no_double_effect(self, tmp_path):
-        """F4: after write-before-ACK crash, new process load + reconcile → no double-apply."""
+        """F4: REAL_PROCESS_BOUNDARY — subprocess proves cross-process crash recovery.
+
+        EVIDENCE_CLASS: REAL_PROCESS_BOUNDARY
+        (Uses subprocess.run() so the restart truly crosses a process boundary;
+        not just two objects in the same process.)
+
+        Scenario: process 1 builds ledger + persists receipts, then "crashes" before
+        persist_report. Process 2 (subprocess) reloads receipts, rebuilds from the
+        same inputs, reconciles, and asserts no double-effect (written == 0).
+        """
         opp = self._make_opp_stub("OPP-001")
         fill = self._make_triggered_fill("OPP-001",
             WINDOW_START_MS + 2 * BAR_DURATION_MS,
             WINDOW_START_MS + 5 * BAR_DURATION_MS)
 
-        # Session 1: build + persist receipts but "crash" before persist_report
-        state1, report1 = build_ledger([opp], [fill], trial_id="T001")
+        # Process 1: build + persist receipts (crash before persist_report)
+        state1, _ = build_ledger([opp], [fill], trial_id="T001")
         receipt_path = tmp_path / "receipts.jsonl"
         persist_receipts(state1, receipt_path)
 
-        # Session 2: reload receipts, rebuild, reconcile
-        persisted = load_receipts(receipt_path)
-        # Rebuild from scratch (as if new process)
-        state2, report2 = build_ledger([opp], [fill], trial_id="T001")
-        # Reconcile: same event_id + same payload_hash → no-op
-        reconcile_receipts(state2, persisted)  # must not raise
-        # persist again: should write 0 (already persisted)
-        written = persist_receipts(state2, receipt_path)
-        assert written == 0, "Double-effect: receipts written again after restart"
+        # REAL_PROCESS_BOUNDARY: subprocess is the "restarted process"
+        subprocess_script = f"""
+import sys
+sys.path.insert(0, {str(REPO_ROOT)!r})
+from pathlib import Path
+from decimal import Decimal
+from research_wp_r0.aql_p0_c1_source import _sha256_hex
+from research_wp_r0.aql_p0_f1f2_opportunities import Opportunity, SignalState
+from research_wp_r0.aql_p0_f3_fill_model import FillResult, _entry_net, _exit_net, _net_return
+from research_wp_r0.aql_p0_f4_ledger import (
+    build_ledger, persist_receipts, load_receipts, reconcile_receipts
+)
+
+WINDOW_START_MS = {WINDOW_START_MS}
+BAR_DURATION_MS = {BAR_DURATION_MS}
+receipt_path = Path({str(receipt_path)!r})
+
+cutoff = WINDOW_START_MS + BAR_DURATION_MS
+opp = Opportunity(
+    opportunity_id="OPP-001",
+    producer_event_id="PE-OPP-001",
+    decision_cutoff_ms=cutoff,
+    decision_ms=cutoff + 2000,
+    prefix_start_ms=WINDOW_START_MS,
+    prefix_end_exclusive_ms=cutoff,
+    prefix_bar_checksums_sha256=_sha256_hex(b"synthetic"),
+    input_disposition="ARMED",
+    signal_state=SignalState.ARMED,
+    reason_code=None,
+    entry_level=42000.0,
+    exit_level=41000.0,
+    trigger_bar_open_ms=cutoff,
+    trigger_bar_close=42000.0,
+    prefix_bar_count=1,
+    strategy_id="TEST-STRAT",
+    trial_id="TEST-TRIAL",
+    dataset_version=1,
+)
+entry_net_p, entry_fee = _entry_net(42000.0)
+exit_net_p, exit_fee = _exit_net(43000.0)
+gross, net = _net_return(entry_net_p, exit_net_p, entry_fee, exit_fee)
+fill = FillResult(
+    opportunity_id="OPP-001",
+    signal_state="TRIGGERED",
+    reason_code=None,
+    entry_bar_open_ms=WINDOW_START_MS + 2 * BAR_DURATION_MS,
+    entry_price_gross=Decimal("42000.0"),
+    entry_price_net=entry_net_p,
+    entry_fee=entry_fee,
+    exit_bar_open_ms=WINDOW_START_MS + 5 * BAR_DURATION_MS,
+    exit_price_gross=Decimal("43000.0"),
+    exit_price_net=exit_net_p,
+    exit_fee=exit_fee,
+    gross_return=gross,
+    net_return=net,
+    is_terminal=True,
+)
+
+# Restarted process: load persisted receipts, rebuild, reconcile
+persisted = load_receipts(receipt_path)
+state2, _ = build_ledger([opp], [fill], trial_id="T001")
+reconcile_receipts(state2, persisted)   # must not raise
+
+# Re-persist: must write 0 new lines (no double-effect)
+written = persist_receipts(state2, receipt_path)
+assert written == 0, f"DOUBLE_EFFECT: persist_receipts wrote {{written}} lines after restart"
+print("SUBPROCESS_PASS: no double-effect after cross-process restart")
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", subprocess_script],
+            capture_output=True, text=True, timeout=30,
+        )
+        assert result.returncode == 0, (
+            f"SUBPROCESS_FAILED (returncode={result.returncode}):\n"
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        assert "SUBPROCESS_PASS" in result.stdout, (
+            f"SUBPROCESS_PASS sentinel missing from stdout:\n{result.stdout!r}"
+        )

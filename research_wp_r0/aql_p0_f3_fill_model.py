@@ -199,8 +199,12 @@ def model_fills(
             continue
 
         # --- EVENT-TIME: check if pending exit has fired at or before entry_bar.bar_open_ms ---
+        # F3-EVENT-TIME-GTE fix: use >= so that when a new entry falls on the SAME
+        # bar as the exit execution, the exit fires first (freeing the position)
+        # before the new entry is checked.  The old bug (>) caused POSITION_ALREADY_OPEN
+        # rejection at the same bar_open_ms as held_until_ms.
         if held_position and held_until_ms is not None:
-            if entry_bar.bar_open_ms > held_until_ms:
+            if entry_bar.bar_open_ms >= held_until_ms:
                 # Exit execution has passed in event-time — release position
                 simulated_cash += pending_exit_proceeds  # type: ignore[operator]
                 held_position = False
@@ -315,5 +319,16 @@ def model_fills(
             net_return=net_ret,
             is_terminal=terminal,
         ))
+
+    # Post-loop: release any pending exit proceeds that were never credited
+    # because no further ARMED opportunity arrived after the last exit.
+    # Without this, the final TRIGGERED trade's cash is silently lost when
+    # model_fills() is the last call in a pipeline (no subsequent opportunity
+    # to trigger the held_until_ms comparison).
+    if held_position and held_until_ms is not None and pending_exit_proceeds is not None:
+        simulated_cash += pending_exit_proceeds
+        held_position = False
+        held_until_ms = None
+        pending_exit_proceeds = None
 
     return results

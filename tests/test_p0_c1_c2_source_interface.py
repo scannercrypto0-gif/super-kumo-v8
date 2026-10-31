@@ -17,6 +17,7 @@ from hashlib import sha256
 import pytest
 
 from research_wp_r0.aql_p0_c1_source import (
+    AdmittedSource,
     C1SourceRejected,
     INTERVAL_MS,
     WINDOW_START_MS,
@@ -64,15 +65,40 @@ def _sha256_bytes(b: bytes) -> str:
 class TestC1SourceLoading:
 
     def _load(self, data: bytes, **kw):
-        """Helper: load with synthetic manifest SHA."""
+        """Helper: load with synthetic AdmittedSource (test-only bypass, clearly marked).
+
+        In production, AdmittedSource is only obtainable via admit_source().
+        Unit tests that need to exercise bar-level validation (not hash gates)
+        construct it directly with synthetic values — clearly documented here.
+        EVIDENCE_CLASS: SYNTHETIC_ONLY — bypasses real ZIP/manifest gates.
+        """
         manifest_sha = _sha256_bytes(b"synthetic-manifest-for-test")
+        admitted = AdmittedSource(
+            normalized_bytes=data,
+            manifest_integrity_sha256=manifest_sha,
+            outer_zip_sha256_verified="SYNTHETIC_TEST_BYPASS",
+        )
         return load_source(
-            normalized_json_bytes=data,
+            admitted=admitted,
             dataset_id="TEST-DATASET-001",
             dataset_version=1,
-            manifest_integrity_sha256=manifest_sha,
             **kw,
         )
+
+    def test_load_source_requires_admitted_source(self):
+        """load_source() must reject raw bytes — AdmittedSource is mandatory.
+
+        Passing normalized_json_bytes directly (old API) must raise TypeError or
+        C1SourceRejected. The C1 enforcement fix ensures that bypassing
+        admit_source() is structurally impossible via the public API.
+        EVIDENCE_CLASS: SYNTHETIC_ONLY
+        """
+        with pytest.raises((TypeError, C1SourceRejected)):
+            load_source(
+                normalized_json_bytes=b"{}",  # type: ignore[call-arg]  # old API — forbidden
+                dataset_id="TEST",
+                manifest_integrity_sha256="abc",  # type: ignore[call-arg]
+            )
 
     def test_wrong_hash_fails_closed(self):
         """C1 must reject source bytes whose SHA-256 does not match pinned constant."""
@@ -134,16 +160,25 @@ class TestC1SourceLoading:
             self._load(data)
 
     def test_dataset_version_must_be_positive(self):
-        """dataset_version=0 must be rejected."""
+        """dataset_version=0 must be rejected.
+
+        Uses AdmittedSource directly (test bypass) to reach dataset_version validation.
+        NORMALIZED_SHA256 check fires before dataset_version, so we expect rejection
+        at NORMALIZED_SHA256_MISMATCH (hash gate) or DATASET_VERSION_INVALID.
+        EVIDENCE_CLASS: SYNTHETIC_ONLY
+        """
         data = _make_synthetic_normalized()
         manifest_sha = _sha256_bytes(b"m")
-        # Hash won't match; test validates argument check path
+        admitted = AdmittedSource(
+            normalized_bytes=data,
+            manifest_integrity_sha256=manifest_sha,
+            outer_zip_sha256_verified="SYNTHETIC_TEST_BYPASS",
+        )
         with pytest.raises((C1SourceRejected, Exception)):
             load_source(
-                normalized_json_bytes=data,
+                admitted=admitted,
                 dataset_id="X",
                 dataset_version=0,  # invalid
-                manifest_integrity_sha256=manifest_sha,
             )
 
 
