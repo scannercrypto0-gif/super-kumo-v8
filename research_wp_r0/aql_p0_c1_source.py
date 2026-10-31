@@ -189,6 +189,132 @@ def _validate_bar_row(row: Any, index: int, expected_open_ms: int) -> tuple:
     return int(open_ms), int(close_ms), float(o), float(h), float(l), float(c), float(v)
 
 
+def admit_source(
+    *,
+    outer_zip_bytes: bytes | None,
+    manifest_bytes: bytes | None,
+    normalized_bytes: bytes,
+) -> None:
+    """Fail-closed source admission boundary.
+
+    MUST be called in any production path before load_source().
+    Computes SHA-256 of each argument and compares to the frozen owner pins.
+
+    Parameters
+    ----------
+    outer_zip_bytes:
+        Raw bytes of the owner's delivery ZIP package.
+        Must not be None; must hash to OUTER_ZIP_SHA256.
+    manifest_bytes:
+        Raw bytes of manifest.json extracted from the ZIP.
+        Must not be None; must hash to MANIFEST_SHA256.
+    normalized_bytes:
+        Raw bytes of the normalized JSON (the input to load_source).
+        Must hash to NORMALIZED_SHA256.
+
+    Raises
+    ------
+    C1SourceRejected
+        "BLOCKED_REAL_SOURCE: ..." when any argument is None (owner package
+        not available in the execution environment).
+        "<DOMAIN>_SHA256_MISMATCH: ..." when the actual hash differs from the
+        frozen pin — indicates tampered or wrong bytes.
+    """
+    if outer_zip_bytes is None:
+        raise C1SourceRejected(
+            "BLOCKED_REAL_SOURCE: outer ZIP bytes not available in environment — "
+            "owner must supply the original delivery package"
+        )
+    if manifest_bytes is None:
+        raise C1SourceRejected(
+            "BLOCKED_REAL_SOURCE: manifest bytes not available in environment — "
+            "owner must supply manifest.json from delivery package"
+        )
+    # normalized_bytes typed as bytes (not Optional), but guard anyway
+    if not isinstance(normalized_bytes, (bytes, bytearray)) or len(normalized_bytes) == 0:
+        raise C1SourceRejected(
+            "BLOCKED_REAL_SOURCE: normalized_bytes must be non-empty bytes"
+        )
+
+    actual_outer = _sha256_hex(outer_zip_bytes)
+    if actual_outer != OUTER_ZIP_SHA256:
+        raise C1SourceRejected(
+            f"OUTER_ZIP_SHA256_MISMATCH: expected {OUTER_ZIP_SHA256!r} "
+            f"got {actual_outer!r}"
+        )
+
+    actual_manifest = _sha256_hex(manifest_bytes)
+    if actual_manifest != MANIFEST_SHA256:
+        raise C1SourceRejected(
+            f"MANIFEST_SHA256_MISMATCH: expected {MANIFEST_SHA256!r} "
+            f"got {actual_manifest!r}"
+        )
+
+    actual_normalized = _sha256_hex(normalized_bytes)
+    if actual_normalized != NORMALIZED_SHA256:
+        raise C1SourceRejected(
+            f"NORMALIZED_SHA256_MISMATCH: expected {NORMALIZED_SHA256!r} "
+            f"got {actual_normalized!r}"
+        )
+
+
+def _validate_normalized_bars(
+    rows: list,
+) -> list["P0Bar"]:
+    """Private: parse and validate a list of normalized bar rows.
+
+    Extracted so that unit tests can exercise bar-level validation guards
+    (grid violations, OHLCV invalidity, count mismatches) using synthetic
+    data that bypasses the hash check — via this private helper rather than
+    via a public bypass parameter.
+
+    Parameters
+    ----------
+    rows:
+        Already-parsed list of [open_ms, close_ms, o, h, l, c, v] rows,
+        exactly EXPECTED_BAR_COUNT of them, grid-aligned from WINDOW_START_MS.
+
+    Returns
+    -------
+    list[P0Bar]
+        Validated P0Bar instances.
+
+    Raises
+    ------
+    C1SourceRejected
+        On any bar-level violation.
+    """
+    if not isinstance(rows, list):
+        raise C1SourceRejected("NORMALIZED_JSON_ROOT_NOT_LIST")
+    if len(rows) != EXPECTED_BAR_COUNT:
+        raise C1SourceRejected(
+            f"BAR_COUNT_MISMATCH: expected {EXPECTED_BAR_COUNT} got {len(rows)}"
+        )
+    bars: list[P0Bar] = []
+    for i, row in enumerate(rows):
+        expected_open = WINDOW_START_MS + i * INTERVAL_MS
+        open_ms, close_ms, o, h, l, c, v = _validate_bar_row(row, i, expected_open)
+        if open_ms >= WINDOW_END_EXCLUSIVE_MS:
+            raise C1SourceRejected(f"BAR_{i}_FUTURE_BAR: open_ms {open_ms} >= window end")
+        chk = _bar_checksum(open_ms, o, h, l, c, v)
+        bars.append(P0Bar(
+            bar_id=f"BTCUSDT:15m:{open_ms}",
+            bar_open_ms=open_ms,
+            bar_close_ms=close_ms,
+            open=o, high=h, low=l, close=c, volume=v,
+            is_final=True,
+            source_label="BINANCE_SPOT_BTCUSDT_15M_OWNER_SUPPLIED",
+            availability_kind="RETROSPECTIVE",
+            available_as_of_decision="UNKNOWN",
+            observation_lower_bound_ms=close_ms + 1,
+            receipt_ms=None, known_at_ms=None,
+            bar_checksum=chk, gap_state="COMPLETE",
+            correction_generation_id="UNKNOWN_NOT_ATTESTED",
+            correction_parent_id=None,
+        ))
+    return bars
+
+
 def load_source(
     *,
     normalized_json_bytes: bytes,
@@ -197,9 +323,13 @@ def load_source(
     raw_generation_id: str = "P0-DEV-2024-01-01-TO-2024-01-08",
     correction_generation_id: str = "UNKNOWN_NOT_ATTESTED",
     manifest_integrity_sha256: str,
-    _skip_hash_check: bool = False,
 ) -> P0SourceManifest:
     """Load and validate owner-supplied normalized BTCUSDT 15m source.
+
+    PRODUCTION USE: call admit_source() BEFORE calling this function to
+    verify the outer ZIP and manifest bytes against frozen owner pins.
+    This function validates normalized_json_bytes only — the outer ZIP
+    and manifest admission boundary is in admit_source().
 
     Parameters
     ----------
@@ -216,8 +346,7 @@ def load_source(
         "UNKNOWN_NOT_ATTESTED" — Binance Vision publisher checksums do not
         attest correction history.
     manifest_integrity_sha256:
-        SHA-256 of the owner's manifest.json bytes (passed in for embedding;
-        not re-derived here since we don't have the manifest file).
+        SHA-256 of the owner's manifest.json bytes (passed in for embedding).
 
     Returns
     -------
@@ -235,28 +364,17 @@ def load_source(
         raise C1SourceRejected("NORMALIZED_JSON_EMPTY")
 
     # --- Hash check FIRST (fail before parsing on mismatch) ---
-    # _skip_hash_check=True is TEST-ONLY: allows synthetic data with known defects
-    # (OHLCV violations, grid gaps, tampered bars) to bypass hash guard so the
-    # actual data validation guards are exercised. NEVER use in production.
-    if not _skip_hash_check:
-        actual_sha = _sha256_hex(normalized_json_bytes)
-        if actual_sha != NORMALIZED_SHA256:
-            raise C1SourceRejected(
-                f"NORMALIZED_SHA256_MISMATCH: expected {NORMALIZED_SHA256!r} got {actual_sha!r}"
-            )
+    actual_sha = _sha256_hex(normalized_json_bytes)
+    if actual_sha != NORMALIZED_SHA256:
+        raise C1SourceRejected(
+            f"NORMALIZED_SHA256_MISMATCH: expected {NORMALIZED_SHA256!r} got {actual_sha!r}"
+        )
 
     # --- Parse ---
     try:
         rows = json.loads(normalized_json_bytes)
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise C1SourceRejected(f"NORMALIZED_JSON_PARSE_ERROR: {exc}") from exc
-
-    if not isinstance(rows, list):
-        raise C1SourceRejected("NORMALIZED_JSON_ROOT_NOT_LIST")
-    if len(rows) != EXPECTED_BAR_COUNT:
-        raise C1SourceRejected(
-            f"BAR_COUNT_MISMATCH: expected {EXPECTED_BAR_COUNT} got {len(rows)}"
-        )
 
     # --- Validate dataset identity ---
     if not isinstance(dataset_id, str) or not dataset_id:
@@ -266,43 +384,29 @@ def load_source(
     if not isinstance(raw_generation_id, str) or not raw_generation_id:
         raise C1SourceRejected("RAW_GENERATION_ID_INVALID")
 
-    # --- Parse bars with grid/geometry validation ---
-    bars: list[P0Bar] = []
-    checksums: list[str] = []
+    # --- Parse and validate bars (delegates to private helper) ---
+    bars = _validate_normalized_bars(rows)
 
-    for i, row in enumerate(rows):
-        expected_open = WINDOW_START_MS + i * INTERVAL_MS
-        open_ms, close_ms, o, h, l, c, v = _validate_bar_row(row, i, expected_open)
+    # Rebuild checksums from validated bars (already computed inside helper)
+    checksums: list[str] = [b.bar_checksum for b in bars]
 
-        # Reject future bars relative to window
-        if open_ms >= WINDOW_END_EXCLUSIVE_MS:
-            raise C1SourceRejected(f"BAR_{i}_FUTURE_BAR: open_ms {open_ms} >= window end")
-
-        chk = _bar_checksum(open_ms, o, h, l, c, v)
-        checksums.append(chk)
-
-        bar = P0Bar(
-            bar_id=f"BTCUSDT:15m:{open_ms}",
-            bar_open_ms=open_ms,
-            bar_close_ms=close_ms,
-            open=o,
-            high=h,
-            low=l,
-            close=c,
-            volume=v,
-            is_final=True,
-            source_label="BINANCE_SPOT_BTCUSDT_15M_OWNER_SUPPLIED",
-            availability_kind="RETROSPECTIVE",
-            available_as_of_decision="UNKNOWN",
-            observation_lower_bound_ms=close_ms + 1,  # theoretical bound only
-            receipt_ms=None,
-            known_at_ms=None,
-            bar_checksum=chk,
-            gap_state="COMPLETE",
-            correction_generation_id=correction_generation_id,
-            correction_parent_id=None,
-        )
-        bars.append(bar)
+    # Apply correction_generation_id (helper uses a default; patch here if different)
+    if correction_generation_id != "UNKNOWN_NOT_ATTESTED":
+        bars = [
+            P0Bar(
+                bar_id=b.bar_id, bar_open_ms=b.bar_open_ms, bar_close_ms=b.bar_close_ms,
+                open=b.open, high=b.high, low=b.low, close=b.close, volume=b.volume,
+                is_final=b.is_final, source_label=b.source_label,
+                availability_kind=b.availability_kind,
+                available_as_of_decision=b.available_as_of_decision,
+                observation_lower_bound_ms=b.observation_lower_bound_ms,
+                receipt_ms=b.receipt_ms, known_at_ms=b.known_at_ms,
+                bar_checksum=b.bar_checksum, gap_state=b.gap_state,
+                correction_generation_id=correction_generation_id,
+                correction_parent_id=b.correction_parent_id,
+            )
+            for b in bars
+        ]
 
     # --- Verify window coverage ---
     if bars[0].bar_open_ms != WINDOW_START_MS:

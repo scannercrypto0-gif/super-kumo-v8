@@ -52,6 +52,10 @@ class LedgerReportCorrupted(ValueError):
     """Loaded report SHA-256 does not match stored value — tampering detected."""
 
 
+class LedgerReceiptCorrupted(ValueError):
+    """Individual receipt file corrupted or conflicts with in-memory state."""
+
+
 # ---------------------------------------------------------------------------
 # Event lifecycle states
 # ---------------------------------------------------------------------------
@@ -80,6 +84,75 @@ class LedgerEvent:
     cumulative_cash: Decimal | None
     held_btc_delta: Decimal | None
     cumulative_held_btc: Decimal | None
+
+
+@dataclass(frozen=True)
+class FinancialReceipt:
+    """F4 fix: individual durable receipt per LedgerEvent.
+
+    Covers every field that, if altered, would constitute a different financial
+    outcome — even if aggregate totals happen to be preserved.
+
+    payload_hash = sha256(canonical of all fields except payload_hash itself)
+    report_sha256 in LedgerReport MUST include the ordered list of all
+    payload_hashes so that altering any single event changes the report digest.
+    """
+    event_id: str
+    opportunity_id: str
+    kind: str                         # "ENTRY_DEBIT" | "EXIT_CREDIT"
+    bar_open_ms: int | None
+    cash_delta: str | None            # str(Decimal) — exact arithmetic
+    fee: str | None
+    quantity_btc: str | None
+    cost_basis: str | None
+    price_net: str | None
+    held_btc_delta: str | None
+    payload_hash: str                 # sha256 of canonical({all other fields})
+
+    @classmethod
+    def from_event(cls, event: "LedgerEvent") -> "FinancialReceipt":
+        """Construct receipt from LedgerEvent, computing payload_hash."""
+        fields = {
+            "bar_open_ms": event.bar_open_ms,
+            "cash_delta": str(event.cash_delta) if event.cash_delta is not None else None,
+            "cost_basis": str(event.cost_basis) if event.cost_basis is not None else None,
+            "event_id": event.event_id,
+            "fee": str(event.fee) if event.fee is not None else None,
+            "held_btc_delta": str(event.held_btc_delta) if event.held_btc_delta is not None else None,
+            "kind": event.kind,
+            "opportunity_id": event.opportunity_id,
+            "price_net": str(event.price_net) if event.price_net is not None else None,
+            "quantity_btc": str(event.quantity_btc) if event.quantity_btc is not None else None,
+        }
+        ph = _sha256_hex(_canonical_bytes(fields))
+        return cls(
+            event_id=event.event_id,
+            opportunity_id=event.opportunity_id,
+            kind=event.kind,
+            bar_open_ms=event.bar_open_ms,
+            cash_delta=fields["cash_delta"],
+            fee=fields["fee"],
+            quantity_btc=fields["quantity_btc"],
+            cost_basis=fields["cost_basis"],
+            price_net=fields["price_net"],
+            held_btc_delta=fields["held_btc_delta"],
+            payload_hash=ph,
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            "bar_open_ms": self.bar_open_ms,
+            "cash_delta": self.cash_delta,
+            "cost_basis": self.cost_basis,
+            "event_id": self.event_id,
+            "fee": self.fee,
+            "held_btc_delta": self.held_btc_delta,
+            "kind": self.kind,
+            "opportunity_id": self.opportunity_id,
+            "payload_hash": self.payload_hash,
+            "price_net": self.price_net,
+            "quantity_btc": self.quantity_btc,
+        }
 
 
 @dataclass
@@ -325,6 +398,16 @@ def build_ledger(
     # settled_equity = None if any open positions remain (OPEN_UNRESOLVED present)
     settled_equity = state.cash if state.held_btc == Decimal("0") else None
 
+    # F4 fix: compute FinancialReceipt per event; derive ordered_receipt_hashes
+    # This covers each individual event so that altering ANY event changes the
+    # report digest — even if aggregate totals are preserved by a compensating edit.
+    receipts: list[FinancialReceipt] = [
+        FinancialReceipt.from_event(ev) for ev in state.events
+    ]
+    ordered_receipt_hashes = tuple(r.payload_hash for r in receipts)
+    # Attach receipts to state for persist_receipts()
+    state._receipts = receipts  # type: ignore[attr-defined]
+
     report = LedgerReport(
         trial_id=trial_id,
         total_scheduled_decisions=total_scheduled,
@@ -338,8 +421,115 @@ def build_ledger(
         average_net_return_closed=avg_net_return,
         settled_equity=settled_equity,
         event_count=len(state.events),
+        ordered_receipt_hashes=ordered_receipt_hashes,
     )
     return state, report
+
+
+# ---------------------------------------------------------------------------
+# F4 durable receipt file
+# ---------------------------------------------------------------------------
+
+def persist_receipts(
+    state: LedgerState,
+    path: Path | str,
+) -> int:
+    """Persist individual FinancialReceipts to a JSON-lines file with fsync.
+
+    Each line is one receipt (sorted-key canonical JSON). File is append-only.
+    On restart, call load_receipts() to reconcile:
+      - Same event_id + same payload_hash → idempotent NO-OP
+      - Same event_id + different payload_hash → LedgerReceiptCorrupted STOP
+
+    Returns number of receipts written.
+    """
+    receipts: list[FinancialReceipt] = getattr(state, "_receipts", [])
+    if not receipts:
+        return 0
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Load existing to check idempotency before writing
+    existing: dict[str, str] = {}
+    if path.exists():
+        existing = _load_receipts_file(path)
+
+    written = 0
+    with open(path, "ab") as fh:
+        for r in receipts:
+            if r.event_id in existing:
+                if existing[r.event_id] != r.payload_hash:
+                    raise LedgerReceiptCorrupted(
+                        f"RECEIPT_CONFLICT: event_id={r.event_id!r} "
+                        f"stored_hash={existing[r.event_id]!r} "
+                        f"new_hash={r.payload_hash!r} — STOP"
+                    )
+                # Same id+hash → already persisted, skip
+                continue
+            line = json.dumps(r.to_dict(), sort_keys=True,
+                              separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+            fh.write(line + b"\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+            written += 1
+
+    return written
+
+
+def load_receipts(path: Path | str) -> dict[str, str]:
+    """Load persisted receipts. Returns {event_id: payload_hash}.
+
+    On restart, pass this to reconcile_receipts() before posting new events.
+    Raises LedgerReceiptCorrupted if the file is corrupt or unreadable.
+    """
+    path = Path(path)
+    if not path.exists():
+        return {}
+    return _load_receipts_file(path)
+
+
+def reconcile_receipts(
+    state: LedgerState,
+    persisted: dict[str, str],
+) -> None:
+    """Cross-check in-memory events against persisted receipts after restart.
+
+    For each event in state:
+      - Same event_id + same payload_hash in persisted → no-op (already durable)
+      - Same event_id + different payload_hash → LedgerReceiptCorrupted STOP
+      - event_id absent from persisted → not yet persisted (write pending)
+    """
+    receipts: list[FinancialReceipt] = getattr(state, "_receipts", [])
+    for r in receipts:
+        if r.event_id in persisted:
+            if persisted[r.event_id] != r.payload_hash:
+                raise LedgerReceiptCorrupted(
+                    f"RECONCILE_CONFLICT: event_id={r.event_id!r} "
+                    f"in-memory payload_hash={r.payload_hash!r} "
+                    f"persisted={persisted[r.event_id]!r} — STOP"
+                )
+
+
+def _load_receipts_file(path: Path) -> dict[str, str]:
+    """Read JSON-lines receipt file → {event_id: payload_hash}.
+    Skips corrupted lines (logs but does not raise — corruption during write
+    detected by reconcile, not load). Last-write-wins for same event_id.
+    """
+    result: dict[str, str] = {}
+    for raw_line in path.read_bytes().splitlines():
+        raw_line = raw_line.strip()
+        if not raw_line:
+            continue
+        try:
+            d = json.loads(raw_line)
+            event_id = d["event_id"]
+            payload_hash = d["payload_hash"]
+            result[event_id] = payload_hash
+        except (json.JSONDecodeError, KeyError):
+            # Corrupted line — will be caught at reconcile time
+            continue
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -439,6 +629,8 @@ def _load_report_bytes(raw: bytes) -> "LedgerReport":
                 if dc["settled_equity"] is not None else None
             ),
             event_count=dc["event_count"],
+            # F4 fix: load ordered_receipt_hashes from persisted report
+            ordered_receipt_hashes=tuple(dc.get("ordered_receipt_hashes", [])),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise LedgerReportCorrupted(f"REPORT_FIELD_ERROR: {exc}") from exc
@@ -454,7 +646,13 @@ def _load_report_bytes(raw: bytes) -> "LedgerReport":
 
 @dataclass(frozen=True)
 class LedgerReport:
-    """Immutable final report. settled_equity=None if open positions remain."""
+    """Immutable final report. settled_equity=None if open positions remain.
+
+    F4 fix: report_sha256 now covers ordered_receipt_hashes — the list of
+    individual per-event payload hashes in event-application order. This means
+    altering ANY single event (even while preserving aggregate totals) produces
+    a different report digest, catching tamper-while-preserving-totals attacks.
+    """
     trial_id: str
     total_scheduled_decisions: int
     denominator_counts: dict
@@ -467,9 +665,16 @@ class LedgerReport:
     average_net_return_closed: Decimal | None
     settled_equity: Decimal | None   # null if held_btc > 0 (OPEN_UNRESOLVED present)
     event_count: int
+    # F4 fix: sorted list of individual FinancialReceipt payload_hashes
+    # Covers every event — altering any event changes this list → changes report_sha256
+    ordered_receipt_hashes: tuple[str, ...]  # in event-application order
 
     def report_sha256(self) -> str:
-        """Immutable content hash of this report."""
+        """Immutable content hash of this report.
+
+        F4 fix: includes ordered_receipt_hashes so that altering any single
+        event (even while preserving aggregate totals) changes this digest.
+        """
         d = {
             "average_net_return_closed": str(self.average_net_return_closed) if self.average_net_return_closed is not None else None,
             "closed_trades": self.closed_trades,
@@ -477,6 +682,8 @@ class LedgerReport:
             "event_count": self.event_count,
             "open_exposure_btc": str(self.open_exposure_btc),
             "open_unresolved": self.open_unresolved,
+            # F4 fix: cover individual receipt hashes — not just aggregates
+            "ordered_receipt_hashes": list(self.ordered_receipt_hashes),
             "settled_equity": str(self.settled_equity) if self.settled_equity is not None else None,
             "terminal_cash": str(self.terminal_cash),
             "terminal_held_btc": str(self.terminal_held_btc),
@@ -494,6 +701,7 @@ class LedgerReport:
             "event_count": self.event_count,
             "open_exposure_btc": str(self.open_exposure_btc),
             "open_unresolved": self.open_unresolved,
+            "ordered_receipt_hashes": list(self.ordered_receipt_hashes),
             "report_sha256": self.report_sha256(),
             "settled_equity": str(self.settled_equity) if self.settled_equity is not None else None,
             "terminal_cash": str(self.terminal_cash),

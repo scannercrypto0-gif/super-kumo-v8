@@ -31,7 +31,6 @@ from research_wp_r0.aql_p0_c1_source import (
 from research_wp_r0.aql_p0_c2_producer import (
     C2ConflictError,
     DecisionEnvelope,
-    ConsumerJournalEntry,
     STRATEGY_ID,
     MIN_PREFIX_BARS,
     produce_envelopes,
@@ -243,11 +242,36 @@ class TestC2Producer:
             bars=tuple(bars),
         )
 
+    @staticmethod
+    def _produce(manifest, *, trial_id: str, **kw):
+        """Thin wrapper: passes a temp journal_path to produce_envelopes."""
+        import tempfile, os as _os
+        with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False) as f:
+            jp = f.name
+        try:
+            return produce_envelopes(manifest, trial_id=trial_id, journal_path=jp, **kw)
+        finally:
+            try:
+                _os.unlink(jp)
+            except OSError:
+                pass
+
+    @staticmethod
+    def _produce_with_path(manifest, *, trial_id: str):
+        """Returns (envelopes, journal_path) — caller must delete the file."""
+        import tempfile
+        import tempfile as _tmp
+        f = _tmp.NamedTemporaryFile(suffix=".jsonl", delete=False)
+        jp = f.name
+        f.close()
+        envelopes = produce_envelopes(manifest, trial_id=trial_id, journal_path=jp)
+        return envelopes, jp
+
     def test_envelope_count_matches_decisions(self):
         """Should produce exactly n_bars - MIN_PREFIX_BARS + 1 envelopes."""
         n = 25
         manifest = self._make_stub_manifest(n)
-        envelopes = produce_envelopes(manifest, trial_id="TEST-TRIAL-001")
+        envelopes = self._produce(manifest, trial_id="TEST-TRIAL-001")
         # Decisions start at index MIN_PREFIX_BARS (0-indexed), so count = n - MIN_PREFIX_BARS + 1
         expected = n - MIN_PREFIX_BARS + 1
         assert len(envelopes) == expected, f"Expected {expected} got {len(envelopes)}"
@@ -255,8 +279,8 @@ class TestC2Producer:
     def test_opportunity_ids_are_deterministic(self):
         """Same inputs produce identical opportunity_ids on two calls."""
         manifest = self._make_stub_manifest(25)
-        e1 = produce_envelopes(manifest, trial_id="TRIAL-A")
-        e2 = produce_envelopes(manifest, trial_id="TRIAL-A")
+        e1 = self._produce(manifest, trial_id="TRIAL-A")
+        e2 = self._produce(manifest, trial_id="TRIAL-A")
         for a, b in zip(e1, e2):
             assert a.opportunity_id == b.opportunity_id
             assert a.producer_event_id == b.producer_event_id
@@ -265,61 +289,81 @@ class TestC2Producer:
     def test_opportunity_ids_differ_by_trial(self):
         """Different trial_id must produce different opportunity_ids."""
         manifest = self._make_stub_manifest(25)
-        e1 = produce_envelopes(manifest, trial_id="TRIAL-A")
-        e2 = produce_envelopes(manifest, trial_id="TRIAL-B")
+        e1 = self._produce(manifest, trial_id="TRIAL-A")
+        e2 = self._produce(manifest, trial_id="TRIAL-B")
         for a, b in zip(e1, e2):
             assert a.opportunity_id != b.opportunity_id
 
     def test_no_opportunity_id_reused_within_trial(self):
         """Every envelope must have a unique opportunity_id within a trial."""
         manifest = self._make_stub_manifest(25)
-        envelopes = produce_envelopes(manifest, trial_id="TRIAL-UNIQ")
+        envelopes = self._produce(manifest, trial_id="TRIAL-UNIQ")
         ids = [e.opportunity_id for e in envelopes]
         assert len(ids) == len(set(ids)), "Duplicate opportunity_ids detected"
 
     def test_idempotent_restart_same_digest_noop(self):
-        """Replaying with same journal entry (same digest) must not raise."""
+        """Replaying with same journal_path (same entries) must not raise."""
+        import os
+        from research_wp_r0.aql_p0_c2_producer import load_journal
         manifest = self._make_stub_manifest(21)
-        journal: dict[str, ConsumerJournalEntry] = {}
-        e1 = produce_envelopes(manifest, trial_id="TRIAL-IDEM", consumer_journal=journal)
-        # Second call with same journal — should be idempotent
-        e2 = produce_envelopes(manifest, trial_id="TRIAL-IDEM", consumer_journal=journal)
-        assert len(e1) == len(e2)
+        e1, jp = self._produce_with_path(manifest, trial_id="TRIAL-IDEM")
+        try:
+            # Second call to same journal_path — idempotent (same digest = noop)
+            e2 = produce_envelopes(manifest, trial_id="TRIAL-IDEM", journal_path=jp)
+            assert len(e1) == len(e2)
+        finally:
+            try:
+                os.unlink(jp)
+            except OSError:
+                pass
 
     def test_idempotent_restart_conflict_raises(self):
-        """Journal entry with same key but different digest must raise C2ConflictError."""
+        """Journal file tampered with conflicting digest must raise C2ConflictError."""
+        import os, json as _json
+        from research_wp_r0.aql_p0_c2_producer import load_journal
         manifest = self._make_stub_manifest(21)
-        journal: dict[str, ConsumerJournalEntry] = {}
-        envelopes = produce_envelopes(manifest, trial_id="TRIAL-CONFLICT", consumer_journal=journal)
+        envelopes, jp = self._produce_with_path(manifest, trial_id="TRIAL-CONFLICT")
         first_env = envelopes[0]
-        # Corrupt the journal entry to simulate a conflicting previous run
-        journal[first_env.producer_event_id] = ConsumerJournalEntry(
-            producer_event_id=first_env.producer_event_id,
-            opportunity_id=first_env.opportunity_id,
-            envelope_sha256="0" * 64,  # wrong digest
-            state="APPLIED",
-        )
-        with pytest.raises(C2ConflictError):
-            produce_envelopes(manifest, trial_id="TRIAL-CONFLICT", consumer_journal=journal)
+        # Corrupt the journal: APPEND a new line with wrong digest at the end.
+        # _load_journal_file uses last-write-wins; replacing lines[0] is not
+        # enough because the APPLIED line (written later) follows it and wins,
+        # restoring the real digest.  Appending at the end guarantees the
+        # corrupt entry is the one that wins on reload.
+        try:
+            corrupt_entry = {
+                "envelope_sha256": "0" * 64,
+                "opportunity_id": first_env.opportunity_id,
+                "producer_event_id": first_env.producer_event_id,
+                "state": "APPLIED",
+            }
+            with open(jp, "a", encoding="utf-8") as _f:
+                _f.write(_json.dumps(corrupt_entry, sort_keys=True, separators=(",", ":")) + "\n")
+            with pytest.raises(C2ConflictError):
+                produce_envelopes(manifest, trial_id="TRIAL-CONFLICT", journal_path=jp)
+        finally:
+            try:
+                os.unlink(jp)
+            except OSError:
+                pass
 
     def test_envelopes_ordered_by_cutoff_asc(self):
         """Envelopes should be in ascending decision_cutoff_ms order."""
         manifest = self._make_stub_manifest(25)
-        envelopes = produce_envelopes(manifest, trial_id="TRIAL-ORDER")
+        envelopes = self._produce(manifest, trial_id="TRIAL-ORDER")
         cutoffs = [e.decision_cutoff_ms for e in envelopes]
         assert cutoffs == sorted(cutoffs)
 
     def test_decision_cutoff_strictly_after_prefix_last_close(self):
         """decision_cutoff_ms must be strictly greater than last bar's close_ms."""
         manifest = self._make_stub_manifest(25)
-        envelopes = produce_envelopes(manifest, trial_id="TRIAL-CUTOFF")
+        envelopes = self._produce(manifest, trial_id="TRIAL-CUTOFF")
         for env in envelopes:
             assert env.decision_cutoff_ms > env.prefix_end_exclusive_ms - 1
 
     def test_availability_mode_always_retrospective(self):
         """All envelopes must have availability_mode=RETROSPECTIVE_NON_PIT."""
         manifest = self._make_stub_manifest(25)
-        envelopes = produce_envelopes(manifest, trial_id="TRIAL-PIT")
+        envelopes = self._produce(manifest, trial_id="TRIAL-PIT")
         for env in envelopes:
             assert env.availability_mode == "RETROSPECTIVE_NON_PIT"
 
@@ -331,7 +375,7 @@ class TestC2Producer:
     def test_envelope_sha_excludes_itself(self):
         """envelope_sha256 must be computed from canonical dict without envelope_sha256."""
         manifest = self._make_stub_manifest(21)
-        envelopes = produce_envelopes(manifest, trial_id="TRIAL-SHA")
+        envelopes = self._produce(manifest, trial_id="TRIAL-SHA")
         env = envelopes[0]
         # Verify: the sha should change if we include itself in the hash
         from dataclasses import asdict
@@ -377,22 +421,17 @@ class TestC1GuardsReached:
     PM Consolidated Correction Order (PR #204 comment 6540907647):
     Existing negative tests short-circuit at the hash check (C1SourceRejected:
     NORMALIZED_SHA256_MISMATCH) and never reach the bar-level guards. These tests
-    use _skip_hash_check=True (TEST-ONLY bypass) to confirm the actual guards fire.
+    call _validate_normalized_bars() directly (the private helper extracted for
+    exactly this purpose) to confirm the actual guards fire without needing a
+    hash-bypass parameter.
 
-    NEVER use _skip_hash_check=True in production code.
+    NEVER bypass the hash check in production code.
     """
 
     def _load_skip(self, rows: list, **kw):
-        data = json.dumps(rows, separators=(",", ":"), allow_nan=False).encode("utf-8")
-        manifest_sha = _sha256_bytes(b"skip-hash-test")
-        return load_source(
-            normalized_json_bytes=data,
-            dataset_id="SKIP-HASH-TEST",
-            dataset_version=1,
-            manifest_integrity_sha256=manifest_sha,
-            _skip_hash_check=True,
-            **kw,
-        )
+        """Call _validate_normalized_bars directly — bypasses hash, tests bar guards."""
+        from research_wp_r0.aql_p0_c1_source import _validate_normalized_bars
+        return _validate_normalized_bars(rows)
 
     def test_negative_volume_reaches_guard(self):
         """Negative volume must be rejected by the BAR_VOLUME_INVALID guard (not hash check)."""
@@ -440,16 +479,16 @@ class TestC1GuardsReached:
         """Volume=0 is valid (bars with no trades can have volume=0)."""
         rows = [_make_bar_row(i) for i in range(EXPECTED_BAR_COUNT)]
         rows[2] = _make_bar_row(2, vol=0.0)   # zero volume — valid
-        manifest = self._load_skip(rows)       # must NOT raise
-        assert manifest is not None
+        bars = self._load_skip(rows)           # must NOT raise
+        assert bars is not None and len(bars) > 0
 
     def test_valid_synthetic_data_passes_all_guards(self):
         """A fully valid synthetic 672-bar input should pass all C1 guards when hash skipped."""
         rows = [_make_bar_row(i) for i in range(EXPECTED_BAR_COUNT)]
-        manifest = self._load_skip(rows)
-        assert len(manifest.bars) == EXPECTED_BAR_COUNT
-        assert manifest.mode == "RETROSPECTIVE_NON_PIT"
-        assert manifest.research_only is True
+        bars = self._load_skip(rows)
+        # _validate_normalized_bars returns list[P0Bar] (not a manifest)
+        assert len(bars) == EXPECTED_BAR_COUNT
+        assert all(b.availability_kind == "RETROSPECTIVE" for b in bars)
 
 
 class TestC2JournalLifecycle:
@@ -507,69 +546,99 @@ class TestC2JournalLifecycle:
             mode="RETROSPECTIVE_NON_PIT", research_only=True, bars=tuple(bars),
         )
 
+    @staticmethod
+    def _produce_with_journal(manifest, *, trial_id: str):
+        """Returns (envelopes, journal_path, DurableJournal) — caller deletes path."""
+        import tempfile
+        from research_wp_r0.aql_p0_c2_producer import load_journal
+        f = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
+        jp = f.name
+        f.close()
+        envelopes = produce_envelopes(manifest, trial_id=trial_id, journal_path=jp)
+        journal = load_journal(jp)
+        return envelopes, jp, journal
+
     def test_journal_pending_to_applied_transition(self):
         """All journal entries must be APPLIED (not PENDING) after produce_envelopes()."""
-        from research_wp_r0.aql_p0_c2_producer import ConsumerJournalEntry
+        import os
+        from research_wp_r0.aql_p0_c2_producer import load_journal
         manifest = self._make_stub_manifest(22)
-        journal: dict[str, ConsumerJournalEntry] = {}
-        envelopes = produce_envelopes(manifest, trial_id="LIFECYCLE-TEST", consumer_journal=journal)
-
-        assert len(journal) > 0, "Journal must be populated"
-        for pid, entry in journal.items():
-            assert entry.state == "APPLIED", (
-                f"Expected APPLIED after produce_envelopes, got {entry.state!r} "
-                f"for producer_event_id={pid!r}"
-            )
-        # No entry should remain in PENDING after production
-        pending = [e for e in journal.values() if e.state == "PENDING"]
-        assert len(pending) == 0, f"Found {len(pending)} PENDING entries after production"
+        envelopes, jp, journal = self._produce_with_journal(manifest, trial_id="LIFECYCLE-TEST")
+        try:
+            entries = journal.entries
+            assert len(entries) > 0, "Journal must be populated"
+            for pid, entry in entries.items():
+                assert entry.state == "APPLIED", (
+                    f"Expected APPLIED after produce_envelopes, got {entry.state!r} "
+                    f"for producer_event_id={pid!r}"
+                )
+            pending = [e for e in entries.values() if e.state == "PENDING"]
+            assert len(pending) == 0, f"Found {len(pending)} PENDING entries after production"
+        finally:
+            try:
+                os.unlink(jp)
+            except OSError:
+                pass
 
     def test_ack_envelopes_applied_to_acked(self):
         """ack_envelopes() must transition APPLIED entries to ACKED."""
-        from research_wp_r0.aql_p0_c2_producer import ack_envelopes, ConsumerJournalEntry
+        import os
+        from research_wp_r0.aql_p0_c2_producer import ack_envelopes, load_journal
         manifest = self._make_stub_manifest(22)
-        journal: dict[str, ConsumerJournalEntry] = {}
-        envelopes = produce_envelopes(manifest, trial_id="ACK-TEST", consumer_journal=journal)
-
-        all_pids = [e.producer_event_id for e in envelopes]
-        acked_count = ack_envelopes(all_pids, journal)
-
-        assert acked_count == len(envelopes), (
-            f"Expected {len(envelopes)} ACKed, got {acked_count}"
-        )
-        for pid, entry in journal.items():
-            assert entry.state == "ACKED", (
-                f"Expected ACKED after ack_envelopes, got {entry.state!r} for {pid!r}"
+        envelopes, jp, journal = self._produce_with_journal(manifest, trial_id="ACK-TEST")
+        try:
+            all_pids = [e.producer_event_id for e in envelopes]
+            acked_count = ack_envelopes(all_pids, journal)
+            assert acked_count == len(envelopes), (
+                f"Expected {len(envelopes)} ACKed, got {acked_count}"
             )
+            # Re-load to verify persisted state
+            journal2 = load_journal(jp)
+            for pid, entry in journal2.entries.items():
+                assert entry.state == "ACKED", (
+                    f"Expected ACKED, got {entry.state!r} for {pid!r}"
+                )
+        finally:
+            try:
+                os.unlink(jp)
+            except OSError:
+                pass
 
     def test_ack_envelopes_idempotent_for_already_acked(self):
         """ack_envelopes() on already-ACKED entries must be a no-op (idempotent)."""
-        from research_wp_r0.aql_p0_c2_producer import ack_envelopes, ConsumerJournalEntry
+        import os
+        from research_wp_r0.aql_p0_c2_producer import ack_envelopes
         manifest = self._make_stub_manifest(22)
-        journal: dict[str, ConsumerJournalEntry] = {}
-        envelopes = produce_envelopes(manifest, trial_id="ACK-IDEM-TEST", consumer_journal=journal)
-        all_pids = [e.producer_event_id for e in envelopes]
-
-        # First ack — transitions APPLIED → ACKED
-        acked_first = ack_envelopes(all_pids, journal)
-        # Second ack — idempotent, returns 0 (already ACKED)
-        acked_second = ack_envelopes(all_pids, journal)
-
-        assert acked_first == len(envelopes)
-        assert acked_second == 0, (
-            f"Expected 0 newly ACKED on second call (idempotent), got {acked_second}"
-        )
+        envelopes, jp, journal = self._produce_with_journal(manifest, trial_id="ACK-IDEM-TEST")
+        try:
+            all_pids = [e.producer_event_id for e in envelopes]
+            acked_first = ack_envelopes(all_pids, journal)
+            acked_second = ack_envelopes(all_pids, journal)
+            assert acked_first == len(envelopes)
+            assert acked_second == 0, (
+                f"Expected 0 newly ACKED on second call (idempotent), got {acked_second}"
+            )
+        finally:
+            try:
+                os.unlink(jp)
+            except OSError:
+                pass
 
     def test_ack_unknown_id_raises_conflict(self):
         """ack_envelopes() with an ID not in journal must raise C2ConflictError."""
+        import os
         from research_wp_r0.aql_p0_c2_producer import ack_envelopes, C2ConflictError
         manifest = self._make_stub_manifest(22)
-        journal = {}
-        produce_envelopes(manifest, trial_id="ACK-ERR-TEST", consumer_journal=journal)
-
-        with pytest.raises(C2ConflictError) as exc_info:
-            ack_envelopes(["nonexistent-id-00000000"], journal)
-        assert "ACK_UNKNOWN_ID" in str(exc_info.value)
+        _, jp, journal = self._produce_with_journal(manifest, trial_id="ACK-ERR-TEST")
+        try:
+            with pytest.raises(C2ConflictError) as exc_info:
+                ack_envelopes(["nonexistent-id-00000000"], journal)
+            assert "ACK_UNKNOWN_ID" in str(exc_info.value)
+        finally:
+            try:
+                os.unlink(jp)
+            except OSError:
+                pass
 
     def test_source_bytes_sha_blocked_marker(self):
         """BLOCKED: owner's original ZIP package is not available in this environment.

@@ -2,6 +2,7 @@
 
 Canonical contract: aql.p0.historical-decision.v1
 Governed by Core #180 comment 6540572768 (C2 execution task).
+PM Consolidated Correction Order PR #204 comment 6541273650 — C2 durable journal fix.
 
 C2 receives the validated P0SourceManifest from C1 and produces one immutable
 decision_envelope per scheduled 15m decision window, with:
@@ -10,15 +11,18 @@ decision_envelope per scheduled 15m decision window, with:
   - RETROSPECTIVE_NON_PIT availability mode throughout
   - explicit BLOCKED/UNKNOWN for any prefix integrity failure (fail closed)
   - idempotent restart: same key + same digest = NO-OP; same key + different digest = CONFLICT/STOP
-  - readback evidence: consumer journal with PENDING→APPLIED→ACKED states
+  - durable journal: JSON-lines file, fsync after each write, readback before APPLIED
+    (replaces prior in-memory dict — fixes C2 blocker: no crash recovery across processes)
 
 NO strategy logic here — C2 produces envelopes; F1 consumes them.
 """
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from hashlib import sha256
+from pathlib import Path
 from typing import Any
 
 from .aql_p0_c1_source import (
@@ -102,6 +106,182 @@ class ConsumerJournalEntry:
     opportunity_id: str
     envelope_sha256: str
     state: str    # "PENDING" | "APPLIED" | "ACKED"
+
+
+# ---------------------------------------------------------------------------
+# Durable Journal (file-backed, crash-safe)
+# ---------------------------------------------------------------------------
+
+class DurableJournal:
+    """JSON-lines file-backed journal with fsync-after-write and readback.
+
+    Lifecycle per entry:
+      PENDING  → written + fsynced to disk
+      APPLIED  → only after successful readback verification
+      ACKED    → confirmed by downstream consumer
+
+    Crash recovery:
+      load_journal(path) reconstructs state from disk.
+      Same producer_event_id + same digest → NO-OP (idempotent).
+      Same producer_event_id + different digest → C2ConflictError STOP.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self._path = Path(path)
+        self._entries: dict[str, ConsumerJournalEntry] = {}
+        # Load existing entries if file exists
+        if self._path.exists():
+            self._entries = _load_journal_file(self._path)
+
+    @property
+    def entries(self) -> dict[str, ConsumerJournalEntry]:
+        return self._entries
+
+    def write_pending(
+        self,
+        producer_event_id: str,
+        opportunity_id: str,
+        envelope_sha256: str,
+    ) -> ConsumerJournalEntry:
+        """Append PENDING entry to disk + fsync. Returns the entry.
+
+        Idempotent: same id + same digest → returns existing entry unchanged.
+        Conflict: same id + different digest → C2ConflictError STOP.
+        """
+        if producer_event_id in self._entries:
+            existing = self._entries[producer_event_id]
+            if existing.envelope_sha256 != envelope_sha256:
+                raise C2ConflictError(
+                    f"CONFLICT: producer_event_id={producer_event_id!r} was previously "
+                    f"journaled with digest={existing.envelope_sha256!r} but now "
+                    f"computes {envelope_sha256!r}. STOP."
+                )
+            # Same id + same digest → idempotent NO-OP
+            return existing
+
+        entry = ConsumerJournalEntry(
+            producer_event_id=producer_event_id,
+            opportunity_id=opportunity_id,
+            envelope_sha256=envelope_sha256,
+            state="PENDING",
+        )
+        self._append_and_fsync(entry)
+        self._entries[producer_event_id] = entry
+        return entry
+
+    def transition_applied(self, producer_event_id: str) -> None:
+        """Transition PENDING → APPLIED after durable write + readback.
+
+        Writes the APPLIED record to disk, fsyncs, then reads back to verify.
+        Only sets in-memory state to APPLIED after successful readback.
+        """
+        entry = self._entries.get(producer_event_id)
+        if entry is None:
+            raise C2ConflictError(
+                f"APPLIED_UNKNOWN_ID: {producer_event_id!r} not in journal"
+            )
+        if entry.state != "PENDING":
+            # Already APPLIED or ACKED — idempotent
+            return
+
+        entry.state = "APPLIED"
+        self._append_and_fsync(entry)
+
+        # Readback verification: confirm the last APPLIED record is on disk
+        disk_entries = _load_journal_file(self._path)
+        disk_entry = disk_entries.get(producer_event_id)
+        if disk_entry is None or disk_entry.state not in ("APPLIED", "ACKED"):
+            # Readback failed — revert in-memory state
+            entry.state = "PENDING"
+            raise C2ConflictError(
+                f"APPLIED_READBACK_FAILED: {producer_event_id!r} not found "
+                f"as APPLIED on disk after write+fsync"
+            )
+
+    def transition_acked(self, producer_event_ids: list[str]) -> int:
+        """Transition APPLIED → ACKED for confirmed producer_event_ids."""
+        acked = 0
+        for pid in producer_event_ids:
+            entry = self._entries.get(pid)
+            if entry is None:
+                raise C2ConflictError(f"ACK_UNKNOWN_ID: {pid!r} not in journal")
+            if entry.state == "PENDING":
+                raise C2ConflictError(
+                    f"ACK_NOT_APPLIED: {pid!r} still in PENDING state"
+                )
+            if entry.state == "APPLIED":
+                entry.state = "ACKED"
+                self._append_and_fsync(entry)
+                acked += 1
+        return acked
+
+    def _append_and_fsync(self, entry: ConsumerJournalEntry) -> None:
+        """Append one JSON-line record to the journal file and fsync."""
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        record = {
+            "envelope_sha256": entry.envelope_sha256,
+            "opportunity_id": entry.opportunity_id,
+            "producer_event_id": entry.producer_event_id,
+            "state": entry.state,
+        }
+        line = json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
+        with open(self._path, "ab") as fh:
+            fh.write(line.encode("utf-8"))
+            fh.flush()
+            os.fsync(fh.fileno())
+
+
+def _load_journal_file(path: Path) -> dict[str, ConsumerJournalEntry]:
+    """Load and reconcile journal from JSON-lines file.
+
+    Later records for the same producer_event_id supersede earlier ones
+    (last-write-wins within the same session, reflecting state progression).
+    """
+    entries: dict[str, ConsumerJournalEntry] = {}
+    with open(path, "r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+                pid = rec["producer_event_id"]
+                if pid in entries:
+                    existing = entries[pid]
+                    # State can only progress; reject regression
+                    state_order = {"PENDING": 0, "APPLIED": 1, "ACKED": 2}
+                    if state_order.get(rec["state"], -1) >= state_order.get(existing.state, -1):
+                        entries[pid] = ConsumerJournalEntry(
+                            producer_event_id=pid,
+                            opportunity_id=rec["opportunity_id"],
+                            envelope_sha256=rec["envelope_sha256"],
+                            state=rec["state"],
+                        )
+                else:
+                    entries[pid] = ConsumerJournalEntry(
+                        producer_event_id=pid,
+                        opportunity_id=rec["opportunity_id"],
+                        envelope_sha256=rec["envelope_sha256"],
+                        state=rec["state"],
+                    )
+            except (json.JSONDecodeError, KeyError):
+                # Corrupted line — skip (partial write at crash boundary)
+                continue
+    return entries
+
+
+def load_journal(path: Path | str) -> "DurableJournal":
+    """Load an existing journal from disk for new-process restart.
+
+    Returns a DurableJournal with all prior entries reconciled.
+    If the file does not exist, returns an empty journal.
+    """
+    j = DurableJournal.__new__(DurableJournal)
+    j._path = Path(path)
+    j._entries = {}
+    if j._path.exists():
+        j._entries = _load_journal_file(j._path)
+    return j
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +383,7 @@ def produce_envelopes(
     manifest: P0SourceManifest,
     *,
     trial_id: str,
-    consumer_journal: dict[str, ConsumerJournalEntry] | None = None,
+    journal_path: Path | str,
 ) -> list[DecisionEnvelope]:
     """Produce all scheduled decision envelopes from a validated C1 manifest.
 
@@ -216,18 +396,18 @@ def produce_envelopes(
         Validated P0SourceManifest from C1.
     trial_id:
         Frozen trial identifier (e.g. "P0-DEV-BTCUSDT-15M-2024-01-01").
-    consumer_journal:
-        Optional dict keyed by producer_event_id for idempotent restart.
-        Same key + same digest = NO-OP (returns existing).
-        Same key + different digest = raises C2ConflictError (STOP).
+    journal_path:
+        Path to the durable JSON-lines journal file.
+        Created on first run; loaded for idempotent restart.
+        Same key + same digest = NO-OP (idempotent).
+        Same key + different digest = C2ConflictError STOP.
 
     Returns
     -------
     list[DecisionEnvelope]
         One per scheduled decision. BLOCKED envelopes included (full denominator).
     """
-    if consumer_journal is None:
-        consumer_journal = {}
+    journal = load_journal(journal_path)
 
     # --- Frozen identity artifacts ---
     strat_digest = _strategy_digest(STRATEGY_ID, STRATEGY_VERSION, POLICY_ID)
@@ -312,16 +492,12 @@ def produce_envelopes(
         }
         env_sha = _envelope_sha256(env_dict)
 
-        # --- Idempotent restart check ---
-        if prod_event_id in consumer_journal:
-            existing = consumer_journal[prod_event_id]
-            if existing.envelope_sha256 != env_sha:
-                raise C2ConflictError(
-                    f"CONFLICT: producer_event_id={prod_event_id!r} previously produced "
-                    f"digest={existing.envelope_sha256!r} but now computes {env_sha!r}. STOP."
-                )
-            # Same key + same digest = NO-OP; use existing envelope from journal
-            # (Would normally reconstruct from journal; here we re-emit for simplicity)
+        # --- Durable journal: PENDING write (idempotent; conflict raises C2ConflictError) ---
+        journal.write_pending(
+            producer_event_id=prod_event_id,
+            opportunity_id=opp_id,
+            envelope_sha256=env_sha,
+        )
 
         envelope = DecisionEnvelope(
             schema=SCHEMA,
@@ -354,25 +530,16 @@ def produce_envelopes(
         )
         envelopes.append(envelope)
 
-        # Journal lifecycle: PENDING on first creation, APPLIED after envelope emitted
-        if prod_event_id not in consumer_journal:
-            consumer_journal[prod_event_id] = ConsumerJournalEntry(
-                producer_event_id=prod_event_id,
-                opportunity_id=opp_id,
-                envelope_sha256=env_sha,
-                state="PENDING",
-            )
-
-        # Transition PENDING → APPLIED: envelope successfully produced and appended
-        if consumer_journal[prod_event_id].state == "PENDING":
-            consumer_journal[prod_event_id].state = "APPLIED"
+        # Transition PENDING → APPLIED: durable write + fsync + readback verification
+        # Only sets in-memory state to APPLIED after confirmed readback.
+        journal.transition_applied(prod_event_id)
 
     return envelopes
 
 
 def ack_envelopes(
     producer_event_ids: list[str],
-    consumer_journal: dict[str, ConsumerJournalEntry],
+    journal: "DurableJournal",
 ) -> int:
     """Transition APPLIED → ACKED for all confirmed producer_event_ids.
 
@@ -384,34 +551,12 @@ def ack_envelopes(
     ----------
     producer_event_ids:
         IDs to acknowledge. Must already be APPLIED in the journal.
-    consumer_journal:
-        The producer journal dict (mutated in place).
+    journal:
+        The DurableJournal instance (writes ACKED state to disk + fsync).
 
     Returns
     -------
     int
         Number of entries transitioned to ACKED.
-
-    Raises
-    ------
-    C2ConflictError
-        If an ID is missing from the journal or already in PENDING state
-        (which would mean the envelope was never APPLIED — logic error).
     """
-    acked = 0
-    for pid in producer_event_ids:
-        entry = consumer_journal.get(pid)
-        if entry is None:
-            raise C2ConflictError(
-                f"ACK_UNKNOWN_ID: producer_event_id={pid!r} not in journal"
-            )
-        if entry.state == "PENDING":
-            raise C2ConflictError(
-                f"ACK_NOT_APPLIED: producer_event_id={pid!r} still in PENDING state "
-                f"(was never transitioned to APPLIED)"
-            )
-        if entry.state == "APPLIED":
-            entry.state = "ACKED"
-            acked += 1
-        # If already ACKED: idempotent no-op
-    return acked
+    return journal.transition_acked(producer_event_ids)

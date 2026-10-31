@@ -108,6 +108,24 @@ def _net_return(entry_net: Decimal, exit_net: Decimal,
     return gross, net
 
 
+def _find_entry_bar(
+    decision_ms: int,
+    bar_by_open: dict[int, P0Bar],
+    sorted_opens: list[int],
+) -> P0Bar | None:
+    """Find the first bar whose open_ms is STRICTLY GREATER than decision_ms.
+
+    F3-ENTRY-CUTOFF fix: entry_bar_open_ms must be > decision_ms.
+    On a 15m grid with 2s lag (decision_ms = cutoff + 2000 = bar[N+1].open + 2000),
+    the bar immediately after the signal bar opens AT cutoff = decision_ms - 2000 < decision_ms.
+    That bar CANNOT be used for entry. The first eligible bar is bar[N+2].
+    """
+    for open_ms in sorted_opens:
+        if open_ms > decision_ms:
+            return bar_by_open[open_ms]
+    return None
+
+
 def model_fills(
     manifest: P0SourceManifest,
     opportunities: list[Opportunity],
@@ -117,8 +135,14 @@ def model_fills(
     Non-ARMED opportunities pass through with their existing signal_state.
     Preserves full denominator.
 
-    Single-position exposure and cash sufficiency are enforced chronologically:
-    a new ARMED signal while a position is already held → REJECTED.
+    Single-position exposure and cash sufficiency are enforced via EVENT-TIME
+    state machine: a new ARMED opportunity's entry is rejected if the EXECUTION
+    TIMESTAMP of the entry bar falls before the exit execution timestamp of any
+    open position (held_until_ms). Cash from an exit is only added when
+    event-time reaches the exit_execution_ms, NOT when the exit is merely scanned.
+
+    F3-ENTRY-CUTOFF fix: entry bar is the first bar with open_ms > decision_ms
+    (not opp.trigger_bar_open_ms which may equal decision_cutoff_ms < decision_ms).
 
     Parameters
     ----------
@@ -139,177 +163,157 @@ def model_fills(
     held_position: bool = False
     simulated_cash: Decimal = INITIAL_CASH
 
+    # Event-time state: track WHEN the open position exits (exit execution ms)
+    # and how much cash will be received at that point.
+    held_until_ms: int | None = None       # exit execution bar open_ms
+    pending_exit_proceeds: Decimal | None = None  # cash from exit when held_until_ms fires
+
     for opp in opportunities:
-        result, held_position, simulated_cash = _model_one(
-            opp, bar_by_open, sorted_opens, held_position, simulated_cash
-        )
-        results.append(result)
-
-    return results
-
-
-def _model_one(
-    opp: Opportunity,
-    bar_by_open: dict[int, P0Bar],
-    sorted_opens: list[int],
-    held_position: bool,
-    simulated_cash: Decimal,
-) -> tuple[FillResult, bool, Decimal]:
-    """Model execution for one opportunity.
-
-    Returns (FillResult, new_held_position, new_simulated_cash).
-    """
-
-    def _no_fill(state: str, reason: str, is_terminal: bool = True) -> FillResult:
-        return FillResult(
-            opportunity_id=opp.opportunity_id,
-            signal_state=state,
-            reason_code=reason,
-            entry_bar_open_ms=None,
-            entry_price_gross=None,
-            entry_price_net=None,
-            entry_fee=None,
-            exit_bar_open_ms=None,
-            exit_price_gross=None,
-            exit_price_net=None,
-            exit_fee=None,
-            gross_return=None,
-            net_return=None,
-            is_terminal=is_terminal,
-        )
-
-    # Pass-through for non-ARMED states
-    if opp.signal_state != SignalState.ARMED:
-        return (
-            FillResult(
+        if opp.signal_state != SignalState.ARMED:
+            results.append(FillResult(
                 opportunity_id=opp.opportunity_id,
                 signal_state=opp.signal_state.value,
                 reason_code=opp.reason_code,
                 entry_bar_open_ms=None,
-                entry_price_gross=None,
-                entry_price_net=None,
-                entry_fee=None,
+                entry_price_gross=None, entry_price_net=None, entry_fee=None,
                 exit_bar_open_ms=None,
-                exit_price_gross=None,
-                exit_price_net=None,
-                exit_fee=None,
-                gross_return=None,
-                net_return=None,
+                exit_price_gross=None, exit_price_net=None, exit_fee=None,
+                gross_return=None, net_return=None,
                 is_terminal=True,
-            ),
-            held_position,
-            simulated_cash,
-        )
+            ))
+            continue
 
-    # --- Single-position exposure enforcement ---
-    # Rising-edge semantics: if we're already holding a position, reject the new ARMED signal.
-    if held_position:
-        return (
-            _no_fill("REJECTED", "POSITION_ALREADY_OPEN"),
-            held_position,
-            simulated_cash,
-        )
+        # --- F3-ENTRY-CUTOFF: first bar strictly after decision_ms ---
+        entry_bar = _find_entry_bar(opp.decision_ms, bar_by_open, sorted_opens)
 
-    # --- Entry: next bar after decision_cutoff_ms ---
-    if opp.trigger_bar_open_ms is None:
-        return (_no_fill("NO_FILL", "NO_TRIGGER_BAR"), held_position, simulated_cash)
+        if entry_bar is None:
+            results.append(FillResult(
+                opportunity_id=opp.opportunity_id,
+                signal_state="NO_FILL", reason_code="NO_ENTRY_BAR_AFTER_DECISION_MS",
+                entry_bar_open_ms=None,
+                entry_price_gross=None, entry_price_net=None, entry_fee=None,
+                exit_bar_open_ms=None,
+                exit_price_gross=None, exit_price_net=None, exit_fee=None,
+                gross_return=None, net_return=None, is_terminal=True,
+            ))
+            continue
 
-    entry_bar = bar_by_open.get(opp.trigger_bar_open_ms)
-    if entry_bar is None:
-        return (_no_fill("NO_FILL", "ENTRY_BAR_MISSING"), held_position, simulated_cash)
+        # --- EVENT-TIME: check if pending exit has fired at or before entry_bar.bar_open_ms ---
+        if held_position and held_until_ms is not None:
+            if entry_bar.bar_open_ms > held_until_ms:
+                # Exit execution has passed in event-time — release position
+                simulated_cash += pending_exit_proceeds  # type: ignore[operator]
+                held_position = False
+                held_until_ms = None
+                pending_exit_proceeds = None
 
-    entry_gross = Decimal(str(entry_bar.open))
-    entry_net, entry_fee = _entry_net(entry_bar.open)
+        # --- Single-position exposure enforcement (event-time) ---
+        if held_position:
+            results.append(FillResult(
+                opportunity_id=opp.opportunity_id,
+                signal_state="REJECTED", reason_code="POSITION_ALREADY_OPEN",
+                entry_bar_open_ms=None,
+                entry_price_gross=None, entry_price_net=None, entry_fee=None,
+                exit_bar_open_ms=None,
+                exit_price_gross=None, exit_price_net=None, exit_fee=None,
+                gross_return=None, net_return=None, is_terminal=True,
+            ))
+            continue
 
-    # --- Cash sufficiency check ---
-    # Total cash outlay = (net_price + fee) * position_size
-    entry_cost = (entry_net + entry_fee) * POSITION_SIZE_BTC
-    if simulated_cash < entry_cost:
-        return (
-            _no_fill("REJECTED", "INSUFFICIENT_CASH"),
-            held_position,
-            simulated_cash,
-        )
+        entry_gross = Decimal(str(entry_bar.open))
+        entry_net, entry_fee = _entry_net(entry_bar.open)
 
-    # --- Entry fill committed ---
-    new_cash = simulated_cash - entry_cost
-    new_held = True
+        # --- Cash sufficiency check ---
+        entry_cost = (entry_net + entry_fee) * POSITION_SIZE_BTC
+        if simulated_cash < entry_cost:
+            results.append(FillResult(
+                opportunity_id=opp.opportunity_id,
+                signal_state="REJECTED", reason_code="INSUFFICIENT_CASH",
+                entry_bar_open_ms=None,
+                entry_price_gross=None, entry_price_net=None, entry_fee=None,
+                exit_bar_open_ms=None,
+                exit_price_gross=None, exit_price_net=None, exit_fee=None,
+                gross_return=None, net_return=None, is_terminal=True,
+            ))
+            continue
 
-    # --- Exit scan: close < prior 10-bar low (signal bar) → execute at NEXT bar's open ---
-    # TEMPORAL CAUSALITY:
-    #   Signal bar close confirms the exit condition (only known after bar ends).
-    #   Execution MUST use the NEXT bar's open — we CANNOT execute at the same bar's
-    #   open because the close is only observable after the open.
-    entry_idx = sorted_opens.index(entry_bar.bar_open_ms)
-    post_entry_opens = sorted_opens[entry_idx + 1:]
-    all_sorted_opens = sorted_opens  # alias for clarity
+        # --- Entry fill committed: reserve cash, open position ---
+        simulated_cash -= entry_cost
+        held_position = True
 
-    exit_bar_open_ms = None
-    exit_gross = None
-    exit_net_price = None
-    exit_fee_val = None
-    gross_ret = None
-    net_ret = None
-    fill_state = "UNKNOWN"
-    reason_code: str | None = None
-    terminal = False
+        # --- Exit scan: close < prior 10-bar low → execute at NEXT bar's open ---
+        entry_idx = sorted_opens.index(entry_bar.bar_open_ms)
+        post_entry_opens = sorted_opens[entry_idx + 1:]
 
-    for signal_open_ms in post_entry_opens:
-        signal_bar = bar_by_open[signal_open_ms]
-        this_bar_idx = all_sorted_opens.index(signal_open_ms)
-
-        # Prior 10 bars = bars immediately before signal_bar (not including it)
-        prior_10_opens = all_sorted_opens[max(0, this_bar_idx - EXIT_LOOKBACK):this_bar_idx]
-        if len(prior_10_opens) < EXIT_LOOKBACK:
-            continue  # not enough history for exit signal
-
-        exit_level = min(bar_by_open[o].low for o in prior_10_opens)
-
-        if signal_bar.close < exit_level:
-            # EXIT SIGNAL confirmed at signal_bar.close
-            # EXECUTION at the NEXT bar's open (temporal causality fix)
-            exec_idx = this_bar_idx + 1
-            if exec_idx >= len(all_sorted_opens):
-                # No next bar available — position cannot be exited
-                # Fall through to OPEN_UNRESOLVED below
-                break
-            exec_open_ms = all_sorted_opens[exec_idx]
-            exec_bar = bar_by_open[exec_open_ms]
-
-            exit_bar_open_ms = exec_open_ms
-            exit_gross = Decimal(str(exec_bar.open))
-            exit_net_price, exit_fee_val = _exit_net(exec_bar.open)
-            gross_ret, net_ret = _net_return(entry_net, exit_net_price, entry_fee, exit_fee_val)
-            fill_state = "TRIGGERED"
-            terminal = True
-
-            # Update cash: receive (exit_net - exit_fee) * qty
-            exit_proceeds = (exit_net_price - exit_fee_val) * POSITION_SIZE_BTC
-            new_cash = new_cash + exit_proceeds
-            new_held = False
-            break
-
-    if not terminal:
-        # Position never exited within the data window — OPEN_UNRESOLVED
-        # new_held remains True; position is still open at window end
-        fill_state = "OPEN_UNRESOLVED"
-        reason_code = "POSITION_OPEN_AT_DATA_WINDOW_END"
+        exit_bar_open_ms: int | None = None
+        exit_gross: Decimal | None = None
+        exit_net_price: Decimal | None = None
+        exit_fee_val: Decimal | None = None
+        gross_ret: Decimal | None = None
+        net_ret: Decimal | None = None
+        fill_state = "UNKNOWN"
+        reason_code: str | None = None
         terminal = False
+        computed_exit_proceeds: Decimal | None = None
+        computed_exit_exec_ms: int | None = None
 
-    result = FillResult(
-        opportunity_id=opp.opportunity_id,
-        signal_state=fill_state,
-        reason_code=reason_code,
-        entry_bar_open_ms=entry_bar.bar_open_ms,
-        entry_price_gross=entry_gross,
-        entry_price_net=entry_net,
-        entry_fee=entry_fee,
-        exit_bar_open_ms=exit_bar_open_ms,
-        exit_price_gross=exit_gross,
-        exit_price_net=exit_net_price,
-        exit_fee=exit_fee_val,
-        gross_return=gross_ret,
-        net_return=net_ret,
-        is_terminal=terminal,
-    )
-    return result, new_held, new_cash
+        for signal_open_ms in post_entry_opens:
+            signal_bar = bar_by_open[signal_open_ms]
+            this_bar_idx = sorted_opens.index(signal_open_ms)
+
+            prior_10_opens = sorted_opens[max(0, this_bar_idx - EXIT_LOOKBACK):this_bar_idx]
+            if len(prior_10_opens) < EXIT_LOOKBACK:
+                continue
+
+            exit_level = min(bar_by_open[o].low for o in prior_10_opens)
+
+            if signal_bar.close < exit_level:
+                exec_idx = this_bar_idx + 1
+                if exec_idx >= len(sorted_opens):
+                    break
+                exec_open_ms = sorted_opens[exec_idx]
+                exec_bar = bar_by_open[exec_open_ms]
+
+                exit_bar_open_ms = exec_open_ms
+                exit_gross = Decimal(str(exec_bar.open))
+                exit_net_price, exit_fee_val = _exit_net(exec_bar.open)
+                gross_ret, net_ret = _net_return(entry_net, exit_net_price, entry_fee, exit_fee_val)
+                fill_state = "TRIGGERED"
+                terminal = True
+
+                # Compute exit proceeds — but DO NOT release cash/position yet.
+                # Cash is released only when event-time reaches exec_open_ms
+                # (checked at the next ARMED opportunity's entry_bar comparison).
+                computed_exit_proceeds = (exit_net_price - exit_fee_val) * POSITION_SIZE_BTC
+                computed_exit_exec_ms = exec_open_ms
+                break
+
+        if not terminal:
+            fill_state = "OPEN_UNRESOLVED"
+            reason_code = "POSITION_OPEN_AT_DATA_WINDOW_END"
+
+        # Record pending exit timing for event-time release
+        if terminal and computed_exit_exec_ms is not None:
+            held_until_ms = computed_exit_exec_ms
+            pending_exit_proceeds = computed_exit_proceeds
+            # Position remains held until event-time reaches held_until_ms
+        # If OPEN_UNRESOLVED, held_position stays True, held_until_ms stays None
+
+        results.append(FillResult(
+            opportunity_id=opp.opportunity_id,
+            signal_state=fill_state,
+            reason_code=reason_code,
+            entry_bar_open_ms=entry_bar.bar_open_ms,
+            entry_price_gross=entry_gross,
+            entry_price_net=entry_net,
+            entry_fee=entry_fee,
+            exit_bar_open_ms=exit_bar_open_ms,
+            exit_price_gross=exit_gross,
+            exit_price_net=exit_net_price,
+            exit_fee=exit_fee_val,
+            gross_return=gross_ret,
+            net_return=net_ret,
+            is_terminal=terminal,
+        ))
+
+    return results

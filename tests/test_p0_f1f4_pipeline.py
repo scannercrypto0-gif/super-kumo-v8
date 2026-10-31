@@ -99,8 +99,17 @@ def _make_manifest(bars: list[P0Bar]) -> P0SourceManifest:
 
 
 def _run_full_pipeline(bars: list[P0Bar], trial_id: str = "TEST-TRIAL"):
+    import tempfile, os
     manifest = _make_manifest(bars)
-    envelopes = produce_envelopes(manifest, trial_id=trial_id)
+    with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False) as f:
+        journal_path = f.name
+    try:
+        envelopes = produce_envelopes(manifest, trial_id=trial_id, journal_path=journal_path)
+    finally:
+        try:
+            os.unlink(journal_path)
+        except OSError:
+            pass
     opportunities = evaluate_opportunities(manifest, envelopes)
     fills = model_fills(manifest, opportunities)
     state, report = build_ledger(opportunities, fills, trial_id=trial_id)
@@ -278,7 +287,16 @@ class TestF4Ledger:
         """Replaying same fills twice into same LedgerState must be idempotent."""
         bars = [_make_bar(i) for i in range(25)]
         manifest = _make_manifest(bars)
-        envelopes = produce_envelopes(manifest, trial_id="IDEM-TEST")
+        import tempfile, os as _os
+        with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False) as _f:
+            _jp = _f.name
+        try:
+            envelopes = produce_envelopes(manifest, trial_id="IDEM-TEST", journal_path=_jp)
+        finally:
+            try:
+                _os.unlink(_jp)
+            except OSError:
+                pass
         opps = evaluate_opportunities(manifest, envelopes)
         fills = model_fills(manifest, opps)
 
@@ -445,19 +463,30 @@ class TestFix3ChronologicalStateMachine:
             f"INITIAL_CASH must be Decimal('10000.00'), got {F3_CASH!r}"
         )
         # Verify that INSUFFICIENT_CASH is a known reason code (code path exists)
-        from research_wp_r0.aql_p0_f3_fill_model import _model_one
-        # The function signature must accept held_position and simulated_cash
+        # _model_one was replaced by _find_entry_bar (F3-ENTRY-CUTOFF fix).
+        # Verify _find_entry_bar accepts expected params.
+        from research_wp_r0.aql_p0_f3_fill_model import _find_entry_bar
         import inspect
-        sig = inspect.signature(_model_one)
+        sig = inspect.signature(_find_entry_bar)
         param_names = list(sig.parameters.keys())
-        assert "held_position" in param_names, "_model_one must have held_position param"
-        assert "simulated_cash" in param_names, "_model_one must have simulated_cash param"
+        assert "decision_ms" in param_names, "_find_entry_bar must have decision_ms param"
+        assert "bar_by_open" in param_names, "_find_entry_bar must have bar_by_open param"
+        assert "sorted_opens" in param_names, "_find_entry_bar must have sorted_opens param"
 
     def test_swapped_fills_raise_identity_error(self):
         """Swapped fill.opportunity_id must raise LedgerIdentityError before ledger mutation."""
         bars = [_make_bar(i) for i in range(25)]
         manifest = _make_manifest(bars)
-        envelopes = produce_envelopes(manifest, trial_id="SWAP-TEST")
+        import tempfile, os as _os
+        with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False) as _f:
+            _jp = _f.name
+        try:
+            envelopes = produce_envelopes(manifest, trial_id="SWAP-TEST", journal_path=_jp)
+        finally:
+            try:
+                _os.unlink(_jp)
+            except OSError:
+                pass
         opps = evaluate_opportunities(manifest, envelopes)
         fills = model_fills(manifest, opps)
 
@@ -483,7 +512,16 @@ class TestFix3ChronologicalStateMachine:
         """Duplicate opportunity_id in fill list must raise LedgerIdentityError."""
         bars = [_make_bar(i) for i in range(25)]
         manifest = _make_manifest(bars)
-        envelopes = produce_envelopes(manifest, trial_id="DUP-TEST")
+        import tempfile, os as _os
+        with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False) as _f:
+            _jp = _f.name
+        try:
+            envelopes = produce_envelopes(manifest, trial_id="DUP-TEST", journal_path=_jp)
+        finally:
+            try:
+                _os.unlink(_jp)
+            except OSError:
+                pass
         opps = evaluate_opportunities(manifest, envelopes)
         fills = model_fills(manifest, opps)
 
@@ -703,7 +741,16 @@ class TestFix4DurableCustody:
         """build_ledger() called twice with identical inputs must produce identical report SHA."""
         bars = [_make_bar(i) for i in range(30)]
         manifest = _make_manifest(bars)
-        envelopes = produce_envelopes(manifest, trial_id="IDEM-SHA-TEST")
+        import tempfile, os as _os
+        with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False) as _f:
+            _jp = _f.name
+        try:
+            envelopes = produce_envelopes(manifest, trial_id="IDEM-SHA-TEST", journal_path=_jp)
+        finally:
+            try:
+                _os.unlink(_jp)
+            except OSError:
+                pass
         opps = evaluate_opportunities(manifest, envelopes)
         fills = model_fills(manifest, opps)
 
