@@ -81,15 +81,15 @@ def reconcile(envelopes, selections):
             raise EvidenceError("duplicate or missing envelope/selection")
         seen.add(key)
         s = by_id[key]
-        for field in ("signal_state", "reason_code", "decision_cutoff_ms"):
+        for field in ("decision_cutoff_ms", "producer_event_id", "opportunity_id"):
             if e.get(field) != s.get(field):
                 raise EvidenceError("conflicting source " + field)
         result.append(RetrospectiveSnapshot(
             trial_id=e["trial_id"], manifest_sha256=e["run_manifest_sha256"],
             opportunity_id=e["opportunity_id"], producer_event_id=e["producer_event_id"],
             envelope_sha256=e["envelope_sha256"], decision_cutoff_ms=e["decision_cutoff_ms"],
-            decision_ms=e["decision_ms"], signal_state=e["signal_state"],
-            reason_code=e.get("reason_code"), direction=s.get("direction"),
+            decision_ms=e["decision_ms"], signal_state=str(s["signal_state"]),
+            reason_code=s.get("reason_code"), direction=s.get("direction"),
             eligibility=s.get("eligibility", "NOT_ESTABLISHED"),
             eligibility_evidence=s.get("eligibility_evidence"),
             context_digest=s["context_digest"],
