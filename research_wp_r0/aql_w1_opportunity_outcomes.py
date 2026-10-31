@@ -106,7 +106,9 @@ def market_outcome(snapshot, horizon_ms, bars, *, source_version, source_end_exc
     OPEN(t) is a non-executable retrospective reference; the modeled decision
     may occur later. All H/15m finalized bars are required, no partial MFE.
     """
-    if not source_version or not policy_version:\n        raise EvidenceError("missing source or policy version")\n    if horizon_ms not in HORIZONS:
+    if not source_version or not policy_version:
+        raise EvidenceError("missing source or policy version")
+    if horizon_ms not in HORIZONS:
         raise EvidenceError("unsupported horizon")
     t = snapshot.decision_cutoff_ms
     due = t + horizon_ms
