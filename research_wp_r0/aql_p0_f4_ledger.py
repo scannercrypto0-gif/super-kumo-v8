@@ -309,12 +309,21 @@ def build_ledger(
     # P0 requires source/strategy/policy provenance for research reproducibility.
     # If all three are None the report cannot be traced to a specific dataset,
     # strategy, or policy — this is a data-integrity gap, not a missing feature.
-    if all(x is None for x in (manifest_sha256, strategy_digest, policy_id)):
+    required_lineage = {
+        "manifest_sha256": manifest_sha256,
+        "strategy_digest": strategy_digest,
+        "policy_id": policy_id,
+        "assumptions_digest": assumptions_digest,
+    }
+    missing = [name for name, value in required_lineage.items()
+               if not isinstance(value, str) or not value.strip()]
+    if missing:
         raise LedgerLineageMissing(
-            "F4_LINEAGE_MISSING: manifest_sha256, strategy_digest, and policy_id "
-            "are all None — P0 requires source/strategy/policy provenance for "
-            "reproducibility. Supply at least one lineage field."
+            "F4_LINEAGE_MISSING: P0 requires ALL source/strategy/policy/assumptions "
+            "bindings; missing " + ", ".join(missing)
         )
+    if len(manifest_sha256) != 64 or any(c not in "0123456789abcdef" for c in manifest_sha256):
+        raise LedgerLineageMissing("F4_MANIFEST_SHA256_INVALID")
 
     state = LedgerState()
 
@@ -584,6 +593,15 @@ def _load_receipts_file(path: Path) -> dict[str, str]:
             d = json.loads(raw_line)
             event_id = d["event_id"]
             payload_hash = d["payload_hash"]
+            if not isinstance(event_id, str) or not event_id:
+                raise LedgerReceiptCorrupted("RECEIPT_EVENT_ID_INVALID")
+            computed_hash = _sha256_hex(_canonical_bytes(
+                {k: v for k, v in d.items() if k != "payload_hash"}
+            ))
+            if payload_hash != computed_hash:
+                raise LedgerReceiptCorrupted(
+                    f"RECEIPT_PAYLOAD_TAMPER: event_id={event_id!r} — STOP"
+                )
             if event_id in result:
                 if result[event_id] != payload_hash:
                     raise LedgerReceiptCorrupted(
