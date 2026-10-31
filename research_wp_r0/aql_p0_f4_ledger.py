@@ -562,6 +562,8 @@ def persist_consumer_effect_receipts(
         raise LedgerLineageMissing("CONSUMER_MANIFEST_SHA256_REQUIRED")
     if not isinstance(assumptions_digest, str) or not assumptions_digest:
         raise LedgerLineageMissing("CONSUMER_ASSUMPTIONS_DIGEST_REQUIRED")
+    if len({o.opportunity_id for o in opportunities}) != len(opportunities):
+        raise LedgerIdentityError("CONSUMER_DUPLICATE_OPPORTUNITY_ID")
     receipts: list[FinancialReceipt] = getattr(state, "_receipts", [])
     financial_path = directory / "financial_receipts.jsonl"
     if receipts:
