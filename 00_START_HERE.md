@@ -6,7 +6,7 @@ Status: DRAFT pending owner approval | 2026-10-20
 SOURCE OF TRUTH: version-controlled project files, never assistant chat memory.
 Start every session: verify identity first, then follow the exact new-session reading order below.
 End every session: update `04_STATE.md` and append `05_WORK_LOG.md` with evidence links, reviewed commit, remaining blockers and exact next action through the authorized PR workflow; do not describe proposed work as merged.
-Current: G0 OPEN; WP-000 bootstrap published at https://github.com/scannercrypto0-gif/super-kumo-v8, pending owner review; active work is G0-001 architecture review in Issue #1. ChatGPT Round 1 is complete with conditional acceptance, not approval; Claude review, critical-question resolution and owner sign-off remain pending. No trading code started.
+Current: G0 APPROVED 2026-10-22 — Issue #1 CLOSED (owner sign-off recorded). R09 credential revocation CRITICAL/UNRESOLVED (mandatory before any V7 code or credential reuse). Active: P0 research implementation on branch `p0/aql-p0-historical-decision-v1` (aql.p0.historical-decision.v1 canonical contract). No trading code, no merge, no live data authorized.
 Roles: Owner approves scope and gates; ChatGPT architecture/research reviewer; Claude proposed lead implementer starting Thu 2026-10-22 13:00 Riyadh.
 Rule: No stage closure without test evidence, review and owner approval.
 
@@ -17,7 +17,7 @@ Rule: No stage closure without test evidence, review and owner approval.
 - Official repository: [scannercrypto0-gif/super-kumo-v8](https://github.com/scannercrypto0-gif/super-kumo-v8).
 - Former name: SUPER KUMO V8.
 - Owner: `scannercrypto0-gif`.
-- Current phase: **G0 OPEN**; G0-001 remains OPEN.
+- Current phase: **G0 APPROVED** (2026-10-22); Issue #1 CLOSED. R09 mandatory before V7 reuse.
 - Operational V8 implementation: **not yet verified or started** in this project. Legacy V8 terminology identifies technical/history context, not implementation evidence.
 
 ## Project identity verification — ATLAS-001
