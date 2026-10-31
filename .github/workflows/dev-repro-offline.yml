@@ -1,0 +1,66 @@
+name: dev-repro-offline
+
+on:
+  push:
+    branches:
+      - "feat/aql-dev-repro-offline-212"
+    paths:
+      - "tools/dev_repro_offline/**"
+      - ".github/workflows/dev-repro-offline.yml"
+  pull_request:
+    paths:
+      - "tools/dev_repro_offline/**"
+      - ".github/workflows/dev-repro-offline.yml"
+
+jobs:
+  test:
+    name: "AQL-CLAUDE-DEV-ENV-REPRO-001 — offline tests"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install --break-system-packages pytest pytest-cov || pip install pytest pytest-cov
+
+      - name: Run dev_repro_offline tests
+        run: |
+          pytest tools/dev_repro_offline/tests/ \
+            -v --tb=short \
+            --cov=tools/dev_repro_offline \
+            --cov-report=term-missing \
+            --cov-fail-under=75
+
+      - name: AST namespace isolation scan
+        run: |
+          python - <<'PYEOF'
+          import ast, sys, pathlib
+          PROTECTED = {"src.aql", "research_wp_r0"}
+          violations = []
+          for f in pathlib.Path("tools/dev_repro_offline").rglob("*.py"):
+              if "tests" in f.parts:
+                  continue
+              tree = ast.parse(f.read_text())
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      for alias in node.names:
+                          for p in PROTECTED:
+                              if alias.name == p or alias.name.startswith(p + "."):
+                                  violations.append(f"{f}:{node.lineno}: import {alias.name}")
+                  elif isinstance(node, ast.ImportFrom):
+                      if node.module:
+                          for p in PROTECTED:
+                              if node.module == p or node.module.startswith(p + "."):
+                                  violations.append(f"{f}:{node.lineno}: from {node.module}")
+          if violations:
+              print("NAMESPACE ISOLATION VIOLATIONS:", file=sys.stderr)
+              for v in violations:
+                  print(" ", v, file=sys.stderr)
+              sys.exit(1)
+          print(f"Namespace isolation OK — {len(list(pathlib.Path('tools/dev_repro_offline').rglob('*.py')))} files scanned")
+          PYEOF
