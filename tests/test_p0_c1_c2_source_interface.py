@@ -365,3 +365,237 @@ class TestC2Producer:
         }
         expected_sha = _sha256_hex(_canonical_bytes(d))
         assert env.envelope_sha256 == expected_sha
+
+
+# ---------------------------------------------------------------------------
+# Fix 5 — Focused verification tests: guards actually reached via _skip_hash_check
+# ---------------------------------------------------------------------------
+
+class TestC1GuardsReached:
+    """Verify that OHLCV/gap/tamper validation guards are actually reached.
+
+    PM Consolidated Correction Order (PR #204 comment 6540907647):
+    Existing negative tests short-circuit at the hash check (C1SourceRejected:
+    NORMALIZED_SHA256_MISMATCH) and never reach the bar-level guards. These tests
+    use _skip_hash_check=True (TEST-ONLY bypass) to confirm the actual guards fire.
+
+    NEVER use _skip_hash_check=True in production code.
+    """
+
+    def _load_skip(self, rows: list, **kw):
+        data = json.dumps(rows, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        manifest_sha = _sha256_bytes(b"skip-hash-test")
+        return load_source(
+            normalized_json_bytes=data,
+            dataset_id="SKIP-HASH-TEST",
+            dataset_version=1,
+            manifest_integrity_sha256=manifest_sha,
+            _skip_hash_check=True,
+            **kw,
+        )
+
+    def test_negative_volume_reaches_guard(self):
+        """Negative volume must be rejected by the BAR_VOLUME_INVALID guard (not hash check)."""
+        rows = [_make_bar_row(i) for i in range(EXPECTED_BAR_COUNT)]
+        rows[10] = _make_bar_row(10, vol=-1.0)
+        with pytest.raises(C1SourceRejected) as exc_info:
+            self._load_skip(rows)
+        assert "VOLUME_INVALID" in str(exc_info.value), (
+            f"Expected VOLUME_INVALID guard, got: {exc_info.value}"
+        )
+
+    def test_bar_grid_gap_reaches_guard(self):
+        """Grid gap (wrong open_ms) must be caught by GRID_VIOLATION guard, not hash check."""
+        rows = [_make_bar_row(i) for i in range(EXPECTED_BAR_COUNT)]
+        rows[5][0] = rows[5][0] + 1   # corrupt open_ms
+        rows[5][1] = rows[5][1] + 1   # corrupt close_ms to match
+        with pytest.raises(C1SourceRejected) as exc_info:
+            self._load_skip(rows)
+        assert "GRID_VIOLATION" in str(exc_info.value), (
+            f"Expected GRID_VIOLATION guard, got: {exc_info.value}"
+        )
+
+    def test_high_below_ohlc_reaches_guard(self):
+        """High < close must be caught by HIGH_BELOW_OHLC guard, not hash check."""
+        rows = [_make_bar_row(i) for i in range(EXPECTED_BAR_COUNT)]
+        rows[3] = _make_bar_row(3, open_=100.0, high_=99.0, low_=98.0, close_=100.5)
+        with pytest.raises(C1SourceRejected) as exc_info:
+            self._load_skip(rows)
+        assert "HIGH_BELOW_OHLC" in str(exc_info.value), (
+            f"Expected HIGH_BELOW_OHLC guard, got: {exc_info.value}"
+        )
+
+    def test_low_above_ohlc_reaches_guard(self):
+        """Low > open must be caught by LOW_ABOVE_OHLC guard, not hash check."""
+        rows = [_make_bar_row(i) for i in range(EXPECTED_BAR_COUNT)]
+        # low=102 > open=100 and close=100.5 → LOW_ABOVE_OHLC
+        rows[7] = _make_bar_row(7, open_=100.0, high_=103.0, low_=102.0, close_=100.5)
+        with pytest.raises(C1SourceRejected) as exc_info:
+            self._load_skip(rows)
+        assert "LOW_ABOVE_OHLC" in str(exc_info.value), (
+            f"Expected LOW_ABOVE_OHLC guard, got: {exc_info.value}"
+        )
+
+    def test_zero_volume_is_allowed(self):
+        """Volume=0 is valid (bars with no trades can have volume=0)."""
+        rows = [_make_bar_row(i) for i in range(EXPECTED_BAR_COUNT)]
+        rows[2] = _make_bar_row(2, vol=0.0)   # zero volume — valid
+        manifest = self._load_skip(rows)       # must NOT raise
+        assert manifest is not None
+
+    def test_valid_synthetic_data_passes_all_guards(self):
+        """A fully valid synthetic 672-bar input should pass all C1 guards when hash skipped."""
+        rows = [_make_bar_row(i) for i in range(EXPECTED_BAR_COUNT)]
+        manifest = self._load_skip(rows)
+        assert len(manifest.bars) == EXPECTED_BAR_COUNT
+        assert manifest.mode == "RETROSPECTIVE_NON_PIT"
+        assert manifest.research_only is True
+
+
+class TestC2JournalLifecycle:
+    """Verify C2 PENDING→APPLIED→ACKED journal lifecycle.
+
+    PM Consolidated Correction Order (PR #204 comment 6540907647) Fix 4:
+    Journal entries must transition PENDING→APPLIED when produced and
+    APPLIED→ACKED when acknowledged by ack_envelopes().
+    """
+
+    def _make_stub_manifest(self, n_bars: int = 22):
+        from research_wp_r0.aql_p0_c1_source import (
+            P0SourceManifest, P0Bar,
+            SOURCE_BYTES_SHA256, RECEIPT_STATUS, RECEIPT_MISSING_REASON, CUSTODY_STATUS,
+        )
+        bars = []
+        checksums = []
+        for i in range(n_bars):
+            open_ms = WINDOW_START_MS + i * INTERVAL_MS
+            close_ms = open_ms + INTERVAL_MS - 1
+            chk = _bar_checksum(open_ms, 100.0, 101.0, 99.0, 100.5, 1.0)
+            checksums.append(chk)
+            bars.append(P0Bar(
+                bar_id=f"BTCUSDT:15m:{open_ms}",
+                bar_open_ms=open_ms, bar_close_ms=close_ms,
+                open=100.0, high=101.0, low=99.0, close=100.5, volume=1.0,
+                is_final=True, source_label="TEST",
+                availability_kind="RETROSPECTIVE", available_as_of_decision="UNKNOWN",
+                observation_lower_bound_ms=close_ms + 1,
+                receipt_ms=None, known_at_ms=None,
+                bar_checksum=chk, gap_state="COMPLETE",
+                correction_generation_id="UNKNOWN_NOT_ATTESTED", correction_parent_id=None,
+            ))
+        ordered_sha = _sha256_hex(_canonical_bytes(checksums))
+        gap_inv = {"bars_with_gap_state": [], "complete": n_bars, "missing": 0,
+                   "total_scheduled": n_bars, "unknown": 0}
+        gap_sha = _sha256_hex(_canonical_bytes(gap_inv))
+        corr = {"correction_generation_id": "UNKNOWN_NOT_ATTESTED",
+                "reason": "test", "status": "UNKNOWN_NOT_ATTESTED"}
+        corr_sha = _sha256_hex(_canonical_bytes(corr))
+        return P0SourceManifest(
+            schema="aql.p0.historical-decision.v1", project_id="AQL-CRYPTO-RESEARCH-001",
+            exchange="BINANCE", market="SPOT", symbol="BTCUSDT",
+            interval_ms=INTERVAL_MS, timezone="UTC",
+            dataset_id="TEST-DATASET-001", dataset_version=1,
+            raw_generation_id="P0-TEST", source_bytes_sha256=SOURCE_BYTES_SHA256,
+            source_provider="BINANCE_VISION", source_version="TEST",
+            source_receipt_sha256=None, receipt_status=RECEIPT_STATUS,
+            receipt_missing_reason=RECEIPT_MISSING_REASON, custody_status=CUSTODY_STATUS,
+            manifest_integrity_sha256=_sha256_hex(b"test-manifest"),
+            ordered_bar_checksums_sha256=ordered_sha,
+            gap_inventory_sha256=gap_sha, correction_lineage_sha256=corr_sha,
+            window_start_ms=WINDOW_START_MS,
+            window_end_exclusive_ms=WINDOW_START_MS + n_bars * INTERVAL_MS,
+            mode="RETROSPECTIVE_NON_PIT", research_only=True, bars=tuple(bars),
+        )
+
+    def test_journal_pending_to_applied_transition(self):
+        """All journal entries must be APPLIED (not PENDING) after produce_envelopes()."""
+        from research_wp_r0.aql_p0_c2_producer import ConsumerJournalEntry
+        manifest = self._make_stub_manifest(22)
+        journal: dict[str, ConsumerJournalEntry] = {}
+        envelopes = produce_envelopes(manifest, trial_id="LIFECYCLE-TEST", consumer_journal=journal)
+
+        assert len(journal) > 0, "Journal must be populated"
+        for pid, entry in journal.items():
+            assert entry.state == "APPLIED", (
+                f"Expected APPLIED after produce_envelopes, got {entry.state!r} "
+                f"for producer_event_id={pid!r}"
+            )
+        # No entry should remain in PENDING after production
+        pending = [e for e in journal.values() if e.state == "PENDING"]
+        assert len(pending) == 0, f"Found {len(pending)} PENDING entries after production"
+
+    def test_ack_envelopes_applied_to_acked(self):
+        """ack_envelopes() must transition APPLIED entries to ACKED."""
+        from research_wp_r0.aql_p0_c2_producer import ack_envelopes, ConsumerJournalEntry
+        manifest = self._make_stub_manifest(22)
+        journal: dict[str, ConsumerJournalEntry] = {}
+        envelopes = produce_envelopes(manifest, trial_id="ACK-TEST", consumer_journal=journal)
+
+        all_pids = [e.producer_event_id for e in envelopes]
+        acked_count = ack_envelopes(all_pids, journal)
+
+        assert acked_count == len(envelopes), (
+            f"Expected {len(envelopes)} ACKed, got {acked_count}"
+        )
+        for pid, entry in journal.items():
+            assert entry.state == "ACKED", (
+                f"Expected ACKED after ack_envelopes, got {entry.state!r} for {pid!r}"
+            )
+
+    def test_ack_envelopes_idempotent_for_already_acked(self):
+        """ack_envelopes() on already-ACKED entries must be a no-op (idempotent)."""
+        from research_wp_r0.aql_p0_c2_producer import ack_envelopes, ConsumerJournalEntry
+        manifest = self._make_stub_manifest(22)
+        journal: dict[str, ConsumerJournalEntry] = {}
+        envelopes = produce_envelopes(manifest, trial_id="ACK-IDEM-TEST", consumer_journal=journal)
+        all_pids = [e.producer_event_id for e in envelopes]
+
+        # First ack — transitions APPLIED → ACKED
+        acked_first = ack_envelopes(all_pids, journal)
+        # Second ack — idempotent, returns 0 (already ACKED)
+        acked_second = ack_envelopes(all_pids, journal)
+
+        assert acked_first == len(envelopes)
+        assert acked_second == 0, (
+            f"Expected 0 newly ACKED on second call (idempotent), got {acked_second}"
+        )
+
+    def test_ack_unknown_id_raises_conflict(self):
+        """ack_envelopes() with an ID not in journal must raise C2ConflictError."""
+        from research_wp_r0.aql_p0_c2_producer import ack_envelopes, C2ConflictError
+        manifest = self._make_stub_manifest(22)
+        journal = {}
+        produce_envelopes(manifest, trial_id="ACK-ERR-TEST", consumer_journal=journal)
+
+        with pytest.raises(C2ConflictError) as exc_info:
+            ack_envelopes(["nonexistent-id-00000000"], journal)
+        assert "ACK_UNKNOWN_ID" in str(exc_info.value)
+
+    def test_source_bytes_sha_blocked_marker(self):
+        """BLOCKED: owner's original ZIP package is not available in this environment.
+
+        The normalized JSON hash constants (NORMALIZED_SHA256) were set from the
+        owner's Factory comment #77/6540521965. The outer ZIP (OUTER_ZIP_SHA256)
+        identifies the full owner delivery package and is NOT available for re-download
+        in this test environment. This test documents that constraint explicitly.
+
+        Status: BLOCKED — source bytes package inaccessible; cannot verify live.
+        Evidence: hash constants recorded from Factory #77 comment 6540521965.
+        """
+        from research_wp_r0.aql_p0_c1_source import (
+            OUTER_ZIP_SHA256, MANIFEST_SHA256, NORMALIZED_SHA256, SOURCE_BYTES_SHA256,
+        )
+        # Verify constants match the canonical Factory comment values
+        assert OUTER_ZIP_SHA256 == "f4e0b3680dd56c9fbe680be2473b8de29fc1d8d7e22657973c85945d2bf99f97"
+        assert MANIFEST_SHA256 == "f731bc19c1d4bb0dfa79198c6739a4dbd356e02904086d4df2a136773bd25456"
+        assert NORMALIZED_SHA256 == "a881cc99e80697f2da57784b5bea91a7f339c6c391d4d53cc0222842168af0f0"
+        assert SOURCE_BYTES_SHA256 == OUTER_ZIP_SHA256, (
+            "SOURCE_BYTES_SHA256 must equal OUTER_ZIP_SHA256 per canonical contract"
+        )
+        # NOT_TESTED: actual ZIP download + hash verification requires the owner's package.
+        # This test only verifies the constants are correctly recorded.
+        pytest.skip(
+            "BLOCKED: owner ZIP package not available in test env; "
+            "constants verified from Factory #77 comment 6540521965 only. "
+            "Live hash verification requires owner-supplied package."
+        )
