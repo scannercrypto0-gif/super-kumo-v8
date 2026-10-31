@@ -218,7 +218,7 @@ class AdmittedSource:
 
     Three outer SHA-256 gates and the complete nested raw data are verified:
       1. OUTER_ZIP_SHA256  — the owner's delivery ZIP package as a whole
-      2. MANIFEST_SHA256   — manifest.json extracted from that ZIP
+      2. MANIFEST_SHA256   — the separately uploaded manifest.json
       3. NORMALIZED_SHA256 — the normalized JSON used for bar decisions
 
     Seven daily ZIPs, their CHECKSUM texts, and raw-to-normalized rows are inspected.
@@ -439,7 +439,7 @@ def load_source(
             f"{admitted.outer_zip_sha256_verified!r} does not match OUTER_ZIP_SHA256 pin — "
             f"AdmittedSource must be obtained via admit_source() in production. "
             f"TRUST_MODEL={AdmittedSource.TRUST_MODEL_DECLARATION} "
-            f"(no nested ZIP or CHECKSUM inspection)"
+            f"(full nested ZIP/CSV/CHECKSUM verification required)"
         )
     if admitted.manifest_integrity_sha256 != MANIFEST_SHA256:
         raise C1SourceRejected(
@@ -447,6 +447,12 @@ def load_source(
             f"{admitted.manifest_integrity_sha256!r} does not match MANIFEST_SHA256 pin"
         )
 
+    # Exact normalized-byte commitment is checked before checking presence
+    # of raw package, so an obviously tampered fake token fails at its own guard.
+    if not isinstance(admitted.normalized_bytes, (bytes, bytearray)):
+        raise C1SourceRejected("NORMALIZED_JSON_MUST_BE_BYTES")
+    if _sha256_hex(admitted.normalized_bytes) != NORMALIZED_SHA256:
+        raise C1SourceRejected("NORMALIZED_SHA256_MISMATCH")
     if admitted.outer_zip_bytes is None or admitted.manifest_bytes is None:
         raise C1SourceRejected("RAW_EVIDENCE_REQUIRED_NOT_FORGED_TOKEN")
     # Constructor is public, so never trust a caller-created AdmittedSource.
