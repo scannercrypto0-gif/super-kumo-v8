@@ -1,63 +1,27 @@
-"""Fail-closed identity check for owner-supplied P0 historical evidence.
+"""Owner P0 evidence gate; delegates ALL verification to Core's canonical C1 custody.
 
-Run locally or in an authorized runner ONLY when the exact owner outer ZIP and
-standalone manifest.json are present. This does not fetch or synthesize inputs.
+No substitute data, no bypass, no independent/weaker duplicate parser.
 """
 from __future__ import annotations
-
 import argparse
-import hashlib
 import json
-import zipfile
+import os
 from pathlib import Path
-
-from research_wp_r0.aql_p0_c1_source import (
-    OUTER_ZIP_SHA256, MANIFEST_SHA256, C1SourceRejected,
-)
+from research_wp_r0.aql_p0_c1_custody import verify_native_bundle
 
 
-def _sha(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-def verify_owner_evidence(outer_zip: Path, manifest_path: Path) -> dict:
-    if not outer_zip.is_file() or not manifest_path.is_file():
-        raise C1SourceRejected("OWNER_SOURCE_FILES_NOT_PRESENT")
-    outer_sha = _sha(outer_zip)
-    manifest_sha = _sha(manifest_path)
-    if outer_sha != OUTER_ZIP_SHA256:
-        raise C1SourceRejected("OWNER_OUTER_ZIP_SHA256_MISMATCH")
-    if manifest_sha != MANIFEST_SHA256:
-        raise C1SourceRejected("OWNER_MANIFEST_SHA256_MISMATCH")
-    with zipfile.ZipFile(outer_zip) as archive:
-        bad = archive.testzip()
-        if bad is not None:
-            raise C1SourceRejected("OWNER_OUTER_ZIP_CRC_MISMATCH")
-        entries = [name for name in archive.namelist() if not name.endswith("/")]
-        inner = [name for name in entries if name.lower().endswith(".zip")]
-        if len(inner) != 7:
-            raise C1SourceRejected("OWNER_EXPECTED_SEVEN_DAILY_ZIPS")
-        # Verify CRC for each nested daily ZIP without writing any input to disk.
-        import io
-        for name in inner:
-            with zipfile.ZipFile(io.BytesIO(archive.read(name))) as nested:
-                if nested.testzip() is not None:
-                    raise C1SourceRejected("OWNER_INNER_ZIP_CRC_MISMATCH")
-    # Parse standalone manifest only after exact bytes have been verified.
-    with manifest_path.open("r", encoding="utf-8") as stream:
-        manifest = json.load(stream)
-    if not isinstance(manifest, dict):
-        raise C1SourceRejected("OWNER_MANIFEST_INVALID_SHAPE")
+def verify_owner_evidence(outer_zip: Path, manifest_path: Path, normalized_path: Path) -> dict:
+    # Verify the three original byte domains together, including all 672 rows,
+    # publisher checksum files, UTC inventory, and the seven nested daily ZIPs.
+    source_sha = verify_native_bundle(
+        outer_zip.read_bytes(), manifest_path.read_bytes(), normalized_path.read_bytes()
+    )
     return {
         "status": "OWNER_SOURCE_BYTES_VERIFIED",
-        "source_bytes_sha256": outer_sha,
-        "manifest_sha256": manifest_sha,
-        "inner_daily_zip_count": len(inner),
-        "limitations": "Byte identity and ZIP integrity only; no historical receipt/PIT attestation.",
+        "source_bytes_sha256": source_sha,
+        "verification": "CORE_C1_VERIFY_NATIVE_BUNDLE",
+        "availability_mode": "RETROSPECTIVE_NON_PIT",
+        "limitations": "Native byte custody only; no historical arrival/PIT attestation.",
     }
 
 
@@ -65,12 +29,18 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--outer-zip", required=True, type=Path)
     parser.add_argument("--manifest", required=True, type=Path)
+    parser.add_argument("--normalized", required=True, type=Path)
     parser.add_argument("--receipt", required=True, type=Path)
     args = parser.parse_args()
-    result = verify_owner_evidence(args.outer_zip, args.manifest)
+    result = verify_owner_evidence(args.outer_zip, args.manifest, args.normalized)
     args.receipt.parent.mkdir(parents=True, exist_ok=True)
-    # Receipt is written only after successful verification.
-    args.receipt.write_text(json.dumps(result, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    encoded = (json.dumps(result, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    with args.receipt.open("xb") as fh:
+        fh.write(encoded)
+        fh.flush()
+        os.fsync(fh.fileno())
+    if args.receipt.read_bytes() != encoded:
+        raise RuntimeError("OWNER_SOURCE_RECEIPT_READBACK_MISMATCH")
     print(json.dumps(result, sort_keys=True))
 
 
