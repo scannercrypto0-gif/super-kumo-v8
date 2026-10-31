@@ -25,6 +25,19 @@ Research / Strategy Factory lane only.
 
 Issue: #59 (SF-IND-01)
 Depends on: SF-DATA-01 (PR #57, commit cf4339e83d8ce2fe30cc727b6c470f1fb0bf63bb)
+
+Hardening changes (AQL-CLAUDE-RESEARCH-FOUNDATION-HARDENING-001 Stage 3):
+* _guard_finite_closes(): fail-closed NaN/Inf check before any arithmetic
+* _guard_finite_bar_prices(): fail-closed NaN/Inf check on bar.high/low for ATR
+* All four indicators (_compute_values) call guards as first action
+
+Note on DataAvailabilityKind.RETROSPECTIVE (F-02):
+  When bars come from a historical fixture, observation_cutoff_ms = bar_close + 1
+  is a THEORETICAL LOWER BOUND only — it represents the earliest possible receipt
+  time, not an actual recorded ingest timestamp. Any analysis that depends on
+  intra-bar or near-close arrival timing cannot be reproduced exactly. Callers
+  consuming RETROSPECTIVE bars should not assume that decision_cutoff_ms = bar_close+1
+  reflects the wall-clock time data was actually available to a real trader.
 """
 from __future__ import annotations
 
