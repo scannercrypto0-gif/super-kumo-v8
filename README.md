@@ -56,4 +56,4 @@ git switch main
 Do not share a Supabase service-role key or exchange secret in chat.
 
 ## Current next step
-Claude performs an independent architecture review using `07_CLAUDE_HANDOFF.md`. The owner resolves or explicitly defers critical questions with rationale and approves the final contract before authorizing G0 closure and G1 work. The five unresolved areas are paper execution, temporal integrity, recovery/idempotency, research methodology, and operational budgets; see [current state](04_STATE.md). G0 and G0-001 remain OPEN; this review does not authorize production implementation.
+G0 FINAL APPROVED 2026-10-22 per closed Issue #1. R09 credential revocation remains unresolved and mandatory before V7 legacy reuse. G1 remains a separate gate; G0 approval does not authorize live/paper trading, formal B0/OOS evaluation, or a P0 historical smoke run. Current bounded P0 DEV integration is tracked in Draft PR #204 and requires independent Audit disposition before any separately authorized trial; see [current state](04_STATE.md).
