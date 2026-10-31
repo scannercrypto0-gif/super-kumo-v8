@@ -100,6 +100,31 @@ class W1OutcomesTest(unittest.TestCase):
         self.assertEqual(r["mae"], 0.0)
         self.assertEqual(r["window_quality"], "COMPLETE_FINALIZED")
 
+    def test_correction_generation_and_replay(self):
+        s = snap()
+        t = s.decision_cutoff_ms
+        args = dict(source_version="archive-v1", source_end_exclusive_ms=t + HORIZONS[0])
+        first = market_outcome(s, HORIZONS[0], bars(t, 16), **args)
+        repeat = market_outcome(s, HORIZONS[0], bars(t, 16), **args)
+        corrected = market_outcome(s, HORIZONS[0], bars(t, 16),
+                                   correction_generation="correction-001", **args)
+        self.assertEqual(first, repeat)
+        self.assertEqual(first["opportunity_identity"], corrected["opportunity_identity"])
+        self.assertNotEqual(first["evaluation_version_id"], corrected["evaluation_version_id"])
+        self.assertEqual(first["evaluation_version_id"], first["outcome_id"])
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "journal.jsonl"
+            j = AppendOnlyOutcomeJournal(path)
+            self.assertTrue(j.append(first))
+            self.assertFalse(j.append(repeat))
+            self.assertTrue(j.append(corrected))
+            with self.assertRaises(EvidenceError):
+                j.append({**first, "mfe": 9})
+            replay = AppendOnlyOutcomeJournal(path)
+            self.assertFalse(replay.append(first))
+            self.assertFalse(replay.append(corrected))
+            self.assertEqual(len(replay._seen), 2)
+
     def test_append_replay_conflict_corruption(self):
         s = snap()
         t = s.decision_cutoff_ms
