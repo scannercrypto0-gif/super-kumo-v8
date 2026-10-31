@@ -213,6 +213,49 @@ class W1OutcomesTest(unittest.TestCase):
             with self.assertRaises(EvidenceError):
                 journal.append("version", "EVALUATED")
 
+    def test_outcome_journal_two_instances_and_lock(self):
+        s = snap()
+        t = s.decision_cutoff_ms
+        payload = market_outcome(s, HORIZONS[0], bars(t, 16),
+                                 source_version="source1",
+                                 source_end_exclusive_ms=t + HORIZONS[0])
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "nested" / "outcomes.jsonl"
+            first, second = AppendOnlyOutcomeJournal(path), AppendOnlyOutcomeJournal(path)
+            self.assertTrue(first.append(payload))
+            self.assertFalse(second.append(payload))
+            self.assertFalse(first.append(payload))
+            lock = Path(str(path) + ".lock")
+            lock.mkdir()
+            try:
+                with self.assertRaises(EvidenceError):
+                    second.append(payload)
+            finally:
+                lock.rmdir()
+            self.assertEqual(len(path.read_text().splitlines()), 1)
+            with self.assertRaises(EvidenceError):
+                second.append({**payload, "mfe": 999})
+
+    def test_outcome_journal_spawned_process_contention(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "outcomes.jsonl"
+            ctx = multiprocessing.get_context("spawn")
+            ready, release = ctx.Event(), ctx.Event()
+            worker = ctx.Process(target=_hold_transition_lock,
+                                 args=(str(path) + ".lock", ready, release))
+            worker.start()
+            try:
+                self.assertTrue(ready.wait(10))
+                with self.assertRaises(EvidenceError):
+                    AppendOnlyOutcomeJournal(path).append({"outcome_id": "v"})
+            finally:
+                release.set()
+                worker.join(10)
+                if worker.is_alive():
+                    worker.terminate()
+                    worker.join()
+            self.assertEqual(worker.exitcode, 0)
+
     def test_append_replay_conflict_corruption(self):
         s = snap()
         t = s.decision_cutoff_ms
