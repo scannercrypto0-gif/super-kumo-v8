@@ -786,3 +786,32 @@ class TestFix4DurableCustody:
         _, _, opps, fills, state, report = _run_full_pipeline(bars)
         # This must not raise
         report.assert_denominator()
+
+
+class TestFactoryF4MandatoryLineageAndTamper:
+    """Focused negative guards; synthetic data only, not owner source admission."""
+
+    def test_policy_only_lineage_fails_closed(self):
+        from research_wp_r0.aql_p0_f4_ledger import LedgerLineageMissing
+        with pytest.raises(LedgerLineageMissing, match="F4_LINEAGE_MISSING"):
+            build_ledger([], [], trial_id="P0-NEGATIVE", policy_id="POLICY-ONLY")
+
+    def test_receipt_payload_tamper_fails_on_reload(self, tmp_path):
+        from research_wp_r0.aql_p0_f4_ledger import (
+            FinancialReceipt, LedgerReceiptCorrupted, load_receipts,
+        )
+        from research_wp_r0.aql_p0_c1_source import _canonical_bytes, _sha256_hex
+        fields = {
+            "bar_open_ms": 1000, "cash_delta": "-1", "cost_basis": "1",
+            "event_id": "event-one", "fee": "0", "held_btc_delta": "0.001",
+            "kind": "ENTRY_DEBIT", "opportunity_id": "opp-one",
+            "price_net": "1000", "quantity_btc": "0.001",
+        }
+        record = {**fields, "payload_hash": _sha256_hex(_canonical_bytes(fields))}
+        path = tmp_path / "financial_receipts.jsonl"
+        path.write_text(json.dumps(record, sort_keys=True) + "\\n")
+        assert load_receipts(path)["event-one"] == record["payload_hash"]
+        record["cash_delta"] = "-2"
+        path.write_text(json.dumps(record, sort_keys=True) + "\\n")
+        with pytest.raises(LedgerReceiptCorrupted, match="RECEIPT_PAYLOAD_TAMPER"):
+            load_receipts(path)
