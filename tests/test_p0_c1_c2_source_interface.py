@@ -751,7 +751,7 @@ class TestC1NestedBundleAdmission:
                 day = (date(2024,1,1) + timedelta(days=day_idx)).isoformat()
                 filename = f"BTCUSDT-15m-{day}.zip"
                 csv_buffer = io.StringIO()
-                writer = csv.writer(csv_buffer, lineterminator="\\n")
+                writer = csv.writer(csv_buffer, lineterminator="\n")
                 for bar_idx in range(96):
                     op = WINDOW_START_MS + (day_idx * 96 + bar_idx) * INTERVAL_MS
                     o, h, l, c, v = ("100.00", "102.00", "99.00", "101.00", "2.00")
