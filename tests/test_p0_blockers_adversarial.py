@@ -649,8 +649,8 @@ class TestF4DurableReceiptsBlocker:
             exit_price=44000.0,  # different exit price → different event → different hash
         )
 
-        _, report_v1 = build_ledger([opp], [fill_v1], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
-        _, report_v2 = build_ledger([opp], [fill_v2], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
+        _, report_v1 = build_ledger([opp], [fill_v1], trial_id="T001", policy_id="P0-SYNTHETIC-TEST", manifest_sha256="a" * 64, strategy_digest="synthetic-strategy-v1", assumptions_digest="synthetic-assumptions-v1")
+        _, report_v2 = build_ledger([opp], [fill_v2], trial_id="T001", policy_id="P0-SYNTHETIC-TEST", manifest_sha256="a" * 64, strategy_digest="synthetic-strategy-v1", assumptions_digest="synthetic-assumptions-v1")
 
         # Different event payload → different report_sha256
         assert report_v1.report_sha256() != report_v2.report_sha256(), (
@@ -705,8 +705,8 @@ class TestF4DurableReceiptsBlocker:
             WINDOW_START_MS + 14 * BAR_DURATION_MS,
             entry_price=44000.0, exit_price=43000.0)  # lower exit
 
-        state_a, report_a = build_ledger([opp1, opp2], [fill1a, fill2a], trial_id="T002", policy_id="P0-SYNTHETIC-TEST")
-        state_b, report_b = build_ledger([opp1, opp2], [fill1b, fill2b], trial_id="T002", policy_id="P0-SYNTHETIC-TEST")
+        state_a, report_a = build_ledger([opp1, opp2], [fill1a, fill2a], trial_id="T002", policy_id="P0-SYNTHETIC-TEST", manifest_sha256="a" * 64, strategy_digest="synthetic-strategy-v1", assumptions_digest="synthetic-assumptions-v1")
+        state_b, report_b = build_ledger([opp1, opp2], [fill1b, fill2b], trial_id="T002", policy_id="P0-SYNTHETIC-TEST", manifest_sha256="a" * 64, strategy_digest="synthetic-strategy-v1", assumptions_digest="synthetic-assumptions-v1")
 
         # Individual events differ → ordered_receipt_hashes differ → different report_sha256
         assert report_a.ordered_receipt_hashes != report_b.ordered_receipt_hashes
@@ -721,7 +721,7 @@ class TestF4DurableReceiptsBlocker:
             WINDOW_START_MS + 2 * BAR_DURATION_MS,
             WINDOW_START_MS + 5 * BAR_DURATION_MS)
 
-        state, report = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
+        state, report = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST", manifest_sha256="a" * 64, strategy_digest="synthetic-strategy-v1", assumptions_digest="synthetic-assumptions-v1")
 
         receipt_path = tmp_path / "receipts.jsonl"
         written = persist_receipts(state, receipt_path)
@@ -743,7 +743,7 @@ class TestF4DurableReceiptsBlocker:
             WINDOW_START_MS + 2 * BAR_DURATION_MS,
             WINDOW_START_MS + 5 * BAR_DURATION_MS)
 
-        state, _ = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
+        state, _ = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST", manifest_sha256="a" * 64, strategy_digest="synthetic-strategy-v1", assumptions_digest="synthetic-assumptions-v1")
         receipt_path = tmp_path / "receipts.jsonl"
 
         written1 = persist_receipts(state, receipt_path)
@@ -758,7 +758,7 @@ class TestF4DurableReceiptsBlocker:
             WINDOW_START_MS + 2 * BAR_DURATION_MS,
             WINDOW_START_MS + 5 * BAR_DURATION_MS)
 
-        state, _ = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
+        state, _ = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST", manifest_sha256="a" * 64, strategy_digest="synthetic-strategy-v1", assumptions_digest="synthetic-assumptions-v1")
         receipt_path = tmp_path / "receipts.jsonl"
         persist_receipts(state, receipt_path)
 
@@ -783,7 +783,7 @@ class TestF4DurableReceiptsBlocker:
             WINDOW_START_MS + 2 * BAR_DURATION_MS,
             WINDOW_START_MS + 5 * BAR_DURATION_MS)
 
-        _, report = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
+        _, report = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST", manifest_sha256="a" * 64, strategy_digest="synthetic-strategy-v1", assumptions_digest="synthetic-assumptions-v1")
         assert len(report.ordered_receipt_hashes) > 0, (
             "F4: ordered_receipt_hashes is empty — receipts not computed"
         )
@@ -795,7 +795,7 @@ class TestF4DurableReceiptsBlocker:
             WINDOW_START_MS + 2 * BAR_DURATION_MS,
             WINDOW_START_MS + 5 * BAR_DURATION_MS)
 
-        state, report = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
+        state, report = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST", manifest_sha256="a" * 64, strategy_digest="synthetic-strategy-v1", assumptions_digest="synthetic-assumptions-v1")
         report_path = tmp_path / "report.json"
         written_sha = persist_report(report, report_path, state)
 
@@ -820,7 +820,7 @@ class TestF4DurableReceiptsBlocker:
             WINDOW_START_MS + 5 * BAR_DURATION_MS)
 
         # Process 1: build + persist receipts (crash before persist_report)
-        state1, _ = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
+        state1, _ = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST", manifest_sha256="a" * 64, strategy_digest="synthetic-strategy-v1", assumptions_digest="synthetic-assumptions-v1")
         receipt_path = tmp_path / "receipts.jsonl"
         persist_receipts(state1, receipt_path)
 
@@ -884,7 +884,7 @@ fill = FillResult(
 
 # Restarted process: load persisted receipts, rebuild, reconcile
 persisted = load_receipts(receipt_path)
-state2, _ = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
+state2, _ = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST", manifest_sha256="a" * 64, strategy_digest="synthetic-strategy-v1", assumptions_digest="synthetic-assumptions-v1")
 reconcile_receipts(state2, persisted)   # must not raise
 
 # Re-persist: must write 0 new lines (no double-effect)
