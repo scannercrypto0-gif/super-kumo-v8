@@ -245,19 +245,27 @@ class DurableJournal:
             # Already APPLIED or ACKED — idempotent
             return
 
-        entry.state = "APPLIED"
-        self._append_and_fsync(entry)
+        applied_entry = ConsumerJournalEntry(
+            producer_event_id=entry.producer_event_id,
+            opportunity_id=entry.opportunity_id,
+            envelope_sha256=entry.envelope_sha256,
+            state="APPLIED",
+            consumer_receipt_hash=entry.consumer_receipt_hash,
+            source_bytes_sha256=entry.source_bytes_sha256,
+            run_manifest_sha256=entry.run_manifest_sha256,
+        )
+        self._append_and_fsync(applied_entry)
 
         # Readback verification: confirm the last APPLIED record is on disk
         disk_entries = _load_journal_file(self._path)
         disk_entry = disk_entries.get(producer_event_id)
         if disk_entry is None or disk_entry.state not in ("APPLIED", "ACKED"):
-            # Readback failed — revert in-memory state
-            entry.state = "PENDING"
+            # In-memory state was never promoted before the persisted readback.
             raise C2ConflictError(
                 f"APPLIED_READBACK_FAILED: {producer_event_id!r} not found "
                 f"as APPLIED on disk after write+fsync"
             )
+        self._entries[producer_event_id] = applied_entry
 
     def transition_acked(self, producer_event_ids: list[str], consumer_receipts: dict[str, str] | None = None) -> int:
         """Accept only a persisted Factory receipt AND its matching persisted effect.
@@ -268,6 +276,8 @@ class DurableJournal:
         """
         if not consumer_receipts:
             raise C2ConflictError("ACK_CONSUMER_RECEIPT_REQUIRED")
+        if len(set(producer_event_ids)) != len(producer_event_ids):
+            raise C2ConflictError("ACK_DUPLICATE_EVENT_ID")
         validated = []
         for pid in producer_event_ids:
             entry = self._entries.get(pid)
@@ -359,7 +369,10 @@ def _load_journal_file(path: Path) -> dict[str, ConsumerJournalEntry]:
                 existing = entries[pid]
                 # STOP on digest inconsistency — same pid, different sha256
                 # indicates history overwrite attempt or data corruption
-                if existing.envelope_sha256 != rec["envelope_sha256"]:
+                if (existing.envelope_sha256 != rec["envelope_sha256"] or
+                    existing.opportunity_id != rec["opportunity_id"] or
+                    existing.source_bytes_sha256 != rec.get("source_bytes_sha256") or
+                    existing.run_manifest_sha256 != rec.get("run_manifest_sha256")):
                     raise C2ConflictError(
                         f"JOURNAL_DIGEST_INCONSISTENCY: pid={pid!r} "
                         f"stored={existing.envelope_sha256!r} "
