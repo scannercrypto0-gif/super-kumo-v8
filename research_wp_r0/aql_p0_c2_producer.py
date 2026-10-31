@@ -354,7 +354,7 @@ def produce_envelopes(
         )
         envelopes.append(envelope)
 
-        # Update journal with PENDING state for new envelopes
+        # Journal lifecycle: PENDING on first creation, APPLIED after envelope emitted
         if prod_event_id not in consumer_journal:
             consumer_journal[prod_event_id] = ConsumerJournalEntry(
                 producer_event_id=prod_event_id,
@@ -363,4 +363,55 @@ def produce_envelopes(
                 state="PENDING",
             )
 
+        # Transition PENDING → APPLIED: envelope successfully produced and appended
+        if consumer_journal[prod_event_id].state == "PENDING":
+            consumer_journal[prod_event_id].state = "APPLIED"
+
     return envelopes
+
+
+def ack_envelopes(
+    producer_event_ids: list[str],
+    consumer_journal: dict[str, ConsumerJournalEntry],
+) -> int:
+    """Transition APPLIED → ACKED for all confirmed producer_event_ids.
+
+    Called by the downstream consumer (F1/Factory) after confirming it has
+    successfully consumed and stored the envelopes. This completes the
+    PENDING→APPLIED→ACKED lifecycle.
+
+    Parameters
+    ----------
+    producer_event_ids:
+        IDs to acknowledge. Must already be APPLIED in the journal.
+    consumer_journal:
+        The producer journal dict (mutated in place).
+
+    Returns
+    -------
+    int
+        Number of entries transitioned to ACKED.
+
+    Raises
+    ------
+    C2ConflictError
+        If an ID is missing from the journal or already in PENDING state
+        (which would mean the envelope was never APPLIED — logic error).
+    """
+    acked = 0
+    for pid in producer_event_ids:
+        entry = consumer_journal.get(pid)
+        if entry is None:
+            raise C2ConflictError(
+                f"ACK_UNKNOWN_ID: producer_event_id={pid!r} not in journal"
+            )
+        if entry.state == "PENDING":
+            raise C2ConflictError(
+                f"ACK_NOT_APPLIED: producer_event_id={pid!r} still in PENDING state "
+                f"(was never transitioned to APPLIED)"
+            )
+        if entry.state == "APPLIED":
+            entry.state = "ACKED"
+            acked += 1
+        # If already ACKED: idempotent no-op
+    return acked

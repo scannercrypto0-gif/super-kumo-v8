@@ -51,9 +51,15 @@ RESEARCH_ONLY = True
 # Core C1 works from the NORMALIZED JSON form for bar-level decisions.
 # Reverify all hashes in executor environment — do not trust ambient state.
 
-NORMALIZED_SHA256 = "aa740790922df44afb50059f5816771bfe97e0316f7eea6657ad5400c5585008"
-SOURCE_BYTES_SHA256 = "4ec2915e610ab4e9a4d5e86a5ada1c15bbf6b5db343cdb385681d6ac97166a4e"
-RECEIPT_SHA256 = "ffce2bbe7890414d84360be80a0ac478795ae8d1a28085f8bb34075faca83386"
+# Hash domain map (Factory #77 comment 6540521965 — three distinct commitments):
+#   OUTER_ZIP_SHA256  : SHA-256 of the owner's delivery ZIP package
+#   MANIFEST_SHA256   : SHA-256 of manifest.json inside the ZIP
+#   NORMALIZED_SHA256 : SHA-256 of the normalized JSON (bar-level decision input, validated here)
+OUTER_ZIP_SHA256 = "f4e0b3680dd56c9fbe680be2473b8de29fc1d8d7e22657973c85945d2bf99f97"
+MANIFEST_SHA256 = "f731bc19c1d4bb0dfa79198c6739a4dbd356e02904086d4df2a136773bd25456"
+NORMALIZED_SHA256 = "a881cc99e80697f2da57784b5bea91a7f339c6c391d4d53cc0222842168af0f0"
+# CONTRACT FIELD source_bytes_sha256 = OUTER_ZIP_SHA256 (identifies the full owner package)
+SOURCE_BYTES_SHA256 = OUTER_ZIP_SHA256
 RECEIPT_STATUS = "MISSING_UNATTESTED"   # No independently observed receipt; null in contract
 RECEIPT_MISSING_REASON = "Binance publisher checksum files establish byte integrity only; no independently recorded historical-arrival timestamp is available for the original ZIP delivery."
 CUSTODY_STATUS = "LOCAL_VERIFIED_NON_INDEPENDENT"
@@ -191,6 +197,7 @@ def load_source(
     raw_generation_id: str = "P0-DEV-2024-01-01-TO-2024-01-08",
     correction_generation_id: str = "UNKNOWN_NOT_ATTESTED",
     manifest_integrity_sha256: str,
+    _skip_hash_check: bool = False,
 ) -> P0SourceManifest:
     """Load and validate owner-supplied normalized BTCUSDT 15m source.
 
@@ -228,11 +235,15 @@ def load_source(
         raise C1SourceRejected("NORMALIZED_JSON_EMPTY")
 
     # --- Hash check FIRST (fail before parsing on mismatch) ---
-    actual_sha = _sha256_hex(normalized_json_bytes)
-    if actual_sha != NORMALIZED_SHA256:
-        raise C1SourceRejected(
-            f"NORMALIZED_SHA256_MISMATCH: expected {NORMALIZED_SHA256!r} got {actual_sha!r}"
-        )
+    # _skip_hash_check=True is TEST-ONLY: allows synthetic data with known defects
+    # (OHLCV violations, grid gaps, tampered bars) to bypass hash guard so the
+    # actual data validation guards are exercised. NEVER use in production.
+    if not _skip_hash_check:
+        actual_sha = _sha256_hex(normalized_json_bytes)
+        if actual_sha != NORMALIZED_SHA256:
+            raise C1SourceRejected(
+                f"NORMALIZED_SHA256_MISMATCH: expected {NORMALIZED_SHA256!r} got {actual_sha!r}"
+            )
 
     # --- Parse ---
     try:
