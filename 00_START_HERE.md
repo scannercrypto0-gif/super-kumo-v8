@@ -44,7 +44,7 @@ Resume map: current phase and active task → STATE's “Bootstrap and active wo
 
 ## Reusable startup prompt
 
-> Resume ATLAS Quant Lab (AQL-CRYPTO-RESEARCH-001) from https://github.com/scannercrypto0-gif/super-kumo-v8 and follow 00_START_HERE.md. Verify identity on latest main; stop on mismatch. Activate SESSION_PROTOCOL.md's proactive pending-change ledger and checkpoint handoffs: automatically provide one consolidated copy-ready Work instruction when meaningful work is ready, or perform already-authorized direct writes and return evidence. Reconcile pending items with GitHub; keep G0 OPEN.
+> Resume ATLAS Quant Lab (AQL-CRYPTO-RESEARCH-001) from https://github.com/scannercrypto0-gif/super-kumo-v8 and follow 00_START_HERE.md. Verify identity on latest main; stop on mismatch. Activate SESSION_PROTOCOL.md's proactive pending-change ledger and checkpoint handoffs: automatically provide one consolidated copy-ready Work instruction when meaningful work is ready, or perform already-authorized direct writes and return evidence. Reconcile pending items with GitHub; G0 FINAL APPROVED 2026-10-22 per closed Issue #1; R09 unresolved before V7 legacy reuse; G1 completion or live/paper/formal B0/OOS authorization is not implied.
 
 ## Proactive documentation and Work handoff
 
@@ -52,7 +52,7 @@ Every session must follow [SESSION_PROTOCOL.md](SESSION_PROTOCOL.md#proactive-wo
 
 ## Handoff continuity and completeness — G0-GOV-01
 
-Before generating any new Work handoff, read [HANDOFF_REGISTER.md](HANDOFF_REGISTER.md) and apply [G0-GOV-01](03_DECISIONS.md#g0-gov-01--work-handoff-continuity-and-completeness). Use the latest owner-confirmed submitted baseline plus addenda, account for every delta, and audit completeness. Ask for inaccessible handoff references; never claim unseen cross-chat or execution coverage. The rule remains owner-approved provisional; G0 remains OPEN.
+Before generating any new Work handoff, read [HANDOFF_REGISTER.md](HANDOFF_REGISTER.md) and apply [G0-GOV-01](03_DECISIONS.md#g0-gov-01--work-handoff-continuity-and-completeness). Use the latest owner-confirmed submitted baseline plus addenda, account for every delta, and audit completeness. Ask for inaccessible handoff references; never claim unseen cross-chat or execution coverage. The G0-GOV-01 rule remains owner-approved provisional pending its own final adoption; the G0 gate itself was FINAL APPROVED 2026-10-22 per closed Issue #1. R09 remains unresolved before V7 legacy reuse; G1 approval is separate.
 
 ## G0 reconciliation source map
-Read STATE's dated evidence ledger and the decision register's reconciliation matrix for current source-PR status, provisional INT-01–06 and unresolved parameters. Branch proposals are not main. The canonical GOV-01 definition appears once in DECISIONS; HANDOFF_REGISTER preserves distinct lifecycle events. This reconciliation changes documentation only; no G0 approval or implementation authorization.
+Read STATE's dated evidence ledger and the decision register's reconciliation matrix for current source-PR status, provisional INT-01–06 and unresolved parameters. Branch proposals are not main. The canonical GOV-01 definition appears once in DECISIONS; HANDOFF_REGISTER preserves distinct lifecycle events. This reconciliation changes documentation only; it does not grant new implementation, G1, live/paper, formal B0 or OOS authorization beyond the already recorded G0 FINAL APPROVED 2026-10-22 per closed Issue #1.
