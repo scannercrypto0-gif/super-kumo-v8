@@ -168,7 +168,11 @@ def model_fills(
     held_until_ms: int | None = None       # exit execution bar open_ms
     pending_exit_proceeds: Decimal | None = None  # cash from exit when held_until_ms fires
 
+    last_decision_ms: int | None = None
     for opp in opportunities:
+        if last_decision_ms is not None and opp.decision_ms < last_decision_ms:
+            raise F3FillError("OPPORTUNITIES_NOT_CHRONOLOGICAL")
+        last_decision_ms = opp.decision_ms
         if opp.signal_state != SignalState.ARMED:
             results.append(FillResult(
                 opportunity_id=opp.opportunity_id,
@@ -190,6 +194,21 @@ def model_fills(
             results.append(FillResult(
                 opportunity_id=opp.opportunity_id,
                 signal_state="NO_FILL", reason_code="NO_ENTRY_BAR_AFTER_DECISION_MS",
+                entry_bar_open_ms=None,
+                entry_price_gross=None, entry_price_net=None, entry_fee=None,
+                exit_bar_open_ms=None,
+                exit_price_gross=None, exit_price_net=None, exit_fee=None,
+                gross_return=None, net_return=None, is_terminal=True,
+            ))
+            continue
+
+        # A decision made while an earlier position is still held cannot reserve
+        # a future entry slot merely because that slot occurs after the exit.
+        # The strategy makes the accept/reject decision at decision_ms.
+        if held_position and (held_until_ms is None or opp.decision_ms < held_until_ms):
+            results.append(FillResult(
+                opportunity_id=opp.opportunity_id,
+                signal_state="REJECTED", reason_code="POSITION_ALREADY_OPEN_AT_DECISION",
                 entry_bar_open_ms=None,
                 entry_price_gross=None, entry_price_net=None, entry_fee=None,
                 exit_bar_open_ms=None,
