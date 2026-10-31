@@ -560,10 +560,28 @@ def persist_consumer_effect_receipts(
         raise LedgerIdentityError("CONSUMER_RECEIPT_DENOMINATOR_MISMATCH")
     if not isinstance(manifest_sha256, str) or len(manifest_sha256) != 64:
         raise LedgerLineageMissing("CONSUMER_MANIFEST_SHA256_REQUIRED")
+    # This P0 trial has one frozen, byte-attested C1 source manifest.
+    # A caller-selected 64-character digest is NOT a valid source commitment.
+    from .aql_p0_c1_custody import MANIFEST_SHA as VERIFIED_C1_MANIFEST_SHA
+    if manifest_sha256 != VERIFIED_C1_MANIFEST_SHA:
+        raise LedgerLineageMissing("CONSUMER_SOURCE_MANIFEST_MISMATCH")
     if not isinstance(assumptions_digest, str) or not assumptions_digest:
         raise LedgerLineageMissing("CONSUMER_ASSUMPTIONS_DIGEST_REQUIRED")
     if len({o.opportunity_id for o in opportunities}) != len(opportunities):
         raise LedgerIdentityError("CONSUMER_DUPLICATE_OPPORTUNITY_ID")
+    # Fail closed on ALL producer/decision identities before writing financial
+    # events. Otherwise a late invalid envelope can leave orphaned durable rows.
+    if len({env.producer_event_id for env in envelopes}) != len(envelopes):
+        raise LedgerIdentityError("CONSUMER_DUPLICATE_PRODUCER_ID")
+    for env, opp, fill in zip(envelopes, opportunities, fill_results):
+        if not isinstance(env, DecisionEnvelope) or env.opportunity_id != opp.opportunity_id or opp.opportunity_id != fill.opportunity_id:
+            raise LedgerIdentityError("CONSUMER_RECEIPT_IDENTITY_MISMATCH")
+        if env.input_disposition != "EVALUABLE_RETROSPECTIVE" and fill.signal_state in ("TRIGGERED", "OPEN_UNRESOLVED"):
+            raise LedgerIdentityError("CONSUMER_BLOCKED_SOURCE_HAS_FINANCIAL_EFFECT")
+        if not env.strategy_digest or not env.run_manifest_sha256 or not env.trial_id:
+            raise LedgerLineageMissing("CONSUMER_PRODUCER_BINDING_INCOMPLETE")
+        if assumptions_digest != _assumptions_digest(env.source_lag_assumption_ms, env.latency_assumption_ms):
+            raise LedgerIdentityError("CONSUMER_ASSUMPTIONS_ENVELOPE_MISMATCH")
     receipts: list[FinancialReceipt] = getattr(state, "_receipts", [])
     financial_path = directory / "financial_receipts.jsonl"
     if receipts:
