@@ -195,11 +195,20 @@ def market_outcome(snapshot, horizon_ms, bars, *, source_version, source_end_exc
 
 
 class AppendOnlyOutcomeJournal:
-    """fsync + deterministic idempotent replay. No position side effects."""
+    """Research-only immutable outcomes, serialized and replay-validated.
+
+    A lock directory is acquired atomically before re-reading and appending.
+    Contention and crash-left locks fail closed; no automatic lock stealing.
+    """
 
     def __init__(self, path):
         self.path = Path(path)
+        self.lock_path = Path(str(self.path) + ".lock")
         self._seen = {}
+        self._reload()
+
+    def _reload(self):
+        seen = {}
         if self.path.exists():
             with self.path.open("rb") as f:
                 for line in f:
@@ -208,22 +217,19 @@ class AppendOnlyOutcomeJournal:
                         payload = record["payload"]
                         if record["sha256"] != digest(payload):
                             raise EvidenceError("journal checksum mismatch")
-                        self._accept(payload)
+                        key = payload["outcome_id"]
+                        if payload.get("evaluation_version_id", key) != key:
+                            raise EvidenceError("evaluation identity mismatch")
+                        if payload.get("evaluation_record_id") != digest(
+                                {k: v for k, v in payload.items() if k != "evaluation_record_id"}):
+                            raise EvidenceError("evaluation record checksum mismatch")
+                        encoded = canonical(payload)
+                        if key in seen and seen[key] != encoded:
+                            raise EvidenceError("conflicting outcome generation")
+                        seen[key] = encoded
                     except (ValueError, KeyError, TypeError) as exc:
                         raise EvidenceError("corrupt journal; fail closed") from exc
-
-    def _accept(self, payload):
-        key = payload["outcome_id"]
-        if payload.get("evaluation_version_id", key) != key:
-            raise EvidenceError("evaluation identity mismatch")
-        if "evaluation_record_id" in payload and payload["evaluation_record_id"] != digest({k: v for k, v in payload.items() if k != "evaluation_record_id"}):
-            raise EvidenceError("evaluation record checksum mismatch")
-        encoded = canonical(payload)
-        if key in self._seen and self._seen[key] != encoded:
-            raise EvidenceError("conflicting outcome generation")
-        old = key in self._seen
-        self._seen[key] = encoded
-        return not old
+        self._seen = seen
 
     def append(self, payload):
         payload = dict(payload)
@@ -231,21 +237,30 @@ class AppendOnlyOutcomeJournal:
         key = payload["outcome_id"]
         if payload.get("evaluation_version_id", key) != key:
             raise EvidenceError("evaluation identity mismatch")
-        if payload["evaluation_record_id"] != digest({k: v for k, v in payload.items() if k != "evaluation_record_id"}):
+        if payload["evaluation_record_id"] != digest(
+                {k: v for k, v in payload.items() if k != "evaluation_record_id"}):
             raise EvidenceError("evaluation record checksum mismatch")
         encoded = canonical(payload)
-        if key in self._seen:
-            if self._seen[key] != encoded:
-                raise EvidenceError("conflicting outcome generation")
-            return False
-        record = (canonical({"payload": payload, "sha256": digest(payload)}) + "\n").encode()
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("ab") as f:
-            f.write(record)
-            f.flush()
-            os.fsync(f.fileno())
-        self._seen[key] = encoded
-        return True
+        try:
+            self.lock_path.mkdir()
+        except FileExistsError as exc:
+            raise EvidenceError("outcome journal locked; fail closed") from exc
+        try:
+            self._reload()
+            if key in self._seen:
+                if self._seen[key] != encoded:
+                    raise EvidenceError("conflicting outcome generation")
+                return False
+            record = (canonical({"payload": payload, "sha256": digest(payload)}) + "\n").encode()
+            with self.path.open("ab") as f:
+                f.write(record)
+                f.flush()
+                os.fsync(f.fileno())
+            self._seen[key] = encoded
+            return True
+        finally:
+            self.lock_path.rmdir()
 
 
 class OutcomeTransitionJournal:
