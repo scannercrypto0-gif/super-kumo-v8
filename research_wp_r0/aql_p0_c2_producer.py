@@ -256,7 +256,14 @@ class DurableJournal:
         """
         if producer_event_id in self._entries:
             existing = self._entries[producer_event_id]
-            if (existing.envelope_sha256 != envelope_sha256 or (source_bytes_sha256 is not None and existing.source_bytes_sha256 not in (None, source_bytes_sha256)) or (run_manifest_sha256 is not None and existing.run_manifest_sha256 not in (None, run_manifest_sha256))):
+            if (existing.envelope_sha256 != envelope_sha256 or
+                existing.opportunity_id != opportunity_id or
+                (source_bytes_sha256 is not None and existing.source_bytes_sha256 != source_bytes_sha256) or
+                (run_manifest_sha256 is not None and existing.run_manifest_sha256 != run_manifest_sha256) or
+                (trial_id is not None and existing.trial_id != trial_id) or
+                (strategy_digest is not None and existing.strategy_digest != strategy_digest) or
+                (policy_id is not None and existing.policy_id != policy_id) or
+                (assumptions_digest is not None and existing.assumptions_digest != assumptions_digest)):
                 raise C2ConflictError(
                     f"CONFLICT: producer_event_id={producer_event_id!r} was previously "
                     f"journaled with digest={existing.envelope_sha256!r} but now "
@@ -311,6 +318,10 @@ class DurableJournal:
             consumer_receipt_hash=entry.consumer_receipt_hash,
             source_bytes_sha256=entry.source_bytes_sha256,
             run_manifest_sha256=entry.run_manifest_sha256,
+            trial_id=entry.trial_id,
+            strategy_digest=entry.strategy_digest,
+            policy_id=entry.policy_id,
+            assumptions_digest=entry.assumptions_digest,
         )
         self._append_and_fsync(applied_entry)
 
