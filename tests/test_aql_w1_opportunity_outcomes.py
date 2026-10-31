@@ -1,4 +1,6 @@
 import tempfile
+import multiprocessing
+import os
 import unittest
 from pathlib import Path
 
@@ -6,6 +8,14 @@ from research_wp_r0.aql_w1_opportunity_outcomes import (
     BAR_MS, HORIZONS, AppendOnlyOutcomeJournal, OutcomeTransitionJournal, EvidenceError,
     RetrospectiveSnapshot, market_outcome, reconcile,
 )
+
+
+
+def _hold_transition_lock(lock_path, ready, release):
+    Path(lock_path).mkdir()
+    ready.set()
+    release.wait(10)
+    Path(lock_path).rmdir()
 
 
 def snap(t=1704067200000, direction="LONG"):
@@ -161,6 +171,47 @@ class W1OutcomesTest(unittest.TestCase):
                 f.write(b"bad tail")
             with self.assertRaises(EvidenceError):
                 OutcomeTransitionJournal(path)
+
+    def test_transition_real_process_contention(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "transition.jsonl"
+            journal = OutcomeTransitionJournal(path)
+            ctx = multiprocessing.get_context("spawn")
+            ready, release = ctx.Event(), ctx.Event()
+            worker = ctx.Process(target=_hold_transition_lock,
+                                 args=(str(journal.lock_path), ready, release))
+            worker.start()
+            try:
+                self.assertTrue(ready.wait(10), "child failed to acquire lock")
+                with self.assertRaises(EvidenceError):
+                    journal.append("version", "PENDING")
+            finally:
+                release.set()
+                worker.join(10)
+                if worker.is_alive():
+                    worker.terminate()
+                    worker.join()
+            self.assertEqual(worker.exitcode, 0)
+            self.assertTrue(journal.append("version", "PENDING"))
+            self.assertFalse(OutcomeTransitionJournal(path).append("version", "PENDING"))
+
+    def test_transition_crash_artifacts_fail_closed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "transition.jsonl"
+            journal = OutcomeTransitionJournal(path)
+            self.assertTrue(journal.append("version", "PENDING"))
+            journal.lock_path.mkdir()
+            with self.assertRaises(EvidenceError):
+                OutcomeTransitionJournal(path).append("version", "EVALUATED")
+            journal.lock_path.rmdir()  # explicit operator action, never automatic
+            with path.open("ab") as f:
+                f.write(b'{"event":')
+                f.flush()
+                os.fsync(f.fileno())
+            with self.assertRaises(EvidenceError):
+                OutcomeTransitionJournal(path)
+            with self.assertRaises(EvidenceError):
+                journal.append("version", "EVALUATED")
 
     def test_append_replay_conflict_corruption(self):
         s = snap()
