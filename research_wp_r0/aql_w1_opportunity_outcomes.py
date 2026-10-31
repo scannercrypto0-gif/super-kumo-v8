@@ -59,6 +59,12 @@ class RetrospectiveSnapshot:
             raise EvidenceError("retrospective PIT time cannot be invented")
 
     @property
+    def opportunity_identity(self):
+        return digest({"trial_id": self.trial_id, "opportunity_id": self.opportunity_id,
+                       "producer_event_id": self.producer_event_id,
+                       "envelope_sha256": self.envelope_sha256})
+
+    @property
     def snapshot_id(self):
         return digest({"schema": 1, **asdict(self)})
 
@@ -120,21 +126,25 @@ def reconcile(envelopes, selections):
 
 
 def market_outcome(snapshot, horizon_ms, bars, *, source_version, source_end_exclusive_ms,
-                   archive_finalized=True, policy_version="W1-MARKET-v1"):
+                   archive_finalized=True, policy_version="W1-MARKET-v1",
+                   correction_generation="original"):
     """bars are OHLC dicts with open_ms/open/high/low/close and finalized flag.
 
     OPEN(t) is a non-executable retrospective reference; the modeled decision
     may occur later. All H/15m finalized bars are required, no partial MFE.
     """
-    if not source_version or not policy_version:
+    if not source_version or not policy_version or not correction_generation:
         raise EvidenceError("missing source or policy version")
     if horizon_ms not in HORIZONS:
         raise EvidenceError("unsupported horizon")
     t = snapshot.decision_cutoff_ms
     due = t + horizon_ms
-    key = {"snapshot_id": snapshot.snapshot_id, "horizon_ms": horizon_ms,
-           "source_version": source_version, "policy_version": policy_version}
-    result = {"outcome_id": digest(key), **key, "due_at_ms": due,
+    key = {"opportunity_identity": snapshot.opportunity_identity,
+           "snapshot_id": snapshot.snapshot_id, "horizon_ms": horizon_ms,
+           "source_version": source_version, "policy_version": policy_version,
+           "correction_generation": correction_generation}
+    result = {"outcome_id": digest(key), "evaluation_version_id": digest(key),
+              **key, "due_at_ms": due,
               "reference_kind": "OPEN_AT_CUTOFF_NON_EXECUTABLE",
               "execution_status": "NOT_OBSERVED", "order_resolution": "NOT_ASSESSED",
               "window_quality": "NOT_READY", "excursion_metrics_status": "NOT_EVALUATED",
@@ -204,6 +214,10 @@ class AppendOnlyOutcomeJournal:
 
     def _accept(self, payload):
         key = payload["outcome_id"]
+        if payload.get("evaluation_version_id", key) != key:
+            raise EvidenceError("evaluation identity mismatch")
+        if "evaluation_record_id" in payload and payload["evaluation_record_id"] != digest({k: v for k, v in payload.items() if k != "evaluation_record_id"}):
+            raise EvidenceError("evaluation record checksum mismatch")
         encoded = canonical(payload)
         if key in self._seen and self._seen[key] != encoded:
             raise EvidenceError("conflicting outcome generation")
@@ -212,7 +226,13 @@ class AppendOnlyOutcomeJournal:
         return not old
 
     def append(self, payload):
+        payload = dict(payload)
+        payload.setdefault("evaluation_record_id", digest(payload))
         key = payload["outcome_id"]
+        if payload.get("evaluation_version_id", key) != key:
+            raise EvidenceError("evaluation identity mismatch")
+        if payload["evaluation_record_id"] != digest({k: v for k, v in payload.items() if k != "evaluation_record_id"}):
+            raise EvidenceError("evaluation record checksum mismatch")
         encoded = canonical(payload)
         if key in self._seen:
             if self._seen[key] != encoded:
