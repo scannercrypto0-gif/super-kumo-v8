@@ -10,7 +10,7 @@ Read `GITHUB_OPERATING_MODEL.md`, `COMMUNICATION_PROTOCOL.md`, and `GITHUB_SETUP
 - Official repository: [scannercrypto0-gif/super-kumo-v8](https://github.com/scannercrypto0-gif/super-kumo-v8).
 - Former name: SUPER KUMO V8.
 - Owner: `scannercrypto0-gif`.
-- Current phase: **G0 OPEN**; G0-001 remains OPEN.
+- Current phase: **G0 APPROVED** (2026-10-22); Issue #1 closed. R09 credential revocation mandatory before any V7 code/credential reuse.
 - Operational V8 implementation: **not yet verified or started** in this project. Legacy V8 terminology identifies technical/history context, not implementation evidence.
 
 ## Context isolation
@@ -20,7 +20,7 @@ Every new ChatGPT, Work or Claude session must verify Project ID `AQL-CRYPTO-RES
 Unrelated conversations describing V7 step 311, `gate_spot_cvd.py`, or other projects are not authoritative evidence of ATLAS Quant Lab implementation. Preserve legitimate repository history and legacy references; use them only with traceable evidence tied to this Project ID and repository.
 
 
-**Status:** G0 OPEN — design contract DRAFT, no trading code or cloud integration.
+**Status:** G0 APPROVED (2026-10-22) — Issue #1 closed. R09 credential revocation unresolved (mandatory before V7 reuse). P0 research implementation in progress on branch `p0/aql-p0-historical-decision-v1`.
 
 ## First read (every session)
 1. `00_START_HERE.md`
@@ -43,7 +43,7 @@ Unrelated conversations describing V7 step 311, `gate_spot_cvd.py`, or other pro
 - Official owner: `scannercrypto0-gif`.
 - Default branch: `main`.
 - Bootstrap: WP-000 governance files are published; owner review remains pending.
-- Active work: [G0-001 architecture review — Issue #1](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/1) (OPEN).
+- G0 gate: [Issue #1](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/1) **CLOSED/APPROVED 2026-10-22**. Active P0 research on branch `p0/aql-p0-historical-decision-v1`.
 - [ChatGPT architecture review — Round 1](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/1#issuecomment-6285495222): **CONDITIONALLY ACCEPTABLE — NOT YET APPROVED**.
 
 To obtain a local checkout:
@@ -56,4 +56,4 @@ git switch main
 Do not share a Supabase service-role key or exchange secret in chat.
 
 ## Current next step
-Claude performs an independent architecture review using `07_CLAUDE_HANDOFF.md`. The owner resolves or explicitly defers critical questions with rationale and approves the final contract before authorizing G0 closure and G1 work. The five unresolved areas are paper execution, temporal integrity, recovery/idempotency, research methodology, and operational budgets; see [current state](04_STATE.md). G0 and G0-001 remain OPEN; this review does not authorize production implementation.
+G0 FINAL APPROVED 2026-10-22 per closed Issue #1. R09 credential revocation remains unresolved and mandatory before V7 legacy reuse. G1 remains a separate gate; G0 approval does not authorize live/paper trading, formal B0/OOS evaluation, or a P0 historical smoke run. Current bounded P0 DEV integration is tracked in Draft PR #204 and requires independent Audit disposition before any separately authorized trial; see [current state](04_STATE.md).
