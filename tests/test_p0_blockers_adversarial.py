@@ -1068,9 +1068,9 @@ class TestC2TailRecoveryGap2:
 
     def test_ack_arbitrary_hash_not_validated_receipt(self, tmp_path):
         journal = DurableJournal(tmp_path / "journal.jsonl")
-        journal.write_pending("PE-002","OPP-002","a"*64,source_bytes_sha256="b"*64,run_manifest_sha256="c"*64)
+        journal.write_pending("PE-002","OPP-002","a"*64,source_bytes_sha256="b"*64,run_manifest_sha256="c"*64,trial_id="T",strategy_digest="d"*64,policy_id="P",assumptions_digest="e"*64)
         journal.transition_applied("PE-002")
-        with pytest.raises(C2ConflictError,match="ACK_RECEIPT_OR_EFFECT_UNREADABLE"):
+        with pytest.raises(C2ConflictError,match="ACK_FACTORY_RECEIPT_READBACK_INVALID"):
             journal.transition_acked(["PE-002"], consumer_receipts={"PE-002":"d"*64})
         assert DurableJournal(tmp_path/"journal.jsonl").entries["PE-002"].state == "APPLIED"
 
