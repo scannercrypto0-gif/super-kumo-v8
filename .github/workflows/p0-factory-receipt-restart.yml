@@ -7,8 +7,6 @@ on:
       - 'research_wp_r0/aql_p0_c1_source.py'
       - 'research_wp_r0/aql_p0_c1_custody.py'
       - 'scripts/verify_p0_owner_source_bytes.py'
-      - 'research_wp_r0/aql_p0_c1_custody.py'
-      - 'scripts/verify_p0_owner_source_bytes.py'
       - 'research_wp_r0/aql_p0_c2_producer.py'
       - 'research_wp_r0/aql_p0_f4_ledger.py'
       - 'tests/test_p0_factory_consumer_ack_restart.py'
@@ -16,6 +14,8 @@ on:
   pull_request:
     paths:
       - 'research_wp_r0/aql_p0_c1_source.py'
+      - 'research_wp_r0/aql_p0_c1_custody.py'
+      - 'scripts/verify_p0_owner_source_bytes.py'
       - 'research_wp_r0/aql_p0_c2_producer.py'
       - 'research_wp_r0/aql_p0_f4_ledger.py'
       - 'tests/test_p0_factory_consumer_ack_restart.py'
