@@ -11,6 +11,7 @@ import sys
 
 import pytest
 
+from research_wp_r0.aql_p0_c1_custody import MANIFEST_SHA
 from research_wp_r0.aql_p0_c2_producer import (
     DecisionEnvelope, DurableJournal, C2ConflictError, POLICY_ID,
     _assumptions_digest, load_journal,
@@ -45,7 +46,7 @@ def _persist(tmp_path, env, assumptions=None):
         directory=tmp_path / "factory", envelopes=[env],
         opportunities=[SimpleNamespace(opportunity_id=env.opportunity_id)],
         fill_results=[SimpleNamespace(opportunity_id=env.opportunity_id, signal_state="NO_SIGNAL")],
-        state=LedgerState(), manifest_sha256="1" * 64,
+        state=LedgerState(), manifest_sha256=MANIFEST_SHA,
         assumptions_digest=assumptions or _assumptions_digest(
             env.source_lag_assumption_ms, env.latency_assumption_ms
         ),
@@ -120,3 +121,47 @@ def test_owner_source_attestation_requires_actual_three_original_domains(tmp_pat
         p.write_bytes(b"synthetic-not-owner-original")
     with pytest.raises(SourceCustodyError, match="OUTER_ZIP_SHA256_MISMATCH"):
         verify_owner_evidence(outer, manifest, normalized)
+
+
+def test_f4_rejects_unverified_caller_manifest_before_writing(tmp_path):
+    env = _envelope()
+    with pytest.raises(Exception, match="CONSUMER_SOURCE_MANIFEST_MISMATCH"):
+        persist_consumer_effect_receipts(
+            directory=tmp_path / "factory", envelopes=[env],
+            opportunities=[SimpleNamespace(opportunity_id=env.opportunity_id)],
+            fill_results=[SimpleNamespace(opportunity_id=env.opportunity_id, signal_state="NO_SIGNAL")],
+            state=LedgerState(), manifest_sha256="1" * 64,
+            assumptions_digest=_assumptions_digest(env.source_lag_assumption_ms, env.latency_assumption_ms),
+        )
+    assert not (tmp_path / "factory").exists()
+
+
+def test_f4_preflight_rejects_bad_later_envelope_without_orphaned_effects(tmp_path):
+    from research_wp_r0.aql_p0_f4_ledger import LedgerEvent, FinancialReceipt
+    from decimal import Decimal
+    env = _envelope()
+    env2 = replace(env, producer_event_id="second-producer", opportunity_id="second-opp")
+    event = LedgerEvent(
+        event_id="financial-entry", opportunity_id=env.opportunity_id,
+        kind="ENTRY_DEBIT", bar_open_ms=1100, price_net=Decimal("100"),
+        quantity_btc=Decimal("1"), fee=Decimal("0"), cost_basis=Decimal("100"),
+        cash_delta=Decimal("-100"), cumulative_cash=None,
+        held_btc_delta=Decimal("1"), cumulative_held_btc=None,
+    )
+    state = LedgerState()
+    state._receipts = [FinancialReceipt.from_event(event)]
+    with pytest.raises(LedgerIdentityError, match="CONSUMER_RECEIPT_IDENTITY_MISMATCH"):
+        persist_consumer_effect_receipts(
+            directory=tmp_path / "factory", envelopes=[env, env2],
+            opportunities=[
+                SimpleNamespace(opportunity_id=env.opportunity_id),
+                SimpleNamespace(opportunity_id="wrong-second-opp"),
+            ],
+            fill_results=[
+                SimpleNamespace(opportunity_id=env.opportunity_id, signal_state="TRIGGERED"),
+                SimpleNamespace(opportunity_id=env2.opportunity_id, signal_state="NO_SIGNAL"),
+            ],
+            state=state, manifest_sha256=MANIFEST_SHA,
+            assumptions_digest=_assumptions_digest(env.source_lag_assumption_ms, env.latency_assumption_ms),
+        )
+    assert not (tmp_path / "factory" / "financial_receipts.jsonl").exists()
