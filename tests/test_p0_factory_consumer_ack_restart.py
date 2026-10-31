@@ -228,3 +228,42 @@ assert load_journal(Path(sys.argv[1])).transition_acked([pid], {pid: sys.argv[2]
     journal2.transition_applied(env.producer_event_id)
     with pytest.raises(C2ConflictError):
         journal2.transition_acked([env.producer_event_id], paths)
+
+
+def test_f3_entry_strictly_after_decision_and_no_fill_at_terminal():
+    from research_wp_r0.aql_p0_f3_fill_model import model_fills
+    from research_wp_r0.aql_p0_f1f2_opportunities import SignalState
+    bars = tuple(SimpleNamespace(bar_open_ms=i * 900000, open=100.0,
+                                 high=101.0, low=99.0, close=100.0)
+                 for i in range(24))
+    manifest = SimpleNamespace(bars=bars)
+    # Decision two seconds AFTER bar 20 opened: bar 20 cannot be filled.
+    opp = SimpleNamespace(opportunity_id="f3-cutoff", decision_ms=20 * 900000 + 2000,
+                          signal_state=SignalState.ARMED, reason_code=None)
+    fill = model_fills(manifest, [opp])[0]
+    assert fill.entry_bar_open_ms == 21 * 900000
+    assert fill.entry_bar_open_ms > opp.decision_ms
+    # Terminal decision has no later eligible open; must not fabricate fill.
+    late = SimpleNamespace(opportunity_id="f3-terminal", decision_ms=23 * 900000 + 2000,
+                           signal_state=SignalState.ARMED, reason_code=None)
+    last = model_fills(manifest, [late])[0]
+    assert last.signal_state == "NO_FILL"
+    assert last.entry_bar_open_ms is None
+
+
+def test_f3_exit_uses_next_open_after_close_trigger():
+    from research_wp_r0.aql_p0_f3_fill_model import model_fills
+    from research_wp_r0.aql_p0_f1f2_opportunities import SignalState
+    bars = []
+    for i in range(40):
+        # Entry at bar 21, exit signal on bar 32, execution bar 33.
+        close = 90.0 if i == 32 else 100.0
+        bars.append(SimpleNamespace(bar_open_ms=i * 900000, open=100.0,
+                                    high=101.0, low=99.0, close=close))
+    opp = SimpleNamespace(opportunity_id="f3-exit", decision_ms=20 * 900000 + 2000,
+                          signal_state=SignalState.ARMED, reason_code=None)
+    fill = model_fills(SimpleNamespace(bars=tuple(bars)), [opp])[0]
+    assert fill.entry_bar_open_ms == 21 * 900000
+    assert fill.signal_state == "TRIGGERED"
+    assert fill.exit_bar_open_ms == 33 * 900000
+    assert fill.exit_bar_open_ms > 32 * 900000
