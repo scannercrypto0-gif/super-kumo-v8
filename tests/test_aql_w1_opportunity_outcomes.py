@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from research_wp_r0.aql_w1_opportunity_outcomes import (
-    BAR_MS, HORIZONS, AppendOnlyOutcomeJournal, EvidenceError,
+    BAR_MS, HORIZONS, AppendOnlyOutcomeJournal, OutcomeTransitionJournal, EvidenceError,
     RetrospectiveSnapshot, market_outcome, reconcile,
 )
 
@@ -124,6 +124,43 @@ class W1OutcomesTest(unittest.TestCase):
             self.assertFalse(replay.append(first))
             self.assertFalse(replay.append(corrected))
             self.assertEqual(len(replay._seen), 2)
+
+    def test_transition_pending_evaluated_replay_and_correction(self):
+        s = snap()
+        t = s.decision_cutoff_ms
+        base = dict(source_version="archive", source_end_exclusive_ms=t + HORIZONS[0])
+        first = market_outcome(s, HORIZONS[0], bars(t, 16), **base)
+        corrected = market_outcome(s, HORIZONS[0], bars(t, 16),
+                                   correction_generation="correction-1", **base)
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "nested" / "transitions.jsonl"
+            j = OutcomeTransitionJournal(path)
+            v = first["evaluation_version_id"]
+            self.assertTrue(j.append(v, "PENDING"))
+            self.assertFalse(j.append(v, "PENDING"))
+            self.assertTrue(j.append(v, "EVALUATED"))
+            self.assertFalse(OutcomeTransitionJournal(path).append(v, "EVALUATED"))
+            with self.assertRaises(EvidenceError):
+                j.append(v, "UNKNOWN")
+            self.assertTrue(j.append(corrected["evaluation_version_id"], "PENDING"))
+            self.assertEqual(len(OutcomeTransitionJournal(path)._states), 2)
+
+    def test_transition_lock_contention_and_corrupt_tail(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "transitions.jsonl"
+            j = OutcomeTransitionJournal(path)
+            lock = Path(str(path) + ".lock")
+            lock.mkdir()
+            try:
+                with self.assertRaises(EvidenceError):
+                    j.append("v1", "PENDING")
+            finally:
+                lock.rmdir()
+            self.assertTrue(j.append("v1", "PENDING"))
+            with path.open("ab") as f:
+                f.write(b"bad tail")
+            with self.assertRaises(EvidenceError):
+                OutcomeTransitionJournal(path)
 
     def test_append_replay_conflict_corruption(self):
         s = snap()
