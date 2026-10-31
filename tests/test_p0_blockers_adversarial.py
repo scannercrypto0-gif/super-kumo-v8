@@ -271,11 +271,10 @@ class TestC2DurableJournal:
         j = DurableJournal(journal_path)
         j.write_pending("P001", "OPP001", "aabbccdd")
         j.transition_applied("P001")
-        count = j.transition_acked(["P001"])
-        assert count == 1
-        # Reload and verify
+        with pytest.raises(C2ConflictError, match="ACK_CONSUMER_RECEIPT_REQUIRED"):
+            j.transition_acked(["P001"])
         j2 = DurableJournal(journal_path)
-        assert j2._entries["P001"].state == "ACKED"
+        assert j2._entries["P001"].state == "APPLIED"
 
 
 # ===========================================================================
@@ -982,7 +981,7 @@ class TestC1DefenseInDepthGap1:
     def test_admitted_source_trust_model_declaration(self):
         """AdmittedSource.TRUST_MODEL_DECLARATION ClassVar must be set correctly."""
         from research_wp_r0.aql_p0_c1_source import AdmittedSource
-        assert AdmittedSource.TRUST_MODEL_DECLARATION == "HASH_ONLY_NOT_NESTED_VERIFIED", (
+        assert AdmittedSource.TRUST_MODEL_DECLARATION == "NATIVE_7DAY_RAW_VERIFIED", (
             f"TRUST_MODEL_DECLARATION mismatch: {AdmittedSource.TRUST_MODEL_DECLARATION!r}"
         )
 
@@ -1059,50 +1058,21 @@ class TestC2TailRecoveryGap2:
             f"Expected JOURNAL_MID_FILE_CORRUPTION, got: {err}"
         )
 
-    def test_transition_acked_writes_consumer_receipt_hash(self, tmp_path):
-        """When consumer_receipts supplied to transition_acked(), the receipt hash
-        must be persisted to the journal entry.
+    def test_ack_without_consumer_receipt_is_rejected(self, tmp_path):
+        journal = DurableJournal(tmp_path / "journal.jsonl")
+        journal.write_pending("PE-001","OPP-001","a"*64,source_bytes_sha256="b"*64,run_manifest_sha256="c"*64)
+        journal.transition_applied("PE-001")
+        with pytest.raises(C2ConflictError,match="ACK_CONSUMER_RECEIPT_REQUIRED"):
+            journal.transition_acked(["PE-001"])
+        assert DurableJournal(tmp_path/"journal.jsonl").entries["PE-001"].state == "APPLIED"
 
-        FAIL on baseline: no consumer_receipt_hash field.
-        PASS after fix: consumer_receipt_hash is written and reloaded.
-        """
-        journal_path = tmp_path / "journal.jsonl"
-        journal = DurableJournal(journal_path)
-
-        pid = "PE-C2-TEST-001"
-        journal.write_pending(pid, "OPP-C2", "a" * 64)
-        journal.transition_applied(pid)
-
-        receipt_map = {pid: "b" * 64}
-        journal.transition_acked([pid], consumer_receipts=receipt_map)
-
-        # Reload and verify consumer_receipt_hash was persisted
-        from research_wp_r0.aql_p0_c2_producer import _load_journal_file
-        entries = _load_journal_file(journal_path)
-        assert pid in entries, "Entry should survive reload"
-        entry = entries[pid]
-        assert entry.state == "ACKED", f"Expected ACKED, got {entry.state}"
-        assert entry.consumer_receipt_hash == receipt_map[pid], (
-            f"consumer_receipt_hash not persisted: "
-            f"got {entry.consumer_receipt_hash!r}, "
-            f"expected {receipt_map[pid]!r}"
-        )
-
-    def test_ack_without_consumer_receipt_leaves_hash_none(self, tmp_path):
-        """transition_acked() without consumer_receipts must leave consumer_receipt_hash=None."""
-        journal_path = tmp_path / "journal.jsonl"
-        journal = DurableJournal(journal_path)
-
-        pid = "PE-C2-TEST-002"
-        journal.write_pending(pid, "OPP-C2-B", "c" * 64)
-        journal.transition_applied(pid)
-        journal.transition_acked([pid])  # no consumer_receipts
-
-        from research_wp_r0.aql_p0_c2_producer import _load_journal_file
-        entries = _load_journal_file(journal_path)
-        assert entries[pid].consumer_receipt_hash is None, (
-            "consumer_receipt_hash should be None when not supplied"
-        )
+    def test_ack_arbitrary_hash_not_validated_receipt(self, tmp_path):
+        journal = DurableJournal(tmp_path / "journal.jsonl")
+        journal.write_pending("PE-002","OPP-002","a"*64,source_bytes_sha256="b"*64,run_manifest_sha256="c"*64)
+        journal.transition_applied("PE-002")
+        with pytest.raises(C2ConflictError,match="ACK_RECEIPT_OR_EFFECT_UNREADABLE"):
+            journal.transition_acked(["PE-002"], consumer_receipts={"PE-002":"d"*64})
+        assert DurableJournal(tmp_path/"journal.jsonl").entries["PE-002"].state == "APPLIED"
 
 
 # ===========================================================================
