@@ -618,6 +618,14 @@ def persist_consumer_effect_receipts(
                 os.fsync(fh.fileno())
         if dest.read_bytes() != encoded:
             raise LedgerReceiptCorrupted("CONSUMER_RECEIPT_READBACK_MISMATCH")
+        # The receipt directory entry must also survive a process crash. A file
+        # fsync alone does not guarantee persistence of a newly created name.
+        if os.name == "posix":
+            dir_fd = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
         paths[env.producer_event_id] = str(dest)
     return paths
 
