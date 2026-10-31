@@ -88,7 +88,7 @@ def reconcile(envelopes, selections):
             trial_id=e["trial_id"], manifest_sha256=e["run_manifest_sha256"],
             opportunity_id=e["opportunity_id"], producer_event_id=e["producer_event_id"],
             envelope_sha256=e["envelope_sha256"], decision_cutoff_ms=e["decision_cutoff_ms"],
-            decision_ms=e["decision_ms"], signal_state=str(s["signal_state"]),
+            decision_ms=e["decision_ms"], signal_state=getattr(s["signal_state"], "value", str(s["signal_state"])),
             reason_code=s.get("reason_code"), direction=s.get("direction"),
             eligibility=s.get("eligibility", "NOT_ESTABLISHED"),
             eligibility_evidence=s.get("eligibility_evidence"),
