@@ -56,6 +56,12 @@ class LedgerReceiptCorrupted(ValueError):
     """Individual receipt file corrupted or conflicts with in-memory state."""
 
 
+class LedgerLineageMissing(ValueError):
+    """P0 requires source/strategy/policy provenance for reproducibility.
+    Raised when all of manifest_sha256, strategy_digest, and policy_id are None.
+    """
+
+
 # ---------------------------------------------------------------------------
 # Event lifecycle states
 # ---------------------------------------------------------------------------
@@ -298,6 +304,17 @@ def build_ledger(
     """
     # --- Phase 0: Identity validation BEFORE any ledger mutation ---
     _validate_identity(opportunities, fill_results)
+
+    # --- Phase 0b: Lineage enforcement — at least one provenance field must be set ---
+    # P0 requires source/strategy/policy provenance for research reproducibility.
+    # If all three are None the report cannot be traced to a specific dataset,
+    # strategy, or policy — this is a data-integrity gap, not a missing feature.
+    if all(x is None for x in (manifest_sha256, strategy_digest, policy_id)):
+        raise LedgerLineageMissing(
+            "F4_LINEAGE_MISSING: manifest_sha256, strategy_digest, and policy_id "
+            "are all None — P0 requires source/strategy/policy provenance for "
+            "reproducibility. Supply at least one lineage field."
+        )
 
     state = LedgerState()
 
@@ -567,7 +584,18 @@ def _load_receipts_file(path: Path) -> dict[str, str]:
             d = json.loads(raw_line)
             event_id = d["event_id"]
             payload_hash = d["payload_hash"]
-            result[event_id] = payload_hash
+            if event_id in result:
+                if result[event_id] != payload_hash:
+                    raise LedgerReceiptCorrupted(
+                        f"DUPLICATE_EVENT_ID_CONFLICT: event_id={event_id!r} "
+                        f"existing payload_hash={result[event_id]!r} "
+                        f"new payload_hash={payload_hash!r} — STOP"
+                    )
+                # Same hash = idempotent replay, no-op
+            else:
+                result[event_id] = payload_hash
+        except LedgerReceiptCorrupted:
+            raise  # always propagate conflict errors
         except (json.JSONDecodeError, KeyError) as exc:
             raise LedgerReceiptCorrupted(
                 f"RECEIPTS_FILE_CORRUPTED: line could not be parsed — {exc}"

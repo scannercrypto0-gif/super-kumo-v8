@@ -112,7 +112,11 @@ def _run_full_pipeline(bars: list[P0Bar], trial_id: str = "TEST-TRIAL"):
             pass
     opportunities = evaluate_opportunities(manifest, envelopes)
     fills = model_fills(manifest, opportunities)
-    state, report = build_ledger(opportunities, fills, trial_id=trial_id)
+    state, report = build_ledger(
+        opportunities, fills,
+        trial_id=trial_id,
+        policy_id="P0-SYNTHETIC-TEST",
+    )
     return manifest, envelopes, opportunities, fills, state, report
 
 
@@ -304,10 +308,10 @@ class TestF4Ledger:
         from research_wp_r0.aql_p0_f4_ledger import LedgerEvent, _event_id
 
         # Build state once
-        state1, report1 = build_ledger(opps, fills, trial_id="IDEM-TEST")
+        state1, report1 = build_ledger(opps, fills, trial_id="IDEM-TEST", policy_id="P0-SYNTHETIC-TEST")
 
         # Build state again — same inputs must produce same report hash
-        state2, report2 = build_ledger(opps, fills, trial_id="IDEM-TEST")
+        state2, report2 = build_ledger(opps, fills, trial_id="IDEM-TEST", policy_id="P0-SYNTHETIC-TEST")
         assert report1.report_sha256() == report2.report_sha256()
 
     def test_report_to_dict_is_json_serializable(self):
@@ -501,7 +505,7 @@ class TestFix3ChronologicalStateMachine:
         swapped_fills[0] = replace(f0, opportunity_id=f1.opportunity_id)
 
         with pytest.raises(LedgerIdentityError) as exc_info:
-            build_ledger(opps, swapped_fills, trial_id="SWAP-TEST")
+            build_ledger(opps, swapped_fills, trial_id="SWAP-TEST", policy_id="P0-SYNTHETIC-TEST")
 
         err_msg = str(exc_info.value)
         assert "IDENTITY_MISMATCH" in err_msg or "DUPLICATE_OPPORTUNITY_ID" in err_msg, (
@@ -537,7 +541,7 @@ class TestFix3ChronologicalStateMachine:
         dup_fills[1] = replace(fills[1], opportunity_id=opps[0].opportunity_id)
 
         with pytest.raises(LedgerIdentityError) as exc_info:
-            build_ledger(dup_opps, dup_fills, trial_id="DUP-TEST")
+            build_ledger(dup_opps, dup_fills, trial_id="DUP-TEST", policy_id="P0-SYNTHETIC-TEST")
         assert "DUPLICATE_OPPORTUNITY_ID" in str(exc_info.value)
 
 
@@ -754,8 +758,8 @@ class TestFix4DurableCustody:
         opps = evaluate_opportunities(manifest, envelopes)
         fills = model_fills(manifest, opps)
 
-        _, report1 = build_ledger(opps, fills, trial_id="IDEM-SHA-TEST")
-        _, report2 = build_ledger(opps, fills, trial_id="IDEM-SHA-TEST")
+        _, report1 = build_ledger(opps, fills, trial_id="IDEM-SHA-TEST", policy_id="P0-SYNTHETIC-TEST")
+        _, report2 = build_ledger(opps, fills, trial_id="IDEM-SHA-TEST", policy_id="P0-SYNTHETIC-TEST")
 
         assert report1.report_sha256() == report2.report_sha256(), (
             "build_ledger must produce identical SHA given identical inputs (idempotency)"

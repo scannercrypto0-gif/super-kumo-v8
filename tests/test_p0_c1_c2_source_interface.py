@@ -24,9 +24,12 @@ from research_wp_r0.aql_p0_c1_source import (
     WINDOW_END_EXCLUSIVE_MS,
     EXPECTED_BAR_COUNT,
     NORMALIZED_SHA256,
+    OUTER_ZIP_SHA256,
+    MANIFEST_SHA256,
     _canonical_bytes,
     _sha256_hex,
     _bar_checksum,
+    _validate_normalized_bars,
     load_source,
 )
 from research_wp_r0.aql_p0_c2_producer import (
@@ -65,25 +68,24 @@ def _sha256_bytes(b: bytes) -> str:
 class TestC1SourceLoading:
 
     def _load(self, data: bytes, **kw):
-        """Helper: load with synthetic AdmittedSource (test-only bypass, clearly marked).
+        """Helper: test bar-level validation using _validate_normalized_bars() directly.
 
-        In production, AdmittedSource is only obtainable via admit_source().
-        Unit tests that need to exercise bar-level validation (not hash gates)
-        construct it directly with synthetic values — clearly documented here.
-        EVIDENCE_CLASS: SYNTHETIC_ONLY — bypasses real ZIP/manifest gates.
+        Does NOT call load_source() — bypasses hash gates so bar-level tests can
+        inject synthetic data without needing real owner ZIP bytes.
+        EVIDENCE_CLASS: SYNTHETIC_ONLY — does NOT test hash gates.
+
+        Gap 1 fix: now routes through _validate_normalized_bars() to avoid breaking
+        when load_source() acquired outer/manifest pin re-verification checks.
         """
-        manifest_sha = _sha256_bytes(b"synthetic-manifest-for-test")
-        admitted = AdmittedSource(
-            normalized_bytes=data,
-            manifest_integrity_sha256=manifest_sha,
-            outer_zip_sha256_verified="SYNTHETIC_TEST_BYPASS",
-        )
-        return load_source(
-            admitted=admitted,
-            dataset_id="TEST-DATASET-001",
-            dataset_version=1,
-            **kw,
-        )
+        if not isinstance(data, (bytes, bytearray)):
+            raise C1SourceRejected("NORMALIZED_JSON_MUST_BE_BYTES")
+        if not data:
+            raise C1SourceRejected("NORMALIZED_JSON_EMPTY")
+        try:
+            rows = json.loads(data)
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise C1SourceRejected(f"NORMALIZED_JSON_PARSE_ERROR: {exc}") from exc
+        return _validate_normalized_bars(rows)
 
     def test_load_source_requires_admitted_source(self):
         """load_source() must reject raw bytes — AdmittedSource is mandatory.
@@ -101,10 +103,21 @@ class TestC1SourceLoading:
             )
 
     def test_wrong_hash_fails_closed(self):
-        """C1 must reject source bytes whose SHA-256 does not match pinned constant."""
-        bad_data = _make_synthetic_normalized()
+        """C1 must reject normalized bytes whose SHA-256 does not match pinned constant.
+
+        Uses real outer/manifest pins so load_source() outer/manifest checks pass.
+        Then the normalized content (synthetic, not the real dataset) must trigger
+        NORMALIZED_SHA256_MISMATCH — proving defense-in-depth is active.
+        EVIDENCE_CLASS: SYNTHETIC_ONLY
+        """
+        synthetic_normalized = _make_synthetic_normalized()
+        admitted = AdmittedSource(
+            normalized_bytes=synthetic_normalized,
+            manifest_integrity_sha256=MANIFEST_SHA256,
+            outer_zip_sha256_verified=OUTER_ZIP_SHA256,
+        )
         with pytest.raises(C1SourceRejected) as exc_info:
-            self._load(bad_data)
+            load_source(admitted=admitted, dataset_id="TEST", dataset_version=1)
         assert "NORMALIZED_SHA256_MISMATCH" in str(exc_info.value)
 
     def test_empty_bytes_rejected(self):
@@ -119,12 +132,14 @@ class TestC1SourceLoading:
     def test_invalid_json_rejected(self):
         # Fake a hash match for malformed JSON (unlikely in practice; validates parse path)
         malformed = b"not json"
-        # Patch SHA to match (manual injection)
-        real_sha = _sha256_bytes(malformed)
-        # Can't patch constant easily; verify the hash check fires first
+        # _load() now routes to _validate_normalized_bars() directly,
+        # which surfaces NORMALIZED_JSON_PARSE_ERROR before any hash check.
         with pytest.raises(C1SourceRejected) as exc_info:
             self._load(malformed)
-        assert "MISMATCH" in str(exc_info.value)
+        err = str(exc_info.value)
+        assert "NORMALIZED_JSON_PARSE_ERROR" in err or "MISMATCH" in err, (
+            f"Expected NORMALIZED_JSON_PARSE_ERROR or MISMATCH for malformed JSON, got: {err}"
+        )
 
     def test_wrong_bar_count_rejected(self):
         """50-bar synthetic should fail hash AND bar count checks (hash first)."""
@@ -162,23 +177,23 @@ class TestC1SourceLoading:
     def test_dataset_version_must_be_positive(self):
         """dataset_version=0 must be rejected.
 
-        Uses AdmittedSource directly (test bypass) to reach dataset_version validation.
-        NORMALIZED_SHA256 check fires before dataset_version, so we expect rejection
-        at NORMALIZED_SHA256_MISMATCH (hash gate) or DATASET_VERSION_INVALID.
+        Uses real outer/manifest pins so those checks pass; NORMALIZED_SHA256
+        fires before dataset_version because synthetic bytes ≠ real hash.
+        Either NORMALIZED_SHA256_MISMATCH or DATASET_VERSION_INVALID is acceptable —
+        the key invariant is rejection (fail closed).
         EVIDENCE_CLASS: SYNTHETIC_ONLY
         """
         data = _make_synthetic_normalized()
-        manifest_sha = _sha256_bytes(b"m")
         admitted = AdmittedSource(
             normalized_bytes=data,
-            manifest_integrity_sha256=manifest_sha,
-            outer_zip_sha256_verified="SYNTHETIC_TEST_BYPASS",
+            manifest_integrity_sha256=MANIFEST_SHA256,
+            outer_zip_sha256_verified=OUTER_ZIP_SHA256,
         )
         with pytest.raises((C1SourceRejected, Exception)):
             load_source(
                 admitted=admitted,
                 dataset_id="X",
-                dataset_version=0,  # invalid
+                dataset_version=0,  # invalid — check fires at NORMALIZED or DATASET_VERSION
             )
 
 

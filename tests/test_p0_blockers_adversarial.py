@@ -61,6 +61,7 @@ from research_wp_r0.aql_p0_f3_fill_model import (
 )
 from research_wp_r0.aql_p0_f4_ledger import (
     LedgerConflictError,
+    LedgerLineageMissing,
     LedgerReceiptCorrupted,
     LedgerReportCorrupted,
     FinancialReceipt,
@@ -71,6 +72,7 @@ from research_wp_r0.aql_p0_f4_ledger import (
     load_receipts,
     reconcile_receipts,
 )
+from research_wp_r0.aql_p0_c1_source import AdmittedSource
 
 
 # ===========================================================================
@@ -648,8 +650,8 @@ class TestF4DurableReceiptsBlocker:
             exit_price=44000.0,  # different exit price → different event → different hash
         )
 
-        _, report_v1 = build_ledger([opp], [fill_v1], trial_id="T001")
-        _, report_v2 = build_ledger([opp], [fill_v2], trial_id="T001")
+        _, report_v1 = build_ledger([opp], [fill_v1], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
+        _, report_v2 = build_ledger([opp], [fill_v2], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
 
         # Different event payload → different report_sha256
         assert report_v1.report_sha256() != report_v2.report_sha256(), (
@@ -704,8 +706,8 @@ class TestF4DurableReceiptsBlocker:
             WINDOW_START_MS + 14 * BAR_DURATION_MS,
             entry_price=44000.0, exit_price=43000.0)  # lower exit
 
-        state_a, report_a = build_ledger([opp1, opp2], [fill1a, fill2a], trial_id="T002")
-        state_b, report_b = build_ledger([opp1, opp2], [fill1b, fill2b], trial_id="T002")
+        state_a, report_a = build_ledger([opp1, opp2], [fill1a, fill2a], trial_id="T002", policy_id="P0-SYNTHETIC-TEST")
+        state_b, report_b = build_ledger([opp1, opp2], [fill1b, fill2b], trial_id="T002", policy_id="P0-SYNTHETIC-TEST")
 
         # Individual events differ → ordered_receipt_hashes differ → different report_sha256
         assert report_a.ordered_receipt_hashes != report_b.ordered_receipt_hashes
@@ -720,7 +722,7 @@ class TestF4DurableReceiptsBlocker:
             WINDOW_START_MS + 2 * BAR_DURATION_MS,
             WINDOW_START_MS + 5 * BAR_DURATION_MS)
 
-        state, report = build_ledger([opp], [fill], trial_id="T001")
+        state, report = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
 
         receipt_path = tmp_path / "receipts.jsonl"
         written = persist_receipts(state, receipt_path)
@@ -742,7 +744,7 @@ class TestF4DurableReceiptsBlocker:
             WINDOW_START_MS + 2 * BAR_DURATION_MS,
             WINDOW_START_MS + 5 * BAR_DURATION_MS)
 
-        state, _ = build_ledger([opp], [fill], trial_id="T001")
+        state, _ = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
         receipt_path = tmp_path / "receipts.jsonl"
 
         written1 = persist_receipts(state, receipt_path)
@@ -757,7 +759,7 @@ class TestF4DurableReceiptsBlocker:
             WINDOW_START_MS + 2 * BAR_DURATION_MS,
             WINDOW_START_MS + 5 * BAR_DURATION_MS)
 
-        state, _ = build_ledger([opp], [fill], trial_id="T001")
+        state, _ = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
         receipt_path = tmp_path / "receipts.jsonl"
         persist_receipts(state, receipt_path)
 
@@ -782,7 +784,7 @@ class TestF4DurableReceiptsBlocker:
             WINDOW_START_MS + 2 * BAR_DURATION_MS,
             WINDOW_START_MS + 5 * BAR_DURATION_MS)
 
-        _, report = build_ledger([opp], [fill], trial_id="T001")
+        _, report = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
         assert len(report.ordered_receipt_hashes) > 0, (
             "F4: ordered_receipt_hashes is empty — receipts not computed"
         )
@@ -794,7 +796,7 @@ class TestF4DurableReceiptsBlocker:
             WINDOW_START_MS + 2 * BAR_DURATION_MS,
             WINDOW_START_MS + 5 * BAR_DURATION_MS)
 
-        state, report = build_ledger([opp], [fill], trial_id="T001")
+        state, report = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
         report_path = tmp_path / "report.json"
         written_sha = persist_report(report, report_path, state)
 
@@ -819,7 +821,7 @@ class TestF4DurableReceiptsBlocker:
             WINDOW_START_MS + 5 * BAR_DURATION_MS)
 
         # Process 1: build + persist receipts (crash before persist_report)
-        state1, _ = build_ledger([opp], [fill], trial_id="T001")
+        state1, _ = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
         receipt_path = tmp_path / "receipts.jsonl"
         persist_receipts(state1, receipt_path)
 
@@ -883,7 +885,7 @@ fill = FillResult(
 
 # Restarted process: load persisted receipts, rebuild, reconcile
 persisted = load_receipts(receipt_path)
-state2, _ = build_ledger([opp], [fill], trial_id="T001")
+state2, _ = build_ledger([opp], [fill], trial_id="T001", policy_id="P0-SYNTHETIC-TEST")
 reconcile_receipts(state2, persisted)   # must not raise
 
 # Re-persist: must write 0 new lines (no double-effect)
@@ -902,3 +904,338 @@ print("SUBPROCESS_PASS: no double-effect after cross-process restart")
         assert "SUBPROCESS_PASS" in result.stdout, (
             f"SUBPROCESS_PASS sentinel missing from stdout:\n{result.stdout!r}"
         )
+
+
+# ===========================================================================
+# GAP 1 (C1): Defense-in-depth — load_source() re-pins outer ZIP + manifest
+# ===========================================================================
+
+class TestC1DefenseInDepthGap1:
+    """PM Gap 1: load_source() must independently re-verify outer_zip and manifest pins.
+
+    EVIDENCE_CLASS: SYNTHETIC_ONLY — real outer ZIP bytes unavailable in executor.
+    REAL_BYTES_VERIFICATION = BLOCKED (owner ZIP not in executor).
+    """
+
+    def test_load_source_rejects_wrong_outer_pin(self):
+        """load_source() must raise LOAD_SOURCE_OUTER_ZIP_PIN_MISMATCH when
+        AdmittedSource carries a wrong outer_zip_sha256_verified.
+
+        FAIL on baseline: no outer re-check in load_source().
+        PASS after fix: raises C1SourceRejected with LOAD_SOURCE_OUTER_ZIP_PIN_MISMATCH.
+        """
+        # AdmittedSource with wrong outer hash but correct manifest and some normalized bytes
+        admitted = AdmittedSource(
+            normalized_bytes=b'{"bars":[]}',
+            manifest_integrity_sha256=MANIFEST_SHA256,
+            outer_zip_sha256_verified="deadbeef" * 8,  # wrong outer hash
+        )
+        with pytest.raises(C1SourceRejected) as exc_info:
+            load_source(admitted=admitted, dataset_id="TEST", dataset_version=1)
+        err = str(exc_info.value)
+        assert "LOAD_SOURCE_OUTER_ZIP_PIN_MISMATCH" in err, (
+            f"Expected LOAD_SOURCE_OUTER_ZIP_PIN_MISMATCH, got: {err}"
+        )
+
+    def test_load_source_rejects_wrong_manifest_pin(self):
+        """load_source() must raise LOAD_SOURCE_MANIFEST_PIN_MISMATCH when
+        AdmittedSource carries correct outer hash but wrong manifest hash.
+
+        FAIL on baseline: no manifest re-check in load_source().
+        PASS after fix: raises C1SourceRejected with LOAD_SOURCE_MANIFEST_PIN_MISMATCH.
+        """
+        admitted = AdmittedSource(
+            normalized_bytes=b'{"bars":[]}',
+            manifest_integrity_sha256="cafebabe" * 8,  # wrong manifest hash
+            outer_zip_sha256_verified=OUTER_ZIP_SHA256,
+        )
+        with pytest.raises(C1SourceRejected) as exc_info:
+            load_source(admitted=admitted, dataset_id="TEST", dataset_version=1)
+        err = str(exc_info.value)
+        assert "LOAD_SOURCE_MANIFEST_PIN_MISMATCH" in err, (
+            f"Expected LOAD_SOURCE_MANIFEST_PIN_MISMATCH, got: {err}"
+        )
+
+    def test_load_source_defense_in_depth_catches_tampered_normalized(self):
+        """load_source() with real outer+manifest pins but tampered normalized bytes
+        must fail at NORMALIZED_SHA256_MISMATCH (not the outer/manifest check).
+
+        Demonstrates defense-in-depth: outer and manifest checks PASS (real pins),
+        but normalized content check CATCHES the tampered payload.
+
+        EVIDENCE_CLASS: SYNTHETIC_ONLY
+        """
+        tampered = b'{"bars": [{"tampered": true}]}'
+        admitted = AdmittedSource(
+            normalized_bytes=tampered,
+            manifest_integrity_sha256=MANIFEST_SHA256,
+            outer_zip_sha256_verified=OUTER_ZIP_SHA256,
+        )
+        with pytest.raises(C1SourceRejected) as exc_info:
+            load_source(admitted=admitted, dataset_id="TEST", dataset_version=1)
+        err = str(exc_info.value)
+        assert "NORMALIZED_SHA256_MISMATCH" in err, (
+            f"Expected NORMALIZED_SHA256_MISMATCH (outer/manifest passed, "
+            f"normalized tampered), got: {err}"
+        )
+
+    def test_admitted_source_trust_model_declaration(self):
+        """AdmittedSource.TRUST_MODEL_DECLARATION ClassVar must be set correctly."""
+        from research_wp_r0.aql_p0_c1_source import AdmittedSource
+        assert AdmittedSource.TRUST_MODEL_DECLARATION == "HASH_ONLY_NOT_NESTED_VERIFIED", (
+            f"TRUST_MODEL_DECLARATION mismatch: {AdmittedSource.TRUST_MODEL_DECLARATION!r}"
+        )
+
+
+# ===========================================================================
+# GAP 2 (C2): Tail-only recovery + consumer_receipt_hash ACK semantics
+# ===========================================================================
+
+class TestC2TailRecoveryGap2:
+    """PM Gap 2: C2 tail-only recovery and ACK semantics honesty.
+
+    EVIDENCE_CLASS: SYNTHETIC_ONLY
+    """
+
+    def test_journal_tail_truncation_is_recoverable(self, tmp_path):
+        """A truncated (incomplete) last line in the journal must be silently skipped.
+
+        This simulates a crash that truncated the final fsync write.
+        FAIL on baseline: corrupt tail raises C2ConflictError.
+        PASS after fix: tail is skipped, earlier valid entries loaded.
+        """
+        journal_path = tmp_path / "journal.jsonl"
+        # Write one valid PENDING record then truncate the second line mid-write
+        valid_record = json.dumps({
+            "envelope_sha256": "a" * 64,
+            "opportunity_id": "OPP-001",
+            "producer_event_id": "PE-001",
+            "state": "PENDING",
+        }, sort_keys=True, separators=(",", ":"))
+        # Second line truncated (simulating crash mid-write)
+        truncated_tail = '{"envelope_sha256":"b' * 1  # incomplete JSON
+        journal_path.write_text(valid_record + "\n" + truncated_tail, encoding="utf-8")
+
+        from research_wp_r0.aql_p0_c2_producer import _load_journal_file
+        entries = _load_journal_file(journal_path)
+        assert "PE-001" in entries, (
+            "Valid head record should be loaded when only tail is corrupt"
+        )
+        assert len(entries) == 1, (
+            f"Expected 1 entry (tail skipped), got {len(entries)}"
+        )
+
+    def test_journal_mid_file_corruption_raises(self, tmp_path):
+        """A corrupt line that is NOT the last line must raise C2ConflictError.
+
+        FAIL on baseline: mid-file corruption silently skipped.
+        PASS after fix: raises C2ConflictError(JOURNAL_MID_FILE_CORRUPTION).
+        """
+        journal_path = tmp_path / "journal.jsonl"
+        record1 = json.dumps({
+            "envelope_sha256": "a" * 64,
+            "opportunity_id": "OPP-001",
+            "producer_event_id": "PE-001",
+            "state": "PENDING",
+        }, sort_keys=True, separators=(",", ":"))
+        record2 = json.dumps({
+            "envelope_sha256": "b" * 64,
+            "opportunity_id": "OPP-002",
+            "producer_event_id": "PE-002",
+            "state": "PENDING",
+        }, sort_keys=True, separators=(",", ":"))
+        # Corrupt line in the MIDDLE (not the last)
+        corrupt_line = "NOT_VALID_JSON_AT_ALL"
+        journal_path.write_text(
+            record1 + "\n" + corrupt_line + "\n" + record2 + "\n",
+            encoding="utf-8",
+        )
+
+        from research_wp_r0.aql_p0_c2_producer import _load_journal_file, C2ConflictError
+        with pytest.raises(C2ConflictError) as exc_info:
+            _load_journal_file(journal_path)
+        err = str(exc_info.value)
+        assert "JOURNAL_MID_FILE_CORRUPTION" in err, (
+            f"Expected JOURNAL_MID_FILE_CORRUPTION, got: {err}"
+        )
+
+    def test_transition_acked_writes_consumer_receipt_hash(self, tmp_path):
+        """When consumer_receipts supplied to transition_acked(), the receipt hash
+        must be persisted to the journal entry.
+
+        FAIL on baseline: no consumer_receipt_hash field.
+        PASS after fix: consumer_receipt_hash is written and reloaded.
+        """
+        journal_path = tmp_path / "journal.jsonl"
+        journal = DurableJournal(journal_path)
+
+        pid = "PE-C2-TEST-001"
+        journal.write_pending(pid, "OPP-C2", "a" * 64)
+        journal.transition_applied(pid)
+
+        receipt_map = {pid: "b" * 64}
+        journal.transition_acked([pid], consumer_receipts=receipt_map)
+
+        # Reload and verify consumer_receipt_hash was persisted
+        from research_wp_r0.aql_p0_c2_producer import _load_journal_file
+        entries = _load_journal_file(journal_path)
+        assert pid in entries, "Entry should survive reload"
+        entry = entries[pid]
+        assert entry.state == "ACKED", f"Expected ACKED, got {entry.state}"
+        assert entry.consumer_receipt_hash == receipt_map[pid], (
+            f"consumer_receipt_hash not persisted: "
+            f"got {entry.consumer_receipt_hash!r}, "
+            f"expected {receipt_map[pid]!r}"
+        )
+
+    def test_ack_without_consumer_receipt_leaves_hash_none(self, tmp_path):
+        """transition_acked() without consumer_receipts must leave consumer_receipt_hash=None."""
+        journal_path = tmp_path / "journal.jsonl"
+        journal = DurableJournal(journal_path)
+
+        pid = "PE-C2-TEST-002"
+        journal.write_pending(pid, "OPP-C2-B", "c" * 64)
+        journal.transition_applied(pid)
+        journal.transition_acked([pid])  # no consumer_receipts
+
+        from research_wp_r0.aql_p0_c2_producer import _load_journal_file
+        entries = _load_journal_file(journal_path)
+        assert entries[pid].consumer_receipt_hash is None, (
+            "consumer_receipt_hash should be None when not supplied"
+        )
+
+
+# ===========================================================================
+# GAP 3 (F4): Duplicate event_id CONFLICT + lineage non-null enforcement
+# ===========================================================================
+
+class TestF4LineageAndDuplicateGap3:
+    """PM Gap 3: F4 duplicate event_id conflict STOP + lineage enforcement.
+
+    EVIDENCE_CLASS: SYNTHETIC_ONLY
+    """
+
+    def _make_opp(self, oid: str) -> Opportunity:
+        cutoff = WINDOW_START_MS + BAR_DURATION_MS
+        return Opportunity(
+            opportunity_id=oid,
+            producer_event_id=f"PE-{oid}",
+            decision_cutoff_ms=cutoff,
+            decision_ms=cutoff + 2000,
+            prefix_start_ms=WINDOW_START_MS,
+            prefix_end_exclusive_ms=cutoff,
+            prefix_bar_checksums_sha256=_sha256_hex(b"synthetic"),
+            input_disposition="ARMED",
+            signal_state=SignalState.ARMED,
+            reason_code=None,
+            entry_level=42000.0,
+            exit_level=41000.0,
+            trigger_bar_open_ms=cutoff,
+            trigger_bar_close=42000.0,
+            prefix_bar_count=1,
+            strategy_id="TEST-STRAT",
+            trial_id="TEST-TRIAL",
+            dataset_version=1,
+        )
+
+    def _make_fill(self, oid: str, entry_price: float = 42000.0, exit_price: float = 43000.0):
+        from research_wp_r0.aql_p0_f3_fill_model import _entry_net, _exit_net, _net_return
+        entry_net_p, entry_fee = _entry_net(entry_price)
+        exit_net_p, exit_fee = _exit_net(exit_price)
+        gross, net = _net_return(entry_net_p, exit_net_p, entry_fee, exit_fee)
+        return FillResult(
+            opportunity_id=oid,
+            signal_state="TRIGGERED",
+            reason_code=None,
+            entry_bar_open_ms=WINDOW_START_MS + 2 * BAR_DURATION_MS,
+            entry_price_gross=Decimal(str(entry_price)),
+            entry_price_net=entry_net_p,
+            entry_fee=entry_fee,
+            exit_bar_open_ms=WINDOW_START_MS + 5 * BAR_DURATION_MS,
+            exit_price_gross=Decimal(str(exit_price)),
+            exit_price_net=exit_net_p,
+            exit_fee=exit_fee,
+            gross_return=gross,
+            net_return=net,
+            is_terminal=True,
+        )
+
+    def test_build_ledger_no_lineage_raises(self):
+        """build_ledger() with all lineage args None must raise LedgerLineageMissing.
+
+        FAIL on baseline: no lineage enforcement.
+        PASS after fix: raises LedgerLineageMissing(F4_LINEAGE_MISSING).
+        """
+        opp = self._make_opp("OPP-LIN-001")
+        fill = self._make_fill("OPP-LIN-001")
+        with pytest.raises(LedgerLineageMissing) as exc_info:
+            build_ledger(
+                [opp], [fill],
+                trial_id="LIN-TEST",
+                manifest_sha256=None,
+                strategy_digest=None,
+                policy_id=None,
+            )
+        err = str(exc_info.value)
+        assert "F4_LINEAGE_MISSING" in err, (
+            f"Expected F4_LINEAGE_MISSING in error, got: {err}"
+        )
+
+    def test_build_ledger_manifest_sha256_satisfies_lineage(self):
+        """manifest_sha256 alone is sufficient to satisfy lineage requirement."""
+        opp = self._make_opp("OPP-LIN-002")
+        fill = self._make_fill("OPP-LIN-002")
+        # Should NOT raise
+        state, report = build_ledger(
+            [opp], [fill],
+            trial_id="LIN-TEST-2",
+            manifest_sha256="abc" * 21 + "d",
+        )
+        assert report is not None
+
+    def test_receipts_duplicate_event_id_conflict_raises(self, tmp_path):
+        """_load_receipts_file() must raise LedgerReceiptCorrupted(DUPLICATE_EVENT_ID_CONFLICT)
+        when same event_id appears with different payload_hash.
+
+        FAIL on baseline: duplicate silently overwritten (last-write-wins).
+        PASS after fix: raises LedgerReceiptCorrupted STOP.
+        """
+        receipt_path = tmp_path / "receipts.jsonl"
+        event_id = "EVT-DUP-001"
+        line1 = json.dumps({
+            "event_id": event_id,
+            "payload_hash": "a" * 64,
+        }, sort_keys=True, separators=(",", ":"))
+        line2 = json.dumps({
+            "event_id": event_id,
+            "payload_hash": "b" * 64,  # DIFFERENT hash = conflict
+        }, sort_keys=True, separators=(",", ":"))
+        receipt_path.write_text(line1 + "\n" + line2 + "\n", encoding="utf-8")
+
+        from research_wp_r0.aql_p0_f4_ledger import _load_receipts_file
+        with pytest.raises(LedgerReceiptCorrupted) as exc_info:
+            _load_receipts_file(receipt_path)
+        err = str(exc_info.value)
+        assert "DUPLICATE_EVENT_ID_CONFLICT" in err, (
+            f"Expected DUPLICATE_EVENT_ID_CONFLICT, got: {err}"
+        )
+
+    def test_receipts_duplicate_event_id_same_hash_is_idempotent(self, tmp_path):
+        """Same event_id with identical payload_hash is idempotent (no-op).
+
+        Duplicate with SAME hash = crash-safe replay, must NOT raise.
+        """
+        receipt_path = tmp_path / "receipts.jsonl"
+        event_id = "EVT-IDEM-001"
+        same_hash = "c" * 64
+        line = json.dumps({
+            "event_id": event_id,
+            "payload_hash": same_hash,
+        }, sort_keys=True, separators=(",", ":"))
+        # Write same entry twice
+        receipt_path.write_text(line + "\n" + line + "\n", encoding="utf-8")
+
+        from research_wp_r0.aql_p0_f4_ledger import _load_receipts_file
+        loaded = _load_receipts_file(receipt_path)
+        assert event_id in loaded
+        assert loaded[event_id] == same_hash, "Idempotent replay must preserve hash"

@@ -101,11 +101,20 @@ class DecisionEnvelope:
 
 @dataclass
 class ConsumerJournalEntry:
-    """Durable consumer journal record (PENDING→APPLIED→ACKED)."""
+    """Durable consumer journal record (PENDING→APPLIED→ACKED).
+
+    consumer_receipt_hash:
+        SHA-256 or equivalent receipt proof from the downstream consumer (F1/Factory)
+        confirming it has durably stored the envelope.  Set when transition_acked()
+        is called with consumer_receipts; None when no downstream receipt was supplied.
+        An absent receipt does NOT prevent the ACK transition, but callers SHOULD
+        supply it whenever the downstream consumer can provide one.
+    """
     producer_event_id: str
     opportunity_id: str
     envelope_sha256: str
     state: str    # "PENDING" | "APPLIED" | "ACKED"
+    consumer_receipt_hash: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -174,6 +183,13 @@ class DurableJournal:
 
         Writes the APPLIED record to disk, fsyncs, then reads back to verify.
         Only sets in-memory state to APPLIED after successful readback.
+
+        ACK SEMANTICS WARNING — APPLIED ≠ downstream confirmed:
+          APPLIED means only that this producer durably wrote the entry and
+          verified the write via readback (fsync + re-read).  It does NOT
+          mean the downstream consumer (F1/Factory) has received, processed,
+          or durably stored the envelope.  Downstream confirmation is recorded
+          separately via transition_acked() with a consumer_receipt_hash.
         """
         entry = self._entries.get(producer_event_id)
         if entry is None:
@@ -198,8 +214,24 @@ class DurableJournal:
                 f"as APPLIED on disk after write+fsync"
             )
 
-    def transition_acked(self, producer_event_ids: list[str]) -> int:
-        """Transition APPLIED → ACKED for confirmed producer_event_ids."""
+    def transition_acked(
+        self,
+        producer_event_ids: list[str],
+        consumer_receipts: dict[str, str] | None = None,
+    ) -> int:
+        """Transition APPLIED → ACKED for confirmed producer_event_ids.
+
+        Parameters
+        ----------
+        producer_event_ids:
+            IDs to acknowledge. Must already be APPLIED in the journal.
+        consumer_receipts:
+            Optional mapping of producer_event_id → downstream consumer receipt hash.
+            When supplied, the receipt is written to the journal entry as
+            consumer_receipt_hash for audit/replay purposes.
+            Callers SHOULD supply this whenever the downstream consumer can
+            provide a receipt proof of durable storage.
+        """
         acked = 0
         for pid in producer_event_ids:
             entry = self._entries.get(pid)
@@ -210,7 +242,9 @@ class DurableJournal:
                     f"ACK_NOT_APPLIED: {pid!r} still in PENDING state"
                 )
             if entry.state == "APPLIED":
+                receipt_hash = (consumer_receipts or {}).get(pid)
                 entry.state = "ACKED"
+                entry.consumer_receipt_hash = receipt_hash
                 self._append_and_fsync(entry)
                 acked += 1
         return acked
@@ -218,12 +252,14 @@ class DurableJournal:
     def _append_and_fsync(self, entry: ConsumerJournalEntry) -> None:
         """Append one JSON-line record to the journal file and fsync."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        record = {
+        record: dict = {
             "envelope_sha256": entry.envelope_sha256,
             "opportunity_id": entry.opportunity_id,
             "producer_event_id": entry.producer_event_id,
             "state": entry.state,
         }
+        if entry.consumer_receipt_hash is not None:
+            record["consumer_receipt_hash"] = entry.consumer_receipt_hash
         line = json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
         with open(self._path, "ab") as fh:
             fh.write(line.encode("utf-8"))
@@ -237,45 +273,71 @@ def _load_journal_file(path: Path) -> dict[str, ConsumerJournalEntry]:
     State may only PROGRESS (PENDING → APPLIED → ACKED) for a given
     producer_event_id.  If the same pid appears with a DIFFERENT envelope_sha256
     the journal has been tampered — STOP immediately with C2ConflictError.
+
+    TAIL-ONLY RECOVERY RULE:
+      Only the LAST non-empty line in the file may be silently skipped on a
+      parse error (truncated write at crash boundary).  Any corrupt line that
+      is NOT the last non-empty line indicates mid-file corruption — STOP with
+      C2ConflictError.  Silent skip of a mid-file corrupt line would hide data
+      loss and is not recoverable.
     """
     entries: dict[str, ConsumerJournalEntry] = {}
     with open(path, "r", encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                rec = json.loads(line)
-                pid = rec["producer_event_id"]
-                if pid in entries:
-                    existing = entries[pid]
-                    # STOP on digest inconsistency — same pid, different sha256
-                    # indicates history overwrite attempt or data corruption
-                    if existing.envelope_sha256 != rec["envelope_sha256"]:
-                        raise C2ConflictError(
-                            f"JOURNAL_DIGEST_INCONSISTENCY: pid={pid!r} "
-                            f"stored={existing.envelope_sha256!r} "
-                            f"new={rec['envelope_sha256']!r}"
-                        )
-                    # Same digest: state can only progress; ignore regression
-                    state_order = {"PENDING": 0, "APPLIED": 1, "ACKED": 2}
-                    if state_order.get(rec["state"], -1) >= state_order.get(existing.state, -1):
-                        entries[pid] = ConsumerJournalEntry(
-                            producer_event_id=pid,
-                            opportunity_id=rec["opportunity_id"],
-                            envelope_sha256=rec["envelope_sha256"],
-                            state=rec["state"],
-                        )
-                else:
+        raw_lines = fh.readlines()
+
+    # Find index of last non-empty line (for tail-only recovery)
+    last_nonempty_idx = -1
+    for i, raw in enumerate(raw_lines):
+        if raw.strip():
+            last_nonempty_idx = i
+
+    for line_no, raw in enumerate(raw_lines):
+        line = raw.strip()
+        if not line:
+            continue
+        is_tail = (line_no == last_nonempty_idx)
+        try:
+            rec = json.loads(line)
+            pid = rec["producer_event_id"]
+            if pid in entries:
+                existing = entries[pid]
+                # STOP on digest inconsistency — same pid, different sha256
+                # indicates history overwrite attempt or data corruption
+                if existing.envelope_sha256 != rec["envelope_sha256"]:
+                    raise C2ConflictError(
+                        f"JOURNAL_DIGEST_INCONSISTENCY: pid={pid!r} "
+                        f"stored={existing.envelope_sha256!r} "
+                        f"new={rec['envelope_sha256']!r}"
+                    )
+                # Same digest: state can only progress; ignore regression
+                state_order = {"PENDING": 0, "APPLIED": 1, "ACKED": 2}
+                if state_order.get(rec["state"], -1) >= state_order.get(existing.state, -1):
                     entries[pid] = ConsumerJournalEntry(
                         producer_event_id=pid,
                         opportunity_id=rec["opportunity_id"],
                         envelope_sha256=rec["envelope_sha256"],
                         state=rec["state"],
+                        consumer_receipt_hash=rec.get("consumer_receipt_hash"),
                     )
-            except (json.JSONDecodeError, KeyError):
-                # Corrupted line — skip (partial write at crash boundary)
+            else:
+                entries[pid] = ConsumerJournalEntry(
+                    producer_event_id=pid,
+                    opportunity_id=rec["opportunity_id"],
+                    envelope_sha256=rec["envelope_sha256"],
+                    state=rec["state"],
+                    consumer_receipt_hash=rec.get("consumer_receipt_hash"),
+                )
+        except C2ConflictError:
+            raise  # always re-raise digest conflict errors
+        except (json.JSONDecodeError, KeyError):
+            if is_tail:
+                # Tail-only recovery: last line may be a partial write (crash) — skip
                 continue
+            raise C2ConflictError(
+                f"JOURNAL_MID_FILE_CORRUPTION at line {line_no + 1}: "
+                f"corrupt record before end of file — cannot safely recover. "
+                f"Manual investigation required."
+            )
     return entries
 
 
@@ -549,6 +611,8 @@ def produce_envelopes(
 def ack_envelopes(
     producer_event_ids: list[str],
     journal: "DurableJournal",
+    *,
+    consumer_receipts: dict[str, str] | None = None,
 ) -> int:
     """Transition APPLIED → ACKED for all confirmed producer_event_ids.
 
@@ -556,16 +620,25 @@ def ack_envelopes(
     successfully consumed and stored the envelopes. This completes the
     PENDING→APPLIED→ACKED lifecycle.
 
+    ACK SEMANTICS: this records that the downstream consumer acknowledged
+    receipt, but does NOT verify that the consumer has committed the data
+    to its own durable store.  Callers SHOULD supply consumer_receipts
+    (a hash or token from the downstream consumer's own storage receipt)
+    whenever available so the journal carries end-to-end evidence.
+
     Parameters
     ----------
     producer_event_ids:
         IDs to acknowledge. Must already be APPLIED in the journal.
     journal:
         The DurableJournal instance (writes ACKED state to disk + fsync).
+    consumer_receipts:
+        Optional mapping of producer_event_id → downstream storage receipt hash.
+        Written to the journal entry as consumer_receipt_hash for audit purposes.
 
     Returns
     -------
     int
         Number of entries transitioned to ACKED.
     """
-    return journal.transition_acked(producer_event_ids)
+    return journal.transition_acked(producer_event_ids, consumer_receipts=consumer_receipts)

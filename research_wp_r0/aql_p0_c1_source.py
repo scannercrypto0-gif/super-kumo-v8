@@ -26,7 +26,7 @@ import json
 import math
 from dataclasses import dataclass, field
 from hashlib import sha256
-from typing import Any
+from typing import Any, ClassVar
 
 # ---------------------------------------------------------------------------
 # Constants frozen by canonical spec
@@ -196,7 +196,22 @@ class AdmittedSource:
     load_source() requires this object as a mandatory parameter — it is the
     ONLY way to obtain a P0SourceManifest in production.  Test code may
     construct one directly ONLY for bar-level unit tests that need to bypass
-    the hash gate; that bypass must be clearly labelled in the test.
+    the hash gate via _validate_normalized_bars() directly; that bypass must
+    be clearly labelled in the test.
+
+    TRUST MODEL
+    -----------
+    TRUST_MODEL_DECLARATION = "HASH_ONLY_NOT_NESTED_VERIFIED"
+
+    Only three SHA-256 hashes are verified:
+      1. OUTER_ZIP_SHA256  — the owner's delivery ZIP package as a whole
+      2. MANIFEST_SHA256   — manifest.json extracted from that ZIP
+      3. NORMALIZED_SHA256 — the normalized JSON used for bar decisions
+
+    The nested structure inside the delivery ZIP (seven daily ZIP archives,
+    individual daily CSV files, and Binance publisher CHECKSUM text files)
+    is NOT independently inspected.  Hash integrity rests on the outer-package
+    and manifest commitments only.
 
     Fields
     ------
@@ -207,6 +222,9 @@ class AdmittedSource:
     outer_zip_sha256_verified:
         The outer ZIP hash that matched OUTER_ZIP_SHA256 (audit trail only).
     """
+    # Class-level trust model declaration (not an instance field)
+    TRUST_MODEL_DECLARATION: ClassVar[str] = "HASH_ONLY_NOT_NESTED_VERIFIED"
+
     normalized_bytes: bytes
     manifest_integrity_sha256: str   # verified against MANIFEST_SHA256
     outer_zip_sha256_verified: str   # the hash that matched OUTER_ZIP_SHA256
@@ -392,6 +410,24 @@ def load_source(
             "bypassing the admission gate is not permitted"
         )
 
+    # --- Defense-in-depth: re-verify outer ZIP and manifest pins independently ---
+    # These checks are independent of admit_source() — they guard against
+    # AdmittedSource objects constructed directly with wrong/arbitrary hashes.
+    # TRUST_MODEL=HASH_ONLY_NOT_NESTED_VERIFIED (nested ZIP/CSV/CHECKSUM not inspected).
+    if admitted.outer_zip_sha256_verified != OUTER_ZIP_SHA256:
+        raise C1SourceRejected(
+            f"LOAD_SOURCE_OUTER_ZIP_PIN_MISMATCH: admitted outer hash "
+            f"{admitted.outer_zip_sha256_verified!r} does not match OUTER_ZIP_SHA256 pin — "
+            f"AdmittedSource must be obtained via admit_source() in production. "
+            f"TRUST_MODEL={AdmittedSource.TRUST_MODEL_DECLARATION} "
+            f"(no nested ZIP or CHECKSUM inspection)"
+        )
+    if admitted.manifest_integrity_sha256 != MANIFEST_SHA256:
+        raise C1SourceRejected(
+            f"LOAD_SOURCE_MANIFEST_PIN_MISMATCH: admitted manifest hash "
+            f"{admitted.manifest_integrity_sha256!r} does not match MANIFEST_SHA256 pin"
+        )
+
     normalized_json_bytes = admitted.normalized_bytes
     manifest_integrity_sha256 = admitted.manifest_integrity_sha256
 
@@ -400,7 +436,7 @@ def load_source(
     if not normalized_json_bytes:
         raise C1SourceRejected("NORMALIZED_JSON_EMPTY")
 
-    # --- Defense-in-depth: re-verify hash even though admit_source() already checked ---
+    # --- Defense-in-depth: re-verify normalized hash even though admit_source() already checked ---
     actual_sha = _sha256_hex(normalized_json_bytes)
     if actual_sha != NORMALIZED_SHA256:
         raise C1SourceRejected(
