@@ -25,11 +25,25 @@ Research / Strategy Factory lane only.
 
 Issue: #59 (SF-IND-01)
 Depends on: SF-DATA-01 (PR #57, commit cf4339e83d8ce2fe30cc727b6c470f1fb0bf63bb)
+
+Hardening changes (AQL-CLAUDE-RESEARCH-FOUNDATION-HARDENING-001 Stage 3):
+* _guard_finite_closes(): fail-closed NaN/Inf check before any arithmetic
+* _guard_finite_bar_prices(): fail-closed NaN/Inf check on bar.high/low for ATR
+* All four indicators (_compute_values) call guards as first action
+
+Note on DataAvailabilityKind.RETROSPECTIVE (F-02):
+  When bars come from a historical fixture, observation_cutoff_ms = bar_close + 1
+  is a THEORETICAL LOWER BOUND only — it represents the earliest possible receipt
+  time, not an actual recorded ingest timestamp. Any analysis that depends on
+  intra-bar or near-close arrival timing cannot be reproduced exactly. Callers
+  consuming RETROSPECTIVE bars should not assume that decision_cutoff_ms = bar_close+1
+  reflects the wall-clock time data was actually available to a real trader.
 """
 from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -62,6 +76,47 @@ def _sha256_hex(*parts: Any) -> str:
 
 def _freeze_params(kwargs: Dict[str, Any]) -> Tuple[Tuple[str, Any], ...]:
     return tuple(sorted(kwargs.items()))
+
+
+def _guard_finite_closes(closes: List[float], label: str = "closes") -> None:
+    """Reject NaN/Inf bar prices before any indicator arithmetic.
+
+    Rationale (F-01): NaN/Inf inputs silently propagate through all indicator
+    computations (SMA sum, EMA recursive step, RSI diff, ATR true-range) and
+    are then committed to IndicatorResult with a valid-looking provenance hash.
+    Any downstream research consuming such a result silently uses contaminated
+    data.  Fail-closed here is the correct policy: a NaN bar price means the
+    bar quality gate (validate_bars in historical_library) failed or was
+    bypassed; we must not paper over that upstream failure.
+    """
+    for i, c in enumerate(closes):
+        if c is None:
+            raise ValueError(
+                f"indicator {label}[{i}]: None close price; "
+                "bar must pass validate_bars() before indicator computation"
+            )
+        if not math.isfinite(c):
+            raise ValueError(
+                f"indicator {label}[{i}]: non-finite close price {c!r}; "
+                "NaN/Inf cannot enter indicator computation (F-01)"
+            )
+
+
+def _guard_finite_bar_prices(bars: List, label: str = "bars") -> None:
+    """Reject NaN/Inf high/low/close on raw bars (ATR uses high and low).
+
+    Applies to the bar objects passed to ATR._compute_values().
+    """
+    for i, bar in enumerate(bars):
+        if bar is None:
+            continue  # warmup slots may be None; closes guard handles those
+        for attr in ("high", "low", "close"):
+            v = getattr(bar, attr, None)
+            if v is not None and not math.isfinite(v):
+                raise ValueError(
+                    f"indicator {label}[{i}].{attr}: non-finite value {v!r}; "
+                    "NaN/Inf cannot enter ATR computation (F-01)"
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -447,6 +502,7 @@ class SMAIndicator(_BaseIndicator):
     def _compute_values(
         self, closes: List[float], bars: List[HistoricalBar]
     ) -> List[Optional[float]]:
+        _guard_finite_closes(closes, label="SMA_v1.closes")
         n = len(closes)
         out: List[Optional[float]] = [None] * n
         p = self.period
@@ -482,6 +538,7 @@ class EMAIndicator(_BaseIndicator):
     def _compute_values(
         self, closes: List[float], bars: List[HistoricalBar]
     ) -> List[Optional[float]]:
+        _guard_finite_closes(closes, label="EMA_v1.closes")
         n = len(closes)
         out: List[Optional[float]] = [None] * n
         p = self.period
@@ -526,6 +583,7 @@ class RSIIndicator(_BaseIndicator):
     def _compute_values(
         self, closes: List[float], bars: List[HistoricalBar]
     ) -> List[Optional[float]]:
+        _guard_finite_closes(closes, label="RSI_v1.closes")
         n = len(closes)
         out: List[Optional[float]] = [None] * n
         p = self.period
@@ -580,6 +638,8 @@ class ATRIndicator(_BaseIndicator):
     def _compute_values(
         self, closes: List[float], bars: List[HistoricalBar]
     ) -> List[Optional[float]]:
+        _guard_finite_closes(closes, label="ATR_v1.closes")
+        _guard_finite_bar_prices(bars, label="ATR_v1.bars")
         n = len(bars)
         out: List[Optional[float]] = [None] * n
         p = self.period
