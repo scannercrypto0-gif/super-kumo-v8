@@ -580,6 +580,10 @@ def persist_consumer_effect_receipts(
             raise LedgerIdentityError("CONSUMER_RECEIPT_IDENTITY_MISMATCH")
         if env.producer_event_id in paths:
             raise LedgerIdentityError("CONSUMER_DUPLICATE_PRODUCER_ID")
+        if env.input_disposition != "EVALUABLE_RETROSPECTIVE" and fill.signal_state in ("TRIGGERED", "OPEN_UNRESOLVED"):
+            raise LedgerIdentityError("CONSUMER_BLOCKED_SOURCE_HAS_FINANCIAL_EFFECT")
+        if not env.strategy_digest or not env.run_manifest_sha256 or not env.trial_id:
+            raise LedgerLineageMissing("CONSUMER_PRODUCER_BINDING_INCOMPLETE")
         own = by_opportunity.get(opp.opportunity_id, [])
         own.sort(key=lambda x: (x.bar_open_ms if x.bar_open_ms is not None else -1,
                                 0 if x.kind == "EXIT_CREDIT" else 1, x.event_id))
