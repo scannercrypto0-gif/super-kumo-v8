@@ -107,3 +107,16 @@ def test_conflicting_effect_receipt_fails_closed(tmp_path):
     receipt.write_text(json.dumps(doc))
     with pytest.raises(LedgerReceiptCorrupted, match="CONSUMER_RECEIPT_CONFLICT"):
         _persist(tmp_path, env)
+
+
+def test_owner_source_attestation_requires_actual_three_original_domains(tmp_path):
+    """No fabricated input, no hash-only bypass, no receipt on failure."""
+    from research_wp_r0.aql_p0_c1_custody import SourceCustodyError
+    from scripts.verify_p0_owner_source_bytes import verify_owner_evidence
+    outer = tmp_path / "outer.zip"
+    manifest = tmp_path / "manifest.json"
+    normalized = tmp_path / "normalized.json"
+    for p in (outer, manifest, normalized):
+        p.write_bytes(b"synthetic-not-owner-original")
+    with pytest.raises(SourceCustodyError, match="OUTER_ZIP_SHA256_MISMATCH"):
+        verify_owner_evidence(outer, manifest, normalized)
