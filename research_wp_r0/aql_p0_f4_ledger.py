@@ -553,7 +553,7 @@ def persist_consumer_effect_receipts(
     Core C2 verifies each JSON file and sibling financial_receipts.jsonl by
     re-reading bytes. This function only returns paths after fsync + readback.
     """
-    from .aql_p0_c2_producer import DecisionEnvelope, POLICY_ID
+    from .aql_p0_c2_producer import DecisionEnvelope, POLICY_ID, _assumptions_digest
 
     directory = Path(directory)
     if len(envelopes) != len(opportunities) or len(envelopes) != len(fill_results):
@@ -584,6 +584,13 @@ def persist_consumer_effect_receipts(
             raise LedgerIdentityError("CONSUMER_BLOCKED_SOURCE_HAS_FINANCIAL_EFFECT")
         if not env.strategy_digest or not env.run_manifest_sha256 or not env.trial_id:
             raise LedgerLineageMissing("CONSUMER_PRODUCER_BINDING_INCOMPLETE")
+        # Derive the assumptions digest from the immutable producer envelope,
+        # rather than trusting a caller-supplied string that merely looks valid.
+        expected_assumptions = _assumptions_digest(
+            env.source_lag_assumption_ms, env.latency_assumption_ms
+        )
+        if assumptions_digest != expected_assumptions:
+            raise LedgerIdentityError("CONSUMER_ASSUMPTIONS_ENVELOPE_MISMATCH")
         own = by_opportunity.get(opp.opportunity_id, [])
         own.sort(key=lambda x: (x.bar_open_ms if x.bar_open_ms is not None else -1,
                                 0 if x.kind == "EXIT_CREDIT" else 1, x.event_id))
