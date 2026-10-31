@@ -727,3 +727,125 @@ class TestC2JournalLifecycle:
             "constants verified from Factory #77 comment 6540521965 only. "
             "Live hash verification requires owner-supplied package."
         )
+
+
+# ---------------------------------------------------------------------------
+# Core manager direct implementation: real production admission against complete
+# synthetic 7-day archive, NOT a historical study and NOT owner source bytes.
+# ---------------------------------------------------------------------------
+
+class TestC1NestedBundleAdmission:
+    def _bundle(self, monkeypatch):
+        import io
+        import zipfile
+        import csv
+        from datetime import date, timedelta
+        import research_wp_r0.aql_p0_c1_source as c1
+        import research_wp_r0.aql_p0_c1_custody as custody
+
+        rows = []
+        entries = []
+        outer_buffer = io.BytesIO()
+        with zipfile.ZipFile(outer_buffer, "w", compression=zipfile.ZIP_DEFLATED) as outer:
+            for day_idx in range(7):
+                day = (date(2024,1,1) + timedelta(days=day_idx)).isoformat()
+                filename = f"BTCUSDT-15m-{day}.zip"
+                csv_buffer = io.StringIO()
+                writer = csv.writer(csv_buffer, lineterminator="\\n")
+                for bar_idx in range(96):
+                    op = WINDOW_START_MS + (day_idx * 96 + bar_idx) * INTERVAL_MS
+                    o, h, l, c, v = ("100.00", "102.00", "99.00", "101.00", "2.00")
+                    writer.writerow([op, o, h, l, c, v, op+INTERVAL_MS-1, "0","0","0","0","0"])
+                    rows.append([op,o,h,l,c,v,op+INTERVAL_MS-1])
+                dayzip_buffer = io.BytesIO()
+                with zipfile.ZipFile(dayzip_buffer, "w", compression=zipfile.ZIP_DEFLATED) as daily:
+                    daily.writestr(filename[:-4] + ".csv", csv_buffer.getvalue())
+                inner = dayzip_buffer.getvalue()
+                digest = sha256(inner).hexdigest()
+                outer.writestr(filename, inner)
+                outer.writestr(filename+".CHECKSUM", digest+"  "+filename)
+                entries.append({
+                    "csv_rows":96,"date_utc":day, "filename":filename,
+                    "publisher_checksum_file":filename+".CHECKSUM",
+                    "publisher_checksum_sha256":digest,
+                    "zip_bytes":len(inner),"zip_sha256":digest,
+                    "url":"https://data.binance.vision/data/spot/daily/klines/BTCUSDT/15m/"+filename
+                })
+            norm_name = "BTCUSDT-15m-2024-01-01_to_2024-01-08-exclusive.normalized.json"
+            normalized = json.dumps(rows, separators=(",",":")).encode("utf-8")
+            outer.writestr(norm_name, normalized)
+        manifest = {
+            "schema":"aql-p0-native-15m-source-evidence-v1",
+            "exchange":"BINANCE","market":"SPOT","symbol":"BTCUSDT",
+            "interval_ms":900000,"expected_bars":672,"observed_bars":672,
+            "gap_count":0,"duplicate_count":0,
+            "window_start_utc":"2024-01-01T00:00:00Z",
+            "window_end_exclusive_utc":"2024-01-08T00:00:00Z",
+            "availability":"RETROSPECTIVE_NON_PIT",
+            "historical_known_at_ms":None, "historical_receipt_ms":None,
+            "correction_history":"UNKNOWN_NOT_ATTESTED",
+            "normalized_file":norm_name,
+            "normalized_sha256":sha256(normalized).hexdigest(),
+            "sources":entries,
+        }
+        manifest_bytes = json.dumps(manifest,sort_keys=True).encode("utf-8")
+        outer_bytes = outer_buffer.getvalue()
+        for module in (c1,custody):
+            for attr,value in (
+                ("OUTER_ZIP_SHA256",sha256(outer_bytes).hexdigest()),
+                ("OUTER_SHA",sha256(outer_bytes).hexdigest()),
+                ("MANIFEST_SHA256",sha256(manifest_bytes).hexdigest()),
+                ("MANIFEST_SHA",sha256(manifest_bytes).hexdigest()),
+                ("NORMALIZED_SHA256",sha256(normalized).hexdigest()),
+                ("NORMALIZED_SHA",sha256(normalized).hexdigest()),
+            ):
+                if hasattr(module,attr):
+                    monkeypatch.setattr(module,attr,value)
+        monkeypatch.setattr(c1,"SOURCE_BYTES_SHA256",sha256(outer_bytes).hexdigest())
+        return outer_bytes,manifest_bytes,normalized
+
+    def test_complete_raw_custody_and_real_normalized_schema(self, monkeypatch):
+        from research_wp_r0.aql_p0_c1_source import admit_source,load_source
+        outer,manifest,normalized = self._bundle(monkeypatch)
+        token = admit_source(outer_zip_bytes=outer, manifest_bytes=manifest, normalized_bytes=normalized)
+        source = load_source(admitted=token,dataset_id="TEST-NATIVE-15M")
+        assert len(source.bars) == 672
+        assert source.bars[0].open == 100.0
+        assert source.bars[-1].bar_close_ms == WINDOW_END_EXCLUSIVE_MS - 1
+        assert all(b.known_at_ms is None and b.receipt_ms is None for b in source.bars)
+
+    def test_raw_zip_swap_detected_even_with_recomputed_outer_pin(self, monkeypatch):
+        import io,zipfile
+        from research_wp_r0.aql_p0_c1_source import admit_source,C1SourceRejected
+        import research_wp_r0.aql_p0_c1_source as c1
+        import research_wp_r0.aql_p0_c1_custody as custody
+        outer,manifest,normalized = self._bundle(monkeypatch)
+        with zipfile.ZipFile(io.BytesIO(outer)) as src:
+            names = src.namelist()
+            pieces = {n: src.read(n) for n in names}
+        target = "BTCUSDT-15m-2024-01-03.zip"
+        pieces[target] = pieces["BTCUSDT-15m-2024-01-04.zip"]
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer,"w") as out:
+            for n,payload in pieces.items():out.writestr(n,payload)
+        modified = buffer.getvalue()
+        monkeypatch.setattr(c1,"OUTER_ZIP_SHA256",sha256(modified).hexdigest())
+        monkeypatch.setattr(custody,"OUTER_SHA",sha256(modified).hexdigest())
+        with pytest.raises(C1SourceRejected,match="DAILY_SOURCE_SHA256_MISMATCH"):
+            admit_source(outer_zip_bytes=modified,manifest_bytes=manifest,normalized_bytes=normalized)
+
+    def test_manifest_swap_detected(self,monkeypatch):
+        from research_wp_r0.aql_p0_c1_source import admit_source,C1SourceRejected
+        outer,manifest,normalized=self._bundle(monkeypatch)
+        with pytest.raises(C1SourceRejected,match="MANIFEST_SHA256_MISMATCH"):
+            admit_source(outer_zip_bytes=outer,manifest_bytes=manifest+b" ",normalized_bytes=normalized)
+
+    def test_raw_proof_token_cannot_be_forged_from_hash_strings(self,monkeypatch):
+        from research_wp_r0.aql_p0_c1_source import admit_source,load_source,AdmittedSource,C1SourceRejected
+        outer,manifest,normalized=self._bundle(monkeypatch)
+        admitted=admit_source(outer_zip_bytes=outer,manifest_bytes=manifest,normalized_bytes=normalized)
+        fake=AdmittedSource(normalized_bytes=normalized,
+            manifest_integrity_sha256=admitted.manifest_integrity_sha256,
+            outer_zip_sha256_verified=admitted.outer_zip_sha256_verified)
+        with pytest.raises(C1SourceRejected,match="RAW_EVIDENCE_REQUIRED"):
+            load_source(admitted=fake,dataset_id="FORGED")
