@@ -107,14 +107,55 @@ class ConsumerJournalEntry:
         SHA-256 or equivalent receipt proof from the downstream consumer (F1/Factory)
         confirming it has durably stored the envelope.  Set when transition_acked()
         is called with consumer_receipts; None when no downstream receipt was supplied.
-        An absent receipt does NOT prevent the ACK transition, but callers SHOULD
-        supply it whenever the downstream consumer can provide one.
+        An absent receipt MUST prevent ACKED.
     """
     producer_event_id: str
     opportunity_id: str
     envelope_sha256: str
     state: str    # "PENDING" | "APPLIED" | "ACKED"
     consumer_receipt_hash: str | None = None
+    source_bytes_sha256: str | None = None
+    run_manifest_sha256: str | None = None
+
+
+def _verify_factory_receipt(path: Path, entry: ConsumerJournalEntry) -> str:
+    """Factory contract: receipt and effect must be readable, bound, and pinned."""
+    if not entry.source_bytes_sha256 or not entry.run_manifest_sha256:
+        raise C2ConflictError("ACK_SOURCE_AND_RUN_BINDING_REQUIRED")
+    try:
+        receipt_bytes = path.read_bytes()
+        receipt = json.loads(receipt_bytes)
+        if receipt.get("schema") != "aql.p0.factory-consumer-receipt.v1":
+            raise C2ConflictError("ACK_RECEIPT_SCHEMA_INVALID")
+        identities = {
+            "producer_event_id": entry.producer_event_id,
+            "opportunity_id": entry.opportunity_id,
+            "envelope_sha256": entry.envelope_sha256,
+            "source_bytes_sha256": entry.source_bytes_sha256,
+            "run_manifest_sha256": entry.run_manifest_sha256,
+        }
+        if any(receipt.get(k) != v for k, v in identities.items()):
+            raise C2ConflictError("ACK_RECEIPT_IDENTITY_MISMATCH")
+        effect_name = receipt.get("effect_path")
+        effect_sha = receipt.get("effect_sha256")
+        if not isinstance(effect_name, str) or not effect_name or not isinstance(effect_sha, str) or len(effect_sha) != 64:
+            raise C2ConflictError("ACK_EFFECT_REFERENCE_INVALID")
+        effect_path = Path(effect_name)
+        if not effect_path.is_absolute():
+            effect_path = path.parent / effect_path
+        effect_bytes = effect_path.read_bytes()
+        if _sha256_hex(effect_bytes) != effect_sha:
+            raise C2ConflictError("ACK_EFFECT_SHA256_MISMATCH")
+        effect = json.loads(effect_bytes)
+        if any(effect.get(k) != v for k, v in identities.items()):
+            raise C2ConflictError("ACK_EFFECT_IDENTITY_MISMATCH")
+        if effect.get("durable_effect_status") != "PERSISTED_READBACK":
+            raise C2ConflictError("ACK_EFFECT_NOT_CONFIRMED")
+        return _sha256_hex(receipt_bytes)
+    except C2ConflictError:
+        raise
+    except (OSError, ValueError, TypeError, AttributeError, KeyError) as exc:
+        raise C2ConflictError("ACK_RECEIPT_OR_EFFECT_UNREADABLE") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +192,8 @@ class DurableJournal:
         producer_event_id: str,
         opportunity_id: str,
         envelope_sha256: str,
+        source_bytes_sha256: str | None = None,
+        run_manifest_sha256: str | None = None,
     ) -> ConsumerJournalEntry:
         """Append PENDING entry to disk + fsync. Returns the entry.
 
@@ -159,7 +202,7 @@ class DurableJournal:
         """
         if producer_event_id in self._entries:
             existing = self._entries[producer_event_id]
-            if existing.envelope_sha256 != envelope_sha256:
+            if (existing.envelope_sha256 != envelope_sha256 or (source_bytes_sha256 is not None and existing.source_bytes_sha256 not in (None, source_bytes_sha256)) or (run_manifest_sha256 is not None and existing.run_manifest_sha256 not in (None, run_manifest_sha256))):
                 raise C2ConflictError(
                     f"CONFLICT: producer_event_id={producer_event_id!r} was previously "
                     f"journaled with digest={existing.envelope_sha256!r} but now "
@@ -173,6 +216,8 @@ class DurableJournal:
             opportunity_id=opportunity_id,
             envelope_sha256=envelope_sha256,
             state="PENDING",
+            source_bytes_sha256=source_bytes_sha256,
+            run_manifest_sha256=run_manifest_sha256,
         )
         self._append_and_fsync(entry)
         self._entries[producer_event_id] = entry
@@ -214,40 +259,47 @@ class DurableJournal:
                 f"as APPLIED on disk after write+fsync"
             )
 
-    def transition_acked(
-        self,
-        producer_event_ids: list[str],
-        consumer_receipts: dict[str, str] | None = None,
-    ) -> int:
-        """Transition APPLIED → ACKED for confirmed producer_event_ids.
+    def transition_acked(self, producer_event_ids: list[str], consumer_receipts: dict[str, str] | None = None) -> int:
+        """Accept only a persisted Factory receipt AND its matching persisted effect.
 
-        Parameters
-        ----------
-        producer_event_ids:
-            IDs to acknowledge. Must already be APPLIED in the journal.
-        consumer_receipts:
-            Optional mapping of producer_event_id → downstream consumer receipt hash.
-            When supplied, the receipt is written to the journal entry as
-            consumer_receipt_hash for audit/replay purposes.
-            Callers SHOULD supply this whenever the downstream consumer can
-            provide a receipt proof of durable storage.
+        Values in consumer_receipts are JSON receipt FILE PATHS, never naked hash
+        strings. Factory must fsync the effect and receipt before passing path.
+        Core re-reads both and verifies source/run/envelope/event binding.
         """
-        acked = 0
+        if not consumer_receipts:
+            raise C2ConflictError("ACK_CONSUMER_RECEIPT_REQUIRED")
+        validated = []
         for pid in producer_event_ids:
             entry = self._entries.get(pid)
             if entry is None:
-                raise C2ConflictError(f"ACK_UNKNOWN_ID: {pid!r} not in journal")
+                raise C2ConflictError(f"ACK_UNKNOWN_ID: {pid!r}")
             if entry.state == "PENDING":
-                raise C2ConflictError(
-                    f"ACK_NOT_APPLIED: {pid!r} still in PENDING state"
-                )
-            if entry.state == "APPLIED":
-                receipt_hash = (consumer_receipts or {}).get(pid)
-                entry.state = "ACKED"
-                entry.consumer_receipt_hash = receipt_hash
-                self._append_and_fsync(entry)
-                acked += 1
-        return acked
+                raise C2ConflictError(f"ACK_NOT_APPLIED: {pid!r}")
+            receipt_path = consumer_receipts.get(pid)
+            if not isinstance(receipt_path, str) or not receipt_path:
+                raise C2ConflictError(f"ACK_CONSUMER_RECEIPT_REQUIRED: {pid!r}")
+            verified_sha = _verify_factory_receipt(Path(receipt_path), entry)
+            if entry.state == "ACKED":
+                if entry.consumer_receipt_hash != verified_sha:
+                    raise C2ConflictError(f"ACK_RECEIPT_CONFLICT: {pid!r}")
+                continue
+            validated.append((entry, verified_sha))
+        for entry, digest in validated:
+            new_entry = ConsumerJournalEntry(
+                producer_event_id=entry.producer_event_id,
+                opportunity_id=entry.opportunity_id,
+                envelope_sha256=entry.envelope_sha256,
+                state="ACKED",
+                consumer_receipt_hash=digest,
+                source_bytes_sha256=entry.source_bytes_sha256,
+                run_manifest_sha256=entry.run_manifest_sha256,
+            )
+            self._append_and_fsync(new_entry)
+            readback = _load_journal_file(self._path).get(entry.producer_event_id)
+            if readback is None or readback.state != "ACKED" or readback.consumer_receipt_hash != digest:
+                raise C2ConflictError(f"ACK_DISK_READBACK_FAILED: {entry.producer_event_id!r}")
+            self._entries[entry.producer_event_id] = new_entry
+        return len(validated)
 
     def _append_and_fsync(self, entry: ConsumerJournalEntry) -> None:
         """Append one JSON-line record to the journal file and fsync."""
@@ -260,6 +312,10 @@ class DurableJournal:
         }
         if entry.consumer_receipt_hash is not None:
             record["consumer_receipt_hash"] = entry.consumer_receipt_hash
+        if entry.source_bytes_sha256 is not None:
+            record["source_bytes_sha256"] = entry.source_bytes_sha256
+        if entry.run_manifest_sha256 is not None:
+            record["run_manifest_sha256"] = entry.run_manifest_sha256
         line = json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
         with open(self._path, "ab") as fh:
             fh.write(line.encode("utf-8"))
@@ -318,6 +374,8 @@ def _load_journal_file(path: Path) -> dict[str, ConsumerJournalEntry]:
                         envelope_sha256=rec["envelope_sha256"],
                         state=rec["state"],
                         consumer_receipt_hash=rec.get("consumer_receipt_hash"),
+                        source_bytes_sha256=rec.get("source_bytes_sha256"),
+                        run_manifest_sha256=rec.get("run_manifest_sha256"),
                     )
             else:
                 entries[pid] = ConsumerJournalEntry(
@@ -326,6 +384,8 @@ def _load_journal_file(path: Path) -> dict[str, ConsumerJournalEntry]:
                     envelope_sha256=rec["envelope_sha256"],
                     state=rec["state"],
                     consumer_receipt_hash=rec.get("consumer_receipt_hash"),
+                        source_bytes_sha256=rec.get("source_bytes_sha256"),
+                        run_manifest_sha256=rec.get("run_manifest_sha256"),
                 )
         except C2ConflictError:
             raise  # always re-raise digest conflict errors
@@ -568,6 +628,8 @@ def produce_envelopes(
             producer_event_id=prod_event_id,
             opportunity_id=opp_id,
             envelope_sha256=env_sha,
+            source_bytes_sha256=manifest.source_bytes_sha256,
+            run_manifest_sha256=run_manifest_sha,
         )
 
         envelope = DecisionEnvelope(
