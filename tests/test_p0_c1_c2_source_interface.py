@@ -834,6 +834,25 @@ class TestC1NestedBundleAdmission:
         with pytest.raises(C1SourceRejected,match="DAILY_SOURCE_SHA256_MISMATCH"):
             admit_source(outer_zip_bytes=modified,manifest_bytes=manifest,normalized_bytes=normalized)
 
+    def test_publisher_checksum_tamper_detected(self, monkeypatch):
+        import io,zipfile
+        from research_wp_r0.aql_p0_c1_source import admit_source,C1SourceRejected
+        import research_wp_r0.aql_p0_c1_source as c1
+        import research_wp_r0.aql_p0_c1_custody as custody
+        outer,manifest,normalized=self._bundle(monkeypatch)
+        with zipfile.ZipFile(io.BytesIO(outer)) as src:
+            parts={name:src.read(name) for name in src.namelist()}
+        name="BTCUSDT-15m-2024-01-04.zip.CHECKSUM"
+        parts[name]=(b"0"*64+b"  BTCUSDT-15m-2024-01-04.zip")
+        buffer=io.BytesIO()
+        with zipfile.ZipFile(buffer,"w") as out:
+            for name,data in parts.items():out.writestr(name,data)
+        altered=buffer.getvalue()
+        monkeypatch.setattr(c1,"OUTER_ZIP_SHA256",sha256(altered).hexdigest())
+        monkeypatch.setattr(custody,"OUTER_SHA",sha256(altered).hexdigest())
+        with pytest.raises(C1SourceRejected,match="PUBLISHER_CHECKSUM_MISMATCH"):
+            admit_source(outer_zip_bytes=altered,manifest_bytes=manifest,normalized_bytes=normalized)
+
     def test_manifest_swap_detected(self,monkeypatch):
         from research_wp_r0.aql_p0_c1_source import admit_source,C1SourceRejected
         outer,manifest,normalized=self._bundle(monkeypatch)
@@ -849,3 +868,23 @@ class TestC1NestedBundleAdmission:
             outer_zip_sha256_verified=admitted.outer_zip_sha256_verified)
         with pytest.raises(C1SourceRejected,match="RAW_EVIDENCE_REQUIRED"):
             load_source(admitted=fake,dataset_id="FORGED")
+
+
+class TestC2ProcessRestartProof:
+    def test_ack_new_python_process_confirms_disk_state(self, tmp_path):
+        import subprocess
+        import sys
+        from research_wp_r0.aql_p0_c2_producer import DurableJournal
+        journal_path=tmp_path/"subprocess-journal.jsonl"
+        journal=DurableJournal(journal_path)
+        journal.write_pending("PID-SUB","OPP-SUB","a"*64,source_bytes_sha256="b"*64,run_manifest_sha256="c"*64)
+        journal.transition_applied("PID-SUB")
+        code=("from research_wp_r0.aql_p0_c2_producer import DurableJournal;"
+              "from pathlib import Path;"
+              "j=DurableJournal(Path(" + repr(str(journal_path)) + "));"
+              "assert j.entries['PID-SUB'].state == 'APPLIED';"
+              "assert j.entries['PID-SUB'].source_bytes_sha256 == 'b'*64;"
+              "print('SUBPROCESS_READBACK_OK')")
+        run=subprocess.run([sys.executable,"-c",code],capture_output=True,text=True,check=True)
+        assert "SUBPROCESS_READBACK_OK" in run.stdout
+
