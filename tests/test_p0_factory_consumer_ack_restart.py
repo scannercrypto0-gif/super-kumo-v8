@@ -165,3 +165,66 @@ def test_f4_preflight_rejects_bad_later_envelope_without_orphaned_effects(tmp_pa
             assumptions_digest=_assumptions_digest(env.source_lag_assumption_ms, env.latency_assumption_ms),
         )
     assert not (tmp_path / "factory" / "financial_receipts.jsonl").exists()
+
+
+def test_positive_financial_receipt_ack_restart_and_tamper(tmp_path):
+    from research_wp_r0.aql_p0_f4_ledger import LedgerEvent, FinancialReceipt
+    from decimal import Decimal
+    env = _envelope()
+    assumptions = _assumptions_digest(env.source_lag_assumption_ms, env.latency_assumption_ms)
+    journal_path = tmp_path / "producer.jsonl"
+    journal = DurableJournal(journal_path)
+    journal.write_pending(
+        env.producer_event_id, env.opportunity_id, env.envelope_sha256,
+        source_bytes_sha256="9" * 64, run_manifest_sha256=env.run_manifest_sha256,
+        trial_id=env.trial_id, strategy_digest=env.strategy_digest,
+        policy_id=POLICY_ID, assumptions_digest=assumptions,
+    )
+    journal.transition_applied(env.producer_event_id)
+    event = LedgerEvent(
+        event_id="synthetic-financial-entry", opportunity_id=env.opportunity_id,
+        kind="ENTRY_DEBIT", bar_open_ms=1100, price_net=Decimal("100"),
+        quantity_btc=Decimal("1"), fee=Decimal("0"), cost_basis=Decimal("100"),
+        cash_delta=Decimal("-100"), cumulative_cash=None,
+        held_btc_delta=Decimal("1"), cumulative_held_btc=None,
+    )
+    state = LedgerState()
+    state._receipts = [FinancialReceipt.from_event(event)]
+    paths = persist_consumer_effect_receipts(
+        directory=tmp_path / "factory", envelopes=[env],
+        opportunities=[SimpleNamespace(opportunity_id=env.opportunity_id)],
+        fill_results=[SimpleNamespace(opportunity_id=env.opportunity_id, signal_state="TRIGGERED")],
+        state=state, manifest_sha256=MANIFEST_SHA, assumptions_digest=assumptions,
+    )
+    assert persist_consumer_effect_receipts(
+        directory=tmp_path / "factory", envelopes=[env],
+        opportunities=[SimpleNamespace(opportunity_id=env.opportunity_id)],
+        fill_results=[SimpleNamespace(opportunity_id=env.opportunity_id, signal_state="TRIGGERED")],
+        state=state, manifest_sha256=MANIFEST_SHA, assumptions_digest=assumptions,
+    ) == paths
+    script = """
+import sys
+from pathlib import Path
+from research_wp_r0.aql_p0_c2_producer import load_journal
+journal = load_journal(Path(sys.argv[1]))
+pid = 'synthetic-producer'
+assert journal.transition_acked([pid], {pid: sys.argv[2]}) == 1
+assert load_journal(Path(sys.argv[1])).transition_acked([pid], {pid: sys.argv[2]}) == 0
+"""
+    proc = subprocess.run([sys.executable, "-c", script, str(journal_path), paths[env.producer_event_id]],
+                          capture_output=True, text=True, check=False)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    # Mutated financial journal must invalidate a fresh replay of the receipt.
+    financial = tmp_path / "factory" / "financial_receipts.jsonl"
+    data = financial.read_text()
+    financial.write_text(data.replace("synthetic-financial-entry", "tampered-financial-entry"))
+    journal2 = DurableJournal(tmp_path / "producer2.jsonl")
+    journal2.write_pending(
+        env.producer_event_id, env.opportunity_id, env.envelope_sha256,
+        source_bytes_sha256="9" * 64, run_manifest_sha256=env.run_manifest_sha256,
+        trial_id=env.trial_id, strategy_digest=env.strategy_digest,
+        policy_id=POLICY_ID, assumptions_digest=assumptions,
+    )
+    journal2.transition_applied(env.producer_event_id)
+    with pytest.raises(C2ConflictError):
+        journal2.transition_acked([env.producer_event_id], paths)
