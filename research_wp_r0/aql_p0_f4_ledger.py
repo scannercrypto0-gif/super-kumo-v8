@@ -543,6 +543,81 @@ def persist_receipts(
     return written
 
 
+def persist_consumer_effect_receipts(
+    *, directory: Path | str, envelopes: list[Any],
+    opportunities: list[Opportunity], fill_results: list[FillResult],
+    state: LedgerState, manifest_sha256: str, assumptions_digest: str,
+) -> dict[str, str]:
+    """Durably record a decision disposition for EVERY envelope, including no-effect.
+
+    Core C2 verifies each JSON file and sibling financial_receipts.jsonl by
+    re-reading bytes. This function only returns paths after fsync + readback.
+    """
+    from .aql_p0_c2_producer import DecisionEnvelope
+
+    directory = Path(directory)
+    if len(envelopes) != len(opportunities) or len(envelopes) != len(fill_results):
+        raise LedgerIdentityError("CONSUMER_RECEIPT_DENOMINATOR_MISMATCH")
+    if not isinstance(manifest_sha256, str) or len(manifest_sha256) != 64:
+        raise LedgerLineageMissing("CONSUMER_MANIFEST_SHA256_REQUIRED")
+    if not isinstance(assumptions_digest, str) or not assumptions_digest:
+        raise LedgerLineageMissing("CONSUMER_ASSUMPTIONS_DIGEST_REQUIRED")
+    receipts: list[FinancialReceipt] = getattr(state, "_receipts", [])
+    financial_path = directory / "financial_receipts.jsonl"
+    if receipts:
+        persist_receipts(state, financial_path)
+        persisted = load_receipts(financial_path)
+        reconcile_receipts(state, persisted)
+    by_opportunity: dict[str, list[FinancialReceipt]] = {}
+    for receipt in receipts:
+        by_opportunity.setdefault(receipt.opportunity_id, []).append(receipt)
+    directory.mkdir(parents=True, exist_ok=True)
+    paths: dict[str, str] = {}
+    for env, opp, fill in zip(envelopes, opportunities, fill_results):
+        if not isinstance(env, DecisionEnvelope) or env.opportunity_id != opp.opportunity_id or opp.opportunity_id != fill.opportunity_id:
+            raise LedgerIdentityError("CONSUMER_RECEIPT_IDENTITY_MISMATCH")
+        if env.producer_event_id in paths:
+            raise LedgerIdentityError("CONSUMER_DUPLICATE_PRODUCER_ID")
+        if env.assumptions_digest if hasattr(env, "assumptions_digest") else False:
+            raise LedgerIdentityError("UNEXPECTED_ENVELOPE_ASSUMPTIONS_FIELD")
+        own = by_opportunity.get(opp.opportunity_id, [])
+        own.sort(key=lambda x: (x.bar_open_ms if x.bar_open_ms is not None else -1,
+                                0 if x.kind == "EXIT_CREDIT" else 1, x.event_id))
+        effect = {
+            "producer_event_id": env.producer_event_id,
+            "envelope_sha256": env.envelope_sha256,
+            "run_manifest_sha256": env.run_manifest_sha256,
+            "opportunity_id": env.opportunity_id,
+            "effect_disposition": fill.signal_state,
+            "ordered_financial_event_ids": [x.event_id for x in own],
+            "ordered_financial_payload_hashes": [x.payload_hash for x in own],
+        }
+        payload = {
+            "schema": "aql.p0.factory-consumer-effect-receipt.v1",
+            **effect,
+            "trial_id": env.trial_id,
+            "strategy_digest": env.strategy_digest,
+            "policy_id": "P0-DEV-RETROSPECTIVE-v1",
+            "assumptions_digest": assumptions_digest,
+            "consumer_effect_digest": _sha256_hex(_canonical_bytes(effect)),
+        }
+        payload["receipt_sha256"] = _sha256_hex(_canonical_bytes(payload))
+        dest = directory / (env.producer_event_id + ".json")
+        encoded = _canonical_bytes(payload)
+        if dest.exists():
+            if dest.read_bytes() != encoded:
+                raise LedgerReceiptCorrupted("CONSUMER_RECEIPT_CONFLICT")
+        else:
+            with dest.open("xb") as fh:
+                fh.write(encoded)
+                fh.flush()
+                os.fsync(fh.fileno())
+        if dest.read_bytes() != encoded:
+            raise LedgerReceiptCorrupted("CONSUMER_RECEIPT_READBACK_MISMATCH")
+        paths[env.producer_event_id] = str(dest)
+    return paths
+
+
 def load_receipts(path: Path | str) -> dict[str, str]:
     """Load persisted receipts. Returns {event_id: payload_hash}.
 
