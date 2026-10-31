@@ -1,0 +1,109 @@
+{
+  "schema": "atlas-ag-f02-investigation-1",
+  "python": "3.14.3",
+  "base_sha": "c6851bbaf0664d19490e374d6019687d1c234be7",
+  "unassisted_failure_reproduced": false,
+  "injected_upsert_delay_s": 0.25,
+  "cohorts": {
+    "baseline": {
+      "runs": 25,
+      "passed": 25,
+      "failed": 0,
+      "max_finish_s": {
+        "BackgroundLane": 0.6818201999994926,
+        "JournalConsumer": 0.017831399993156083
+      }
+    },
+    "slow-baseline": {
+      "runs": 5,
+      "passed": 0,
+      "failed": 5,
+      "max_finish_s": {
+        "BackgroundLane": 1.0045665000070585,
+        "JournalConsumer": 0.5152596000116318
+      }
+    },
+    "slow-final-worker": {
+      "runs": 1,
+      "passed": 0,
+      "failed": 1,
+      "max_finish_s": {
+        "BackgroundLane": 1.0035463999956846,
+        "JournalConsumer": 0.43390180000278633
+      }
+    },
+    "fixed-natural": {
+      "runs": 25,
+      "passed": 25,
+      "failed": 0,
+      "max_finish_s": {
+        "BackgroundLane": 0.06786129999090917,
+        "JournalConsumer": 0.017609500006074086
+      }
+    },
+    "fixed-slow": {
+      "runs": 5,
+      "passed": 5,
+      "failed": 0,
+      "max_finish_s": {
+        "BackgroundLane": 0.06767390000459272,
+        "JournalConsumer": 0.017122299992479384
+      }
+    },
+    "baseline-isolated": {
+      "fresh_pytest_processes": 5,
+      "passed": 5
+    },
+    "fixed-isolated": {
+      "fresh_pytest_processes": 10,
+      "passed": 10
+    }
+  },
+  "controlled_observation": {
+    "BackgroundLane": {
+      "elapsed_s": 1.0035463999956846,
+      "status": {
+        "pending": 1,
+        "rejected": 0,
+        "errors": [],
+        "worker_alive": true
+      },
+      "live_after": true,
+      "unfinished_after": 1
+    },
+    "JournalConsumer": {
+      "elapsed_s": 0.43390180000278633,
+      "status": {
+        "errors": 0,
+        "worker_alive": false
+      },
+      "live_after": false,
+      "unfinished_after": null
+    },
+    "recovery_at_pipeline_return": {
+      "alive": false,
+      "pending": 1,
+      "queued": 1,
+      "errors": []
+    },
+    "background_recovery": {
+      "pending": 1,
+      "rejected": 0,
+      "errors": [],
+      "worker_alive": true
+    },
+    "background_persistence": {
+      "errors": 0,
+      "worker_alive": false
+    },
+    "startup": {
+      "bars_replayed": 5,
+      "replay_inserted": 5,
+      "replay_errors": 0,
+      "error": "Background work pending/failed; retry from durable journal on restart",
+      "unresolved_backlog": true
+    },
+    "store": 5,
+    "health": "UNHEALTHY"
+  }
+}
