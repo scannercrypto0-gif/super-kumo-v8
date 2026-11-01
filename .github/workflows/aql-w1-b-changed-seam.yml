@@ -33,9 +33,10 @@ jobs:
           cp factory/research_wp_r0/aql_w1_original_p0_readonly_link.py compatible/research_wp_r0/
           cp factory/tests/test_aql_w1_original_p0_readonly_link.py compatible/tests/
           cp factory/research_wp_r0/aql_w1_original_p0_zip_adapter.py compatible/research_wp_r0/
+          cp factory/tests/test_aql_w1_original_p0_zip_hardening.py compatible/tests/
           cd compatible
           test "$(git rev-parse HEAD)" = "59fb9a71714a719a58b00d4de05654c409fb8a67"
-          git add research_wp_r0/aql_w1_factory_research_consumer.py research_wp_r0/aql_w1_f4_custody_gate.py tests/test_aql_w1_f4_custody_gate.py research_wp_r0/aql_w1_original_p0_readonly_link.py tests/test_aql_w1_original_p0_readonly_link.py research_wp_r0/aql_w1_original_p0_zip_adapter.py
+          git add research_wp_r0/aql_w1_factory_research_consumer.py research_wp_r0/aql_w1_f4_custody_gate.py tests/test_aql_w1_f4_custody_gate.py research_wp_r0/aql_w1_original_p0_readonly_link.py tests/test_aql_w1_original_p0_readonly_link.py research_wp_r0/aql_w1_original_p0_zip_adapter.py tests/test_aql_w1_original_p0_zip_hardening.py
           echo "PINNED_CORE_SHA=$(git rev-parse HEAD)"
           echo "FACTORY_HEAD_SHA=${{ github.sha }}"
           echo "COMBINED_TREE_SHA=$(git write-tree)"
@@ -45,6 +46,7 @@ jobs:
           git hash-object research_wp_r0/aql_w1_original_p0_readonly_link.py
           git hash-object tests/test_aql_w1_original_p0_readonly_link.py
           git hash-object research_wp_r0/aql_w1_original_p0_zip_adapter.py
+          git hash-object tests/test_aql_w1_original_p0_zip_hardening.py
       - name: Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -56,4 +58,4 @@ jobs:
           set -o pipefail
           python -m unittest discover -s tests -p 'test_aql_w1_f4_custody_gate.py' -v
           python -m unittest discover -s tests -p 'test_aql_w1_original_p0_readonly_link.py' -v
-          python -m py_compile research_wp_r0/aql_w1_original_p0_zip_adapter.py
+          python -m unittest discover -s tests -p 'test_aql_w1_original_p0_zip_hardening.py' -v
