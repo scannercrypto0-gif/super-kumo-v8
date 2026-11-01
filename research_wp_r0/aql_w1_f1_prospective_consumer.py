@@ -238,14 +238,35 @@ def project_f1_research_slots(scheduled, captures=(), market_windows=(), *,
                     "f1_signal_state": one.get("f1_signal_state") if status == "RECORDED" else None,
                     "f3_effect_disposition": f3_by_c2.get(identity),
                     "horizon_ms": horizon, "coverage_status": coverage,
-                    "measurement_class": "COMMON_PAIRED" if status == "RECORDED" and signed else "MARKET_ONLY",
+                    "measurement_class": "ARM_SPECIFIC_POLICY" if signed else "MARKET_ONLY",
                     "excursion_status": reason_metric if coverage == "COMPLETE" or reason_metric != "EVALUABLE" else "UNVERIFIED_PIT",
                     "max_favorable": signed[0] if signed and coverage == "COMPLETE" else None,
                     "max_adverse": signed[1] if signed and coverage == "COMPLETE" else None,
                     "tp_sl_first_hit": first_hit,
                     "observe_only_indicators": indicators,
+                    "measurement_policy_sha256": (
+                        (one.get("reference") or {}).get("measurement_policy_sha256")
+                        if status == "RECORDED" else None
+                    ),
+                    "reference_price": (
+                        (one.get("reference") or {}).get("price")
+                        if status == "RECORDED" else None
+                    ),
                     "no_fill_or_pnl_inference": True,
                 })
+    # A one-sided signed observation cannot be called a common paired estimate.
+    by_pair_horizon = {}
+    for row in slots:
+        by_pair_horizon.setdefault((row["pair_id"], row["horizon_ms"]), []).append(row)
+    for rows in by_pair_horizon.values():
+        if (len(rows) == 2 and {x["arm"] for x in rows} == set(ARMS)
+            and all(x["measurement_class"] == "ARM_SPECIFIC_POLICY" for x in rows)
+            and all(x["coverage_status"] == "COMPLETE" for x in rows)
+            and rows[0]["reference_price"] == rows[1]["reference_price"]
+            and rows[0]["measurement_policy_sha256"] is not None
+            and rows[0]["measurement_policy_sha256"] == rows[1]["measurement_policy_sha256"]):
+            for row in rows:
+                row["measurement_class"] = "COMMON_PAIRED"
     counts = Counter(row["capture_status"] for row in slots if row["horizon_ms"] == HORIZONS[0])
     return {"schema": "AQL-F1-FACTORY-RESEARCH-PROJECTION-v0",
             "evidence_class": "CONSUMER_PROJECTION_NOT_INDEPENDENT_PIT_PROOF",
