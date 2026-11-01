@@ -1,68 +1,40 @@
-name: AQL W1 F1 Factory Focused Consumer
+name: AQL Factory B1 Original Market Research
 on:
   push:
-    branches:
-      - aql/w1-factory-research-consumer-20261031
+    branches: [aql/w1-factory-research-consumer-20261031]
   workflow_dispatch:
-
+permissions:
+  contents: read
 jobs:
-  f1-factory-consumer-only:
+  b1-original-market-only:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
-      - name: Checkout pinned Core baseline
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          ref: 275a5198fb501db767af28ea537ee3772cc5ea75
-          path: compatible
           persist-credentials: false
-      - name: Checkout Factory exact commit
-        uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          ref: ${{ github.sha }}
-          path: factory
-          persist-credentials: false
-      - name: Overlay only prospective consumer and focused tests
+          python-version: '3.11'
+      - name: Exact source and actual vendor-byte replay
         shell: bash
         run: |
           set -euo pipefail
-          cp factory/research_wp_r0/aql_w1_f1_prospective_consumer.py compatible/research_wp_r0/
-          cp factory/tests/test_aql_w1_f1_prospective_consumer.py compatible/tests/
-          cp factory/tests/test_aql_w1_f1_core_integration.py compatible/tests/
-          cp factory/research_wp_r0/aql_w1_market_window_adapter.py compatible/research_wp_r0/
-          cp factory/tests/test_aql_w1_market_window_adapter.py compatible/tests/
-          cp factory/tests/test_aql_w1_provenance_market_integration.py compatible/tests/
-          cp factory/research_wp_r0/aql_w1_raw_parent_bridge.py compatible/research_wp_r0/
-          cp factory/tests/test_aql_w1_raw_parent_bridge.py compatible/tests/
-          cp factory/tests/test_aql_w1_core_parent_market_integration.py compatible/tests/
-          cp factory/research_wp_r0/aql_w1_raw_research_demo.py compatible/research_wp_r0/
-          cp factory/tests/test_aql_w1_raw_research_demo.py compatible/tests/
-          cp factory/research_wp_r0/aql_w1_external_raw_source_gate.py compatible/research_wp_r0/
-          cp factory/tests/test_aql_w1_external_raw_source_gate.py compatible/tests/
-          cd compatible
-          test "$(git rev-parse HEAD)" = "275a5198fb501db767af28ea537ee3772cc5ea75"
-          echo "PINNED_CORE_SHA=$(git rev-parse HEAD)"
-          echo "FACTORY_HEAD_SHA=${{ github.sha }}"
-          git add research_wp_r0/aql_w1_f1_prospective_consumer.py tests/test_aql_w1_f1_prospective_consumer.py tests/test_aql_w1_f1_core_integration.py research_wp_r0/aql_w1_market_window_adapter.py tests/test_aql_w1_market_window_adapter.py tests/test_aql_w1_provenance_market_integration.py research_wp_r0/aql_w1_raw_parent_bridge.py tests/test_aql_w1_raw_parent_bridge.py tests/test_aql_w1_core_parent_market_integration.py research_wp_r0/aql_w1_raw_research_demo.py tests/test_aql_w1_raw_research_demo.py research_wp_r0/aql_w1_external_raw_source_gate.py tests/test_aql_w1_external_raw_source_gate.py
-          echo "COMBINED_TREE_SHA=$(git write-tree)"
-          git hash-object research_wp_r0/aql_w1_f1_prospective_consumer.py
-          git hash-object tests/test_aql_w1_f1_prospective_consumer.py
-          git hash-object tests/test_aql_w1_f1_core_integration.py
-          git hash-object research_wp_r0/aql_w1_market_window_adapter.py
-          git hash-object tests/test_aql_w1_market_window_adapter.py
-          git hash-object tests/test_aql_w1_provenance_market_integration.py
-          git hash-object research_wp_r0/aql_w1_raw_parent_bridge.py
-          git hash-object tests/test_aql_w1_raw_parent_bridge.py
-          git hash-object tests/test_aql_w1_core_parent_market_integration.py
-          git hash-object research_wp_r0/aql_w1_raw_research_demo.py
-          git hash-object tests/test_aql_w1_raw_research_demo.py
-          git hash-object research_wp_r0/aql_w1_external_raw_source_gate.py
-          git hash-object tests/test_aql_w1_external_raw_source_gate.py
-      - name: Python 3.11
-        uses: actions/setup-python@v5
+          echo "FACTORY_HEAD_SHA=$(git rev-parse HEAD)"
+          echo "FACTORY_TREE_SHA=$(git rev-parse HEAD^{tree})"
+          python -m research_wp_r0.aql_b1_market_research --lock docs/evidence/factory-b1-20261101/originals-lock.json --data-dir b1-originals --out b1-replay --download
+          cmp b1-replay/report.json docs/evidence/factory-b1-20261101/market-report.json
+          sha256sum b1-originals/* b1-replay/*
+      - name: Only eight new B1 actual-input tests
+        env:
+          AQL_B1_DATA_DIR: b1-originals
+        run: python -m unittest -v tests.test_aql_b1_market_research
+      - name: Retain actual originals and replay bytes (90 days, not an external custody authority)
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          python-version: '3.11'
-      - name: Only F1 Factory consumer focused tests
-        working-directory: compatible
-        run: python -m unittest -v tests.test_aql_w1_external_raw_source_gate
+          name: factory-b1-original-market-replay
+          path: |
+            b1-originals/
+            b1-replay/
+          if-no-files-found: error
+          retention-days: 90
