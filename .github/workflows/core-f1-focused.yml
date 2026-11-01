@@ -63,3 +63,49 @@ jobs:
             b1_evidence/core-b1-factory-controlled.json
             b1_evidence/f3_callsites.txt
           retention-days: 30
+  b1-claude-v2-independent-replay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 2ddfb2f4a6e145c6579820beb03e4d678594de21
+          path: .vault-pin
+      - uses: actions/checkout@v4
+        with:
+          ref: e52a9fb9d091ce439278988bdb0c7ef4ffaeab99
+          path: .factory-pin
+      - uses: actions/checkout@v4
+        with:
+          ref: 2e19949042e4912d6e17154c7e2382f1dbe9f127
+          path: .core-v2-pin
+      - uses: actions/checkout@v4
+        with:
+          ref: 64d88eb98113312189170b7dbae18de569b3c1a3
+          path: .claude-pin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Independently pin and rehash original Claude V2 evidence bytes
+        run: |
+          test "$(git -C .vault-pin rev-parse HEAD)" = 2ddfb2f4a6e145c6579820beb03e4d678594de21
+          test "$(git -C .factory-pin rev-parse HEAD)" = e52a9fb9d091ce439278988bdb0c7ef4ffaeab99
+          test "$(git -C .core-v2-pin rev-parse HEAD)" = 2e19949042e4912d6e17154c7e2382f1dbe9f127
+          test "$(git -C .claude-pin rev-parse HEAD)" = 64d88eb98113312189170b7dbae18de569b3c1a3
+          echo "86e8ae53ae990de42cbfd13cfe52e1a5ac4044da6a25ab05d18f0e3b24d47961  .claude-pin/integration_tests/option_b_v2_cross_pr_harness.py" | sha256sum -c -
+          echo "b8860ae4a8d90bdd19100ff0f92e2db1673ed75d1170156658b0866da1b79ad6  .claude-pin/integration_tests/option_b_v2_evidence_bundle.json" | sha256sum -c -
+          mkdir -p b1_evidence /tmp/aql-overlay
+          sudo mkdir -p /home/claude
+          sudo ln -s "$PWD/.vault-pin" /home/claude/super-kumo-v8
+          ln -s "$PWD/.factory-pin" /tmp/aql-overlay/factory
+          ln -s "$PWD/.core-v2-pin" /tmp/aql-overlay/core
+          PYTHONPATH="$PWD/.vault-pin" python .claude-pin/integration_tests/option_b_v2_cross_pr_harness.py > b1_evidence/claude_v2_independent_replay.log
+          tail -45 b1_evidence/claude_v2_independent_replay.log
+          grep -E 'PASS=22.*FAIL=0.*BLOCKED=2' b1_evidence/claude_v2_independent_replay.log
+          sha256sum b1_evidence/claude_v2_independent_replay.log
+      - name: Preserve independent pinned replay log
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-b1-claude-v2-independent-replay
+          path: b1_evidence/claude_v2_independent_replay.log
+          retention-days: 30
