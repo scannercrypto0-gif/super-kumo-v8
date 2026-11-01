@@ -54,7 +54,7 @@ def _canon_decimal(number):
     return text.rstrip("0").rstrip(".") if "." in text else text
 
 
-def _capture_structure(row, expected_pair, expected_identity):
+def _capture_structure(row, expected_pair, expected_identity, plan):
     if not isinstance(row, dict) or row.get("schema_version") != CAPTURE_SCHEMA:
         return False
     if row.get("pair_id") != expected_pair or row.get("arm") not in ARMS:
@@ -69,6 +69,12 @@ def _capture_structure(row, expected_pair, expected_identity):
     if row.get("predecision_eligibility") not in ("YES", "NO", "NOT_ESTABLISHED"):
         return False
     if not isinstance(row.get("f1_record_sha256"), str) or not SHA.fullmatch(row["f1_record_sha256"]):
+        return False
+    for field in ("source_version", "source_bytes_sha256", "correction_generation",
+                  "decision_cutoff_ms", "experiment_plan_sha256"):
+        if row.get(field) != plan.get(field):
+            return False
+    if not isinstance(row.get("arm_event_sha256"), str) or not SHA.fullmatch(row["arm_event_sha256"]):
         return False
     if not isinstance(row.get("producer_sequence"), int) or isinstance(row["producer_sequence"], bool) or row["producer_sequence"] < 0:
         return False
@@ -90,14 +96,16 @@ def _verifier_ok(verifier, value):
 
 
 def project_f1_research_slots(scheduled, captures=(), market_windows=(), *,
-                              verify_original=None, verify_market=None):
+                              verify_original=None, verify_market=None,
+                              f3_effects=None):
     """Project all scheduled C2 opportunities x BASE/SHADOW x 4/24/72h.
 
-    Both verification callbacks are REQUIRED for any positive original/market
-    authority. Missing callbacks result in UNVERIFIED/UNKNOWN, never PIT PASS.
+    Both verification callbacks are REQUIRED for positive original/market authority.
+    verify_original returns a trusted Core verdict RECORDED/UNVERIFIED/QUARANTINED.
+    Missing callbacks result in UNVERIFIED/UNKNOWN, never PIT PASS.
     `market_windows` is a common per-pair/horizon observed range, not fills.
     """
-    slots, expected, capture_groups, market = [], {}, {}, {}
+    slots, expected, capture_groups, market, f3_by_c2 = [], {}, {}, {}, {}
     for item in scheduled:
         if not isinstance(item, dict) or not isinstance(item.get("pair_id"), str) or not SHA.fullmatch(item["pair_id"]):
             raise EvidenceError("missing preregistered pair identity")
@@ -107,10 +115,23 @@ def project_f1_research_slots(scheduled, captures=(), market_windows=(), *,
             raise EvidenceError("duplicate scheduled C2 opportunity")
         if not isinstance(item.get("decision_cutoff_ms"), int) or isinstance(item["decision_cutoff_ms"], bool):
             raise EvidenceError("invalid predeclared cutoff")
-        for field in ("source_version", "correction_generation", "source_bytes_sha256"):
+        for field in ("source_version", "correction_generation", "source_bytes_sha256", "experiment_plan_sha256"):
             if not isinstance(item.get(field), str) or not item[field]:
                 raise EvidenceError("missing preregistered source vintage")
         expected[pair] = {"identity": identity, **item}
+    if f3_effects is not None:
+        for effect in f3_effects:
+            if not isinstance(effect, dict):
+                raise EvidenceError("untyped downstream F3 effect")
+            identity = _key(effect.get("c2_identity"))
+            if identity in f3_by_c2 or identity not in (x["identity"] for x in expected.values()):
+                raise EvidenceError("duplicate or orphan downstream F3 effect")
+            disposition = effect.get("effect_disposition")
+            if disposition not in ("NO_SIGNAL", "REJECTED", "TRIGGERED"):
+                raise EvidenceError("invalid F3 disposition")
+            f3_by_c2[identity] = disposition
+        if len(f3_by_c2) != len(expected):
+            raise EvidenceError("incomplete downstream F3 denominator")
     for row in captures:
         if not isinstance(row, dict):
             raise EvidenceError("untyped F1 candidate")
@@ -139,12 +160,17 @@ def project_f1_research_slots(scheduled, captures=(), market_windows=(), *,
             one = original[0] if original else None
             if not original:
                 status, reason = "MISSING_CAPTURE", "NO_ORIGINAL_CANDIDATE"
-            elif len(distinct) != 1 or any(not _capture_structure(r, pair, identity) for r in original):
+            elif len(distinct) != 1 or any(not _capture_structure(r, pair, identity, plan) for r in original):
                 status, reason = "QUARANTINED", "INVALID_OR_CONFLICTING_ORIGINAL"
-            elif not _verifier_ok(verify_original, one):
-                status, reason = "UNVERIFIED", "ORIGINAL_PROVENANCE_NOT_VERIFIED"
             else:
-                status, reason = "RECORDED", None
+                # Independent strict Core validation, never a source self-assertion.
+                verdict = verify_original(one) if verify_original is not None else None
+                if verdict == "RECORDED":
+                    status, reason = "RECORDED", None
+                elif verdict == "QUARANTINED":
+                    status, reason = "QUARANTINED", "UPSTREAM_ORIGINAL_INVALID"
+                else:
+                    status, reason = "UNVERIFIED", "ORIGINAL_PROVENANCE_NOT_VERIFIED"
             indicators = tuple({
                 "indicator_id": x["indicator_id"], "value_kind": x.get("value_kind"),
                 "value": x.get("value"), "missing_reason": x.get("missing_reason")
@@ -210,6 +236,7 @@ def project_f1_research_slots(scheduled, captures=(), market_windows=(), *,
                     "capture_status": status, "capture_reason": reason,
                     "f1_record_sha256": one["f1_record_sha256"] if status == "RECORDED" else None,
                     "f1_signal_state": one.get("f1_signal_state") if status == "RECORDED" else None,
+                    "f3_effect_disposition": f3_by_c2.get(identity),
                     "horizon_ms": horizon, "coverage_status": coverage,
                     "measurement_class": "COMMON_PAIRED" if status == "RECORDED" and signed else "MARKET_ONLY",
                     "excursion_status": reason_metric if coverage == "COMPLETE" or reason_metric != "EVALUABLE" else "UNVERIFIED_PIT",
