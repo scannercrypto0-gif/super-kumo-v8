@@ -118,6 +118,18 @@ class AuthenticatedMarketTests(unittest.TestCase):
         altered["high"] = "9999"
         self.assertFalse(checker(altered))
 
+    def test_post_verification_inplace_mutation_is_not_authenticated(self):
+        windows, checker, *_ = self.make(proof=lambda _: True)
+        self.assertTrue(checker(windows[0]))
+        windows[0]["high"] = "9999"
+        self.assertFalse(checker(windows[0]))
+
+    def test_tampered_receipt_payload_without_rehash_is_rejected(self):
+        windows, checker, *_ = self.make(proof=lambda _: True,
+                                          receipt={"published_at_ms": 999999999})
+        self.assertEqual(windows, [])
+        self.assertFalse(checker({}))
+
     def test_same_candle_tp_sl_unknown_independent(self):
         plan, f1, registry, raw, receipt = sample()
         windows, _ = authenticated_market_windows(
