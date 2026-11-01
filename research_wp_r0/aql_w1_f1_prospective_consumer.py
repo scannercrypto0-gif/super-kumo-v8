@@ -34,7 +34,7 @@ def _key(record):
 
 
 def _decimal(value):
-    if not isinstance(value, str) or not re.fullmatch(r"-?(?:0|[1-9][0-9]*)(?:\\.[0-9]*[1-9])?", value):
+    if not isinstance(value, str) or not re.fullmatch(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]*[1-9])?", value):
         raise EvidenceError("noncanonical decimal input")
     try:
         parsed = Decimal(value)
