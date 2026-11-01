@@ -22,7 +22,8 @@ def capture(arm, **changes):
                f1_signal_state="ARMED" if arm == "BASE" else "NO_SIGNAL",
                direction="LONG" if arm == "BASE" else None,
                predecision_eligibility="YES" if arm == "BASE" else "NOT_ESTABLISHED",
-               reference=dict(price="100", reference_available_at_ms=900000),
+               reference=dict(price="100", reference_available_at_ms=900000,
+                              measurement_policy_sha256="e" * 64),
                tp=dict(status="DEFINED_PREDECISION"),
                sl=dict(status="DEFINED_PREDECISION"),
                indicators=[dict(indicator_id="RSI14", role="OBSERVE_ONLY",
@@ -73,9 +74,20 @@ class FactoryF1ProjectionTests(unittest.TestCase):
         self.assertEqual((rows["BASE"]["max_favorable"], rows["BASE"]["max_adverse"]), ("10", "5"))
         self.assertEqual(rows["BASE"]["tp_sl_first_hit"], "UNKNOWN")
         self.assertEqual(rows["BASE"]["excursion_status"], "EVALUABLE")
+        self.assertEqual(rows["BASE"]["measurement_class"], "ARM_SPECIFIC_POLICY")
         self.assertEqual(rows["BASE"]["observe_only_indicators"][0]["indicator_id"], "RSI14")
         self.assertEqual(rows["SHADOW"]["measurement_class"], "MARKET_ONLY")
         self.assertIsNone(rows["SHADOW"]["max_favorable"])
+
+    def test_genuinely_comparable_two_arm_signed_pair(self):
+        base = capture("BASE")
+        shadow = capture("SHADOW", direction="SHORT", f1_signal_state="ARMED",
+                         predecision_eligibility="YES")
+        report = self.project([base, shadow], [window()],
+                              verify_original=accepted, verify_market=market_accepted)
+        rows = [r for r in report["outcomes"] if r["horizon_ms"] == 86400000]
+        self.assertEqual({r["measurement_class"] for r in rows}, {"COMMON_PAIRED"})
+        self.assertEqual({r["max_favorable"] for r in rows}, {"10", "5"})
 
     def test_censored_retained_no_signed_extrema(self):
         report = self.project([capture("BASE")],
