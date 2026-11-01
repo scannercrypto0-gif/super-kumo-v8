@@ -10,12 +10,15 @@ PAIR = "c" * 64
 K = dict(trial_id="T", opportunity_id="O", producer_event_id="E", envelope_sha256=H)
 PLAN = dict(pair_id=PAIR, c2_identity=K, decision_cutoff_ms=900000,
             source_version="src-v1", source_bytes_sha256=S,
-            correction_generation="gen0")
+            correction_generation="gen0", experiment_plan_sha256="d" * 64)
 
 
 def capture(arm, **changes):
     row = dict(schema_version="aql.f1-decision-capture.v1", pair_id=PAIR,
                c2_identity=K, arm=arm, f1_record_sha256=H, producer_sequence=1,
+               arm_event_sha256=S, experiment_plan_sha256="d" * 64,
+               source_version="src-v1", source_bytes_sha256=S,
+               correction_generation="gen0", decision_cutoff_ms=900000,
                f1_signal_state="ARMED" if arm == "BASE" else "NO_SIGNAL",
                direction="LONG" if arm == "BASE" else None,
                predecision_eligibility="YES" if arm == "BASE" else "NOT_ESTABLISHED",
@@ -39,6 +42,10 @@ def window(h=86400000, **changes):
 
 
 def accepted(_):
+    return 'RECORDED'
+
+
+def market_accepted(_):
     return True
 
 
@@ -61,7 +68,7 @@ class FactoryF1ProjectionTests(unittest.TestCase):
 
     def test_complete_signed_and_no_signal_market_only(self):
         report = self.project([capture("BASE"), capture("SHADOW")],
-                              [window()], verify_original=accepted, verify_market=accepted)
+                              [window()], verify_original=accepted, verify_market=market_accepted)
         rows = {r["arm"]: r for r in report["outcomes"] if r["horizon_ms"] == 86400000}
         self.assertEqual((rows["BASE"]["max_favorable"], rows["BASE"]["max_adverse"]), ("10", "5"))
         self.assertEqual(rows["BASE"]["tp_sl_first_hit"], "UNKNOWN")
@@ -103,6 +110,22 @@ class FactoryF1ProjectionTests(unittest.TestCase):
             self.project([capture("SHADOW", pair_id="d" * 64)])
         with self.assertRaises(EvidenceError):
             self.project(windows=[window(), window()])
+
+    def test_core_quarantine_verdict_not_silently_unverified(self):
+        report = self.project([capture("BASE")], verify_original=lambda _: "QUARANTINED")
+        self.assertEqual(report["capture_status_counts"]["QUARANTINED"], 1)
+
+    def test_f3_rejected_separate_from_original_f1(self):
+        effects = [{"c2_identity": K, "effect_disposition": "REJECTED"}]
+        report = self.project([capture("BASE")], f3_effects=effects)
+        self.assertTrue(all(r["f3_effect_disposition"] == "REJECTED" for r in report["outcomes"]))
+        self.assertTrue(all(r["f1_signal_state"] is None for r in report["outcomes"]))
+        with self.assertRaises(EvidenceError):
+            self.project([capture("BASE")], f3_effects=[])
+
+    def test_mismatched_original_source_is_quarantined(self):
+        report = self.project([capture("BASE", source_version="wrong")], verify_original=accepted)
+        self.assertEqual(report["capture_status_counts"]["QUARANTINED"], 1)
 
     def test_directionless_never_signed_even_complete(self):
         row = capture("BASE", direction=None)
