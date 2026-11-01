@@ -125,8 +125,11 @@ class AuthenticatedMarketTests(unittest.TestCase):
         self.assertFalse(checker(windows[0]))
 
     def test_tampered_receipt_payload_without_rehash_is_rejected(self):
-        windows, checker, *_ = self.make(proof=lambda _: True,
-                                          receipt={"published_at_ms": 999999999})
+        plan, f1, registry, raw, receipt = sample()
+        receipt["published_at_ms"] = 999999999  # tamper after digest was fixed
+        windows, checker = authenticated_market_windows(
+            [plan], {plan["pair_id"]: raw}, {plan["pair_id"]: receipt},
+            verify_receipt=lambda _: True)
         self.assertEqual(windows, [])
         self.assertFalse(checker({}))
 
