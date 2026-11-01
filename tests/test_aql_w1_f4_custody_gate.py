@@ -4,8 +4,7 @@ from dataclasses import replace
 from hashlib import sha256
 
 from research_wp_r0.aql_w1_f4_custody_gate import F4Custody, verify_f3_custody
-from research_wp_r0.aql_w1_factory_research_consumer import describe_original_p0_f3
-from research_wp_r0.aql_w1_factory_research_consumer import describe_original_p0_f3
+from research_wp_r0.aql_w1_factory_research_consumer import (describe_original_p0_f3, describe_original_p0_f3_effects)
 from research_wp_r0.aql_w1_opportunity_outcomes import EvidenceError
 from research_wp_r0.aql_w1_typed_contract import F3EffectV1
 
@@ -69,12 +68,12 @@ class CustodyGateTest(unittest.TestCase):
             verify_f3_custody([self.effect], {}, {self.key: self.source})
 
     def test_original_f3_only_no_f1_inference(self):
-        report = describe_original_p0_f3([self.effect], expected_total=1)
+        report = describe_original_p0_f3_effects([self.effect], expected_total=1)
         self.assertEqual(report["original_f1_status"], "NOT_RECORDED_IN_P0")
         self.assertEqual(report["entry_eligibility"], "NOT_ESTABLISHED")
         self.assertEqual(report["f3_final_effects"], {"REJECTED": 1})
         with self.assertRaises(EvidenceError):
-            describe_original_p0_f3([self.effect], expected_total=653)
+            describe_original_p0_f3_effects([self.effect], expected_total=653)
 
     def test_duplicate_effect_fails_closed(self):
         with self.assertRaises(EvidenceError):
