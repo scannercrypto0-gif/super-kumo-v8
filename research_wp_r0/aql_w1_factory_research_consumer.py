@@ -55,7 +55,7 @@ class ResearchSelectionV1:
                    snapshot.eligibility, snapshot.eligibility_evidence, cohort)
 
 
-def project(snapshots, outcomes, *, expected_total=None, f3_effects=None):
+def project(snapshots, outcomes, *, expected_total=None, f3_effects=None,\n            f4_custody=None, selected_sources=None):
     """Validate exact snapshot identity and horizon generations; no missing rows silently dropped.
 
     The latest correction generation is NOT guessed. A caller must explicitly
@@ -120,7 +120,7 @@ def project(snapshots, outcomes, *, expected_total=None, f3_effects=None):
             by_effect[effect.effect_disposition] += 1
         if seen_effects != expected_keys:
             raise EvidenceError("F3 denominator mismatch")
-    by_state = Counter(s.source_signal_state for s in selections.values())
+    custody_verified = False\n    if f4_custody is not None or selected_sources is not None:\n        if f3_effects is None or f4_custody is None or selected_sources is None:\n            raise EvidenceError("incomplete F4 custody verification inputs")\n        from research_wp_r0.aql_w1_f4_custody_gate import verify_f3_custody\n        custody_verified = verify_f3_custody(\n            f3_effects, f4_custody, selected_sources)\n    by_state = Counter(s.source_signal_state for s in selections.values())
     by_cohort = Counter(s.cohort for s in selections.values())
     by_status = Counter(o["status"] for o in selected.values())
     report = {
@@ -135,7 +135,7 @@ def project(snapshots, outcomes, *, expected_total=None, f3_effects=None):
         "outcome_count": len(selected),
         "primary_checkpoint_ms": 86_400_000,
         "primary_metric": "MFE_WITH_MAE_COUNTERMETRIC_DESCRIPTIVE_ONLY",
-        "research_only": True,
+        "f4_custody_verified": custody_verified,\n        "f4_custody_status": ("VERIFIED_PROVIDED_BYTES_AND_SELECTION" if custody_verified\n                              else "BLOCKED_MISSING_AUTHENTICATED_CUSTODY"),\n        "research_only": True,
         "no_fill_or_pnl_inference": True,
     }
     report["report_sha256"] = _hash(report)
