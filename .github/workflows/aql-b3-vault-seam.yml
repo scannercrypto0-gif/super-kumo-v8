@@ -1,0 +1,76 @@
+name: AQL B3 Actual Vault admit-readback seam
+on:
+  push:
+    branches: [feat/aql-raw-vault-offline-207]
+    paths:
+      - tools/raw_vault_offline/b3_handoff.py
+      - integration_tests/aql_b3_vault_seam.py
+      - integration_tests/test_aql_b3_vault_seam.py
+      - .github/workflows/aql-b3-vault-seam.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  b3-new-seam-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: vault
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 83d44ef23392b9ca9628d18d0f6fc909cd98e4ff
+          path: core
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ac7f160005672140a3254eb2ed82f4d586432b69
+          path: factory
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Retrieve existing exact Core input, no old test/build or market replay
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir b3-inputs
+          curl --fail --location --retry 2 -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/scannercrypto0-gif/super-kumo-v8/actions/artifacts/13084853700/zip" -o b3-inputs/core.zip
+          python - <<'PY'
+          import hashlib,pathlib,zipfile
+          with zipfile.ZipFile('b3-inputs/core.zip') as z:
+              data=z.read('core-b2-integrity-input.json')
+          assert hashlib.sha256(data).hexdigest()=='42005d09e3674420ddd8a761d40540c8e6509e8e79943d1f6a9821f692823b09'
+          pathlib.Path('b3-inputs/core-b2-integrity-input.json').write_bytes(data)
+          PY
+      - name: Run only ten NEW B3 API-readback-Factory tests
+        working-directory: vault
+        env:
+          AQL_B3_CORE_JSON: ../b3-inputs/core-b2-integrity-input.json
+          AQL_B3_CORE_ROOT: ../core
+          AQL_B3_FACTORY_ROOT: ../factory
+        run: python -m unittest -v integration_tests.test_aql_b3_vault_seam
+      - name: Actual admit-readback receipt and same-retained-vault deterministic replay
+        working-directory: vault
+        run: |
+          set -euo pipefail
+          echo "VAULT_HEAD_SHA=$(git rev-parse HEAD)"
+          echo "VAULT_TREE_SHA=$(git rev-parse HEAD^{tree})"
+          python -m integration_tests.aql_b3_vault_seam --core-json ../b3-inputs/core-b2-integrity-input.json --core-root ../core --factory-root ../factory --vault-root ../b3-retained-vault --out ../b3-report
+          python -m integration_tests.aql_b3_vault_seam --core-json ../b3-inputs/core-b2-integrity-input.json --core-root ../core --factory-root ../factory --vault-root ../b3-retained-vault --out ../b3-second
+          for name in system-integrity.json readback-receipt.json parent-manifest.jsonl original-core-container.json; do cmp "../b3-report/$name" "../b3-second/$name"; done
+          sha256sum ../b3-report/*
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vault-b3-actual-admit-readback-factory
+          path: |
+            b3-report/
+            b3-retained-vault/objects/
+            b3-retained-vault/manifest.jsonl
+            b3-retained-vault/index.json
+          if-no-files-found: error
+          retention-days: 90
