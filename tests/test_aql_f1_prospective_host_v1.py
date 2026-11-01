@@ -86,10 +86,10 @@ class ProspectiveHostIntegrationTests(unittest.TestCase):
 
     def test_changed_evidence_cannot_rewrite_existing_handoff(self):
         self.run_host()
-        # Real verifier returns False with this incomplete evidence.
-        # The immutable status hash is stable for the same failed evidence.
-        self.assertEqual(self.run_host(evidence_lookup=lambda _: {}),
-                         self.run_host())
+        # A changed evidence-view is not allowed to rewrite an already
+        # frozen handoff, even when the new proof still fails closed.
+        with self.assertRaisesRegex(CaptureError, "IMMUTABLE_HANDOFF_CONFLICT"):
+            self.run_host(evidence_lookup=lambda _: {})
 
     def test_capture_precedes_f3_callback(self):
         received = []
