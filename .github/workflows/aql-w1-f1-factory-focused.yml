@@ -2,6 +2,10 @@ name: AQL Factory B1 Original Market Research
 on:
   push:
     branches: [aql/w1-factory-research-consumer-20261031]
+    paths:
+      - research_wp_r0/aql_b1_market_research.py
+      - tests/test_aql_b1_market_research.py
+      - 'docs/evidence/factory-b1-20261101/**'
   workflow_dispatch:
 permissions:
   contents: read
