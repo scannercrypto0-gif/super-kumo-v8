@@ -14,7 +14,7 @@ from research_wp_r0.aql_w1_opportunity_outcomes import (
     EvidenceError, HORIZONS, RetrospectiveSnapshot, canonical,
 )
 
-STATES = frozenset(("NO_SIGNAL", "REJECTED", "TRIGGERED"))
+STATES = frozenset(("NO_SIGNAL", "WATCH", "ARMED", "EXPIRED", "UNKNOWN", "BLOCKED"))
 ELIGIBILITY = frozenset(("YES", "NO", "NOT_ESTABLISHED"))
 
 
@@ -43,20 +43,19 @@ class ResearchSelectionV1:
             raise EvidenceError("PIT and retrospective evidence cannot be mixed")
         if snapshot.eligibility == "YES" and not snapshot.eligibility_evidence:
             raise EvidenceError("eligible without predecision evidence")
+        # F1 predecision cohorts; F3 dispositions must never be inferred here.
         if snapshot.eligibility != "YES":
             cohort = "NOT_ESTABLISHED_OR_INELIGIBLE"
-        elif snapshot.signal_state == "REJECTED":
-            cohort = "REJECTED_ACTIONABLE"
-        elif snapshot.signal_state == "TRIGGERED":
-            cohort = "ACCEPTED_ELIGIBLE_COMPARATOR"
+        elif snapshot.signal_state == "ARMED":
+            cohort = "F1_ARMED_PREDECISION_ONLY"
         else:
-            cohort = "NO_SIGNAL_DENOMINATOR_ONLY"
+            cohort = "F1_NON_ARMED_DENOMINATOR_ONLY"
         return cls(snapshot.opportunity_identity, snapshot.snapshot_id,
                    snapshot.signal_state, snapshot.reason_code,
                    snapshot.eligibility, snapshot.eligibility_evidence, cohort)
 
 
-def project(snapshots, outcomes, *, expected_total=None):
+def project(snapshots, outcomes, *, expected_total=None, f3_effects=None):
     """Validate exact snapshot identity and horizon generations; no missing rows silently dropped.
 
     The latest correction generation is NOT guessed. A caller must explicitly
@@ -103,6 +102,24 @@ def project(snapshots, outcomes, *, expected_total=None):
                        0 <= o[k] < float("inf") for k in ("mfe", "mae")):
                 raise EvidenceError("invalid MFE/MAE")
         selected[key] = dict(o)
+    # Optional typed F3 effects are a separate final-disposition stream.
+    by_effect = Counter()
+    if f3_effects is not None:
+        from research_wp_r0.aql_w1_typed_contract import F3EffectV1
+        expected_keys = {(s.trial_id, s.opportunity_id, s.producer_event_id,
+                          s.envelope_sha256) for s in snapshots}
+        seen_effects = set()
+        for effect in f3_effects:
+            if not isinstance(effect, F3EffectV1):
+                raise EvidenceError("untyped F3 effect")
+            key = (effect.trial_id, effect.opportunity_id, effect.producer_event_id,
+                   effect.envelope_sha256)
+            if key not in expected_keys or key in seen_effects:
+                raise EvidenceError("orphan or duplicate F3 effect")
+            seen_effects.add(key)
+            by_effect[effect.effect_disposition] += 1
+        if seen_effects != expected_keys:
+            raise EvidenceError("F3 denominator mismatch")
     by_state = Counter(s.source_signal_state for s in selections.values())
     by_cohort = Counter(s.cohort for s in selections.values())
     by_status = Counter(o["status"] for o in selected.values())
@@ -111,6 +128,8 @@ def project(snapshots, outcomes, *, expected_total=None):
         "evidence_class": "RETROSPECTIVE_NON_PIT",
         "scheduled_total": len(selections),
         "source_states": dict(sorted(by_state.items())),
+        "f3_final_effects": dict(sorted(by_effect.items())) if f3_effects is not None else None,
+        "eligible_rejected_cohort": "NOT_ESTABLISHED",
         "cohorts": dict(sorted(by_cohort.items())),
         "outcomes_by_status": dict(sorted(by_status.items())),
         "outcome_count": len(selected),
