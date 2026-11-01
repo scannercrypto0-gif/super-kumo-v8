@@ -153,3 +153,29 @@ def project(snapshots, outcomes, *, expected_total=None, f3_effects=None,
     }
     report["report_sha256"] = _hash(report)
     return report
+
+
+def describe_original_p0_f3(dispositions, *, expected_total=653):
+    """Original F3 dispositions only; original F1 was not recorded in P0.
+
+    Caller must supply independently sourced original F3 dispositions. No
+    synthetic F1 selection, direction, eligible cohort or PIT is inferred.
+    """
+    values = tuple(dispositions)
+    if len(values) != expected_total:
+        raise EvidenceError("original F3 denominator mismatch")
+    allowed = frozenset(("NO_SIGNAL", "REJECTED", "TRIGGERED"))
+    if any(v not in allowed for v in values):
+        raise EvidenceError("invalid original P0 F3 disposition")
+    return {
+        "schema": "AQL-W1-P0-F3-DESCRIPTIVE-v1",
+        "scheduled_total": expected_total,
+        "f3_final_effects": dict(sorted(Counter(values).items())),
+        "original_f1_status": "NOT_RECORDED_IN_P0",
+        "entry_eligibility": "NOT_ESTABLISHED",
+        "direction": "NOT_ESTABLISHED",
+        "evidence_class": "RETROSPECTIVE_NON_PIT",
+        "research_only": True,
+        "no_fill_or_pnl_inference": True,
+        "original_f4_ack_authenticated": False,
+    }
