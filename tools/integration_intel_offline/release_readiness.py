@@ -48,13 +48,29 @@ class ReleaseReadinessReport:
         }
 
     def verdict(self) -> ReadinessVerdict:
-        for g in self._gates.values():
-            if g["status"] == "FAIL":
-                return "BLOCKED"
-        # All defined gates must be evaluated
+        # P0-C fix: all 7 gates must be explicitly present and PASS (or WAIVED with justification).
+        # Missing gates, PENDING gates, and WAIVED-without-note all block.
         evaluated = set(self._gates.keys())
-        if not GATE_NAMES[0] in evaluated:  # minimal sanity
-            return "UNKNOWN"
+        required = set(GATE_NAMES)
+
+        # Any missing gate → BLOCKED
+        missing = required - evaluated
+        if missing:
+            return "BLOCKED"
+
+        for g in self._gates.values():
+            status = g["status"]
+            if status == "FAIL":
+                return "BLOCKED"
+            if status == "PENDING":
+                # PENDING means not yet evaluated to PASS — must block
+                return "BLOCKED"
+            if status == "WAIVED":
+                # WAIVED is only acceptable with a non-empty justification note
+                if not g.get("waiver_note", "").strip():
+                    return "BLOCKED"
+            # PASS falls through — gate is satisfied
+
         return "READY_FOR_OWNER_REVIEW"
 
     def blockers(self) -> list[dict]:
