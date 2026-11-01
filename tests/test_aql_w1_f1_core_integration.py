@@ -99,6 +99,7 @@ class CoreFactoryIntegration(unittest.TestCase):
         plan, record, registry = setup()
         changed = copy.deepcopy(record)
         changed["decision_cutoff_ms"] += 900000
+        changed["decision_ms"] = changed["decision_cutoff_ms"]
         changed["f1_record_sha256"] = hash_f1(changed)
         validate_f1(changed, registry)
         report = project_core_verified_f1_slots(
