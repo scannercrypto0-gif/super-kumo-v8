@@ -66,9 +66,10 @@ class ReleaseReadinessReport:
                 # PENDING means not yet evaluated to PASS — must block
                 return "BLOCKED"
             if status == "WAIVED":
-                # WAIVED is only acceptable with a non-empty justification note
-                if not g.get("waiver_note", "").strip():
-                    return "BLOCKED"
+                # Gate 2 fix (Issue #215): PM requirement: WAIVED-with-note is NOT PASS.
+                # Any WAIVED gate — regardless of waiver_note content — blocks the verdict.
+                # Only an explicit PASS on all 7 gates produces READY_FOR_OWNER_REVIEW.
+                return "BLOCKED"
             # PASS falls through — gate is satisfied
 
         return "READY_FOR_OWNER_REVIEW"

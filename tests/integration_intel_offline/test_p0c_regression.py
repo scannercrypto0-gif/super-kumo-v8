@@ -114,16 +114,18 @@ class TestP0CFalseReadiness:
             "All 7 must be present and PASS."
         )
 
-    def test_waived_with_note_is_ready_when_rest_pass(self):
+    def test_waived_with_note_is_blocked(self):
         """
-        P0-C-COMPAT2: WAIVED gates WITH a justification note are acceptable.
-        After fix, all 7 gates present (6 PASS + 1 WAIVED-with-note) → READY.
+        Gate 2 fix (Issue #215): PM requirement: WAIVED-with-note is NOT PASS.
+        Previously P0-C-COMPAT2 asserted WAIVED-with-note → READY_FOR_OWNER_REVIEW.
+        Updated per PM: any WAIVED gate must produce BLOCKED regardless of note content.
         """
         rpt = ReleaseReadinessReport()
         for name in GATE_NAMES:
             rpt.set_gate(name, "PASS", evidence="ok")
         rpt.set_gate(GATE_NAMES[6], "WAIVED",
                      waiver_note="Snapshot age check waived: offline environment confirmed")
-        assert rpt.verdict() == "READY_FOR_OWNER_REVIEW", (
-            "P0-C-COMPAT2: WAIVED gate with a note should not block when all 7 are set."
+        assert rpt.verdict() == "BLOCKED", (
+            "Gate 2 fix: WAIVED gate with note must produce BLOCKED. "
+            "PM requirement (Issue #215): WAIVED-with-note is NOT PASS."
         )
