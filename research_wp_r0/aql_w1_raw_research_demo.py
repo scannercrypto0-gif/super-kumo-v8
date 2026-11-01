@@ -127,6 +127,7 @@ def run_controlled_raw_research_demo(
             end_ms = int(datetime.fromisoformat(
                 meta["coverage_end_utc"].replace("Z", "+00:00")
             ).timestamp() * 1000)
+            # The declared coverage end is only a fixture processing bound, not independent publication evidence.
             finalized = end_ms
             published = end_ms + 1
             bars = derive_15m_bars_from_original_csv(
