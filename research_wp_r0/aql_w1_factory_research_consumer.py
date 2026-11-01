@@ -145,7 +145,7 @@ def project(snapshots, outcomes, *, expected_total=None, f3_effects=None,
         "outcome_count": len(selected),
         "primary_checkpoint_ms": 86_400_000,
         "primary_metric": "MFE_WITH_MAE_COUNTERMETRIC_DESCRIPTIVE_ONLY",
-        "f4_custody_verified": custody_verified,
+        "supplied_byte_digest_matched": custody_verified,
         "f4_custody_status": ("SUPPLIED_BYTES_MATCH_NOT_ORIGINALITY_PROOF" if custody_verified
                               else "BLOCKED_MISSING_AUTHENTICATED_CUSTODY"),
         "research_only": True,
@@ -181,7 +181,7 @@ def describe_original_p0_f3(dispositions, *, expected_total=653):
     }
 
 
-def describe_original_p0_f3(effects, *, expected_total=653):
+def describe_original_p0_f3_effects(effects, *, expected_total=653):
     """F3-only historical counts; never reconstruct missing original F1."""
     from research_wp_r0.aql_w1_typed_contract import F3EffectV1
     effects = tuple(effects)
