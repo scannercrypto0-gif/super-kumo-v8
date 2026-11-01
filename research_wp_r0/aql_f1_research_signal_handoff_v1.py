@@ -61,6 +61,8 @@ def project_original_signal_handoffs(
                 _fail("DUPLICATE_SCHEDULE")
             plans[pair] = scheduled_row
             seen_identities.add(identity_key)
+        except CaptureError:
+            raise
         except (KeyError, ValueError, TypeError) as exc:
             raise CaptureError("SCHEDULE_INVALID") from exc
 
@@ -88,7 +90,12 @@ def project_original_signal_handoffs(
             _fail("HANDOFF_TWO_ARM_DENOMINATOR")
         if {r.get("arm") for r in slots if isinstance(r, dict)} != set(ARMS):
             _fail("HANDOFF_ARM_SET_INVALID")
+        sha_map = data.get("original_record_sha256_by_arm")
+        if not isinstance(sha_map, dict) or set(sha_map) != set(ARMS):
+            _fail("HANDOFF_ORIGINAL_HASH_MAP")
         for slot in slots:
+            if slot.get("f1_record_sha256") != sha_map[slot["arm"]]:
+                _fail("HANDOFF_ORIGINAL_DIGEST_MISMATCH")
             if (slot.get("pair_id") != pair or
                 slot.get("c2_identity") != schedule["c2_identity"] or
                 slot.get("capture_status") not in (
@@ -180,10 +187,9 @@ def project_original_signal_handoffs(
                 "research_entry_reference_price": authorized["reference"]["price"] if authorized else None,
                 "research_target_price": authorized["tp"]["level"] if authorized else None,
                 "research_stop_price": authorized["sl"]["level"] if authorized else None,
-                "directional_outcomes_allowed": bool(
-                    authorized and authorized["direction"] in ("LONG", "SHORT")
-                    and authorized["predecision_eligibility"] == "YES"
-                ),
+                # This projector is controlled-only. A callable verifier alone
+                # cannot establish a separately audited issuer/clock/anchor.
+                "directional_outcomes_allowed": False,
             })
     result = {
         "schema_version": "aql.f1-research-signal-handoff.v1",
