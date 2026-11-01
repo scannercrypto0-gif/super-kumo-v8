@@ -14,7 +14,7 @@ jobs:
       - name: Checkout pinned Core baseline
         uses: actions/checkout@v4
         with:
-          ref: a592ff1c7ccdcc67d400badf093feebceefbdcb9
+          ref: 1a4458146bc4ad6b899f4fffb7464edec7b7c0a0
           path: compatible
           persist-credentials: false
       - name: Checkout Factory exact commit
@@ -33,7 +33,7 @@ jobs:
           cp factory/research_wp_r0/aql_w1_market_window_adapter.py compatible/research_wp_r0/
           cp factory/tests/test_aql_w1_market_window_adapter.py compatible/tests/
           cd compatible
-          test "$(git rev-parse HEAD)" = "a592ff1c7ccdcc67d400badf093feebceefbdcb9"
+          test "$(git rev-parse HEAD)" = "1a4458146bc4ad6b899f4fffb7464edec7b7c0a0"
           echo "PINNED_CORE_SHA=$(git rev-parse HEAD)"
           echo "FACTORY_HEAD_SHA=${{ github.sha }}"
           git add research_wp_r0/aql_w1_f1_prospective_consumer.py tests/test_aql_w1_f1_prospective_consumer.py tests/test_aql_w1_f1_core_integration.py research_wp_r0/aql_w1_market_window_adapter.py tests/test_aql_w1_market_window_adapter.py
@@ -49,4 +49,4 @@ jobs:
           python-version: '3.11'
       - name: Only F1 Factory consumer focused tests
         working-directory: compatible
-        run: python -m unittest -v tests.test_aql_w1_market_window_adapter
+        run: python -m unittest -v tests.test_aql_w1_market_window_adapter tests.test_aql_w1_provenance_market_integration
