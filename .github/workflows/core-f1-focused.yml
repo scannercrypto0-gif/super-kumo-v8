@@ -1,0 +1,26 @@
+name: Core prospective F1 focused tests
+on:
+  push:
+    branches:
+      - aql/core-f1-prospective-capture-20261101
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_f1_*.py'
+      - 'tests/test_aql_f1_*.py'
+      - '.github/workflows/core-f1-focused.yml'
+permissions:
+  contents: read
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Pin exact source
+        run: git rev-parse HEAD && python --version
+      - name: Compile and run only changed Core F1 tests
+        run: |
+          python -m compileall -q research_wp_r0/aql_f1_decision_capture_v1.py research_wp_r0/aql_f1_prospective_bridge.py
+          python -m unittest -v tests.test_aql_f1_decision_capture_v1 tests.test_aql_f1_prospective_bridge
