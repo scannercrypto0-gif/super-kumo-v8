@@ -135,7 +135,7 @@ def project(snapshots, outcomes, *, expected_total=None, f3_effects=None,\n     
         "outcome_count": len(selected),
         "primary_checkpoint_ms": 86_400_000,
         "primary_metric": "MFE_WITH_MAE_COUNTERMETRIC_DESCRIPTIVE_ONLY",
-        "f4_custody_verified": custody_verified,\n        "f4_custody_status": ("VERIFIED_PROVIDED_BYTES_AND_SELECTION" if custody_verified\n                              else "BLOCKED_MISSING_AUTHENTICATED_CUSTODY"),\n        "research_only": True,
+        "f4_custody_verified": custody_verified,\n        "f4_custody_status": ("SUPPLIED_BYTES_MATCH_NOT_ORIGINALITY_PROOF" if custody_verified\n                              else "BLOCKED_MISSING_AUTHENTICATED_CUSTODY"),\n        "research_only": True,
         "no_fill_or_pnl_inference": True,
     }
     report["report_sha256"] = _hash(report)
