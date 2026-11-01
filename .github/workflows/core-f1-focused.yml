@@ -11,16 +11,33 @@ on:
 permissions:
   contents: read
 jobs:
-  focused:
+  b1-signal-handoff:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Pin exact source
-        run: git rev-parse HEAD && python --version
-      - name: Compile and run only changed Core F1 tests
+      - name: Exact Core SHA and focused B1 signal-path tests
         run: |
-          python -m compileall -q research_wp_r0/aql_f1_decision_capture_v1.py research_wp_r0/aql_f1_prospective_bridge.py research_wp_r0/aql_f1_provenance_v1.py research_wp_r0/aql_f1_parent_witness_v1.py research_wp_r0/aql_f1_prospective_host_v1.py
-          python -m unittest -v tests.test_aql_f1_decision_capture_v1 tests.test_aql_f1_prospective_bridge tests.test_aql_f1_provenance_v1 tests.test_aql_f1_parent_witness_v1 tests.test_aql_f1_prospective_host_v1
+          git rev-parse HEAD
+          python -m compileall -q research_wp_r0/aql_f1_research_signal_handoff_v1.py research_wp_r0/aql_f1_prospective_host_v1.py
+          python -m unittest -v tests.test_aql_f1_b1_research_signal_handoff
+  b1-factory-pinned-overlay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: e52a9fb9d091ce439278988bdb0c7ef4ffaeab99
+          path: .factory-pin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check exact Factory head and copy only read-only adapter to overlay
+        run: |
+          echo "PINNED_FACTORY_SHA=e52a9fb9d091ce439278988bdb0c7ef4ffaeab99"
+          test "$(git -C .factory-pin rev-parse HEAD)" = e52a9fb9d091ce439278988bdb0c7ef4ffaeab99
+          echo "CORE_HEAD_SHA=$(git rev-parse HEAD)"
+          cp .factory-pin/research_wp_r0/aql_w1_f1_prospective_consumer.py research_wp_r0/aql_w1_f1_prospective_consumer.py
+          python -m unittest -v tests.test_aql_f1_b1_factory_overlay
