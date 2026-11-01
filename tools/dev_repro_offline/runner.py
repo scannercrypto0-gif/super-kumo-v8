@@ -137,14 +137,29 @@ def _is_approved_pytest_flag(arg: str) -> bool:
 
 
 # ── G7-B: SHA validation ──────────────────────────────────────────────────────
-# Accepts 7–40 lowercase hex characters — covers both full 40-char SHAs from
-# `git rev-parse HEAD` and abbreviated SHAs used in manifest expected_sha fields.
-_SHA_VALID_RE = re.compile(r"^[0-9a-f]{7,40}$")
+# _is_valid_sha: 7–40 hex — for manifest expected_sha prefix-match comparison.
+# _is_valid_execute_sha: exactly 40 hex — for execute-mode current_sha only.
+#   Execute mode requires a full SHA produced by `git rev-parse HEAD`; abbreviated
+#   SHAs (7–39 chars) are not accepted as execute authority.
+#   Audit B2 (Issue #215 / Audit #134 comment #6555797225).
+_SHA_VALID_RE         = re.compile(r"^[0-9a-f]{7,40}$")
+_SHA_EXECUTE_VALID_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 def _is_valid_sha(sha: str) -> bool:
-    """Return True if sha is a non-empty lowercase-hex string of 7–40 characters."""
+    """Return True if sha is a non-empty lowercase-hex string of 7–40 characters.
+    Used for manifest expected_sha entries and prefix-match comparison only.
+    NOT sufficient for execute-mode current_sha — use _is_valid_execute_sha() there.
+    """
     return bool(sha and _SHA_VALID_RE.match(sha))
+
+
+def _is_valid_execute_sha(sha: str) -> bool:
+    """Return True if sha is exactly 40 lowercase hex characters.
+    Required for current_sha in execute mode — must be a full SHA from git rev-parse HEAD.
+    Audit B2: abbreviated SHAs (7–39 chars) must not serve as execute authority.
+    """
+    return bool(sha and _SHA_EXECUTE_VALID_RE.match(sha))
 
 
 # Internal sentinel: run_manifest() passes this to indicate it was called from
@@ -247,6 +262,7 @@ def run_entry(
     dry_run: bool = True,
     timeout: int = DEFAULT_TIMEOUT,
     current_sha: Optional[str] = None,
+    _preflight_guard_token: object = None,
 ) -> RunResult:
     """
     Run a single manifest entry.
@@ -265,6 +281,18 @@ def run_entry(
     SHA matching policy (prefix): current_sha.startswith(expected_sha) or
     expected_sha.startswith(current_sha).  This accommodates abbreviated SHAs
     stored in the manifest while still requiring a real hex string.
+
+    Audit B1 (Issue #215 / Audit #134 comment #6555797225): EXECUTE GUARD.
+    Direct calls to run_entry(dry_run=False) without the internal
+    _preflight_guard_token sentinel are BLOCKED.  This closes the bypass where
+    callers could skip the P0-B / G5-GAP-3 / run_manifest guard chain by calling
+    run_entry() directly.  Only run_manifest() (itself guarded by G5-GAP-3) may
+    call run_entry() in execute mode — it passes _PREFLIGHT_GUARD_TOKEN.
+
+    Audit B2 (Issue #215 / Audit #134 comment #6555797225): EXECUTE SHA STRICTNESS.
+    In execute mode (dry_run=False), current_sha must be exactly 40 lowercase hex
+    chars — as produced by `git rev-parse HEAD`.  Abbreviated SHAs (7–39 chars)
+    are not accepted as execute authority.
 
     Gate 5 / G5-GAP-2 (retained): SHA mismatch → BLOCKED.
     """
@@ -286,17 +314,47 @@ def run_entry(
             notes=f"Status={entry.status.value}",
         )
 
+    # Audit B1 (Issue #215 / Audit #134 comment #6555797225): EXECUTE GUARD.
+    # run_entry(dry_run=False) must not be callable directly without the internal
+    # sentinel — callers must go through run_manifest_with_preflight_guard() →
+    # run_manifest(_PREFLIGHT_GUARD_TOKEN) → run_entry(_PREFLIGHT_GUARD_TOKEN).
+    # This prevents bypass of the P0-B / G5-GAP-3 preflight chain.
+    # dry_run=True is unrestricted (no subprocess launched in dry-run mode).
+    if not dry_run and _preflight_guard_token is not _PREFLIGHT_GUARD_TOKEN:
+        return RunResult(
+            entry_id=entry.entry_id,
+            status=RunStatus.BLOCKED,
+            command=argv,
+            notes=(
+                "B1_EXECUTE_GUARD_REQUIRED: run_entry(dry_run=False) must be called "
+                "via the authorized preflight guard chain — "
+                "run_manifest_with_preflight_guard() → run_manifest() → run_entry(). "
+                "Direct execute calls without the internal sentinel are prohibited. "
+                "(Audit B1)"
+            ),
+        )
+
     # G7-B / G5-GAP-2: SHA integrity check for SHA-pinned EXPECTED entries.
     if entry.expected_sha:
-        # G7-B: current_sha must be present and valid — no opt-out for pinned entries.
-        if not _is_valid_sha(current_sha or ""):
+        # G7-B + Audit B2: validate current_sha with mode-appropriate strictness.
+        #   dry_run=True  → 7-40 hex accepted (_is_valid_sha) — no subprocess launched.
+        #   dry_run=False → exactly 40 hex required (_is_valid_execute_sha) — execute
+        #     authority must come from git rev-parse HEAD output, not an abbreviated SHA.
+        sha_validator = _is_valid_execute_sha if not dry_run else _is_valid_sha
+        if not sha_validator(current_sha or ""):
+            execute_note = (
+                " In execute mode, current_sha must be exactly 40 lowercase hex chars "
+                "as produced by `git rev-parse HEAD` — abbreviated SHAs are not "
+                "accepted as execute authority. (Audit B2)"
+            ) if not dry_run else ""
             return RunResult(
                 entry_id=entry.entry_id,
                 status=RunStatus.BLOCKED,
                 command=argv,
                 notes=(
                     f"SHA_ABSENT_OR_INVALID: entry.expected_sha={entry.expected_sha!r} "
-                    f"requires a valid hex current_sha but got {current_sha!r}. "
+                    f"requires a valid hex current_sha but got {current_sha!r}."
+                    f"{execute_note} "
                     "Use run_manifest_with_preflight_guard() to provide a verified SHA "
                     "from run_preflight(). (G7-B)"
                 ),
@@ -419,7 +477,8 @@ def run_manifest(
         result = run_entry(
             entry, repo_root,
             dry_run=dry_run, timeout=timeout,
-            current_sha=current_sha,   # G7-B: thread SHA through to each entry
+            current_sha=current_sha,           # G7-B: thread SHA through to each entry
+            _preflight_guard_token=_preflight_guard_token,  # B1: propagate sentinel
         )
         report.results.append(result)
     return report
@@ -448,7 +507,12 @@ def run_manifest_with_preflight_guard(
     """
     from .preflight import CheckStatus  # avoid circular import at module level
 
-    if not dry_run and preflight.overall == CheckStatus.FAIL:
+    # Audit B3 (Issue #215 / Audit #134 comment #6555797225):
+    # WARN is not sufficient execute authority.  Only CheckStatus.PASS may proceed
+    # to execute mode.  WARN represents a non-clean environment (dirty worktree,
+    # line-ending warnings, etc.) and must block just like FAIL.
+    # Change: `overall == FAIL` → `overall != PASS`
+    if not dry_run and preflight.overall != CheckStatus.PASS:
         # Fail closed: record all entries as BLOCKED, no subprocess launched
         report = RunReport(dry_run=dry_run)
         for entry in manifest.entries:
@@ -467,14 +531,20 @@ def run_manifest_with_preflight_guard(
                 ))
             else:
                 # EXPECTED entries blocked by preflight gate
+                # B3: distinguish WARN gate from FAIL gate in notes
+                gate_label = (
+                    "PREFLIGHT_WARN_GATE" if preflight.overall == CheckStatus.WARN
+                    else "PREFLIGHT_FAIL_GATE"
+                )
                 report.results.append(RunResult(
                     entry_id=entry.entry_id,
                     status=RunStatus.BLOCKED,
                     command=argv,
                     notes=(
-                        "PREFLIGHT_FAIL_GATE: preflight checks failed. "
+                        f"{gate_label}: preflight status={preflight.overall.value} — "
+                        "only CheckStatus.PASS may proceed to execute mode. "
                         "Execution blocked until environment is clean. "
-                        f"Preflight summary: {preflight.summary()}"
+                        f"Preflight summary: {preflight.summary()} (B3)"
                     ),
                 ))
         return report
