@@ -391,3 +391,32 @@ def project_core_verified_f1_slots(scheduled, captures=(), market_windows=(), *,
     result["core_verdict_source"] = "CORE_STATUS_SLOTS_PINNED_INTEGRATION"
     result["proof_verifier_supplied"] = proof_verifier is not None
     return result
+
+
+def project_authenticated_market_f1_slots(scheduled, captures=(), *,
+                                          raw_by_pair, receipt_by_pair,
+                                          indicator_registry,
+                                          verify_raw_receipt=None,
+                                          proof_verifier=None,
+                                          asof_ms=None, f3_effects=None):
+    """Research-only join: pinned Core original verdict and RAW bar evidence.
+
+    Receipt verification is an injected *external* host dependency, not an
+    operational PIT authority furnished by this adapter. A synthetic True
+    verifier is suitable for negative tests only.
+    """
+    from .aql_w1_market_window_adapter import authenticated_market_windows
+
+    schedule = list(scheduled)
+    windows, verify_window = authenticated_market_windows(
+        schedule, raw_by_pair, receipt_by_pair,
+        verify_receipt=verify_raw_receipt, asof_ms=asof_ms)
+    result = project_core_verified_f1_slots(
+        schedule, captures, windows,
+        indicator_registry=indicator_registry,
+        proof_verifier=proof_verifier, verify_market=verify_window,
+        f3_effects=f3_effects)
+    result["market_adapter"] = "RAW_BYTES_EXACT_15M_RECEIPT_BOUND"
+    result["market_receipt_verifier_supplied"] = verify_raw_receipt is not None
+    result["operational_pit_and_custody_proven"] = False
+    return result
