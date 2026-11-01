@@ -74,6 +74,15 @@ def authenticated_market_windows(scheduled, raw_by_pair, receipt_by_pair, *,
             continue
         if not all(k in receipt for k in REQUIRED_RECEIPT):
             continue
+        if (not isinstance(receipt["receipt_sha256"], str)
+                or len(receipt["receipt_sha256"]) != 64
+                or not isinstance(receipt["raw_bytes_sha256"], str)
+                or len(receipt["raw_bytes_sha256"]) != 64):
+            continue
+        # This first bounded format treats source_bytes_sha256 as the RAW
+        # object identity; a parent-manifest identity needs a new trusted chain.
+        if receipt["source_bytes_sha256"] != receipt["raw_bytes_sha256"]:
+            continue
         if any(plan.get(k) != receipt.get(k) for k in
                ("source_id", "source_version", "source_bytes_sha256",
                 "correction_generation") if k in plan):
@@ -83,6 +92,8 @@ def authenticated_market_windows(scheduled, raw_by_pair, receipt_by_pair, *,
         if hashlib.sha256(raw).hexdigest() != receipt["raw_bytes_sha256"]:
             continue
         if not all(_integer(receipt[k]) for k in ("published_at_ms", "finalized_at_ms")):
+            continue
+        if receipt["finalized_at_ms"] > receipt["published_at_ms"]:
             continue
         if verify_receipt is None:
             continue
@@ -110,6 +121,8 @@ def authenticated_market_windows(scheduled, raw_by_pair, receipt_by_pair, *,
                     raise ValueError()
                 high, low = _price(bar["high"]), _price(bar["low"])
                 if high < low or start in parsed:
+                    raise ValueError()
+                if published > receipt["published_at_ms"] or finalized > receipt["finalized_at_ms"]:
                     raise ValueError()
                 parsed[start] = (high, low, finalized, published)
             except (EvidenceError, ValueError, TypeError, KeyError):
