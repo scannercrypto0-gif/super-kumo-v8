@@ -33,8 +33,8 @@ def verify_p0_zip(path, *, independently_recorded_zip_sha256):
             if not isinstance(item, dict):
                 raise EvidenceError("invalid ledger item")
             # Original ledger keys are determined from actual artifact, not assumed here.
-            filename = item.get("path") or item.get("file")
-            expected = item.get("sha256")
+            filename = item.get("Path")
+            expected = item.get("SHA256")
             if not filename or not expected:
                 raise EvidenceError("original ledger schema mismatch")
             if sha(z.read(filename)) != expected:
