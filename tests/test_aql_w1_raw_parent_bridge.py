@@ -86,6 +86,20 @@ class ParentProvenanceTests(unittest.TestCase):
         self.assertTrue(all(x["max_favorable"] is None for x in report["outcomes"]))
         self.assertFalse(report["operational_pit_and_custody_proven"])
 
+    def test_parent_digest_is_original_and_swapped_digest_rejected(self):
+        windows, checker, plan, _, _, parent, _, derived, _ = windows_fixture()
+        original_sha = hashlib.sha256(parent).hexdigest()
+        derived_sha = hashlib.sha256(derived).hexdigest()
+        self.assertNotEqual(original_sha, plan["source_bytes_sha256"])
+        self.assertNotEqual(original_sha, derived_sha)
+        self.assertTrue(all(w["parent_content_sha256"] == original_sha
+                            and checker(w) for w in windows))
+        swapped = copy.deepcopy(windows[0])
+        swapped["parent_content_sha256"] = plan["source_bytes_sha256"]
+        self.assertFalse(checker(swapped))
+        swapped["parent_content_sha256"] = derived_sha
+        self.assertFalse(checker(swapped))
+
     def test_tampered_parent_never_authenticated(self):
         windows, check, *_ = windows_fixture(parent=b"tampered bytes")
         self.assertEqual(windows, [])
