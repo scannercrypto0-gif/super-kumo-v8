@@ -22,5 +22,5 @@ jobs:
         run: git rev-parse HEAD && python --version
       - name: Compile and run only changed Core F1 tests
         run: |
-          python -m compileall -q research_wp_r0/aql_f1_decision_capture_v1.py research_wp_r0/aql_f1_prospective_bridge.py
-          python -m unittest -v tests.test_aql_f1_decision_capture_v1 tests.test_aql_f1_prospective_bridge
+          python -m compileall -q research_wp_r0/aql_f1_decision_capture_v1.py research_wp_r0/aql_f1_prospective_bridge.py research_wp_r0/aql_f1_provenance_v1.py
+          python -m unittest -v tests.test_aql_f1_decision_capture_v1 tests.test_aql_f1_prospective_bridge tests.test_aql_f1_provenance_v1
