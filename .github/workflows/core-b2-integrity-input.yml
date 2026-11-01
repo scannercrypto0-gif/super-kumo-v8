@@ -1,0 +1,38 @@
+name: Core B2 deterministic system integrity input
+on:
+  push:
+    branches:
+      - aql/core-f1-prospective-capture-20261101
+    paths:
+      - 'research_wp_r0/aql_f1_b2_integrity_input.py'
+      - 'examples/aql_f1_b2_emit_integrity_input.py'
+      - 'tests/test_aql_f1_b2_integrity_input.py'
+      - '.github/workflows/core-b2-integrity-input.yml'
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_f1_b2_integrity_input.py'
+      - 'examples/aql_f1_b2_emit_integrity_input.py'
+      - 'tests/test_aql_f1_b2_integrity_input.py'
+      - '.github/workflows/core-b2-integrity-input.yml'
+permissions:
+  contents: read
+jobs:
+  b2-test-only-input:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: B2 new contract tests only
+        run: |
+          git rev-parse HEAD
+          python -m unittest -v tests.test_aql_f1_b2_integrity_input
+          mkdir -p b2_evidence
+          PYTHONPATH=. python examples/aql_f1_b2_emit_integrity_input.py --out b2_evidence/core-b2-integrity-input.json
+          sha256sum b2_evidence/core-b2-integrity-input.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core-b2-deterministic-factory-input
+          path: b2_evidence/core-b2-integrity-input.json
+          retention-days: 30
