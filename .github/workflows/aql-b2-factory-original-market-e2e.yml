@@ -48,6 +48,17 @@ jobs:
           assert got=='265b7ade1be307bd2efafbd0a8438e6846c869df6205af717133d490e38aeb59', got
           print('PINNED_BYTES_SHA256_OK')
           PY
+      - name: Read-only pinned Core F1 validator overlay (not a cross-PR merge)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 2 \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github.raw+json" \
+            "https://api.github.com/repos/scannercrypto0-gif/super-kumo-v8/contents/research_wp_r0/aql_f1_decision_capture_v1.py?ref=83d44ef23392b9ca9628d18d0f6fc909cd98e4ff" \
+            -o research_wp_r0/aql_f1_decision_capture_v1.py
+          python -m py_compile research_wp_r0/aql_f1_decision_capture_v1.py
       - name: Run only 8 changed-path B2 real-source integration and fail-closed tests
         env:
           AQL_B2_CORE_JSON: b2-pinned/core-b2-integrity-input.json
