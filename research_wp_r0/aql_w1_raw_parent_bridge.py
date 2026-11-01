@@ -75,12 +75,13 @@ def authenticated_parent_market_windows(
         if (meta["correction_generation"] > 0 and
                 not _HEX.fullmatch(str(meta["parent_content_sha256"]))):
             continue
-        # The scheduled source hash is that of ORIGINAL parent bytes,
-        # never silently substituted by the projected/normalised bytes.
-        if (plan.get("source_bytes_sha256") != parent_sha or
-                str(plan.get("correction_generation")) != str(meta["correction_generation"])):
+        # Core F1 source bytes can be a bounded prefix/derived source; this
+        # SHA MUST NOT be inferred equal to the original RAW parent SHA.
+        if str(plan.get("correction_generation")) != str(meta["correction_generation"]):
             continue
         if (lineage.get("parent_content_sha256") != parent_sha or
+                lineage.get("f1_source_bytes_sha256") != plan.get("source_bytes_sha256") or
+                lineage.get("source_id") != plan.get("source_id") or
                 lineage.get("derived_bytes_sha256") != derived_sha or
                 lineage.get("source_version") != plan.get("source_version") or
                 str(lineage.get("correction_generation")) != str(meta["correction_generation"]) or
