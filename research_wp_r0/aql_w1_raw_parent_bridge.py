@@ -146,16 +146,18 @@ def authenticated_parent_market_windows(
         ), asof_ms=asof_ms)
     output = []
     accepted_output = {}
+    parent_sha_by_pair = {pair: parent_sha for pair, parent_sha, _, _ in accepted}
     for window in windows:
         if not verify_window(window):
             output.append({**window,
                            "source_bytes_sha256": next(p["source_bytes_sha256"]
                                                        for p in plans if p["pair_id"] == window["pair_id"]),
+                           "parent_content_sha256": parent_sha_by_pair[window["pair_id"]],
                            "coverage_status": window["coverage_status"]})
             continue
         original = next(p for p in plans if p["pair_id"] == window["pair_id"])
         rewritten = {**window, "source_bytes_sha256": original["source_bytes_sha256"],
-                     "parent_content_sha256": original["source_bytes_sha256"]}
+                     "parent_content_sha256": parent_sha_by_pair[window["pair_id"]]}
         output.append(rewritten)
         accepted_output[(rewritten["pair_id"], rewritten["horizon_ms"])] = json.dumps(
             rewritten, sort_keys=True, separators=(",", ":"))
