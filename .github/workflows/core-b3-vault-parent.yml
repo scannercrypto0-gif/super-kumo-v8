@@ -1,0 +1,49 @@
+name: Core B3 pinned F1 Vault parent seam
+on:
+  push:
+    branches:
+      - aql/core-f1-prospective-capture-20261101
+    paths:
+      - 'research_wp_r0/aql_f1_b3_vault_parent_adapter.py'
+      - 'examples/aql_f1_b3_emit_vault_parent.py'
+      - 'tests/test_aql_f1_b3_vault_parent.py'
+      - '.github/workflows/core-b3-vault-parent.yml'
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_f1_b3_vault_parent_adapter.py'
+      - 'examples/aql_f1_b3_emit_vault_parent.py'
+      - 'tests/test_aql_f1_b3_vault_parent.py'
+      - '.github/workflows/core-b3-vault-parent.yml'
+permissions:
+  contents: read
+jobs:
+  b3-real-vault-seam:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 2ddfb2f4a6e145c6579820beb03e4d678594de21
+          path: .vault-pin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Overlay only actual pinned RawVault schema and vault module
+        run: |
+          echo "CORE_CURRENT_SHA=$(git rev-parse HEAD)"
+          echo "VAULT_PINNED_SHA=$(git -C .vault-pin rev-parse HEAD)"
+          test "$(git -C .vault-pin rev-parse HEAD)" = 2ddfb2f4a6e145c6579820beb03e4d678594de21
+          mkdir -p tools/raw_vault_offline
+          cp .vault-pin/tools/raw_vault_offline/schema.py tools/raw_vault_offline/schema.py
+          cp .vault-pin/tools/raw_vault_offline/vault.py tools/raw_vault_offline/vault.py
+          test -f tools/raw_vault_offline/__init__.py || touch tools/raw_vault_offline/__init__.py
+          python -m unittest -v tests.test_aql_f1_b3_vault_parent
+          mkdir -p b3_evidence
+          PYTHONPATH=. python examples/aql_f1_b3_emit_vault_parent.py --out b3_evidence/core-b3-vault-parent.json
+          sha256sum b3_evidence/core-b3-vault-parent.json
+      - name: Preserve exact B3 Core Vault manifest handoff bytes
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-b3-pinned-vault-parent-handoff
+          path: b3_evidence/core-b3-vault-parent.json
+          retention-days: 30
