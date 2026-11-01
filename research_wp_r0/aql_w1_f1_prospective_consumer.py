@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from collections import Counter
 from decimal import Decimal, InvalidOperation
-from hashlib import sha256
 import json
 import re
 
@@ -35,12 +34,14 @@ def _key(record):
 
 
 def _decimal(value):
-    if not isinstance(value, str) or not re.fullmatch(r"(?:0|[1-9][0-9]*)(?:\\.[0-9]*[1-9])?|-(?:[1-9][0-9]*)(?:\\.[0-9]*[1-9])?", value):
+    if not isinstance(value, str) or not re.fullmatch(r"-?(?:0|[1-9][0-9]*)(?:\\.[0-9]*[1-9])?", value):
         raise EvidenceError("noncanonical decimal input")
     try:
         parsed = Decimal(value)
     except InvalidOperation as exc:
         raise EvidenceError("invalid decimal input") from exc
+    if value.startswith("-") and parsed == 0:
+        raise EvidenceError("negative zero is noncanonical")
     if not parsed.is_finite():
         raise EvidenceError("nonfinite decimal")
     return parsed
@@ -133,7 +134,8 @@ def project_f1_research_slots(scheduled, captures=(), market_windows=(), *,
         identity = plan["identity"]
         for arm in ARMS:
             original = capture_groups.get((pair, arm), [])
-            distinct = {(r.get("f1_record_sha256"), r.get("producer_sequence")) for r in original}
+            distinct = {(r.get("f1_record_sha256"), r.get("producer_sequence"),
+                         json.dumps(r, sort_keys=True, ensure_ascii=False)) for r in original}
             one = original[0] if original else None
             if not original:
                 status, reason = "MISSING_CAPTURE", "NO_ORIGINAL_CANDIDATE"
@@ -168,12 +170,17 @@ def project_f1_research_slots(scheduled, captures=(), market_windows=(), *,
                 else:
                     coverage = "UNKNOWN"
                 signed = None
-                reason_metric = "UNVERIFIED_PIT"
+                reason_metric = "MISSING_F1" if status == "MISSING_CAPTURE" else "UNVERIFIED_PIT"
                 first_hit = "NOT_ESTABLISHED"
                 if status == "RECORDED":
-                    first_hit = one.get("tp_sl_first_hit", "NOT_ESTABLISHED")
-                    if first_hit not in ("TP_FIRST", "SL_FIRST", "NEITHER", "UNKNOWN", "NOT_ESTABLISHED"):
-                        first_hit = "NOT_ESTABLISHED"
+                    # First-hit is an outcome observation, never original F1 data.
+                    tp, sl = one.get("tp"), one.get("sl")
+                    if (valid_market and isinstance(tp, dict) and isinstance(sl, dict)
+                        and tp.get("status") == "DEFINED_PREDECISION"
+                        and sl.get("status") == "DEFINED_PREDECISION"):
+                        hit = source.get("tp_sl_first_hit")
+                        if hit in ("TP_FIRST", "SL_FIRST", "NEITHER", "UNKNOWN"):
+                            first_hit = hit
                     if one.get("direction") not in ("LONG", "SHORT"):
                         reason_metric = "NO_DIRECTION"
                     elif one.get("predecision_eligibility") != "YES":
@@ -205,7 +212,7 @@ def project_f1_research_slots(scheduled, captures=(), market_windows=(), *,
                     "f1_signal_state": one.get("f1_signal_state") if status == "RECORDED" else None,
                     "horizon_ms": horizon, "coverage_status": coverage,
                     "measurement_class": "COMMON_PAIRED" if status == "RECORDED" and signed else "MARKET_ONLY",
-                    "excursion_status": reason_metric if coverage == "COMPLETE" else "UNVERIFIED_PIT",
+                    "excursion_status": reason_metric if coverage == "COMPLETE" or reason_metric != "EVALUABLE" else "UNVERIFIED_PIT",
                     "max_favorable": signed[0] if signed and coverage == "COMPLETE" else None,
                     "max_adverse": signed[1] if signed and coverage == "COMPLETE" else None,
                     "tp_sl_first_hit": first_hit,
