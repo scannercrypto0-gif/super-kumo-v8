@@ -10,7 +10,7 @@ def _entry(
     cmd="pytest {module} -v",
     module="tools/dev_repro_offline/tests/",
     status=ManifestEntryStatus.EXPECTED,
-    sha="abc1234",
+    sha="",          # G7-B: default to unpinned — unit tests here test non-SHA behaviour
 ) -> ManifestEntry:
     return ManifestEntry(
         entry_id=eid, label=eid, command_template=cmd,

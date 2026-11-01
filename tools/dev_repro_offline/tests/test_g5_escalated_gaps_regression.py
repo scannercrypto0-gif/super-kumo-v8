@@ -153,12 +153,20 @@ class TestGap2RuntimeShaCheck:
         )
 
     def test_gap2_sha_prefix_match_is_allowed(self, tmp_path):
-        """Regression: when expected_sha is a prefix of current_sha, must NOT block."""
+        """Regression: when expected_sha is a prefix of current_sha, must NOT block.
+
+        G7-B note: current_sha must be a valid hex string (7–40 chars). The previous
+        fixture used "abc12349999longsha" which contains non-hex chars ('l','o','n','g',
+        's','h') and is now correctly rejected by _is_valid_sha(). Updated to use a
+        valid 40-char hex string that starts with "abc1234" so the prefix match logic
+        is what's being tested, not the sha format validation.
+        """
         e = _entry(sha="abc1234")
         result = run_entry(
             e, str(tmp_path),
             dry_run=True,  # dry_run to avoid actual subprocess
-            current_sha="abc12349999longsha",
+            # G7-B: must be valid hex; starts with "abc1234" so prefix-match passes
+            current_sha="abc1234000000000000000000000000000000000",  # 40-char hex, prefix=abc1234
         )
         # In dry_run mode, should return DRY_RUN (not BLOCKED)
         assert result.status == RunStatus.DRY_RUN, (
@@ -166,11 +174,29 @@ class TestGap2RuntimeShaCheck:
         )
 
     def test_gap2_no_current_sha_does_not_block(self, tmp_path):
-        """Regression: when current_sha not provided, run_entry must not block."""
+        """
+        G7-B UPDATE (Issue #215): G7-B closes the 'no SHA opt-out' loophole
+        that this test previously documented as acceptable behaviour.
+
+        Old G5 behaviour (was): SHA-pinned EXPECTED entry with current_sha=None
+        was silently allowed to proceed (DRY_RUN) because the check was guarded
+        by 'if current_sha and entry.expected_sha:', which skipped the check when
+        current_sha was falsy.
+
+        New G7-B behaviour: A SHA-pinned EXPECTED entry MUST return BLOCKED when
+        current_sha is None/empty/malformed. The test name is preserved for
+        traceability; the assertion is inverted to reflect the new safety invariant.
+
+        See: test_g7b_sha_wiring_regression.py::TestG7BSHAWiringDefects
+        """
         e = _entry(sha="abc1234")
         result = run_entry(e, str(tmp_path), dry_run=True)
-        assert result.status == RunStatus.DRY_RUN, (
-            f"Gap 2 regression: omitting current_sha must not block, got {result.status}"
+        assert result.status == RunStatus.BLOCKED, (
+            f"G7-B: SHA-pinned EXPECTED entry with current_sha=None must return "
+            f"BLOCKED, got {result.status}. "
+            "The 'no current_sha does not block' behaviour was the G7-B defect — "
+            "it has been closed. Use run_manifest_with_preflight_guard() to "
+            "provide a verified SHA from run_preflight()."
         )
 
 

@@ -31,6 +31,7 @@ Gate 5 escalated-gaps fix (Issue #215):
 """
 from __future__ import annotations
 
+import re
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -133,6 +134,17 @@ def _is_approved_pytest_flag(arg: str) -> bool:
         if arg.startswith(prefix):
             return True
     return False
+
+
+# ── G7-B: SHA validation ──────────────────────────────────────────────────────
+# Accepts 7–40 lowercase hex characters — covers both full 40-char SHAs from
+# `git rev-parse HEAD` and abbreviated SHAs used in manifest expected_sha fields.
+_SHA_VALID_RE = re.compile(r"^[0-9a-f]{7,40}$")
+
+
+def _is_valid_sha(sha: str) -> bool:
+    """Return True if sha is a non-empty lowercase-hex string of 7–40 characters."""
+    return bool(sha and _SHA_VALID_RE.match(sha))
 
 
 # Internal sentinel: run_manifest() passes this to indicate it was called from
@@ -240,12 +252,21 @@ def run_entry(
     Run a single manifest entry.
     dry_run=True (default) prints the command without executing.
 
-    Gate 5 / G5-GAP-2: current_sha= (optional) — when provided AND
-    entry.expected_sha is set, the two are compared using prefix matching
-    (either is a prefix of the other → match).  A mismatch returns BLOCKED
-    before any subprocess is launched, catching stale manifest entries running
-    against a different commit than they were designed for.
-    Pass current_sha=None (the default) to skip this check (backwards compatible).
+    G7-B fix (Issue #215 comment #6555520562): for EXPECTED SHA-pinned entries
+    (entry.expected_sha non-empty), current_sha must be provided AND must be a
+    valid hex SHA.  current_sha=None, empty string, or malformed value → BLOCKED
+    before any subprocess.  There is no opt-out for pinned entries.
+
+    The trusted source of current_sha is run_manifest_with_preflight_guard(),
+    which reads it from preflight.head_sha (the result of `git rev-parse HEAD`
+    in run_preflight()).  Untrusted direct callers that supply a fake SHA will
+    still be blocked by the mismatch check below.
+
+    SHA matching policy (prefix): current_sha.startswith(expected_sha) or
+    expected_sha.startswith(current_sha).  This accommodates abbreviated SHAs
+    stored in the manifest while still requiring a real hex string.
+
+    Gate 5 / G5-GAP-2 (retained): SHA mismatch → BLOCKED.
     """
     argv = _build_command(entry.command_template, entry.module_path)
 
@@ -265,8 +286,22 @@ def run_entry(
             notes=f"Status={entry.status.value}",
         )
 
-    # Gate 5 / G5-GAP-2: runtime SHA check
-    if current_sha and entry.expected_sha:
+    # G7-B / G5-GAP-2: SHA integrity check for SHA-pinned EXPECTED entries.
+    if entry.expected_sha:
+        # G7-B: current_sha must be present and valid — no opt-out for pinned entries.
+        if not _is_valid_sha(current_sha or ""):
+            return RunResult(
+                entry_id=entry.entry_id,
+                status=RunStatus.BLOCKED,
+                command=argv,
+                notes=(
+                    f"SHA_ABSENT_OR_INVALID: entry.expected_sha={entry.expected_sha!r} "
+                    f"requires a valid hex current_sha but got {current_sha!r}. "
+                    "Use run_manifest_with_preflight_guard() to provide a verified SHA "
+                    "from run_preflight(). (G7-B)"
+                ),
+            )
+        # G5-GAP-2 (retained): SHA mismatch → BLOCKED.
         sha_match = (
             current_sha.startswith(entry.expected_sha) or
             entry.expected_sha.startswith(current_sha)
@@ -279,7 +314,7 @@ def run_entry(
                 notes=(
                     f"SHA_MISMATCH: entry.expected_sha={entry.expected_sha!r} "
                     f"does not match current_sha={current_sha!r}. "
-                    "Update the manifest or switch to the correct commit (G5-GAP-2)."
+                    "Update the manifest or switch to the correct commit (G7-B / G5-GAP-2)."
                 ),
             )
 
@@ -346,12 +381,18 @@ def run_manifest(
     *,
     dry_run: bool = True,
     timeout: int = DEFAULT_TIMEOUT,
+    current_sha: Optional[str] = None,
     _preflight_guard_token: object = None,
 ) -> RunReport:
     """
     Run all entries in the manifest.
     BLOCKED/SKIP entries are recorded without executing.
     dry_run=True is the safe default.
+
+    G7-B fix (Issue #215): current_sha= is propagated to every run_entry() call
+    so that SHA-pinned EXPECTED entries are checked against the current HEAD.
+    The trusted caller is run_manifest_with_preflight_guard(), which supplies
+    current_sha=preflight.head_sha (verified by run_preflight() via git).
 
     Gate 5 / G5-GAP-3: DIRECT EXECUTE MODE IS PROHIBITED.
     Calling run_manifest(dry_run=False) without the internal preflight guard
@@ -375,7 +416,11 @@ def run_manifest(
 
     report = RunReport(dry_run=dry_run)
     for entry in manifest.entries:
-        result = run_entry(entry, repo_root, dry_run=dry_run, timeout=timeout)
+        result = run_entry(
+            entry, repo_root,
+            dry_run=dry_run, timeout=timeout,
+            current_sha=current_sha,   # G7-B: thread SHA through to each entry
+        )
         report.results.append(result)
     return report
 
@@ -435,9 +480,15 @@ def run_manifest_with_preflight_guard(
         return report
 
     # Preflight passed or dry_run mode — proceed normally.
-    # Pass the internal sentinel token so run_manifest() permits execute mode.
+    # G7-B: extract the verified HEAD SHA from the preflight report and pass it
+    # through to run_manifest() → run_entry() so SHA-pinned EXPECTED entries are
+    # compared against the git-verified current HEAD.
+    # preflight.head_sha is set by run_preflight() via `git rev-parse HEAD` —
+    # it is NOT caller-supplied and cannot be faked by an untrusted direct caller.
+    verified_sha: Optional[str] = preflight.head_sha if preflight.head_sha else None
     return run_manifest(
         manifest, repo_root,
         dry_run=dry_run, timeout=timeout,
+        current_sha=verified_sha,       # G7-B: propagate verified SHA from preflight
         _preflight_guard_token=_PREFLIGHT_GUARD_TOKEN,
     )

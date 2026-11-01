@@ -192,10 +192,15 @@ class TestP0BExecuteAfterPreflightFail:
         expected_ids = {e.entry_id for e in manifest.allowed_entries()}
         for r in run_report.results:
             if r.entry_id in expected_ids:
-                # Should be DRY_RUN (not blanket-blocked by guard)
-                assert r.status != RunStatus.BLOCKED or "preflight" not in (r.notes or "").lower(), (
-                    f"P0-B-COMPAT: EXPECTED entry {r.entry_id!r} was blocked by preflight guard "
-                    "even though preflight did not FAIL."
+                # Should NOT be blocked specifically by the P0-B preflight fail gate.
+                # G7-B note: an EXPECTED entry may still be BLOCKED if preflight.head_sha
+                # is absent/invalid (e.g. tmp_path has no .git → git rev-parse fails →
+                # head_sha=""). In that case the block reason is SHA_ABSENT_OR_INVALID,
+                # not PREFLIGHT_FAIL_GATE. The guard's P0-B gate itself must not fire.
+                assert "PREFLIGHT_FAIL_GATE" not in (r.notes or ""), (
+                    f"P0-B-COMPAT: EXPECTED entry {r.entry_id!r} was blocked by "
+                    "PREFLIGHT_FAIL_GATE even though preflight did not report overall FAIL. "
+                    f"notes={r.notes!r}"
                 )
 
     def test_cli_execute_aborts_on_preflight_fail(self, tmp_path):

@@ -48,7 +48,9 @@ def test_summary_mentions_not_integrated(tmp_path):
 
 def test_repro_self_is_dry_run(tmp_path):
     manifest = build_w1_manifest("dbc191d")
-    run_report = run_manifest(manifest, str(tmp_path), dry_run=True)
+    # G7-B: REPRO-SELF-001 is pinned to "dbc191d"; run_manifest must receive the
+    # matching current_sha or it will return BLOCKED (not DRY_RUN) for that entry.
+    run_report = run_manifest(manifest, str(tmp_path), dry_run=True, current_sha="dbc191d")
     report = build_w1_coordinator_report(run_report, "dbc191d")
     # In dry-run the repro self test is DRY_RUN, not PASS
     assert report.repro_result is not None
