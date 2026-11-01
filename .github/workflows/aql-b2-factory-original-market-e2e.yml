@@ -30,13 +30,13 @@ jobs:
           mkdir -p b2-pinned b2-report
           api="https://api.github.com/repos/scannercrypto0-gif/super-kumo-v8/actions/artifacts"
           curl --fail --location --retry 2 \
-            -H "Authorization: Bearer $\{GH_TOKEN}" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
-            "$\{api}/13084853700/zip" -o b2-pinned/core.zip
+            "${api}/13084853700/zip" -o b2-pinned/core.zip
           curl --fail --location --retry 2 \
-            -H "Authorization: Bearer $\{GH_TOKEN}" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
-            "$\{api}/13084775420/zip" -o b2-pinned/b1-original-2024.zip
+            "${api}/13084775420/zip" -o b2-pinned/b1-original-2024.zip
           python - <<'PY'
           import zipfile,hashlib,pathlib
           d=pathlib.Path('b2-pinned')
