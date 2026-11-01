@@ -30,8 +30,7 @@ observation file retains response metadata. Its request-start times and HTTP
 Date/Last-Modified/ETag are diagnostic observations, not historical availability
 or independent publication/correction clock evidence.
 
-Parser validates exact single CSV member and CRC, all 12 columns, canonical
-integer timestamps/trade counts, finite positive ordered OHLC, nonnegative volumes,
+Parser validates exact single CSV member and CRC, all 12 columns, integer timestamps/trade counts, finite positive ordered OHLC, nonnegative volumes,
 taker-volume bounds, every 15m open and close, month and whole-year counts and
 cross-month continuity. No interpolation, resampling, deduplication or dropped rows.
 Normalization keeps original text values in 12 named canonical sorted ASCII
@@ -135,7 +134,11 @@ Eight new focused tests run against downloaded actual originals: whole-year,
 changed ZIP/checksum/member hashes, duplicate grid, malformed OHLC, nonfinite
 volume, and exact next-open/horizon-censor boundary. Adversarial derivatives of
 actual rows are test inputs only, never reported as market observations. No old
-accepted controlled 288-bar, P0/W1-B or integration harness suite rerun.
+accepted controlled 288-bar, P0/W1-B or integration harness suite was manually
+rerun. The first B1 push automatically triggered pre-existing W1-B workflow
+41308649819 (SUCCESS); it had no path filter. This is disclosed, not counted as
+B1 evidence. Added old-source path filtering so B1-only changes no longer
+trigger that legacy suite. No historical production research run occurred.
 The existing Factory focused workflow now downloads/rechecks the locked real
 originals, compares exact report bytes, runs only this eight-test module and
 uploads originals/replay. CI SHA/run/log/artifact results are recorded in the
