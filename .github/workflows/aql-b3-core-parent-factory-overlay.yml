@@ -64,13 +64,20 @@ jobs:
           for file in __init__.py schema.py vault.py; do
             curl --fail --location --retry 2 -H "Authorization: Bearer ${GH_TOKEN}" \
               -H "Accept: application/vnd.github.raw+json" \
-              "${api}/tools/raw_vault_offline/${file}?ref=2ddfb2f4a6e145c6579820beb03e4d678594de21" \
+              "${api}/tools/raw_vault_offline/${file}?ref=7d97b09c0c6ee2650a61d523acb8d8c771a99c46" \
               -o "tools/raw_vault_offline/${file}"
+            curl --fail --location --retry 2 -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github.raw+json" \
+              "${api}/tools/raw_vault_offline/${file}?ref=2ddfb2f4a6e145c6579820beb03e4d678594de21" \
+              -o "b3-core-input/vault-original-${file}"
+            cmp "tools/raw_vault_offline/${file}" "b3-core-input/vault-original-${file}"
           done
           python -m py_compile research_wp_r0/aql_f1_b3_vault_parent_adapter.py \
             research_wp_r0/aql_f1_parent_witness_v1.py tools/raw_vault_offline/vault.py
           echo "CORE_B3_PIN=17955e295263340b5cfbcfed8ae8e2a3e8a70c32"
-          echo "VAULT_PIN=2ddfb2f4a6e145c6579820beb03e4d678594de21"
+          echo "VAULT_HANDOFF_PIN=2ddfb2f4a6e145c6579820beb03e4d678594de21"
+          echo "VAULT_LIVE_EXECUTED=7d97b09c0c6ee2650a61d523acb8d8c771a99c46"
+          echo "VAULT_SCHEMA_VAULT_PY_AND_PACKAGE_INIT_UNCHANGED=YES"
       - name: Run only 8 changed-seam Factory B3 Core parent tests
         env:
           AQL_B3_CORE_B2: b3-core-input/core-b2-integrity-input.json
