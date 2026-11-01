@@ -80,7 +80,7 @@ class FactoryF1ProjectionTests(unittest.TestCase):
     def test_censored_retained_no_signed_extrema(self):
         report = self.project([capture("BASE")],
                               [window(coverage_status="ARCHIVE_END_CENSORED", observed_bars=24)],
-                              verify_original=accepted, verify_market=accepted)
+                              verify_original=accepted, verify_market=market_accepted)
         row = next(r for r in report["outcomes"] if r["arm"] == "BASE" and r["horizon_ms"] == 86400000)
         self.assertEqual(row["coverage_status"], "ARCHIVE_END_CENSORED")
         self.assertIsNone(row["max_adverse"])
