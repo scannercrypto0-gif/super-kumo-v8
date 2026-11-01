@@ -29,6 +29,8 @@ jobs:
         run: pip install --break-system-packages pytest pytest-cov || pip install pytest pytest-cov
 
       - name: Run dev_repro_offline tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           pytest tools/dev_repro_offline/tests/ \
             -v --tb=short \

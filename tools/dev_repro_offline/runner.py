@@ -35,6 +35,15 @@ Audit C1 fix (Issue #215 / Audit #134 comment #6556235030):
   accepting the report. A forged PreflightReport or a report from a different
   repository will not match, and all entries are BLOCKED with
   PREFLIGHT_SHA_MISMATCH_OR_FORGED. Applies in both dry_run and execute modes.
+
+Audit C1b fix (Issue #215 / Audit #134 comment #6556518643):
+  C1 (SHA match only) does not prevent a caller from forging a PreflightReport
+  with overall=PASS and head_sha=<actual repo HEAD>. A dirty worktree or other
+  environmental failure would go undetected if the caller skips run_preflight().
+  C1b fix: in execute mode (dry_run=False), independently re-run run_preflight(
+  repo_root) and block ALL entries if the live result is not PASS. The caller-
+  supplied preflight is still checked (C1 SHA gate) but the execute boundary
+  performs its own authoritative live preflight regardless of the caller's report.
 """
 from __future__ import annotations
 
@@ -560,15 +569,23 @@ def run_manifest_with_preflight_guard(
     all entries will be BLOCKED with PREFLIGHT_SHA_MISMATCH_OR_FORGED. This applies
     in both dry_run and execute modes.
 
+    Audit C1b (Issue #215 / Audit #134 comment #6556518643):
+    In execute mode (dry_run=False), independently re-runs run_preflight(repo_root)
+    at the execute boundary. A caller that forges PreflightReport(overall=PASS,
+    head_sha=<real_HEAD>) passes the C1 SHA gate but NOT this live re-check. A
+    dirty worktree, altered files, or any environmental failure detected by live
+    preflight will block ALL entries even if the caller's report says PASS.
+
     In dry_run=True mode preflight failures are recorded in the report but do NOT
     block execution — there is no subprocess launched in dry_run mode so the risk
     is informational only.
 
     In dry_run=False (execute) mode:
-    - preflight.overall != PASS → all EXPECTED entries become BLOCKED.
-    - preflight.overall == PASS but SHA mismatch → all entries BLOCKED (C1).
+    - C1: SHA mismatch between preflight.head_sha and live git HEAD → BLOCKED.
+    - C1b: live run_preflight(repo_root) result is not PASS → BLOCKED.
+    - preflight.overall != PASS (caller's report) → BLOCKED (B3/B1).
     """
-    from .preflight import CheckStatus  # avoid circular import at module level
+    from .preflight import CheckStatus, run_preflight  # avoid circular import
 
     # ── C1: Re-verify preflight SHA against actual repo HEAD ─────────────────
     # This binds the preflight report to repo_root and rejects forged reports.
@@ -585,6 +602,32 @@ def run_manifest_with_preflight_guard(
                 notes=sha_error,
             ))
         return report
+
+    # ── C1b: At execute boundary, independently re-run live preflight ────────
+    # C1 proved the SHA matches. C1b proves the environment is actually clean.
+    # A caller with a forged PASS report (but matching SHA) is blocked here.
+    # Only applies in execute mode — dry_run poses no subprocess launch risk.
+    if not dry_run:
+        live_preflight = run_preflight(repo_root)
+        if live_preflight.overall != CheckStatus.PASS:
+            c1b_error = (
+                f"C1B_LIVE_PREFLIGHT_FAILED: Independent live preflight at execute "
+                f"boundary returned {live_preflight.overall.value} — aborting execution. "
+                f"The caller's preflight report may be forged or stale. "
+                f"Live preflight summary: {live_preflight.summary()} "
+                "Run run_preflight(repo_root) in a clean environment and pass the "
+                "genuine result. (C1b)"
+            )
+            report = RunReport(dry_run=dry_run)
+            for entry in manifest.entries:
+                argv = _build_command(entry.command_template, entry.module_path)
+                report.results.append(RunResult(
+                    entry_id=entry.entry_id,
+                    status=RunStatus.BLOCKED,
+                    command=argv,
+                    notes=c1b_error,
+                ))
+            return report
 
     # Audit B3 (Issue #215 / Audit #134 comment #6555797225):
     # WARN is not sufficient execute authority.  Only CheckStatus.PASS may proceed

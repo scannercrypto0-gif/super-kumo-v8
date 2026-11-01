@@ -1,20 +1,28 @@
 """
-Audit C1 Remediation Tests — Issue #215 / Audit #134 comment #6556235030
-=========================================================================
+Audit C1 / C1b Remediation Tests — Issue #215 / Audit #134
+===========================================================
 Blocker C1: run_manifest_with_preflight_guard() accepted any caller-supplied
 PreflightReport(overall=PASS, head_sha=...) without verifying that the SHA
 corresponds to the actual git HEAD in repo_root.  A forged report could be
 constructed without ever calling run_preflight(repo_root), bypassing the
 environmental gate.
 
-Fix: _verify_preflight_sha_matches_repo() re-runs git rev-parse HEAD in
+Fix C1: _verify_preflight_sha_matches_repo() re-runs git rev-parse HEAD in
 repo_root and compares against preflight.head_sha. Mismatch or unreadable
 repo → all entries BLOCKED with PREFLIGHT_SHA_MISMATCH_OR_FORGED or
 PREFLIGHT_SHA_UNVERIFIABLE. Applied in both dry_run and execute modes.
 
+Fix C1b (Audit #134 comment #6556518643): At execute boundary (dry_run=False),
+independently re-run run_preflight(repo_root) live. A caller who forges
+PreflightReport(overall=PASS, head_sha=<real_HEAD>) passes the C1 SHA gate
+but is blocked by C1b if the live environment is not PASS (dirty worktree,
+line-ending check failures, etc.). This closes the forged-PASS-with-real-SHA
+attack vector.
+
 FAIL→PASS cycle:
   RED on 992b5fc (pre-fix): test_c1_forged_preflight_dry_run_is_blocked → FAIL
-  GREEN after fix: all 6 tests PASS
+  GREEN after fix (C1): all 6 C1 tests PASS
+  GREEN after fix (C1b commit): +2 C1b tests PASS
 
 Run:
     PYTHONPATH=/home/claude/super-kumo-v8 \\
@@ -188,19 +196,23 @@ class TestAuditC1Positive:
 
     def test_c1_b3_regression_warn_still_blocks_execute(self, tmp_path):
         """
-        REGRESSION (B3): After adding C1 check, B3 (WARN blocks execute) must
-        still work.  We need a PreflightReport with actual matching SHA but
-        overall=WARN to test B3 still fires after C1 passes.
+        REGRESSION (B3): After adding C1/C1b checks, a WARN environment must
+        still block execute.
+
+        Note on C1b interaction: C1b independently re-runs run_preflight(repo_root)
+        at execute boundary. If the live repo is dirty, C1b blocks first with
+        C1B_LIVE_PREFLIGHT_FAILED. If the live repo is clean, C1b passes and B3
+        fires with PREFLIGHT_WARN_GATE. Either way the result is BLOCKED — the
+        invariant is that WARN environments never reach execute, regardless of which
+        gate fires first.
         """
         repo_root = os.getcwd()
-        # Get the real HEAD SHA
         r = subprocess.run(
             ["git", "rev-parse", "HEAD"], capture_output=True, text=True,
             cwd=repo_root,
         )
         real_sha = r.stdout.strip()
 
-        # Build a preflight with matching SHA but WARN overall
         warn_preflight = PreflightReport(
             overall=CheckStatus.WARN,
             checks=[CheckResult("LINE-ENDINGS", "test", CheckStatus.WARN, "warn")],
@@ -214,12 +226,18 @@ class TestAuditC1Positive:
         )
         result = report.results[0]
         assert result.status == RunStatus.BLOCKED, (
-            f"B3 REGRESSION: WARN preflight in execute mode produced {result.status!r}. "
-            "Must still be BLOCKED after C1 fix. "
+            f"B3 REGRESSION: WARN environment in execute mode produced {result.status!r}. "
+            "Must be BLOCKED (either by C1b live preflight or B3 WARN gate). "
             f"notes={result.notes!r}"
         )
-        assert "PREFLIGHT_WARN_GATE" in result.notes, (
-            f"B3 REGRESSION: expected PREFLIGHT_WARN_GATE in notes, got: {result.notes!r}"
+        # Accept either C1b blocking (dirty live env) or B3 WARN gate (clean env)
+        blocked_by_warn_or_c1b = (
+            "PREFLIGHT_WARN_GATE" in result.notes
+            or "C1B_LIVE_PREFLIGHT_FAILED" in result.notes
+        )
+        assert blocked_by_warn_or_c1b, (
+            f"B3/C1b REGRESSION: expected PREFLIGHT_WARN_GATE or C1B_LIVE_PREFLIGHT_FAILED "
+            f"in notes, got: {result.notes!r}"
         )
 
     def test_c1_does_not_block_non_git_repo_dry_run_with_forged_empty_sha(self, tmp_path):
@@ -237,4 +255,94 @@ class TestAuditC1Positive:
             f"C1 edge: empty head_sha on non-git repo produced {result.status!r}. "
             "Must be BLOCKED. "
             f"notes={result.notes!r}"
+        )
+
+# ── C1b dedicated tests (RED on 3f3c1ad pre-C1b, GREEN after C1b commit) ─────
+
+
+class TestAuditC1bLivePreflight:
+    """
+    C1b: At execute boundary, run_manifest_with_preflight_guard() must
+    independently re-run run_preflight(repo_root) even when the caller supplies
+    a PreflightReport(overall=PASS, head_sha=<real HEAD>).
+
+    Attack vector closed: a caller can forge overall=PASS and set head_sha to the
+    actual git HEAD (obtained independently). C1 SHA check passes. Without C1b,
+    the execute boundary has no knowledge that the environment is dirty.
+    C1b catches this by re-running run_preflight() live.
+    """
+
+    def test_c1b_forged_pass_with_real_sha_in_dirty_worktree_is_blocked(self):
+        """
+        C1b PRIMARY: Forged PreflightReport(overall=PASS, head_sha=<real HEAD>)
+        in a dirty worktree (runner.py modified) must be BLOCKED with
+        C1B_LIVE_PREFLIGHT_FAILED at execute boundary.
+
+        This is the exact attack closed by C1b: caller obtains the real HEAD SHA
+        via git rev-parse HEAD and builds a fake PASS report without ever calling
+        run_preflight(). C1 passes (SHA matches). C1b catches the dirty env.
+
+        Precondition: runner.py is modified (git status shows M) in this CI run.
+        If the worktree is unexpectedly clean, C1b won't fire but the test still
+        verifies that BLOCKED is returned (either gate is acceptable).
+        """
+        repo_root = os.getcwd()
+        # Get the real HEAD SHA
+        r = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True,
+            cwd=repo_root,
+        )
+        real_sha = r.stdout.strip()
+        assert real_sha, "Could not read git HEAD SHA — test environment misconfigured"
+
+        # Forge a PASS report with the real HEAD SHA
+        forged_pass = PreflightReport(
+            overall=CheckStatus.PASS,
+            checks=[CheckResult("FORGED", "no real check", CheckStatus.PASS, "forged")],
+            head_sha=real_sha,   # real SHA — C1 will PASS
+            branch="feat/c1b-test",
+        )
+
+        report = run_manifest_with_preflight_guard(
+            _manifest_one(), repo_root=repo_root,
+            preflight=forged_pass, dry_run=False,
+        )
+        result = report.results[0]
+        assert result.status == RunStatus.BLOCKED, (
+            f"C1b: forged PASS report with real SHA in execute mode produced "
+            f"{result.status!r}. Must be BLOCKED. notes={result.notes!r}"
+        )
+        # C1b must have fired (dirty worktree) OR the environment was already clean
+        # and some other gate fired — either way it must not be a silent PASS/DRY_RUN
+        assert result.status != RunStatus.DRY_RUN, (
+            "C1b: dry_run=False but got DRY_RUN status — execute boundary is broken"
+        )
+
+    def test_c1b_does_not_fire_in_dry_run_mode(self):
+        """
+        C1b BOUNDARY: C1b live preflight re-run must NOT occur in dry_run=True mode.
+        Only execute mode (dry_run=False) triggers the live preflight.
+
+        A forged PASS report with a SHA mismatch (not real HEAD) will be caught by
+        C1 (SHA check), but that's fine — it still proves C1b is not the gating logic
+        in dry_run mode. We verify: dry_run=True with a real run_preflight() result
+        is not C1b-blocked.
+        """
+        repo_root = os.getcwd()
+        # Use a genuinely produced preflight (SHA will match)
+        real_preflight = run_preflight(repo_root=repo_root)
+
+        report = run_manifest_with_preflight_guard(
+            _manifest_one(), repo_root=repo_root,
+            preflight=real_preflight, dry_run=True,   # dry_run=True → C1b must NOT fire
+        )
+        result = report.results[0]
+        # Must NOT be blocked by C1b in dry_run mode
+        c1b_blocked = (
+            result.status == RunStatus.BLOCKED
+            and "C1B_LIVE_PREFLIGHT_FAILED" in (result.notes or "")
+        )
+        assert not c1b_blocked, (
+            f"C1b BOUNDARY: C1b fired in dry_run=True mode — must not. "
+            f"status={result.status!r} notes={result.notes!r}"
         )

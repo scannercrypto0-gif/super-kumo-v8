@@ -340,7 +340,11 @@ class TestG7BRegressionAlreadyCorrect:
         REGRESSION (P0-B): failing preflight in execute mode must still block all entries.
 
         Updated for C1 fix: repo_root must be a real git repository and preflight.head_sha
-        must match the real HEAD SHA so C1 passes, then FAIL overall → PREFLIGHT_FAIL_GATE.
+        must match the real HEAD SHA so C1 passes.
+
+        Updated for C1b: in a dirty worktree (during development), C1b fires first with
+        C1B_LIVE_PREFLIGHT_FAILED before the B3/P0-B FAIL gate. Either note is correct —
+        both represent BLOCKED due to a failed environment. The invariant is BLOCKED.
         """
         repo_root = os.getcwd()
         real_sha = _real_head_sha()
@@ -349,7 +353,8 @@ class TestG7BRegressionAlreadyCorrect:
         manifest = TestManifest()
         manifest.entries.append(entry)
 
-        # FAIL preflight with real HEAD SHA — C1 passes (SHA matches), but FAIL gate fires
+        # FAIL preflight with real HEAD SHA — C1 passes (SHA matches), FAIL gate fires
+        # unless C1b fires first (dirty worktree during development).
         preflight = _failing_preflight(sha=real_sha)
 
         report = run_manifest_with_preflight_guard(
@@ -362,6 +367,12 @@ class TestG7BRegressionAlreadyCorrect:
             f"REGRESSION (P0-B): failing preflight in execute mode returned "
             f"{result.status!r}. Must be BLOCKED."
         )
-        assert "PREFLIGHT_FAIL_GATE" in result.notes, (
-            f"REGRESSION (P0-B): expected PREFLIGHT_FAIL_GATE in notes, got: {result.notes!r}"
+        # Accept either C1b (dirty dev worktree) or P0-B FAIL gate (clean env)
+        blocked_by_correct_gate = (
+            "PREFLIGHT_FAIL_GATE" in result.notes
+            or "C1B_LIVE_PREFLIGHT_FAILED" in result.notes
+        )
+        assert blocked_by_correct_gate, (
+            f"REGRESSION (P0-B/C1b): expected PREFLIGHT_FAIL_GATE or C1B_LIVE_PREFLIGHT_FAILED "
+            f"in notes, got: {result.notes!r}"
         )
