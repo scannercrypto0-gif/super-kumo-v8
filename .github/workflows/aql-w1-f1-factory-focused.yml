@@ -38,11 +38,13 @@ jobs:
           cp factory/tests/test_aql_w1_core_parent_market_integration.py compatible/tests/
           cp factory/research_wp_r0/aql_w1_raw_research_demo.py compatible/research_wp_r0/
           cp factory/tests/test_aql_w1_raw_research_demo.py compatible/tests/
+          cp factory/research_wp_r0/aql_w1_external_raw_source_gate.py compatible/research_wp_r0/
+          cp factory/tests/test_aql_w1_external_raw_source_gate.py compatible/tests/
           cd compatible
           test "$(git rev-parse HEAD)" = "275a5198fb501db767af28ea537ee3772cc5ea75"
           echo "PINNED_CORE_SHA=$(git rev-parse HEAD)"
           echo "FACTORY_HEAD_SHA=${{ github.sha }}"
-          git add research_wp_r0/aql_w1_f1_prospective_consumer.py tests/test_aql_w1_f1_prospective_consumer.py tests/test_aql_w1_f1_core_integration.py research_wp_r0/aql_w1_market_window_adapter.py tests/test_aql_w1_market_window_adapter.py tests/test_aql_w1_provenance_market_integration.py research_wp_r0/aql_w1_raw_parent_bridge.py tests/test_aql_w1_raw_parent_bridge.py tests/test_aql_w1_core_parent_market_integration.py research_wp_r0/aql_w1_raw_research_demo.py tests/test_aql_w1_raw_research_demo.py
+          git add research_wp_r0/aql_w1_f1_prospective_consumer.py tests/test_aql_w1_f1_prospective_consumer.py tests/test_aql_w1_f1_core_integration.py research_wp_r0/aql_w1_market_window_adapter.py tests/test_aql_w1_market_window_adapter.py tests/test_aql_w1_provenance_market_integration.py research_wp_r0/aql_w1_raw_parent_bridge.py tests/test_aql_w1_raw_parent_bridge.py tests/test_aql_w1_core_parent_market_integration.py research_wp_r0/aql_w1_raw_research_demo.py tests/test_aql_w1_raw_research_demo.py research_wp_r0/aql_w1_external_raw_source_gate.py tests/test_aql_w1_external_raw_source_gate.py
           echo "COMBINED_TREE_SHA=$(git write-tree)"
           git hash-object research_wp_r0/aql_w1_f1_prospective_consumer.py
           git hash-object tests/test_aql_w1_f1_prospective_consumer.py
@@ -55,10 +57,12 @@ jobs:
           git hash-object tests/test_aql_w1_core_parent_market_integration.py
           git hash-object research_wp_r0/aql_w1_raw_research_demo.py
           git hash-object tests/test_aql_w1_raw_research_demo.py
+          git hash-object research_wp_r0/aql_w1_external_raw_source_gate.py
+          git hash-object tests/test_aql_w1_external_raw_source_gate.py
       - name: Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - name: Only F1 Factory consumer focused tests
         working-directory: compatible
-        run: python -m unittest -v tests.test_aql_w1_raw_research_demo
+        run: python -m unittest -v tests.test_aql_w1_external_raw_source_gate
