@@ -2,7 +2,7 @@
 import copy
 import unittest
 
-from research_wp_r0.aql_f1_decision_capture_v1 import digest
+from research_wp_r0.aql_f1_decision_capture_v1 import digest, hash_f1, validate_f1
 from research_wp_r0.aql_w1_f1_prospective_consumer import project_core_verified_f1_slots
 from research_wp_r0.aql_w1_opportunity_outcomes import EvidenceError
 from tests.test_aql_f1_decision_capture_v1 import fixture
@@ -75,6 +75,43 @@ class CoreFactoryIntegration(unittest.TestCase):
         record["indicators"][0]["available_at_ms"] = record["decision_cutoff_ms"] + 1
         report = self.project([record], proof=lambda _: True)
         self.assertEqual(report["capture_status_counts"]["QUARANTINED"], 1)
+
+    def test_rehashed_valid_source_mismatch_stays_quarantined(self):
+        # Core-valid JCS/hash is insufficient if Factory preregistered a
+        # different source vintage; even a synthetic lambda-True verifier
+        # must not promote the candidate to RECORDED.
+        plan, record, registry = setup()
+        changed = copy.deepcopy(record)
+        changed["source_version"] = "another-valid-vintage"
+        changed["f1_record_sha256"] = hash_f1(changed)
+        validate_f1(changed, registry)
+        report = project_core_verified_f1_slots(
+            [plan], [changed], indicator_registry=registry,
+            proof_verifier=lambda _: True)
+        self.assertEqual(report["capture_status_counts"],
+                         {"QUARANTINED": 1, "MISSING_CAPTURE": 1})
+        self.assertEqual(report["arm_slots"], 2)
+        self.assertEqual(report["outcome_rows"], 6)
+        self.assertTrue(all(r["max_favorable"] is None and r["max_adverse"] is None
+                            for r in report["outcomes"]))
+
+    def test_rehashed_valid_cutoff_mismatch_stays_quarantined(self):
+        plan, record, registry = setup()
+        changed = copy.deepcopy(record)
+        changed["decision_cutoff_ms"] += 900000
+        changed["f1_record_sha256"] = hash_f1(changed)
+        validate_f1(changed, registry)
+        report = project_core_verified_f1_slots(
+            [plan], [changed], indicator_registry=registry,
+            proof_verifier=lambda _: True)
+        self.assertEqual(report["capture_status_counts"]["QUARANTINED"], 1)
+
+    def test_same_source_positive_synthetic_control(self):
+        report = self.project(proof=lambda _: True)
+        self.assertEqual(report["capture_status_counts"],
+                         {"RECORDED": 1, "MISSING_CAPTURE": 1})
+        self.assertTrue(report["proof_verifier_supplied"])
+        self.assertNotIn("independent_pit_proof", report)
 
     def test_orphan_rejected(self):
         _, record, _ = setup()
