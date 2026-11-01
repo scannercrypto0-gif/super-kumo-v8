@@ -79,7 +79,7 @@ def _freeze_params(kwargs: Dict[str, Any]) -> Tuple[Tuple[str, Any], ...]:
 
 
 def _guard_finite_closes(closes: List[float], label: str = "closes") -> None:
-    """Reject NaN/Inf bar prices before any indicator arithmetic.
+    """Reject None/non-numeric/NaN/Inf bar prices before any indicator arithmetic.
 
     Rationale (F-01): NaN/Inf inputs silently propagate through all indicator
     computations (SMA sum, EMA recursive step, RSI diff, ATR true-range) and
@@ -88,11 +88,20 @@ def _guard_finite_closes(closes: List[float], label: str = "closes") -> None:
     data.  Fail-closed here is the correct policy: a NaN bar price means the
     bar quality gate (validate_bars in historical_library) failed or was
     bypassed; we must not paper over that upstream failure.
+
+    Fix P2-B-1: added isinstance guard before math.isfinite() so that a
+    non-numeric close (e.g. str) raises ValueError rather than TypeError.
     """
     for i, c in enumerate(closes):
         if c is None:
             raise ValueError(
                 f"indicator {label}[{i}]: None close price; "
+                "bar must pass validate_bars() before indicator computation"
+            )
+        if not isinstance(c, (int, float)):
+            raise ValueError(
+                f"indicator {label}[{i}]: close price must be a number, "
+                f"got {type(c).__name__!r} value {c!r}; "
                 "bar must pass validate_bars() before indicator computation"
             )
         if not math.isfinite(c):
@@ -102,17 +111,36 @@ def _guard_finite_closes(closes: List[float], label: str = "closes") -> None:
             )
 
 
+# Sentinel distinguishing a missing bar attribute from one explicitly set to None.
+_GUARD_MISSING = object()
+
+
 def _guard_finite_bar_prices(bars: List, label: str = "bars") -> None:
-    """Reject NaN/Inf high/low/close on raw bars (ATR uses high and low).
+    """Reject None/missing/NaN/Inf high/low/close on raw bars (ATR uses high and low).
 
     Applies to the bar objects passed to ATR._compute_values().
+
+    Fix P2-B-2: replaces getattr(bar, attr, None) / `if v is not None` pattern
+    with a sentinel so that both a missing attribute and an attribute explicitly
+    set to None are caught as ValueError instead of silently passing through to
+    ATR arithmetic where they cause TypeError or AttributeError.
     """
     for i, bar in enumerate(bars):
         if bar is None:
             continue  # warmup slots may be None; closes guard handles those
         for attr in ("high", "low", "close"):
-            v = getattr(bar, attr, None)
-            if v is not None and not math.isfinite(v):
+            v = getattr(bar, attr, _GUARD_MISSING)
+            if v is _GUARD_MISSING:
+                raise ValueError(
+                    f"indicator {label}[{i}]: bar missing required attribute "
+                    f"'{attr}'; bar must have high, low, close fields (F-01)"
+                )
+            if v is None:
+                raise ValueError(
+                    f"indicator {label}[{i}].{attr}: None value; "
+                    "bar must pass validate_bars() before indicator computation"
+                )
+            if not math.isfinite(v):
                 raise ValueError(
                     f"indicator {label}[{i}].{attr}: non-finite value {v!r}; "
                     "NaN/Inf cannot enter ATR computation (F-01)"
