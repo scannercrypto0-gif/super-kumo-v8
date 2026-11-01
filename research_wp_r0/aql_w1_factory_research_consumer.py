@@ -61,7 +61,7 @@ def project(snapshots, outcomes, *, expected_total=None, f3_effects=None,\n     
     The latest correction generation is NOT guessed. A caller must explicitly
     select one immutable outcome version per snapshot/horizon.
     """
-    snapshots = tuple(snapshots)
+    snapshots = tuple(snapshots)\n    if f3_effects is not None:\n        f3_effects = tuple(f3_effects)
     if expected_total is not None and len(snapshots) != expected_total:
         raise EvidenceError("scheduled denominator mismatch")
     selections = {}
