@@ -28,6 +28,13 @@ Gate 5 escalated-gaps fix (Issue #215):
   G5-GAP-3: run_manifest(dry_run=False) now raises RuntimeError unless
     called internally via run_manifest_with_preflight_guard() — prevents
     callers from bypassing the P0-B preflight gate in execute mode.
+
+Audit C1 fix (Issue #215 / Audit #134 comment #6556235030):
+  run_manifest_with_preflight_guard() now re-verifies that preflight.head_sha
+  matches the actual git HEAD in repo_root via git rev-parse HEAD before
+  accepting the report. A forged PreflightReport or a report from a different
+  repository will not match, and all entries are BLOCKED with
+  PREFLIGHT_SHA_MISMATCH_OR_FORGED. Applies in both dry_run and execute modes.
 """
 from __future__ import annotations
 
@@ -484,6 +491,56 @@ def run_manifest(
     return report
 
 
+def _verify_preflight_sha_matches_repo(
+    preflight: "PreflightReport",
+    repo_root: str,
+) -> Optional[str]:
+    """
+    Audit C1 (Issue #215 / Audit #134 comment #6556235030):
+    Re-verify that preflight.head_sha matches the actual git HEAD in repo_root.
+
+    This binds the preflight report to the specific repository and prevents
+    acceptance of a forged PreflightReport(overall=PASS, head_sha=...) constructed
+    without calling run_preflight(repo_root).
+
+    Returns None if the SHA matches (verification passed).
+    Returns an error string if the SHA cannot be verified or does not match —
+    the caller must treat this as a BLOCKED condition for all entries.
+    """
+    import subprocess as _sp
+    try:
+        result = _sp.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=10,
+            cwd=repo_root,
+        )
+    except Exception as exc:
+        return (
+            f"PREFLIGHT_SHA_UNVERIFIABLE: git rev-parse HEAD failed in repo_root "
+            f"{repo_root!r}: {exc}. "
+            "Cannot confirm preflight report corresponds to this repository. (C1)"
+        )
+
+    if result.returncode != 0:
+        return (
+            f"PREFLIGHT_SHA_UNVERIFIABLE: git rev-parse HEAD returned exit code "
+            f"{result.returncode} in repo_root={repo_root!r}: {result.stderr.strip()}. "
+            "Cannot confirm preflight report corresponds to this repository. (C1)"
+        )
+
+    actual_sha = result.stdout.strip()
+    if actual_sha != preflight.head_sha:
+        return (
+            f"PREFLIGHT_SHA_MISMATCH_OR_FORGED: preflight.head_sha={preflight.head_sha!r} "
+            f"does not match actual git HEAD {actual_sha!r} in repo_root={repo_root!r}. "
+            "The preflight report may be forged, stale, or obtained from a different "
+            "repository. Call run_preflight(repo_root) immediately before "
+            "run_manifest_with_preflight_guard() to obtain a bound report. (C1)"
+        )
+
+    return None  # verification passed
+
+
 def run_manifest_with_preflight_guard(
     manifest: TestManifest,
     repo_root: str,
@@ -496,16 +553,38 @@ def run_manifest_with_preflight_guard(
     P0-B fix (Issue #215): Fail closed before any subprocess when preflight FAIL
     and dry_run=False (execute mode).
 
+    Audit C1 (Issue #215 / Audit #134 comment #6556235030):
+    Re-verifies that preflight.head_sha matches the actual git HEAD in repo_root
+    before proceeding.  A forged PreflightReport(overall=PASS, head_sha=...) or a
+    report obtained from a different repository will not match the live git HEAD and
+    all entries will be BLOCKED with PREFLIGHT_SHA_MISMATCH_OR_FORGED. This applies
+    in both dry_run and execute modes.
+
     In dry_run=True mode preflight failures are recorded in the report but do NOT
     block execution — there is no subprocess launched in dry_run mode so the risk
     is informational only.
 
     In dry_run=False (execute) mode:
-    - preflight.overall == FAIL → all EXPECTED entries become BLOCKED with a
-      "PREFLIGHT_FAIL_GATE" note; no subprocess is launched.
-    - preflight.overall != FAIL → normal execution proceeds.
+    - preflight.overall != PASS → all EXPECTED entries become BLOCKED.
+    - preflight.overall == PASS but SHA mismatch → all entries BLOCKED (C1).
     """
     from .preflight import CheckStatus  # avoid circular import at module level
+
+    # ── C1: Re-verify preflight SHA against actual repo HEAD ─────────────────
+    # This binds the preflight report to repo_root and rejects forged reports.
+    # Applied in ALL modes (dry_run and execute) to prevent forged SHA propagation.
+    sha_error = _verify_preflight_sha_matches_repo(preflight, repo_root)
+    if sha_error:
+        report = RunReport(dry_run=dry_run)
+        for entry in manifest.entries:
+            argv = _build_command(entry.command_template, entry.module_path)
+            report.results.append(RunResult(
+                entry_id=entry.entry_id,
+                status=RunStatus.BLOCKED,
+                command=argv,
+                notes=sha_error,
+            ))
+        return report
 
     # Audit B3 (Issue #215 / Audit #134 comment #6555797225):
     # WARN is not sufficient execute authority.  Only CheckStatus.PASS may proceed

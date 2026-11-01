@@ -27,6 +27,8 @@ Run:
 from __future__ import annotations
 from unittest.mock import patch, MagicMock
 
+import os
+import subprocess
 import pytest
 
 from tools.dev_repro_offline.manifest import (
@@ -36,7 +38,18 @@ from tools.dev_repro_offline.runner import (
     RunStatus, run_entry, run_manifest, run_manifest_with_preflight_guard,
     _PREFLIGHT_GUARD_TOKEN,
 )
-from tools.dev_repro_offline.preflight import PreflightReport, CheckStatus
+from tools.dev_repro_offline.preflight import (
+    PreflightReport, CheckStatus, run_preflight,
+)
+
+
+def _real_head_sha() -> str:
+    """Return the actual git HEAD SHA for the current repo."""
+    r = subprocess.run(
+        ["git", "rev-parse", "HEAD"], capture_output=True, text=True,
+        cwd=os.getcwd(),
+    )
+    return r.stdout.strip()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -230,30 +243,32 @@ class TestG7BSHAPositive:
 
     def test_g7b_matching_sha_via_preflight_gives_dry_run(self):
         """
-        G7-B POSITIVE: entry pinned to VALID_SHA, preflight.head_sha=VALID_SHA,
-        dry_run=True → result must be DRY_RUN (not BLOCKED).
+        G7-B POSITIVE: entry pinned to real HEAD SHA, real preflight from
+        run_preflight(repo_root), dry_run=True → result must be DRY_RUN (not BLOCKED).
 
         Verifies that the wiring passes SHA correctly AND does not false-positive.
-        This test is GREEN on both old and new code for dry_run=True when SHA matches
-        — but after the fix the SHA comparison actually happens; before the fix it is
-        silently skipped. The pass condition remains DRY_RUN in both cases.
+        Updated for C1 fix: repo_root must be a real git repository and the
+        preflight must carry the actual HEAD SHA so C1 verification passes.
         """
-        entry = _pinned_entry(sha=VALID_SHA)
+        repo_root = os.getcwd()  # actual super-kumo-v8 git repo
+        real_sha = _real_head_sha()
+
+        entry = _pinned_entry(sha=real_sha)
         manifest = TestManifest()
         manifest.entries.append(entry)
 
-        preflight = _passing_preflight(sha=VALID_SHA)
+        real_preflight = run_preflight(repo_root=repo_root)
 
         report = run_manifest_with_preflight_guard(
-            manifest, repo_root="/fake",
-            preflight=preflight,
+            manifest, repo_root=repo_root,
+            preflight=real_preflight,
             dry_run=True,
         )
 
         result = report.results[0]
         assert result.status == RunStatus.DRY_RUN, (
             f"G7-B POSITIVE: expected DRY_RUN but got {result.status!r}. "
-            f"Entry pinned to {VALID_SHA[:8]}... and preflight has same SHA — should pass. "
+            f"Entry pinned to {real_sha[:8]}... and preflight has same SHA — should pass. "
             f"notes={result.notes!r}"
         )
 
@@ -323,15 +338,22 @@ class TestG7BRegressionAlreadyCorrect:
     def test_preflight_fail_still_blocks_execute(self):
         """
         REGRESSION (P0-B): failing preflight in execute mode must still block all entries.
+
+        Updated for C1 fix: repo_root must be a real git repository and preflight.head_sha
+        must match the real HEAD SHA so C1 passes, then FAIL overall → PREFLIGHT_FAIL_GATE.
         """
-        entry = _pinned_entry(sha=VALID_SHA)
+        repo_root = os.getcwd()
+        real_sha = _real_head_sha()
+
+        entry = _pinned_entry(sha=real_sha)
         manifest = TestManifest()
         manifest.entries.append(entry)
 
-        preflight = _failing_preflight(sha=VALID_SHA)
+        # FAIL preflight with real HEAD SHA — C1 passes (SHA matches), but FAIL gate fires
+        preflight = _failing_preflight(sha=real_sha)
 
         report = run_manifest_with_preflight_guard(
-            manifest, repo_root="/fake",
+            manifest, repo_root=repo_root,
             preflight=preflight,
             dry_run=False,
         )
@@ -340,4 +362,6 @@ class TestG7BRegressionAlreadyCorrect:
             f"REGRESSION (P0-B): failing preflight in execute mode returned "
             f"{result.status!r}. Must be BLOCKED."
         )
-        assert "PREFLIGHT_FAIL_GATE" in result.notes
+        assert "PREFLIGHT_FAIL_GATE" in result.notes, (
+            f"REGRESSION (P0-B): expected PREFLIGHT_FAIL_GATE in notes, got: {result.notes!r}"
+        )

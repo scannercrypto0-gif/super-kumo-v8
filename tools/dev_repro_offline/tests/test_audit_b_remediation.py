@@ -39,6 +39,8 @@ Run:
 """
 from __future__ import annotations
 
+import os
+import subprocess
 import pytest
 
 from tools.dev_repro_offline.manifest import ManifestEntry, ManifestEntryStatus, TestManifest
@@ -49,7 +51,16 @@ from tools.dev_repro_offline.runner import (
     run_manifest_with_preflight_guard,
     _PREFLIGHT_GUARD_TOKEN,
 )
-from tools.dev_repro_offline.preflight import PreflightReport, CheckResult, CheckStatus
+from tools.dev_repro_offline.preflight import PreflightReport, CheckResult, CheckStatus, run_preflight
+
+
+def _real_head_sha() -> str:
+    """Return the actual git HEAD SHA for the current repo (super-kumo-v8)."""
+    r = subprocess.run(
+        ["git", "rev-parse", "HEAD"], capture_output=True, text=True,
+        cwd=os.getcwd(),
+    )
+    return r.stdout.strip()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -150,27 +161,31 @@ class TestAuditB1DirectRunEntryBypass:
             f"Got {result.status!r}. The execute guard must only apply in execute mode."
         )
 
-    def test_b1_run_manifest_with_preflight_guard_chain_still_works(self, tmp_path):
+    def test_b1_run_manifest_with_preflight_guard_chain_still_works(self):
         """
         B1 regression: the authorized path run_manifest_with_preflight_guard →
         run_manifest(sentinel) → run_entry(sentinel) must NOT be blocked.
         The sentinel chain must remain functional.
 
-        Uses a PASS preflight and a manifest with one un-pinned entry.
-        Result must NOT be BLOCKED for sentinel-missing reasons.
+        Uses a real preflight from run_preflight(repo_root) so C1 SHA check passes.
+        Result must NOT be BLOCKED for B1 sentinel-missing reasons.
+
+        Updated for C1 fix: repo_root must be a real git repository and the
+        preflight must carry the actual HEAD SHA (obtained via run_preflight).
         """
+        repo_root = os.getcwd()  # actual super-kumo-v8 git repo
+        real_preflight = run_preflight(repo_root=repo_root)
+
         entry = _unpinned_entry(eid="B1-CHAIN-TEST")
         manifest = TestManifest()
         manifest.add(entry)
 
-        preflight = _preflight(CheckStatus.PASS, sha=VALID_FULL_SHA)
-
         # Execute mode via authorized path — must not block on sentinel
-        # (It may block on subprocess failure since tmp_path has no tests, but
-        #  should not block with B1 sentinel error)
+        # (It may block on subprocess failure, SHA mismatch, or WARN preflight,
+        #  but should not block with B1 sentinel error)
         report = run_manifest_with_preflight_guard(
-            manifest, str(tmp_path),
-            preflight=preflight,
+            manifest, repo_root,
+            preflight=real_preflight,
             dry_run=False,
         )
         assert report.results, "B1 chain regression: must produce at least one result"
@@ -179,12 +194,10 @@ class TestAuditB1DirectRunEntryBypass:
         # Check that if blocked, the note is NOT about a missing preflight guard/sentinel
         if result.status == RunStatus.BLOCKED:
             note_lower = result.notes.lower()
-            assert "b1" not in note_lower and (
-                ("guard" not in note_lower and "sentinel" not in note_lower) or
-                "preflight_fail" in note_lower or "sha" in note_lower
-            ), (
-                f"B1 chain regression: authorized execute path should not be blocked "
-                f"by missing sentinel guard. Got BLOCKED with note: {result.notes!r}"
+            assert "b1_execute_guard_required" not in note_lower and \
+                   "guard_sentinel" not in note_lower, (
+                f"B1 chain regression: authorized execute path (via run_manifest_with_preflight_guard) "
+                f"should not be blocked by B1 sentinel error. Got BLOCKED with note: {result.notes!r}"
             )
 
 
