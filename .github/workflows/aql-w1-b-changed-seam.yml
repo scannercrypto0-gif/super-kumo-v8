@@ -1,0 +1,51 @@
+name: AQL W1 B Changed-Seam Only
+on:
+  push:
+    branches:
+      - aql/w1-factory-research-consumer-20261031
+  workflow_dispatch:
+
+jobs:
+  w1-b-focused:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout pinned Core contract
+        uses: actions/checkout@v4
+        with:
+          ref: 59fb9a71714a719a58b00d4de05654c409fb8a67
+          path: compatible
+          persist-credentials: false
+      - name: Checkout Factory PR B changes
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: factory
+          persist-credentials: false
+      - name: Overlay B changed source and test without modifying Core
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp factory/research_wp_r0/aql_w1_factory_research_consumer.py compatible/research_wp_r0/
+          cp factory/research_wp_r0/aql_w1_f4_custody_gate.py compatible/research_wp_r0/
+          cp factory/tests/test_aql_w1_f4_custody_gate.py compatible/tests/
+          cd compatible
+          test "$(git rev-parse HEAD)" = "59fb9a71714a719a58b00d4de05654c409fb8a67"
+          git add research_wp_r0/aql_w1_factory_research_consumer.py research_wp_r0/aql_w1_f4_custody_gate.py tests/test_aql_w1_f4_custody_gate.py
+          echo "PINNED_CORE_SHA=$(git rev-parse HEAD)"
+          echo "FACTORY_HEAD_SHA=${{ github.sha }}"
+          echo "COMBINED_TREE_SHA=$(git write-tree)"
+          git hash-object research_wp_r0/aql_w1_factory_research_consumer.py
+          git hash-object research_wp_r0/aql_w1_f4_custody_gate.py
+          git hash-object tests/test_aql_w1_f4_custody_gate.py
+      - name: Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run only changed W1 B focused tests
+        shell: bash
+        working-directory: compatible
+        run: |
+          set -o pipefail
+          python -m unittest discover -s tests -p 'test_aql_w1_f4_custody_gate.py' -v
