@@ -16,16 +16,26 @@ No production datastore. No network. Fixture bytes only in tests.
 """
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import os
+import sys
 import time
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+
+# P1-A fix: fcntl is POSIX-only. Guard the import so Windows gets a clear error
+# rather than a confusing ModuleNotFoundError at import time.
+if sys.platform == "win32":
+    raise OSError(
+        "UNSUPPORTED_PLATFORM: raw_vault_offline.vault requires fcntl (POSIX only). "
+        "Windows is not supported."
+    )
+else:
+    import fcntl
 
 from .schema import (
     SCHEMA_VERSION,
