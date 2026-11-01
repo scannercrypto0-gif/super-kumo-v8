@@ -162,6 +162,13 @@ def authenticated_market_windows(scheduled, raw_by_pair, receipt_by_pair, *,
                 accepted.add((pair, horizon, receipt["raw_bytes_sha256"],
                               receipt["receipt_sha256"]))
     def verified(window):
-        return ((window.get("pair_id"), window.get("horizon_ms"),
-                 window.get("raw_bytes_sha256"), window.get("market_receipt_sha256")) in accepted)
+        if not isinstance(window, dict):
+            return False
+        key = (window.get("pair_id"), window.get("horizon_ms"),
+               window.get("raw_bytes_sha256"), window.get("market_receipt_sha256"))
+        # Do not authenticate a mutated high/low or a repackaged row using
+        # a previously accepted receipt key.
+        return key in accepted and any(row == window for row in windows
+                                       if (row.get("pair_id"), row.get("horizon_ms"),
+                                           row.get("raw_bytes_sha256"), row.get("market_receipt_sha256")) == key)
     return windows, verified
