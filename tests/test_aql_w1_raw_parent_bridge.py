@@ -13,11 +13,8 @@ def fixture():
     plan, original, registry, derived, derived_receipt = sample()
     parent = b"open_time,high,low\n900000,110,95\n"
     parent_sha = hashlib.sha256(parent).hexdigest()
-    plan["source_bytes_sha256"] = parent_sha
-    # The Core original can only be validated if its source exactly matches
-    # the scheduled parent, not a later synthetic derivative.
+    # F1 bounded-source hash stays distinct from parent RAW object digest.
     from research_wp_r0.aql_f1_decision_capture_v1 import hash_f1
-    original["source_bytes_sha256"] = parent_sha
     original["f1_record_sha256"] = hash_f1(original)
     manifest = dict(
         schema_version="raw_object.v1", content_sha256=parent_sha,
@@ -32,6 +29,8 @@ def fixture():
     )
     lineage = dict(
         parent_content_sha256=parent_sha,
+        f1_source_bytes_sha256=plan["source_bytes_sha256"],
+        source_id=original["source_id"],
         derived_bytes_sha256=hashlib.sha256(derived).hexdigest(),
         source_version=plan["source_version"],
         correction_generation=1,
@@ -68,8 +67,9 @@ class ParentProvenanceTests(unittest.TestCase):
         self.assertEqual(len(windows), 3)
         self.assertEqual([w["coverage_status"] for w in windows], ["COMPLETE"]*3)
         self.assertTrue(all(checker(x) for x in windows))
-        self.assertTrue(all(w["source_bytes_sha256"] == hashlib.sha256(parent).hexdigest()
+        self.assertTrue(all(w["source_bytes_sha256"] == plan["source_bytes_sha256"]
                             for w in windows))
+        self.assertNotEqual(plan["source_bytes_sha256"], hashlib.sha256(parent).hexdigest())
         self.assertTrue(all(w["raw_bytes_sha256"] == hashlib.sha256(derived).hexdigest()
                             for w in windows))
         report = project_parent_authenticated_f1_slots(
