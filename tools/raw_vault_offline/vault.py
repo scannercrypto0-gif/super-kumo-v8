@@ -264,27 +264,123 @@ class RawVault:
         """
         Scan vault after a simulated crash.
 
+        G7-A fix (Issue #215 comment #6555520562): perform bidirectional per-key
+        integrity check across index.json and manifest.jsonl instead of count
+        comparison alone.  Detects:
+          - corrupt / invalid index JSON           → INCONSISTENT (not silently {})
+          - malformed manifest lines               → INCONSISTENT (not raised)
+          - equal-count wrong mappings (swapped    → INCONSISTENT
+            SHAs, different keys)
+          - duplicate/conflicting manifest entries → INCONSISTENT
+          - extra keys in index not in manifest    → INCONSISTENT
+          - extra keys in manifest not in index    → INCONSISTENT
+          - missing object files for index entries → INCONSISTENT
+
+        Never returns CLEAN when authoritative metadata (index.json or
+        manifest.jsonl) is unreadable or corrupt.
+
         Returns
         -------
         dict with keys:
-          orphan_staging  : list of .tmp files left in .staging/
-          index_entries   : count of entries in index.json
-          manifest_lines  : count of non-empty lines in manifest.jsonl
-          objects_count   : count of files under objects/
-          status          : "CLEAN" | "ORPHAN_STAGING_FOUND"
+          orphan_staging     : list of .tmp files left in .staging/
+          index_entries      : count of valid entries loaded from index.json
+          manifest_lines     : count of valid non-empty lines parsed from manifest
+          objects_count      : count of files under objects/
+          status             : "CLEAN" | "ORPHAN_STAGING_FOUND" | "INCONSISTENT"
+          index_corrupt      : True if index.json existed but could not be parsed
+          manifest_malformed : True if any manifest line was malformed/unparseable
+          manifest_duplicates: True if any logical_identity_key appeared >1 time
+          extra_in_index     : sorted list of keys in index but not in manifest
+          extra_in_manifest  : sorted list of keys in manifest but not in index
+          sha_mismatches     : dict {lid: {index_sha, manifest_sha}} for each
+                               key where SHAs disagree across the two sources
+          missing_objects    : list of content_sha256 values whose object file
+                               is absent from objects/
         """
         orphans = list(self._staging.glob("*.tmp"))
         objects = list((self.root / "objects").rglob("*"))
         objects = [p for p in objects if p.is_file()]
-        index = self._read_index()
-        manifest_lines = len(self.manifest_entries())
 
-        # Gate 3 fix (G3-CRASH-2): detect index/manifest mismatch that results
-        # from a crash between _write_index (step 4) and _append_manifest (step 5).
-        # If index has entries not reflected in manifest, report INCONSISTENT.
+        # ── 1. Load index — corrupt JSON is INCONSISTENT, not silently {} ──
+        index_corrupt = False
+        if self._index_path.exists():
+            try:
+                raw_index = json.loads(self._index_path.read_bytes())
+                if not isinstance(raw_index, dict):
+                    index_corrupt = True
+                    index = {}
+                else:
+                    index = raw_index
+            except Exception:
+                index_corrupt = True
+                index = {}
+        else:
+            index = {}
+
+        # ── 2. Parse manifest line-by-line — malformed lines → INCONSISTENT ──
+        manifest_malformed = False
+        manifest_duplicates = False
+        manifest_map: dict[str, str] = {}  # logical_identity_key → content_sha256
+
+        if self._manifest_path.exists():
+            try:
+                text = self._manifest_path.read_text(encoding="utf-8")
+            except Exception:
+                manifest_malformed = True
+                text = ""
+
+            for line in text.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    lid = entry.get("logical_identity_key")
+                    sha = entry.get("content_sha256")
+                    if not lid or not sha:
+                        manifest_malformed = True
+                        continue
+                    if lid in manifest_map:
+                        manifest_duplicates = True
+                    # Last writer wins for per-key map; duplicate flag already set
+                    manifest_map[lid] = sha
+                except Exception:
+                    manifest_malformed = True
+
+        # ── 3. Bidirectional per-key association check ──
+        index_keys = set(index.keys())
+        manifest_keys = set(manifest_map.keys())
+
+        extra_in_index = sorted(index_keys - manifest_keys)
+        extra_in_manifest = sorted(manifest_keys - index_keys)
+
+        sha_mismatches: dict[str, dict] = {}
+        for lid in index_keys & manifest_keys:
+            if index[lid] != manifest_map[lid]:
+                sha_mismatches[lid] = {
+                    "index_sha": index[lid],
+                    "manifest_sha": manifest_map[lid],
+                }
+
+        # ── 4. Check for missing object files for every index entry ──
+        missing_objects: list[str] = []
+        for lid, sha in index.items():
+            obj_path = _object_path(self.root, sha)
+            if not obj_path.exists():
+                missing_objects.append(sha)
+
+        # ── 5. Determine status ──
         if orphans:
             status = "ORPHAN_STAGING_FOUND"
-        elif len(index) != manifest_lines:
+        elif (
+            index_corrupt
+            or manifest_malformed
+            or manifest_duplicates
+            or extra_in_index
+            or extra_in_manifest
+            or sha_mismatches
+            or missing_objects
+        ):
             status = "INCONSISTENT"
         else:
             status = "CLEAN"
@@ -292,9 +388,17 @@ class RawVault:
         return dict(
             orphan_staging=[str(p) for p in orphans],
             index_entries=len(index),
-            manifest_lines=manifest_lines,
+            manifest_lines=len(manifest_map),
             objects_count=len(objects),
             status=status,
+            # G7-A detail fields:
+            index_corrupt=index_corrupt,
+            manifest_malformed=manifest_malformed,
+            manifest_duplicates=manifest_duplicates,
+            extra_in_index=extra_in_index,
+            extra_in_manifest=extra_in_manifest,
+            sha_mismatches=sha_mismatches,
+            missing_objects=missing_objects,
         )
 
     def purge_orphan_staging(self) -> int:
