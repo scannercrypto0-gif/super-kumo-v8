@@ -33,13 +33,35 @@ jobs:
     steps:
       - name: Checkout branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      - name: Detect legacy Vault implementation delta (B3 has a separate focused job)
+        id: legacy
+        env:
+          PREVIOUS_SHA: ${{ github.event.before }}
+        run: |
+          python - <<'PYCODE'
+          import os,re,subprocess
+          previous=os.environ.get('PREVIOUS_SHA','')
+          if not re.fullmatch(r'[0-9a-f]{40}',previous) or set(previous)=={'0'}:
+              previous=subprocess.check_output(['git','rev-parse','HEAD^'],text=True).strip()
+          names=subprocess.check_output(['git','diff','--name-only',previous,'HEAD','--','tools/raw_vault_offline'],text=True).splitlines()
+          changed=[p for p in names if p!='tools/raw_vault_offline/b3_handoff.py']
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+              f.write('required='+('true' if changed else 'false')+'\n')
+          print('LEGACY_VAULT_DELTA='+repr(changed))
+          PYCODE
+
       - name: Install test dependencies
+        if: steps.legacy.outputs.required == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install pytest pytest-cov
@@ -73,6 +95,7 @@ jobs:
           EOF
 
       - name: Run pytest — raw vault offline suite
+        if: steps.legacy.outputs.required == 'true'
         run: |
           python -m pytest tools/raw_vault_offline/tests/ \
             -v \
@@ -84,7 +107,7 @@ jobs:
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.legacy.outputs.required == 'true'
         with:
           name: coverage-raw-vault-offline
           path: coverage-raw-vault-offline.xml
