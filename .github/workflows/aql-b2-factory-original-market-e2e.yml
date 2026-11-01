@@ -1,0 +1,75 @@
+name: AQL B2 Factory exact-original controlled system replay
+on:
+  push:
+    branches:
+      - aql/w1-factory-research-consumer-20261031
+    paths:
+      - research_wp_r0/aql_b2_market_e2e.py
+      - tests/test_aql_b2_market_e2e.py
+      - research_wp_r0/aql_b2_system_integrity_gate.py
+      - .github/workflows/aql-b2-factory-original-market-e2e.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  b2-pinned-original-controlled-replay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Fetch two existing pinned GitHub Actions artifacts, not Binance re-acquisition
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p b2-pinned b2-report
+          api="https://api.github.com/repos/scannercrypto0-gif/super-kumo-v8/actions/artifacts"
+          curl --fail --location --retry 2 \
+            -H "Authorization: Bearer $\{GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "$\{api}/13084853700/zip" -o b2-pinned/core.zip
+          curl --fail --location --retry 2 \
+            -H "Authorization: Bearer $\{GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "$\{api}/13084775420/zip" -o b2-pinned/b1-original-2024.zip
+          python - <<'PY'
+          import zipfile,hashlib,pathlib
+          d=pathlib.Path('b2-pinned')
+          with zipfile.ZipFile(d/'core.zip') as z:
+              raw=z.read('core-b2-integrity-input.json')
+          assert hashlib.sha256(raw).hexdigest() == '42005d09e3674420ddd8a761d40540c8e6509e8e79943d1f6a9821f692823b09'
+          (d/'core-b2-integrity-input.json').write_bytes(raw)
+          got=hashlib.sha256((d/'b1-original-2024.zip').read_bytes()).hexdigest()
+          assert got=='265b7ade1be307bd2efafbd0a8438e6846c869df6205af717133d490e38aeb59', got
+          print('PINNED_BYTES_SHA256_OK')
+          PY
+      - name: Run only 8 changed-path B2 real-source integration and fail-closed tests
+        env:
+          AQL_B2_CORE_JSON: b2-pinned/core-b2-integrity-input.json
+          AQL_B2_MARKET_ARTIFACT: b2-pinned/b1-original-2024.zip
+        run: python -m unittest tests.test_aql_b2_market_e2e -v
+      - name: Run one bounded E2E and verify deterministic replay byte-for-byte
+        run: |
+          set -euo pipefail
+          python -m research_wp_r0.aql_b2_market_e2e \
+            --core b2-pinned/core-b2-integrity-input.json \
+            --b1-artifact b2-pinned/b1-original-2024.zip \
+            --out b2-report/system-integrity.json
+          python -m research_wp_r0.aql_b2_market_e2e \
+            --core b2-pinned/core-b2-integrity-input.json \
+            --b1-artifact b2-pinned/b1-original-2024.zip \
+            --out b2-report/second-run.json
+          cmp b2-report/system-integrity.json b2-report/second-run.json
+          sha256sum b2-report/system-integrity.json | tee b2-report/sha256.txt
+          rm b2-report/second-run.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: factory-b2-pinned-original-controlled-system-integrity
+          path: b2-report/
+          if-no-files-found: warn
