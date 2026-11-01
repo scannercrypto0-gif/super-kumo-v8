@@ -33,15 +33,22 @@ def sample(asof=72*3600000, bars=288):
         "source_bytes_sha256": digest, "raw_bytes_sha256": digest,
         "published_at_ms": cutoff+bars*BAR_MS+1,
         "finalized_at_ms": cutoff+bars*BAR_MS,
-        "receipt_sha256": "f"*64,
     }
+    receipt["receipt_sha256"] = hashlib.sha256(
+        json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
     return plan, f1, registry, raw, receipt
 
 class AuthenticatedMarketTests(unittest.TestCase):
     def make(self, *, proof=None, raw=None, receipt=None, source=None, bars=288, asof=None):
         plan, f1, registry, original, ticket = sample(bars=bars)
         if raw is not None: original = raw
-        if receipt is not None: ticket.update(receipt)
+        if receipt is not None:
+            ticket.update(receipt)
+            ticket["receipt_sha256"] = hashlib.sha256(
+                json.dumps({k:v for k,v in ticket.items() if k != "receipt_sha256"},
+                           sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest()
         if source is not None: plan["source_version"] = source
         windows, checker = authenticated_market_windows(
             [plan], {plan["pair_id"]: original},
