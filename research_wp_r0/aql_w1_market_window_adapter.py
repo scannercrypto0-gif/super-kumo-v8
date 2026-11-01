@@ -140,6 +140,8 @@ def authenticated_market_windows(scheduled, raw_by_pair, receipt_by_pair, *,
                 break
         if not sane:
             continue
+        # Trusted receipt metadata must be associated with every bar from RAW.
+        # Bar rows alone cannot establish a publication clock or receipt custody.
         cutoff = plan["decision_cutoff_ms"]
         if not _integer(cutoff) or cutoff % BAR_MS:
             raise EvidenceError("invalid decision cutoff for 15m grid")
