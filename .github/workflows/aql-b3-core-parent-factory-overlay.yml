@@ -1,3 +1,4 @@
+# Exact-head B3 final rerun after B1 trigger narrowing; B1 accepted suites excluded.
 name: AQL B3 exact Core parent Vault Factory consumer replay
 on:
   push:
