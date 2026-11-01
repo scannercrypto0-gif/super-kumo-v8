@@ -337,7 +337,7 @@ def project_core_verified_f1_slots(scheduled, captures=(), market_windows=(), *,
         key = (pair, arm)
         grouped.setdefault(key, []).append(record)
         scheduled = by_pair[pair]
-        if (_key(record.get("c2_identity")) != _key(scheduled["c2_identity"])
+        if (record.get("c2_identity") != scheduled["c2_identity"]
                 or any(record.get(field) != scheduled.get(field)
                        for field in schedule_fields)):
             schedule_mismatches.add(key)
