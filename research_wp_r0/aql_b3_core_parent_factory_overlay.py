@@ -27,6 +27,7 @@ CORE_B2_DIGEST = "42005d09e3674420ddd8a761d40540c8e6509e8e79943d1f6a9821f692823b
 CORE_B3_DIGEST = "01a934a90dc6ca72e7b1fca8b352fd1f425d9c0a9eb4c05c9d59a8c3ed69400b"
 CORE_B3_HEAD = "17955e295263340b5cfbcfed8ae8e2a3e8a70c32"
 VAULT_HEAD = "2ddfb2f4a6e145c6579820beb03e4d678594de21"
+VAULT_LIVE_HEAD = "7d97b09c0c6ee2650a61d523acb8d8c771a99c46"
 FACTORY_B2_HEAD = "ac7f160005672140a3254eb2ed82f4d586432b69"
 HORIZONS = (14_400_000, 86_400_000, 259_200_000)
 
@@ -171,7 +172,9 @@ def run_pinned_core_parent_factory(core_bytes: bytes, handoff_bytes: bytes,
                  "core_b3_sha256": CORE_B3_DIGEST,
                  "core_b3_head": CORE_B3_HEAD,
                  "factory_b2_base_head": FACTORY_B2_HEAD,
-                 "vault_head": VAULT_HEAD},
+                 "vault_core_handoff_head": VAULT_HEAD,
+                 "vault_executed_live_head": VAULT_LIVE_HEAD,
+                 "vault_schema_and_implementation_unchanged_since_handoff": True},
         "N": n, "expected_2N": 2*n, "observed_2N": projected["arm_slots"],
         "expected_6N": 6*n, "observed_6N": projected["outcome_rows"],
         "local_vault_recovery": "CLEAN",
