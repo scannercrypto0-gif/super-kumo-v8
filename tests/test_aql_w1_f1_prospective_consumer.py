@@ -20,7 +20,8 @@ def capture(arm, **changes):
                direction="LONG" if arm == "BASE" else None,
                predecision_eligibility="YES" if arm == "BASE" else "NOT_ESTABLISHED",
                reference=dict(price="100", reference_available_at_ms=900000),
-               tp_sl_first_hit="UNKNOWN",
+               tp=dict(status="DEFINED_PREDECISION"),
+               sl=dict(status="DEFINED_PREDECISION"),
                indicators=[dict(indicator_id="RSI14", role="OBSERVE_ONLY",
                                 value_kind="NUMBER", value="58.2", missing_reason=None)])
     row.update(changes)
@@ -32,7 +33,7 @@ def window(h=86400000, **changes):
                source_version="src-v1", source_bytes_sha256=S,
                correction_generation="gen0", coverage_status="COMPLETE",
                expected_bars=h // 900000, observed_bars=h // 900000,
-               high="110", low="95")
+               high="110", low="95", tp_sl_first_hit="UNKNOWN")
     row.update(changes)
     return row
 
