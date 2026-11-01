@@ -273,3 +273,99 @@ def project_f1_research_slots(scheduled, captures=(), market_windows=(), *,
             "scheduled_total": len(expected), "arm_slots": len(expected) * 2,
             "outcome_rows": len(slots), "capture_status_counts": dict(sorted(counts.items())),
             "outcomes": slots, "research_only": True, "no_fill_or_pnl_inference": True}
+
+
+def project_core_verified_f1_slots(scheduled, captures=(), market_windows=(), *,
+                                   indicator_registry, proof_verifier=None,
+                                   verify_market=None, f3_effects=None):
+    """Read-only Core r1.2a integration; never self-certify original PIT.
+
+    The independent host proof_verifier is deliberately NOT implemented here.
+    In its absence Core classifies structurally valid originals UNVERIFIED.
+    """
+    from .aql_f1_decision_capture_v1 import (
+        CaptureError, digest, status_slots, validate_f1,
+    )
+
+    schedule = list(scheduled)
+    records = list(captures)
+    if not schedule:
+        if records:
+            raise EvidenceError("orphan captures without a preregistered schedule")
+        return project_f1_research_slots([], (), market_windows,
+                                         verify_market=verify_market, f3_effects=f3_effects)
+    plans = set()
+    expected_c2 = []
+    by_pair = {}
+    for item in schedule:
+        try:
+            identity = dict(item["c2_identity"])
+            _key(identity)
+            plan_sha = item["experiment_plan_sha256"]
+            expected_pair = digest({"experiment_plan_sha256": plan_sha,
+                                    "c2_identity": identity})
+            if item["pair_id"] != expected_pair:
+                raise EvidenceError("Core pair_id does not match preregistered C2")
+            if expected_pair in by_pair:
+                raise EvidenceError("duplicate Core preregistered pair")
+        except (KeyError, TypeError, ValueError, CaptureError) as exc:
+            raise EvidenceError("invalid Core schedule identity") from exc
+        plans.add(plan_sha)
+        expected_c2.append(identity)
+        by_pair[expected_pair] = item
+    if len(plans) != 1:
+        raise EvidenceError("mixed experiment plans require separate projections")
+
+    grouped = {}
+    for record in records:
+        if not isinstance(record, dict):
+            raise EvidenceError("untyped Core original candidate")
+        pair, arm = record.get("pair_id"), record.get("arm")
+        if pair not in by_pair or arm not in ARMS:
+            raise EvidenceError("orphan Core original candidate")
+        grouped.setdefault((pair, arm), []).append(record)
+    try:
+        core_slots = status_slots(expected_c2, next(iter(plans)), grouped,
+                                  indicator_registry, proof_verifier)
+    except (CaptureError, KeyError, TypeError, ValueError) as exc:
+        raise EvidenceError("Core status reconciliation rejected input") from exc
+    verdicts = {}
+    for slot in core_slots:
+        key = (slot["pair_id"], slot["arm"])
+        if key in verdicts or slot["pair_id"] not in by_pair:
+            raise EvidenceError("duplicate or orphan Core status slot")
+        verdicts[key] = slot
+    if len(verdicts) != 2 * len(schedule):
+        raise EvidenceError("incomplete Core status universe")
+
+    def verified_original(record):
+        key = (record["pair_id"], record["arm"])
+        slot = verdicts.get(key)
+        if slot is None:
+            return "QUARANTINED"
+        # Core has already reconciled all candidate conflicts. Never trust a
+        # caller-supplied status embedded in the candidate itself.
+        if slot["capture_status"] != "RECORDED":
+            return slot["capture_status"]
+        try:
+            validate_f1(record, indicator_registry)
+        except (CaptureError, KeyError, TypeError, ValueError):
+            return "QUARANTINED"
+        if record["f1_record_sha256"] != slot["f1_record_sha256"]:
+            return "QUARANTINED"
+        return "RECORDED"
+
+    result = project_f1_research_slots(
+        schedule, records, market_windows,
+        verify_original=verified_original, verify_market=verify_market,
+        f3_effects=f3_effects,
+    )
+    # Both engines must agree; fail closed instead of silently downgrading a
+    # Core quarantine or treating a missing capture as a synthetic F1 event.
+    for row in result["outcomes"]:
+        key = (row["pair_id"], row["arm"])
+        if row["capture_status"] != verdicts[key]["capture_status"]:
+            raise EvidenceError("Core/Factory capture status divergence")
+    result["core_verdict_source"] = "CORE_STATUS_SLOTS_PINNED_INTEGRATION"
+    result["independent_pit_proof"] = proof_verifier is not None
+    return result
