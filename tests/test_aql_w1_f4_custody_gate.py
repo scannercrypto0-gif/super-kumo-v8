@@ -4,6 +4,7 @@ from dataclasses import replace
 from hashlib import sha256
 
 from research_wp_r0.aql_w1_f4_custody_gate import F4Custody, verify_f3_custody
+from research_wp_r0.aql_w1_factory_research_consumer import describe_original_p0_f3
 from research_wp_r0.aql_w1_opportunity_outcomes import EvidenceError
 from research_wp_r0.aql_w1_typed_contract import F3EffectV1
 
@@ -70,6 +71,21 @@ class CustodyGateTest(unittest.TestCase):
         with self.assertRaises(EvidenceError):
             verify_f3_custody([self.effect, self.effect],
                               {self.key: self.custody}, {self.key: self.source})
+
+
+class OriginalP0DescriptiveTest(unittest.TestCase):
+    def test_original_f3_descriptive_without_f1(self):
+        values = ["NO_SIGNAL"] * 616 + ["REJECTED"] * 27 + ["TRIGGERED"] * 10
+        report = describe_original_p0_f3(values)
+        self.assertEqual(report["f3_final_effects"],
+                         {"NO_SIGNAL": 616, "REJECTED": 27, "TRIGGERED": 10})
+        self.assertEqual(report["original_f1_status"], "NOT_RECORDED_IN_P0")
+        self.assertEqual(report["entry_eligibility"], "NOT_ESTABLISHED")
+        self.assertFalse(report["original_f4_ack_authenticated"])
+
+    def test_descriptive_denominator_fail_closed(self):
+        with self.assertRaises(EvidenceError):
+            describe_original_p0_f3(["NO_SIGNAL"] * 652)
 
 
 if __name__ == "__main__":
