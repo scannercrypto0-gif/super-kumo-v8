@@ -81,7 +81,7 @@ class ControlledEndToEnd(unittest.TestCase):
         trace = report["source_derivation_trace"][0]
         self.assertEqual(trace["parent_sha256"], hashlib.sha256(raw).hexdigest())
         self.assertNotEqual(trace["derived_sha256"], trace["parent_sha256"])
-        self.assertNotEqual(trace["derived_sha256"], plan["source_bytes_sha256"])
+        self.assertNotEqual(trace["parent_sha256"], plan["source_bytes_sha256"])
         self.assertTrue(report["controlled_demo_only"])
         self.assertFalse(report["real_raw_issuer_or_pit_proven"])
 
