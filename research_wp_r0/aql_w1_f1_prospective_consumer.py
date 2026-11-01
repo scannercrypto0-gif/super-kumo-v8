@@ -420,3 +420,36 @@ def project_authenticated_market_f1_slots(scheduled, captures=(), *,
     result["market_receipt_verifier_supplied"] = verify_raw_receipt is not None
     result["operational_pit_and_custody_proven"] = False
     return result
+
+
+def project_parent_authenticated_f1_slots(scheduled, captures=(), *,
+                                          parent_bytes_by_pair, manifest_by_pair,
+                                          derived_bars_by_pair, derived_evidence_by_pair,
+                                          indicator_registry, verify_parent_manifest=None,
+                                          verify_derivation=None,
+                                          verify_external_receipt=None,
+                                          proof_verifier=None, asof_ms=None,
+                                          f3_effects=None):
+    """Join read-only original RAW parent chain to Core F1; fail closed.
+
+    Does not infer operational PIT or act as an independent custody oracle.
+    """
+    from .aql_w1_raw_parent_bridge import authenticated_parent_market_windows
+    plans = list(scheduled)
+    windows, market_verifier = authenticated_parent_market_windows(
+        plans, parent_bytes_by_pair, manifest_by_pair,
+        derived_bars_by_pair, derived_evidence_by_pair,
+        verify_parent_manifest=verify_parent_manifest,
+        verify_derivation=verify_derivation,
+        verify_external_receipt=verify_external_receipt,
+        asof_ms=asof_ms)
+    report = project_core_verified_f1_slots(
+        plans, captures, windows, indicator_registry=indicator_registry,
+        proof_verifier=proof_verifier, verify_market=market_verifier,
+        f3_effects=f3_effects)
+    report["market_adapter"] = "RAW_ORIGINAL_PARENT_DERIVED_LINEAGE_BOUND"
+    report["independent_parent_verifiers_supplied"] = all(
+        callable(cb) for cb in (verify_parent_manifest,
+                                verify_derivation, verify_external_receipt))
+    report["operational_pit_and_custody_proven"] = False
+    return report
