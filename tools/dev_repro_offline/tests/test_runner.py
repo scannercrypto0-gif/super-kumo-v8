@@ -30,8 +30,10 @@ def test_allowed_pytest_with_flags():
     assert _allowed(["pytest", "tests/", "-v", "--tb=short"])
 
 def test_allowed_python_plain_path():
-    # python <path> with no flags is allowed
-    assert _allowed(["python", "some/script.py"])
+    # Gate 1 fix (G1-GAP-1, Issue #215): python removed from _ALLOWED_EXECUTABLES.
+    # The manifest never uses python commands; allowing python permitted arbitrary
+    # file execution. python <path> — even with no flags — is now BLOCKED.
+    assert not _allowed(["python", "some/script.py"])
 
 def test_not_allowed_python_dash_m():
     # P0-A fix: python -m <module> must be BLOCKED (arbitrary module execution)

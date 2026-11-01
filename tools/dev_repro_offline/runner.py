@@ -7,6 +7,17 @@ P0-A fix (Issue #215): command allowlist now validates the full argv,
 not just argv[0]. Dangerous flags (-c, -m, -p) and module_path injection
 of flags are blocked. Only commands matching an explicit typed template are
 allowed through. run_manifest_with_preflight_guard enforces P0-B.
+
+Gate 1 fix (Issue #215): strengthened _allowed() to close three gaps:
+  G1-GAP-1: removed python/python3 from _ALLOWED_EXECUTABLES — they are
+    not used in the manifest and their presence permitted arbitrary file
+    execution (e.g. python ../../evil.py with no flags).
+  G1-GAP-2: added path traversal and absolute path rejection for the
+    module_path position (any argv element containing '../' or starting
+    with '/' or '~' is BLOCKED).
+  G1-GAP-4: added flag-injection detection for the module_path slot —
+    any pytest argv element in position 1 (the module slot) that starts
+    with '-' is BLOCKED (e.g. module_path='--forked' → BLOCKED).
 """
 from __future__ import annotations
 
@@ -64,11 +75,13 @@ class RunReport:
 MAX_OUTPUT_BYTES = 32_768          # 32 KB per stream
 DEFAULT_TIMEOUT  = 120             # seconds
 
-# Only these executable base names are allowed
+# Only these executable base names are allowed.
+# Gate 1 fix (G1-GAP-1): python/python3 removed — the manifest never uses
+# them, and their presence permitted arbitrary file execution with no flags.
+# If python execution is needed in future it must be re-added with strict
+# approved-path enforcement.
 _ALLOWED_EXECUTABLES = frozenset([
     "pytest",
-    "python",
-    "python3",
 ])
 
 # ── P0-A fix: dangerous argument flags that must never appear in argv ─────────
@@ -105,18 +118,25 @@ def _build_command(template: str, module_path: str) -> list[str]:
 
 def _allowed(argv: list[str]) -> bool:
     """
-    P0-A: Validate the full argv, not just argv[0].
+    Validate the full argv, not just argv[0].
 
-    Rules (all must pass):
-    1. argv[0] base name must be in _ALLOWED_EXECUTABLES.
-    2. No element of argv may be in _BLOCKED_FLAGS.
-    3. module_path substitution must not inject a flag-like argument
-       (any arg starting with '-' after argv[0] that is in _BLOCKED_FLAGS is caught
-       by rule 2, but we also reject module paths that start with '-').
-    4. python/python3 are only allowed when argv[1] is NOT a flag (i.e. the module
-       path is the first arg — equivalent to 'python <module_path>' only, no flags).
-       pytest does not have dangerous code-execution flags so it is allowed with
-       its standard flags (-v, --tb, -k, --co is blocked above, etc.).
+    Rules (ALL must pass for the argv to be allowed):
+
+    Rule 1 — Executable allowlist:
+      argv[0] base name must be in _ALLOWED_EXECUTABLES (currently only 'pytest').
+      Gate 1 fix (G1-GAP-1): python/python3 removed; manifest never uses them.
+
+    Rule 2 — Blocked flags:
+      No element of argv[1:] may be in _BLOCKED_FLAGS (-c, -m, -p, --co).
+
+    Rule 3 — No path traversal or absolute paths:
+      No argv[1:] element may contain '../' (traversal) or start with '/' or '~'.
+      Gate 1 fix (G1-GAP-2): pytest ../../etc/ and pytest /absolute/ are BLOCKED.
+
+    Rule 4 — No module-position flag injection:
+      argv[1] (the module/path slot after the executable) must not start with '-'.
+      Gate 1 fix (G1-GAP-4): module_path='--forked' expanding to pytest --forked
+      is BLOCKED; prevents flag injection through the module substitution slot.
     """
     if not argv:
         return False
@@ -130,18 +150,20 @@ def _allowed(argv: list[str]) -> bool:
         if arg in _BLOCKED_FLAGS:
             return False
 
-    # Rule 3: no argument after argv[0] that starts with '-' and is a known dangerous flag
-    # (belt-and-suspenders — rule 2 already covers _BLOCKED_FLAGS)
-    # Additionally block any module_path that starts with '-' (injected flag)
-    # We detect this by checking: does argv contain an element that starts with '-'
-    # and is not a recognised safe pytest flag?
-    if exe in ("python", "python3"):
-        # For python/python3, the ONLY allowed form is:
-        #   python <path_to_module_or_test>
-        # No flags of any kind are permitted.
-        for arg in argv[1:]:
-            if arg.startswith("-"):
-                return False
+    # Rule 3 (Gate 1 / G1-GAP-2): no path traversal or absolute paths
+    # Applied to ALL non-flag args (path-like positions).
+    for arg in argv[1:]:
+        if arg.startswith("/") or arg.startswith("~"):
+            return False  # absolute path / home expansion
+        if "../" in arg or arg == ".." or arg.endswith("/.."):
+            return False  # path traversal sequence
+
+    # Rule 4 (Gate 1 / G1-GAP-4): module-position flag injection
+    # argv[1] is where the module_path substitution lands. If it starts with '-',
+    # it was injected as a flag (e.g. module_path='--forked' → argv[1]='--forked').
+    # Rule 2 only blocks _BLOCKED_FLAGS; rule 4 blocks ANY '-' in position 1.
+    if len(argv) >= 2 and argv[1].startswith("-"):
+        return False
 
     return True
 
