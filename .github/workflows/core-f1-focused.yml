@@ -43,9 +43,23 @@ jobs:
           python -m unittest -v tests.test_aql_f1_b1_factory_overlay
           PYTHONPATH=. python examples/aql_f1_b1_emit_controlled_sample.py --out b1_evidence/core-b1-factory-controlled.json
           sha256sum b1_evidence/core-b1-factory-controlled.json
+          {
+            echo "RESEARCH_ONLY_F3_CALLSITE_INVENTORY"
+            echo "CORE_PR_CHECKOUT=$(git rev-parse HEAD)"
+            echo "HISTORICAL_F3_MODEL_CALLS:"
+            git grep -n 'model_fills(' -- research_wp_r0 tests || true
+            echo "PROSPECTIVE_CAPTURE_WRAPPER_CALLS:"
+            git grep -n 'capture_then_call_f3(' -- research_wp_r0 tests || true
+            echo "C2_HISTORICAL_MARKERS:"
+            git grep -n 'RETROSPECTIVE_NON_PIT' -- research_wp_r0/aql_p0_c2_producer.py || true
+          } > b1_evidence/f3_callsites.txt
+          cat b1_evidence/f3_callsites.txt
+          sha256sum b1_evidence/f3_callsites.txt
       - name: Preserve exact controlled-only research handoff bytes
         uses: actions/upload-artifact@v4
         with:
           name: core-b1-signal-factory-overlay
-          path: b1_evidence/core-b1-factory-controlled.json
+          path: |
+            b1_evidence/core-b1-factory-controlled.json
+            b1_evidence/f3_callsites.txt
           retention-days: 30
