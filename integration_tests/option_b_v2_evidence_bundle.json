@@ -1,0 +1,56 @@
+{
+  "bundle_type": "option_b_v2_cross_pr_integration_evidence",
+  "generated_at_utc": "2026-11-01T12:06:57Z",
+  "pm_order_comment": "#6557572977",
+  "audit_ref": "Issue #134 comment #6557545171",
+  "harness_v2": {
+    "path": "/tmp/claude-0/-home-claude/4862db27-8717-5785-8640-d59d0325b8c0/scratchpad/option_b_v2_integration_harness.py",
+    "sha256": "86e8ae53ae990de42cbfd13cfe52e1a5ac4044da6a25ab05d18f0e3b24d47961",
+    "byte_length": 39206,
+    "result": "22 PASS / 0 FAIL / 2 BLOCKED"
+  },
+  "pinned_shas": {
+    "pr_211_vault": "2ddfb2f4a6e145c6579820beb03e4d678594de21",
+    "pr_209_factory": "e52a9fb9d091ce439278988bdb0c7ef4ffaeab99",
+    "pr_216_core": "2e19949042e4912d6e17154c7e2382f1dbe9f127",
+    "pr_214_devrepro": "7e63002d4bb82bf978a6710218ceb5b4ddfb6644"
+  },
+  "run_command": "python3 option_b_v2_integration_harness.py",
+  "run_cwd": "/home/claude/super-kumo-v8",
+  "decision_cutoff_ms": 1762041600000,
+  "decision_cutoff_utc": "2026-11-01T00:00:00Z",
+  "sections": {
+    "A_vault": {
+      "pass": 11,
+      "fail": 0,
+      "blocked": 0
+    },
+    "B_factory": {
+      "pass": 5,
+      "fail": 0,
+      "blocked": 0
+    },
+    "C_blocked_external": {
+      "pass": 0,
+      "fail": 0,
+      "blocked": 2
+    },
+    "D_core": {
+      "pass": 6,
+      "fail": 0,
+      "blocked": 0
+    }
+  },
+  "labels": {
+    "CONTROLLED_ONLY": "synthetic-verifier positive, not independently attested",
+    "BLOCKED_EXTERNAL_EVIDENCE": "real P0 ZIP / publication clock / issuer custody / freeze anchor \u2014 operator input required",
+    "UNVERIFIED": "no external attestation \u2014 correct absence, not a test failure"
+  },
+  "governance": [
+    "No merge, deploy, G0 claim, Paper/Shadow/Live",
+    "No #208/#213 reruns",
+    "No unauthorized Core/Factory edits",
+    "BLOCKED_EXTERNAL_EVIDENCE persists unchanged",
+    "Core #180 coordination pending separate handoff"
+  ]
+}
