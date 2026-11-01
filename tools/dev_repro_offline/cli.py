@@ -15,8 +15,8 @@ from typing import Optional
 
 from .fingerprint import collect as collect_fingerprint, save as save_fingerprint
 from .manifest import build_w1_manifest, save_manifest, load_manifest
-from .preflight import run_preflight
-from .runner import run_manifest
+from .preflight import run_preflight, CheckStatus
+from .runner import run_manifest, run_manifest_with_preflight_guard
 from .evidence import build_evidence_bundle, save_bundle
 from .w1_coordinator import build_w1_coordinator_report
 from .triage import triage_report as build_triage_report
@@ -45,7 +45,10 @@ def run(
 ) -> int:
     """
     Full operator workflow.
-    Returns exit code: 0 = success, 1 = preflight failed, 2 = tests failed.
+    Returns exit code:
+      0 = success (all tests pass or dry-run complete)
+      2 = tests failed
+      3 = preflight FAIL in --execute mode (P0-B gate: no subprocess launched)
     """
     root = repo_root or _find_repo_root()
     tag  = _now_tag()
@@ -76,14 +79,21 @@ def run(
     print("[3/6] Running preflight checks …")
     preflight = run_preflight(repo_root=root, expected_sha=expected_sha)
     print(f"      {preflight.summary()}")
-    if preflight.overall.value == "FAIL":
-        print("  ⚠  Preflight FAILED — recording failure in evidence (continuing to collect).")
+    preflight_failed = (preflight.overall == CheckStatus.FAIL)
+    if preflight_failed:
+        if dry_run:
+            print("  ⚠  Preflight FAILED — dry-run mode; recording failure in evidence (continuing).")
+        else:
+            print("  ✗  Preflight FAILED — EXECUTE mode blocked (P0-B gate). "
+                  "No subprocess will be launched. Fix preflight issues and retry.")
 
     _write_preflight_report(preflight, out / "preflight.json")
 
-    # Stage 5 — runner
+    # Stage 5 — runner (P0-B: use guard function in execute mode)
     print(f"[4/6] Running manifest ({mode}) …")
-    run_report = run_manifest(manifest, root, dry_run=dry_run)
+    run_report = run_manifest_with_preflight_guard(
+        manifest, root, preflight=preflight, dry_run=dry_run
+    )
     print(f"      {run_report.summary()}")
 
     # Stage 7 — W1 coordinator
@@ -127,6 +137,12 @@ def run(
     write_wrappers(out / "scripts", info)
 
     print(f"\n✓ Evidence written to: {out}")
+
+    # P0-B: exit code 3 when execute mode was blocked by preflight failure
+    if preflight_failed and not dry_run:
+        print("  exit code 3: preflight gate blocked execution.")
+        return 3
+
     fail_count = sum(1 for r in run_report.results
                      if r.status.value in ("FAIL", "TIMEOUT", "ERROR"))
     return 2 if fail_count else 0

@@ -25,10 +25,25 @@ def test_build_command_substitution():
 
 def test_allowed_pytest():
     assert _allowed(["pytest", "tests/"])
-def test_allowed_python():
-    assert _allowed(["python", "-m", "pytest"])
+
+def test_allowed_pytest_with_flags():
+    assert _allowed(["pytest", "tests/", "-v", "--tb=short"])
+
+def test_allowed_python_plain_path():
+    # python <path> with no flags is allowed
+    assert _allowed(["python", "some/script.py"])
+
+def test_not_allowed_python_dash_m():
+    # P0-A fix: python -m <module> must be BLOCKED (arbitrary module execution)
+    assert not _allowed(["python", "-m", "pytest"])
+
+def test_not_allowed_python_dash_c():
+    # P0-A fix: python -c <code> must be BLOCKED (arbitrary inline code)
+    assert not _allowed(["python", "-c", "import os"])
+
 def test_not_allowed_shell():
     assert not _allowed(["bash", "-c", "rm -rf /"])
+
 def test_not_allowed_curl():
     assert not _allowed(["curl", "http://example.com"])
 
