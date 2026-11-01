@@ -14,9 +14,6 @@ from typing import Callable
 from .aql_w1_opportunity_outcomes import EvidenceError, HORIZONS
 
 BAR_MS = 900_000
-SHA_FIELDS = ("source_bytes_sha256", "raw_bytes_sha256")
-SOURCE_FIELDS = ("source_id", "source_version", "source_bytes_sha256",
-                 "correction_generation", "decision_cutoff_ms")
 REQUIRED_RECEIPT = ("source_id", "source_version", "source_bytes_sha256",
                     "correction_generation", "raw_bytes_sha256",
                     "published_at_ms", "finalized_at_ms", "receipt_sha256")
@@ -61,7 +58,11 @@ def authenticated_market_windows(scheduled, raw_by_pair, receipt_by_pair, *,
     windows = []
     accepted = set()
     seen = set()
-    for plan in scheduled:
+    schedule = list(scheduled)
+    pairs = {item["pair_id"] for item in schedule}
+    if set(raw_by_pair) - pairs or set(receipt_by_pair) - pairs:
+        raise EvidenceError("orphan RAW source or market receipt")
+    for plan in schedule:
         pair = plan["pair_id"]
         if pair in seen:
             raise EvidenceError("duplicate market schedule")
@@ -76,8 +77,10 @@ def authenticated_market_windows(scheduled, raw_by_pair, receipt_by_pair, *,
             continue
         if (not isinstance(receipt["receipt_sha256"], str)
                 or len(receipt["receipt_sha256"]) != 64
+                or not all(ch in "0123456789abcdef" for ch in receipt["receipt_sha256"])
                 or not isinstance(receipt["raw_bytes_sha256"], str)
-                or len(receipt["raw_bytes_sha256"]) != 64):
+                or len(receipt["raw_bytes_sha256"]) != 64
+                or not all(ch in "0123456789abcdef" for ch in receipt["raw_bytes_sha256"])):
             continue
         # This first bounded format treats source_bytes_sha256 as the RAW
         # object identity; a parent-manifest identity needs a new trusted chain.
@@ -94,6 +97,13 @@ def authenticated_market_windows(scheduled, raw_by_pair, receipt_by_pair, *,
         if not all(_integer(receipt[k]) for k in ("published_at_ms", "finalized_at_ms")):
             continue
         if receipt["finalized_at_ms"] > receipt["published_at_ms"]:
+            continue
+        # The receipt digest binds all supplied fields; the host verifier
+        # separately supplies independent time/custody authority.
+        receipt_payload = {k: v for k, v in receipt.items() if k != "receipt_sha256"}
+        if hashlib.sha256(json.dumps(receipt_payload, sort_keys=True,
+                                     separators=(",", ":"), ensure_ascii=False).encode()
+                          ).hexdigest() != receipt["receipt_sha256"]:
             continue
         if verify_receipt is None:
             continue
