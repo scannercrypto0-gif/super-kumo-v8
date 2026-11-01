@@ -18,6 +18,16 @@ Gate 1 fix (Issue #215): strengthened _allowed() to close three gaps:
   G1-GAP-4: added flag-injection detection for the module_path slot —
     any pytest argv element in position 1 (the module slot) that starts
     with '-' is BLOCKED (e.g. module_path='--forked' → BLOCKED).
+
+Gate 5 escalated-gaps fix (Issue #215):
+  G5-GAP-1: replaced _BLOCKED_FLAGS denylist with _APPROVED_PYTEST_FLAGS
+    allowlist in Rule 2 — any flag not in the approved set is BLOCKED
+    (e.g. --forked, --randomly-seed are no longer silently allowed).
+  G5-GAP-2: run_entry() now accepts current_sha= and validates it against
+    entry.expected_sha; a mismatch returns BLOCKED before any subprocess.
+  G5-GAP-3: run_manifest(dry_run=False) now raises RuntimeError unless
+    called internally via run_manifest_with_preflight_guard() — prevents
+    callers from bypassing the P0-B preflight gate in execute mode.
 """
 from __future__ import annotations
 
@@ -87,12 +97,47 @@ _ALLOWED_EXECUTABLES = frozenset([
 # ── P0-A fix: dangerous argument flags that must never appear in argv ─────────
 # These flags allow arbitrary code or module execution via python/python3.
 # pytest has no equivalent dangerous flags for arbitrary code execution.
+# Kept for backward reference; superseded by _APPROVED_PYTEST_FLAGS allowlist
+# in Gate 5 (G5-GAP-1 fix).
 _BLOCKED_FLAGS = frozenset([
     "-c",   # python -c <code>  — arbitrary inline code
     "-m",   # python -m <mod>   — arbitrary module as __main__
     "-p",   # pytest plugin injection
     "--co", # pytest collect-only injection variant (abbreviated form)
 ])
+
+# ── Gate 5 / G5-GAP-1: approved pytest flags allowlist ───────────────────────
+# Only these flags may appear in pytest argv.  Any flag not in this set is
+# BLOCKED (allowlist model, not denylist).  Values following -k (e.g. "unit",
+# "not integration") do not start with '-' and are not flag-checked.
+# Source: the three command_template patterns used in the W1 manifest.
+_APPROVED_PYTEST_FLAGS = frozenset([
+    "-v",            # verbose output
+    "-k",            # keyword/filter expression (value is next token)
+    "-x",            # stop on first failure
+    "-q",            # quiet
+    "-s",            # no capture (stdout passthrough)
+])
+
+# --tb= prefix is approved; the suffix (short/long/no/auto/line/native) varies.
+_APPROVED_PYTEST_FLAG_PREFIXES: tuple[str, ...] = (
+    "--tb=",
+)
+
+
+def _is_approved_pytest_flag(arg: str) -> bool:
+    """Return True if arg is an approved pytest flag or --tb=<anything>."""
+    if arg in _APPROVED_PYTEST_FLAGS:
+        return True
+    for prefix in _APPROVED_PYTEST_FLAG_PREFIXES:
+        if arg.startswith(prefix):
+            return True
+    return False
+
+
+# Internal sentinel: run_manifest() passes this to indicate it was called from
+# run_manifest_with_preflight_guard() (Gap 3 fix).
+_PREFLIGHT_GUARD_TOKEN = object()
 
 # Typed immutable command templates: the only patterns the runner will execute.
 # Format: (executable_name, fixed_prefix_args, variable_arg_position)
@@ -126,8 +171,12 @@ def _allowed(argv: list[str]) -> bool:
       argv[0] base name must be in _ALLOWED_EXECUTABLES (currently only 'pytest').
       Gate 1 fix (G1-GAP-1): python/python3 removed; manifest never uses them.
 
-    Rule 2 — Blocked flags:
-      No element of argv[1:] may be in _BLOCKED_FLAGS (-c, -m, -p, --co).
+    Rule 2 — Approved pytest flags allowlist (Gate 5 / G5-GAP-1):
+      Every element of argv[1:] that starts with '-' must be in
+      _APPROVED_PYTEST_FLAGS or match an _APPROVED_PYTEST_FLAG_PREFIXES prefix.
+      Replaces the old _BLOCKED_FLAGS denylist: instead of blocking known-bad
+      flags, we block EVERYTHING not explicitly approved.  --forked, --randomly-seed
+      and any other unapproved flag will now fail here.
 
     Rule 3 — No path traversal or absolute paths:
       No argv[1:] element may contain '../' (traversal) or start with '/' or '~'.
@@ -137,6 +186,7 @@ def _allowed(argv: list[str]) -> bool:
       argv[1] (the module/path slot after the executable) must not start with '-'.
       Gate 1 fix (G1-GAP-4): module_path='--forked' expanding to pytest --forked
       is BLOCKED; prevents flag injection through the module substitution slot.
+      (Belt-and-suspenders: Rule 2 also catches this since --forked is unapproved.)
     """
     if not argv:
         return False
@@ -145,9 +195,10 @@ def _allowed(argv: list[str]) -> bool:
     if exe not in _ALLOWED_EXECUTABLES:
         return False
 
-    # Rule 2: no blocked flags anywhere in argv
+    # Rule 2 (Gate 5 / G5-GAP-1): approved pytest flags allowlist.
+    # Any element starting with '-' that is NOT in the approved set is BLOCKED.
     for arg in argv[1:]:
-        if arg in _BLOCKED_FLAGS:
+        if arg.startswith("-") and not _is_approved_pytest_flag(arg):
             return False
 
     # Rule 3 (Gate 1 / G1-GAP-2): no path traversal or absolute paths
@@ -161,7 +212,7 @@ def _allowed(argv: list[str]) -> bool:
     # Rule 4 (Gate 1 / G1-GAP-4): module-position flag injection
     # argv[1] is where the module_path substitution lands. If it starts with '-',
     # it was injected as a flag (e.g. module_path='--forked' → argv[1]='--forked').
-    # Rule 2 only blocks _BLOCKED_FLAGS; rule 4 blocks ANY '-' in position 1.
+    # Rule 2 also catches this, but Rule 4 makes the rejection explicit.
     if len(argv) >= 2 and argv[1].startswith("-"):
         return False
 
@@ -183,10 +234,18 @@ def run_entry(
     *,
     dry_run: bool = True,
     timeout: int = DEFAULT_TIMEOUT,
+    current_sha: Optional[str] = None,
 ) -> RunResult:
     """
     Run a single manifest entry.
     dry_run=True (default) prints the command without executing.
+
+    Gate 5 / G5-GAP-2: current_sha= (optional) — when provided AND
+    entry.expected_sha is set, the two are compared using prefix matching
+    (either is a prefix of the other → match).  A mismatch returns BLOCKED
+    before any subprocess is launched, catching stale manifest entries running
+    against a different commit than they were designed for.
+    Pass current_sha=None (the default) to skip this check (backwards compatible).
     """
     argv = _build_command(entry.command_template, entry.module_path)
 
@@ -205,6 +264,24 @@ def run_entry(
             command=argv,
             notes=f"Status={entry.status.value}",
         )
+
+    # Gate 5 / G5-GAP-2: runtime SHA check
+    if current_sha and entry.expected_sha:
+        sha_match = (
+            current_sha.startswith(entry.expected_sha) or
+            entry.expected_sha.startswith(current_sha)
+        )
+        if not sha_match:
+            return RunResult(
+                entry_id=entry.entry_id,
+                status=RunStatus.BLOCKED,
+                command=argv,
+                notes=(
+                    f"SHA_MISMATCH: entry.expected_sha={entry.expected_sha!r} "
+                    f"does not match current_sha={current_sha!r}. "
+                    "Update the manifest or switch to the correct commit (G5-GAP-2)."
+                ),
+            )
 
     if not _allowed(argv):
         return RunResult(
@@ -269,16 +346,33 @@ def run_manifest(
     *,
     dry_run: bool = True,
     timeout: int = DEFAULT_TIMEOUT,
+    _preflight_guard_token: object = None,
 ) -> RunReport:
     """
     Run all entries in the manifest.
     BLOCKED/SKIP entries are recorded without executing.
     dry_run=True is the safe default.
 
-    NOTE: This function does NOT enforce the preflight guard.
+    Gate 5 / G5-GAP-3: DIRECT EXECUTE MODE IS PROHIBITED.
+    Calling run_manifest(dry_run=False) without the internal preflight guard
+    would bypass the P0-B gate and launch subprocesses in an unvalidated
+    environment.  This function now raises RuntimeError when dry_run=False
+    and the internal _preflight_guard_token sentinel is not provided.
+
     For execute mode (dry_run=False), always call
-    run_manifest_with_preflight_guard() instead so P0-B is enforced.
+    run_manifest_with_preflight_guard() instead — it validates the environment
+    through the preflight gate BEFORE delegating to this function with the
+    sentinel token.  dry_run=True mode remains unrestricted (no subprocess
+    is launched in dry-run mode, so the risk is absent).
     """
+    # Gate 5 / G5-GAP-3: enforce preflight guard for execute mode
+    if not dry_run and _preflight_guard_token is not _PREFLIGHT_GUARD_TOKEN:
+        raise RuntimeError(
+            "Direct call to run_manifest(dry_run=False) is prohibited. "
+            "Use run_manifest_with_preflight_guard() to enforce the P0-B "
+            "preflight gate before launching subprocesses. (G5-GAP-3 fix)"
+        )
+
     report = RunReport(dry_run=dry_run)
     for entry in manifest.entries:
         result = run_entry(entry, repo_root, dry_run=dry_run, timeout=timeout)
@@ -340,5 +434,10 @@ def run_manifest_with_preflight_guard(
                 ))
         return report
 
-    # Preflight passed or dry_run mode — proceed normally
-    return run_manifest(manifest, repo_root, dry_run=dry_run, timeout=timeout)
+    # Preflight passed or dry_run mode — proceed normally.
+    # Pass the internal sentinel token so run_manifest() permits execute mode.
+    return run_manifest(
+        manifest, repo_root,
+        dry_run=dry_run, timeout=timeout,
+        _preflight_guard_token=_PREFLIGHT_GUARD_TOKEN,
+    )

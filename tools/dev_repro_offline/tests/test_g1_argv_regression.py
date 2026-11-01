@@ -234,15 +234,17 @@ class TestG1Gap5UnapprovedPytestFlags:
     which is a scope extension. ESCALATED for PM decision.
     """
 
-    def test_g1_pytest_forked_is_currently_allowed(self):
+    def test_g1_pytest_forked_is_blocked(self):
         """
-        NOT_REPRODUCED as a subprocess launch risk: '--forked' arrives only
-        via hardcoded command_template (trusted). Documenting current behavior.
-        This test CONFIRMS the current gap and will need PM decision on fix scope.
+        Gate 5 / G5-GAP-1 fix: --forked is no longer allowed.
+        The old denylist (_BLOCKED_FLAGS) was replaced with an approved-flags
+        allowlist (_APPROVED_PYTEST_FLAGS) that does not include --forked.
+        RED on 8bc898f: this assertion was assert True (documenting the gap).
+        GREEN after Gate 5 fix: --forked returns False.
         """
-        # This documents that --forked in the TEMPLATE position is allowed
-        assert _allowed(["pytest", "tools/dev_repro_offline/tests/", "--forked"])
-        # The real risk is injection via module_path, covered by GAP-4 fix.
+        assert not _allowed(["pytest", "tools/dev_repro_offline/tests/", "--forked"]), (
+            "G5-GAP-1: --forked must be BLOCKED by the approved-flags allowlist."
+        )
 
 
 # ---------------------------------------------------------------------------
