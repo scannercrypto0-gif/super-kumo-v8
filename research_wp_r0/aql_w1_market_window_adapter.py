@@ -75,6 +75,8 @@ def authenticated_market_windows(scheduled, raw_by_pair, receipt_by_pair, *,
             continue
         if not all(k in receipt for k in REQUIRED_RECEIPT):
             continue
+        if type(plan.get("decision_cutoff_ms")) is not int:
+            raise EvidenceError("bad scheduled decision cutoff")
         if (not isinstance(receipt["receipt_sha256"], str)
                 or len(receipt["receipt_sha256"]) != 64
                 or not all(ch in "0123456789abcdef" for ch in receipt["receipt_sha256"])
@@ -173,6 +175,16 @@ def authenticated_market_windows(scheduled, raw_by_pair, receipt_by_pair, *,
             if complete:
                 accepted.add((pair, horizon, receipt["raw_bytes_sha256"],
                               receipt["receipt_sha256"]))
+    # Freeze accepted windows so a caller cannot mutate a row, then have the
+    # verifier accept the same mutated reference as if the RAW supported it.
+    accepted_payloads = {
+        (w["pair_id"], w["horizon_ms"], w["raw_bytes_sha256"],
+         w["market_receipt_sha256"]):
+        json.dumps(w, sort_keys=True, separators=(",", ":"))
+        for w in windows
+        if (w["pair_id"], w["horizon_ms"], w["raw_bytes_sha256"],
+            w["market_receipt_sha256"]) in accepted
+    }
     def verified(window):
         if not isinstance(window, dict):
             return False
@@ -180,7 +192,7 @@ def authenticated_market_windows(scheduled, raw_by_pair, receipt_by_pair, *,
                window.get("raw_bytes_sha256"), window.get("market_receipt_sha256"))
         # Do not authenticate a mutated high/low or a repackaged row using
         # a previously accepted receipt key.
-        return key in accepted and any(row == window for row in windows
-                                       if (row.get("pair_id"), row.get("horizon_ms"),
-                                           row.get("raw_bytes_sha256"), row.get("market_receipt_sha256")) == key)
+        return (key in accepted_payloads and
+                json.dumps(window, sort_keys=True, separators=(",", ":"))
+                == accepted_payloads[key])
     return windows, verified
