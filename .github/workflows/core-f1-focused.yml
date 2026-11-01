@@ -41,3 +41,11 @@ jobs:
           echo "CORE_HEAD_SHA=$(git rev-parse HEAD)"
           cp .factory-pin/research_wp_r0/aql_w1_f1_prospective_consumer.py research_wp_r0/aql_w1_f1_prospective_consumer.py
           python -m unittest -v tests.test_aql_f1_b1_factory_overlay
+          PYTHONPATH=. python examples/aql_f1_b1_emit_controlled_sample.py --out b1_evidence/core-b1-factory-controlled.json
+          sha256sum b1_evidence/core-b1-factory-controlled.json
+      - name: Preserve exact controlled-only research handoff bytes
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-b1-signal-factory-overlay
+          path: b1_evidence/core-b1-factory-controlled.json
+          retention-days: 30
