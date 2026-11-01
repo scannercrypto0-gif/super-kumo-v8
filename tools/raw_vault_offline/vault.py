@@ -42,6 +42,7 @@ from .schema import (
     RawObjectMeta,
     VaultError,
     ChecksumMismatch,
+    CorruptMetadata,
     IdentityConflict,
     OversizedObject,
     MalformedIdentity,
@@ -113,13 +114,33 @@ class RawVault:
     # ── private helpers ──────────────────────────────────────────────────────
 
     def _read_index(self) -> dict:
-        """Load logical-identity→content-sha map. Returns {} if absent."""
+        """
+        Load logical-identity→content-sha map.
+
+        Returns {} if index is absent (new vault).
+        Raises CorruptMetadata if index exists but contains invalid JSON.
+
+        Audit A3 (Issue #215 / Audit #134 comment #6556506884):
+        Previously silently returned {} on JSON parse error, allowing admit()
+        to continue writing over a corrupt vault. Now fails closed.
+        """
         if not self._index_path.exists():
             return {}
+        raw = self._index_path.read_bytes()
         try:
-            return json.loads(self._index_path.read_bytes())
-        except Exception:
-            return {}
+            data = json.loads(raw)
+        except Exception as exc:
+            raise CorruptMetadata(
+                f"index.json exists but contains invalid JSON — vault is corrupt. "
+                f"Run recovery_scan() to assess and do not attempt admission until "
+                f"the corruption is resolved. Parse error: {exc}"
+            ) from exc
+        if not isinstance(data, dict):
+            raise CorruptMetadata(
+                f"index.json exists but root element is {type(data).__name__}, "
+                f"expected dict. Vault metadata is corrupt."
+            )
+        return data
 
     def _write_index(self, index: dict) -> None:
         tmp = self._staging / (uuid.uuid4().hex + ".idx.tmp")
@@ -131,20 +152,43 @@ class RawVault:
         tmp.replace(self._index_path)
 
     def _manifest_contains(self, content_sha256: str) -> bool:
-        """Return True if manifest.jsonl already contains an entry for this sha256."""
+        """
+        Return True if manifest.jsonl already contains an entry for content_sha256.
+
+        ALWAYS scans every non-empty line in the manifest, even after finding a
+        match, to ensure the entire manifest is parseable before returning.
+        Raises CorruptMetadata if any line cannot be parsed as JSON.
+
+        Audit A3 (Issue #215 / Audit #134 comment #6556506884):
+        Previously silently skipped malformed lines with `except Exception: continue`,
+        allowing a vault with a partially-corrupted manifest to appear healthy and
+        allowing admit() to append a new entry on top of corrupt metadata.
+
+        A3 strict interpretation: ANY corrupt line in manifest.jsonl (even lines
+        after the matching entry) indicates a corrupt vault and must block admission.
+        Early return on match is therefore NOT permitted — scan all lines first.
+        """
         if not self._manifest_path.exists():
             return False
-        for line in self._manifest_path.read_text(encoding="utf-8").splitlines():
+        found = False
+        for lineno, line in enumerate(
+            self._manifest_path.read_text(encoding="utf-8").splitlines(),
+            start=1,
+        ):
             line = line.strip()
             if not line:
                 continue
             try:
                 entry = json.loads(line)
-                if entry.get("content_sha256") == content_sha256:
-                    return True
-            except Exception:
-                continue
-        return False
+            except Exception as exc:
+                raise CorruptMetadata(
+                    f"manifest.jsonl line {lineno} is not valid JSON — vault is "
+                    f"corrupt. Run recovery_scan() before any admission. "
+                    f"Parse error: {exc}"
+                ) from exc
+            if entry.get("content_sha256") == content_sha256:
+                found = True
+        return found
 
     def _append_manifest(self, meta: RawObjectMeta) -> None:
         line = json.dumps(meta.to_dict(), sort_keys=True, separators=(",", ":")) + "\n"
@@ -186,6 +230,8 @@ class RawVault:
         OversizedObject     if byte_length > MAX_OBJECT_BYTES
         IdentityConflict    if same logical identity has different content
         MalformedIdentity   if meta fields fail validation
+        CorruptMetadata     if existing index.json or manifest.jsonl is corrupt
+                            (A3: fail-closed — do not write over corrupt metadata)
         """
         validate_meta(meta)
 
@@ -201,6 +247,9 @@ class RawVault:
             )
 
         with _vault_lock(self.root):
+            # A3: _read_index() and _manifest_contains() now raise CorruptMetadata
+            # on invalid JSON or malformed manifest lines. admit() inherits that
+            # fail-closed behaviour — do not catch CorruptMetadata here.
             index = self._read_index()
             lid = meta.logical_identity_key
 

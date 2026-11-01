@@ -103,6 +103,13 @@ class UnsafeArchivePath(VaultError):
 class ArchiveTooLarge(VaultError):
     """Archive member count or total size exceeds ceiling."""
 
+class CorruptMetadata(VaultError):
+    """
+    Audit A3 (Issue #215 / Audit #134 comment #6556506884):
+    index.json or manifest.jsonl is present but contains corrupt/invalid data.
+    admit() must fail closed rather than silently resetting or skipping.
+    """
+
 
 # ── safe path normalisation ───────────────────────────────────────────────────
 
