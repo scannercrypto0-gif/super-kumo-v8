@@ -297,10 +297,14 @@ def project_core_verified_f1_slots(scheduled, captures=(), market_windows=(), *,
     plans = set()
     expected_c2 = []
     by_pair = {}
+    seen_c2 = set()
     for item in schedule:
         try:
             identity = dict(item["c2_identity"])
-            _key(identity)
+            identity_key = _key(identity)
+            if identity_key in seen_c2:
+                raise EvidenceError("duplicate scheduled C2 composite identity")
+            seen_c2.add(identity_key)
             plan_sha = item["experiment_plan_sha256"]
             expected_pair = digest({"experiment_plan_sha256": plan_sha,
                                     "c2_identity": identity})
@@ -316,14 +320,27 @@ def project_core_verified_f1_slots(scheduled, captures=(), market_windows=(), *,
     if len(plans) != 1:
         raise EvidenceError("mixed experiment plans require separate projections")
 
+    # A Core-valid original is not necessarily bound to this preregistered
+    # source vintage and cutoff. Core status_slots intentionally only gets C2
+    # identity + experiment plan; this check remains Factory's responsibility.
+    schedule_fields = ("experiment_plan_sha256", "source_version",
+                       "source_bytes_sha256", "correction_generation",
+                       "decision_cutoff_ms")
     grouped = {}
+    schedule_mismatches = set()
     for record in records:
         if not isinstance(record, dict):
             raise EvidenceError("untyped Core original candidate")
         pair, arm = record.get("pair_id"), record.get("arm")
         if pair not in by_pair or arm not in ARMS:
             raise EvidenceError("orphan Core original candidate")
-        grouped.setdefault((pair, arm), []).append(record)
+        key = (pair, arm)
+        grouped.setdefault(key, []).append(record)
+        scheduled = by_pair[pair]
+        if (_key(record.get("c2_identity")) != _key(scheduled["c2_identity"])
+                or any(record.get(field) != scheduled.get(field)
+                       for field in schedule_fields)):
+            schedule_mismatches.add(key)
     try:
         core_slots = status_slots(expected_c2, next(iter(plans)), grouped,
                                   indicator_registry, proof_verifier)
@@ -334,6 +351,11 @@ def project_core_verified_f1_slots(scheduled, captures=(), market_windows=(), *,
         key = (slot["pair_id"], slot["arm"])
         if key in verdicts or slot["pair_id"] not in by_pair:
             raise EvidenceError("duplicate or orphan Core status slot")
+        # Even a correctly rehashed, Core-valid candidate must not be
+        # promoted to RECORDED against a different preregistered vintage.
+        if key in schedule_mismatches:
+            slot = {**slot, "capture_status": "QUARANTINED",
+                    "reason_code": "PREREGISTERED_SOURCE_CUTOFF_MISMATCH"}
         verdicts[key] = slot
     if len(verdicts) != 2 * len(schedule):
         raise EvidenceError("incomplete Core status universe")
@@ -367,5 +389,5 @@ def project_core_verified_f1_slots(scheduled, captures=(), market_windows=(), *,
         if row["capture_status"] != verdicts[key]["capture_status"]:
             raise EvidenceError("Core/Factory capture status divergence")
     result["core_verdict_source"] = "CORE_STATUS_SLOTS_PINNED_INTEGRATION"
-    result["independent_pit_proof"] = proof_verifier is not None
+    result["proof_verifier_supplied"] = proof_verifier is not None
     return result
