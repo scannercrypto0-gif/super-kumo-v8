@@ -179,3 +179,35 @@ def describe_original_p0_f3(dispositions, *, expected_total=653):
         "no_fill_or_pnl_inference": True,
         "original_f4_ack_authenticated": False,
     }
+
+
+def describe_original_p0_f3(effects, *, expected_total=653):
+    """F3-only historical counts; never reconstruct missing original F1."""
+    from research_wp_r0.aql_w1_typed_contract import F3EffectV1
+    effects = tuple(effects)
+    if len(effects) != expected_total:
+        raise EvidenceError("original F3 denominator mismatch")
+    seen = set()
+    counts = Counter()
+    for effect in effects:
+        if not isinstance(effect, F3EffectV1):
+            raise EvidenceError("untyped original F3 effect")
+        key = (effect.trial_id, effect.opportunity_id,
+               effect.producer_event_id, effect.envelope_sha256)
+        if key in seen:
+            raise EvidenceError("duplicate original F3 identity")
+        seen.add(key)
+        if effect.effect_disposition not in ("NO_SIGNAL", "REJECTED", "TRIGGERED"):
+            raise EvidenceError("unexpected original P0 F3 disposition")
+        counts[effect.effect_disposition] += 1
+    return {
+        "evidence_class": "DESCRIPTIVE_NON_PIT_F3_ONLY",
+        "original_f1_status": "NOT_RECORDED_IN_P0",
+        "entry_eligibility": "NOT_ESTABLISHED",
+        "direction": "NOT_ESTABLISHED",
+        "scheduled_total": expected_total,
+        "f3_final_effects": dict(sorted(counts.items())),
+        "receipt_authentication": "NOT_ESTABLISHED_BY_THIS_FUNCTION",
+        "research_only": True,
+        "no_fill_or_pnl_inference": True,
+    }
