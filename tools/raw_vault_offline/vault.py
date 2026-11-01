@@ -362,17 +362,45 @@ class RawVault:
                     "manifest_sha": manifest_map[lid],
                 }
 
-        # ── 4. Check for missing object files for every index entry ──
+        # ── 4. Check for missing or corrupted object files for every index entry ──
+        #
+        # Audit A1 (Issue #215 / Audit #134 comment #6555797225):
+        # obj_path.exists() is insufficient — a file may exist but contain altered
+        # bytes. We must read each object, recompute SHA256, and confirm the stored
+        # content matches the SHA256 key under which it is addressed.
+        #
+        # Also detect non-regular files at the expected object path (e.g. a directory
+        # placed where a file should be) — these cannot be read for byte verification.
         missing_objects: list[str] = []
+        corrupted_objects: list[str] = []
         for lid, sha in index.items():
             obj_path = _object_path(self.root, sha)
             if not obj_path.exists():
                 missing_objects.append(sha)
+                continue
+            # A1: regular-file check — a non-regular file (directory, symlink to dir,
+            # special file) cannot be reliably read; treat as corrupted.
+            if not obj_path.is_file():
+                corrupted_objects.append(sha)
+                continue
+            # A1: byte-hash recomputation — read actual bytes, compute SHA256,
+            # compare to the content-addressed key. Altered bytes → corrupted.
+            try:
+                actual_sha = hashlib.sha256(obj_path.read_bytes()).hexdigest()
+            except Exception:
+                corrupted_objects.append(sha)
+                continue
+            if actual_sha != sha:
+                corrupted_objects.append(sha)
 
         # ── 5. Determine status ──
-        if orphans:
-            status = "ORPHAN_STAGING_FOUND"
-        elif (
+        #
+        # Audit A2 (Issue #215 / Audit #134 comment #6555797225):
+        # INCONSISTENT must take precedence over ORPHAN_STAGING_FOUND when any
+        # integrity failure exists. Orphan staging files are collected and reported
+        # in the result regardless of status, but they do not mask proven integrity
+        # violations.
+        integrity_failure = (
             index_corrupt
             or manifest_malformed
             or manifest_duplicates
@@ -380,8 +408,14 @@ class RawVault:
             or extra_in_manifest
             or sha_mismatches
             or missing_objects
-        ):
+            or corrupted_objects  # A1: byte-level corruption
+        )
+
+        if integrity_failure:
+            # A2: INCONSISTENT takes precedence — orphan staging is still reported
             status = "INCONSISTENT"
+        elif orphans:
+            status = "ORPHAN_STAGING_FOUND"
         else:
             status = "CLEAN"
 
@@ -399,6 +433,8 @@ class RawVault:
             extra_in_manifest=extra_in_manifest,
             sha_mismatches=sha_mismatches,
             missing_objects=missing_objects,
+            # Audit A1 addition:
+            corrupted_objects=corrupted_objects,  # SHAs where stored bytes ≠ SHA256 key
         )
 
     def purge_orphan_staging(self) -> int:
