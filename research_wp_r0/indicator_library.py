@@ -140,6 +140,15 @@ def _guard_finite_bar_prices(bars: List, label: str = "bars") -> None:
                     f"indicator {label}[{i}].{attr}: None value; "
                     "bar must pass validate_bars() before indicator computation"
                 )
+            if not isinstance(v, (int, float)):
+                # Gate 4 fix (Issue #215): math.isfinite(v) raises TypeError for
+                # non-numeric types (str, list, dict …).  PM requirement: must be
+                # ValueError.  Mirror the isinstance guard already in _guard_finite_closes
+                # (P2-B-1).
+                raise ValueError(
+                    f"indicator {label}[{i}].{attr}: non-numeric value {v!r} "
+                    f"(type {type(v).__name__!r}); bar prices must be numeric (F-01)"
+                )
             if not math.isfinite(v):
                 raise ValueError(
                     f"indicator {label}[{i}].{attr}: non-finite value {v!r}; "
