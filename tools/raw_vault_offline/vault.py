@@ -130,6 +130,22 @@ class RawVault:
             os.fsync(fh.fileno())
         tmp.replace(self._index_path)
 
+    def _manifest_contains(self, content_sha256: str) -> bool:
+        """Return True if manifest.jsonl already contains an entry for this sha256."""
+        if not self._manifest_path.exists():
+            return False
+        for line in self._manifest_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+                if entry.get("content_sha256") == content_sha256:
+                    return True
+            except Exception:
+                continue
+        return False
+
     def _append_manifest(self, meta: RawObjectMeta) -> None:
         line = json.dumps(meta.to_dict(), sort_keys=True, separators=(",", ":")) + "\n"
         with open(self._manifest_path, "a", encoding="utf-8") as fh:
@@ -192,7 +208,13 @@ class RawVault:
             existing_sha = index.get(lid)
             if existing_sha is not None:
                 if existing_sha == actual_sha:
-                    # idempotent: same bytes already admitted
+                    # Idempotent: same bytes already in index.
+                    # Gate 3 fix (G3-CRASH-1): a crash between _write_index (step 4)
+                    # and _append_manifest (step 5) leaves index updated but manifest
+                    # missing the entry. Repair by scanning manifest and re-appending
+                    # if the content_sha256 is absent.
+                    if not self._manifest_contains(actual_sha):
+                        self._append_manifest(meta)
                     return meta
                 else:
                     raise IdentityConflict(
@@ -256,7 +278,17 @@ class RawVault:
         objects = [p for p in objects if p.is_file()]
         index = self._read_index()
         manifest_lines = len(self.manifest_entries())
-        status = "ORPHAN_STAGING_FOUND" if orphans else "CLEAN"
+
+        # Gate 3 fix (G3-CRASH-2): detect index/manifest mismatch that results
+        # from a crash between _write_index (step 4) and _append_manifest (step 5).
+        # If index has entries not reflected in manifest, report INCONSISTENT.
+        if orphans:
+            status = "ORPHAN_STAGING_FOUND"
+        elif len(index) != manifest_lines:
+            status = "INCONSISTENT"
+        else:
+            status = "CLEAN"
+
         return dict(
             orphan_staging=[str(p) for p in orphans],
             index_entries=len(index),
