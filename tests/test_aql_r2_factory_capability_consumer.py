@@ -37,8 +37,10 @@ class FactoryR2CapabilityTests(unittest.TestCase):
         self.assertEqual(self.check(BASE), self.check(BASE))
 
     def test_pin_mismatch_rejected(self):
-        with self.assertRaisesRegex(ValueError, "SHA_DRIFT"):
-            consume_capability(encoded(BASE))
+        original = encoded(BASE)
+        self.assertEqual(consume_capability(original)["connection_status"], "NOT_CONNECTED")
+        with self.assertRaisesRegex(ValueError, "R2_CORE_CAPABILITY_SHA_DRIFT"):
+            consume_capability(original + b" ")
 
     def test_duplicate_json_key_rejected(self):
         raw = encoded(BASE).rstrip(b"\n")[:-1] + b',"connection_status":"NOT_CONNECTED"}'
