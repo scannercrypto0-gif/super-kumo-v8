@@ -12,6 +12,7 @@ on:
       - "research_wp_r0/indicator_library.py"
       - "research_wp_r0/_dep_guard.py"
       - "tests/test_sf_ind_01.py"
+      - "tests/test_sf_ind_01_nan_guard.py"
       - "tests/test_sf_dep_guard.py"
       - ".github/workflows/sf-ind-01-fast.yml"
   workflow_dispatch:
@@ -55,7 +56,7 @@ jobs:
 
       - name: Run SF-IND-01 indicator tests
         # Single-line: backslash continuation is bash-only; PowerShell (Windows) rejects it.
-        run: python -m pytest tests/test_sf_ind_01.py -v --tb=short --junit-xml=test-results-sf-ind-01.xml
+        run: python -m pytest tests/test_sf_ind_01.py tests/test_sf_ind_01_nan_guard.py -v --tb=short --junit-xml=test-results-sf-ind-01.xml
 
       - name: Run SF-IND-01 dependency-guard regression tests
         # Single-line: same Windows/PowerShell compatibility reason.

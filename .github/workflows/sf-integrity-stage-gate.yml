@@ -37,7 +37,25 @@ jobs:
       - name: Full Factory regression including adversarial default admission
         run: python -B -m pytest -p no:cacheprovider research_wp_r0 -v --tb=short --junitxml=factory-admission.xml
       - name: Verify complete matrix evidence
-        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('factory-admission.xml').getroot().find('testsuite'); print(s.attrib); assert len(s.findall('testcase')) == 61; assert all(int(s.get(k,0)) == 0 for k in ('failures','errors','skipped'))"
+        run: |
+          python -B -c "
+          import xml.etree.ElementTree as E
+          suite = E.parse('factory-admission.xml').getroot().find('testsuite')
+          print('JUnit attributes:', suite.attrib)
+          failures = int(suite.get('failures', 0))
+          errors   = int(suite.get('errors', 0))
+          skipped  = int(suite.get('skipped', 0))
+          tests    = int(suite.get('tests', 0))
+          # Stale count was 61 (pre-P2-A hardening).
+          # Post P2-A: 81 testcases reported by pytest >= 9.2 (subtests exposed
+          # as separate <testcase> elements in JUnit XML).  Use >= floor to avoid
+          # re-staling on future additions while still catching deletions.
+          assert tests >= 81, f'Expected >= 81 tests, got {tests} (regression: tests deleted or not collected)'
+          assert failures == 0, f'Expected 0 failures, got {failures}'
+          assert errors   == 0, f'Expected 0 errors, got {errors}'
+          assert skipped  == 0, f'Expected 0 skipped, got {skipped}'
+          print(f'PASS: {tests} tests collected, 0 failures, 0 errors, 0 skipped')
+          "
       - uses: actions/upload-artifact@v4
         if: always()
         with:
