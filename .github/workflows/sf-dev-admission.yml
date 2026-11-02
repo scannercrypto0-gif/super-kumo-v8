@@ -1,27 +1,93 @@
-name: SF DEV historical admission focused
-
+# Core draft uses an ALREADY REGISTERED manual carrier; default main is unchanged.
+# No push/pull_request/schedule event may activate this public WS job.
+name: R5B manual public nontrading pilot (Core draft only)
+run-name: R5B-one-shot-${{ inputs.approved_sha }}-${{ inputs.approval_comment_id }}
 on:
-  pull_request:
-    paths:
-      - 'research_wp_r0/sf_historical_admission.py'
-      - 'tests/test_sf_historical_admission.py'
-      - 'docs/research/SF_DEV_ADMISSION_23_25.md'
-      - '.github/workflows/sf-dev-admission.yml'
   workflow_dispatch:
-
+    inputs:
+      approval:
+        description: 'Owner approved public WS engineering only, no PIT/trading'
+        required: true
+        type: string
+      approved_sha:
+        description: 'Full exact reviewed Core commit SHA'
+        required: true
+        type: string
+      approval_comment_id:
+        description: 'One-time explicit owner approval comment on Issue 180'
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: r5b-one-public-source-pilot
+  cancel-in-progress: false
 jobs:
-  dev-only-preflight:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  bounded-public-ws:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.actor == github.repository_owner &&
+      github.run_attempt == 1 &&
+      github.ref == 'refs/heads/aql/core-f1-prospective-capture-20261101' &&
+      inputs.approved_sha == github.sha &&
+      inputs.approval == 'GO_RUN_R5B_PUBLIC_WS_UNVERIFIED_960S_1BAR'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.approved_sha }}
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-      - name: Install focused test runner
-        run: python -m pip install pytest
-      - name: Focused isolated synthetic research tests
-        run: python -m pytest -q tests/test_sf_historical_admission.py
+          python-version: '3.11'
+      - name: Verify explicit one-time owner approval before Binance egress
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPROVAL_ID: ${{ inputs.approval_comment_id }}
+          APPROVED_SHA: ${{ inputs.approved_sha }}
+        run: |
+          python - <<'PY'
+          import os,re,json,urllib.request,datetime
+          from research_wp_r0.aql_r5b_run_authorization import verify_comment,deny_previous_runs
+          repo=os.environ['GITHUB_REPOSITORY'];owner=repo.split('/')[0]
+          approved=os.environ['APPROVED_SHA'];cid=os.environ['APPROVAL_ID']
+          assert re.fullmatch(r'[a-f0-9]{40}',approved)
+          assert re.fullmatch(r'[0-9]{1,20}',cid)
+          assert os.environ['GITHUB_ACTOR']==owner
+          api='https://api.github.com/repos/'+repo
+          def get(path):
+              request=urllib.request.Request(api+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+              with urllib.request.urlopen(request,timeout=15) as r:return json.load(r)
+          comment=get('/issues/comments/'+cid)
+          title=verify_comment(comment,repo=repo,actor=os.environ['GITHUB_ACTOR'],approved_sha=approved,comment_id=cid,now=datetime.datetime.now(datetime.timezone.utc))
+          current=int(os.environ['GITHUB_RUN_ID'])
+          for page in range(1,11):
+              runs=get('/actions/workflows/sf-dev-admission.yml/runs?event=workflow_dispatch&per_page=100&page='+str(page))['workflow_runs']
+              deny_previous_runs(runs,title=title,current_run_id=current)
+              if len(runs)<100:break
+          else:raise RuntimeError('Approval-history bound exceeded; refuse unverified repeat')
+          print('OWNER_ONE_TIME_EXACT_SHA_APPROVAL_VERIFIED; independent witness remains UNVERIFIED')
+          PY
+      - name: Install public WS client, no account keys
+        run: python -m pip install websocket-client==1.8.0
+      - name: One socket, no REST/reconnect, one final bar, hard16min
+        env:
+          PYTHONPATH: src:.
+          R5B_NETWORK_ENABLED: OWNER_APPROVED_MANUAL_DISPATCH
+          R5B_APPROVED_SHA: ${{ inputs.approved_sha }}
+          OWNER_APPROVAL: ${{ inputs.approval }}
+          OWNER_COMMENT_ID: ${{ inputs.approval_comment_id }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$R5B_APPROVED_SHA"
+          timeout --signal=TERM --kill-after=5s 960s python -m research_wp_r0.aql_r5b_public_pilot --out r5b-evidence --approval "$OWNER_APPROVAL" --operator "$GITHUB_ACTOR" --approval-ref "https://github.com/$GITHUB_REPOSITORY/issues/180#issuecomment-$OWNER_COMMENT_ID"
+      - name: Retain actual partial or complete evidence, never call it PIT
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-r5b-source-engineering-UNVERIFIED
+          path: r5b-evidence/
+          if-no-files-found: warn
+          retention-days: 7
