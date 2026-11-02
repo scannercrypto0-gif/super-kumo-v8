@@ -1,0 +1,62 @@
+name: Core R1 accepted-2024 market research producer
+on:
+  push:
+    branches:
+      - aql/core-f1-prospective-capture-20261101
+    paths:
+      - 'research_wp_r0/aql_r1_market_research_producer.py'
+      - 'examples/aql_r1_emit_market_research.py'
+      - 'tests/test_aql_r1_market_research_producer.py'
+      - '.github/workflows/core-r1-research-producer.yml'
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_r1_market_research_producer.py'
+      - 'examples/aql_r1_emit_market_research.py'
+      - 'tests/test_aql_r1_market_research_producer.py'
+      - '.github/workflows/core-r1-research-producer.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  r1-pinned-market-research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Focused new source/time/regime/adversarial tests ONLY
+        run: |
+          git rev-parse HEAD
+          python -m unittest -v tests.test_aql_r1_market_research_producer
+      - name: Retrieve previously accepted 2024 original market artifact, no source reacquisition
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p r1-pinned r1-evidence
+          curl --fail --location --retry 2 \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/scannercrypto0-gif/super-kumo-v8/actions/artifacts/13084775420/zip" \
+            -o r1-pinned/b1-accepted-original-2024.zip
+          echo "265b7ade1be307bd2efafbd0a8438e6846c869df6205af717133d490e38aeb59  r1-pinned/b1-accepted-original-2024.zip" | sha256sum -c -
+      - name: Execute actual original 2024 month bytes, produce R1 handoff twice
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python examples/aql_r1_emit_market_research.py \
+            --b1-artifact r1-pinned/b1-accepted-original-2024.zip \
+            --out r1-evidence/core-r1-market-research.json
+          PYTHONPATH=. python examples/aql_r1_emit_market_research.py \
+            --b1-artifact r1-pinned/b1-accepted-original-2024.zip \
+            --out r1-evidence/replay.json
+          cmp r1-evidence/core-r1-market-research.json r1-evidence/replay.json
+          sha256sum r1-evidence/core-r1-market-research.json | tee r1-evidence/sha256.txt
+          rm r1-evidence/replay.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-r1-2024-market-only-handoff
+          path: r1-evidence/
+          if-no-files-found: warn
+          retention-days: 30
