@@ -7,8 +7,10 @@ on:
     paths:
       - research_wp_r0/aql_coinbase_public_candles.py
       - research_wp_r0/aql_coinbase_public_capture.py
+      - research_wp_r0/aql_coinbase_evidence_verify.py
       - tests/test_aql_coinbase_public_candles.py
       - tests/test_aql_coinbase_public_capture.py
+      - tests/test_aql_coinbase_evidence_verify.py
       - .github/workflows/core-coinbase-focused.yml
 permissions:
   contents: read
@@ -22,4 +24,4 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
-          python -m unittest discover -s tests -p 'test_aql_coinbase_public_*.py' -v
+          python -m unittest discover -s tests -p 'test_aql_coinbase_*.py' -v
