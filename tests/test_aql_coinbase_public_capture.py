@@ -22,7 +22,7 @@ class CaptureTests(unittest.TestCase):
             self.assertFalse(result["collector_journal_connected"])
             self.assertFalse(result["binance_execution_price_verified"])
             self.assertEqual((out / "raw-response.json").read_bytes(), raw)
-            self.assertEqual(len(calls), 1)
+            self.assertTrue((out / "normalized-bars.json").exists())\n            self.assertIn("normalized_sha256", result)\n            self.assertEqual(len(calls), 1)
             self.assertIn("granularity=900", calls[0])
 
     def test_malformed_response_fails_closed_and_preserves_evidence(self):
