@@ -771,10 +771,10 @@ class TestF4DurableReceiptsBlocker:
             tampered_lines.append(json.dumps(d, sort_keys=True).encode())
         receipt_path.write_bytes(b"\n".join(tampered_lines) + b"\n")
 
-        # Now reconcile: should detect conflict
-        loaded = load_receipts(receipt_path)
-        with pytest.raises(LedgerReceiptCorrupted, match="RECONCILE_CONFLICT"):
-            reconcile_receipts(state, loaded)
+        # load_receipts validates payload_hash on load — tamper is detected there.
+        # RECEIPT_PAYLOAD_TAMPER is raised before reconcile_receipts is reached.
+        with pytest.raises(LedgerReceiptCorrupted, match="RECEIPT_PAYLOAD_TAMPER"):
+            load_receipts(receipt_path)
 
     def test_report_sha256_covers_receipts_field(self):
         """report_sha256 must include ordered_receipt_hashes."""
@@ -1152,14 +1152,17 @@ class TestF4LineageAndDuplicateGap3:
         )
 
     def test_build_ledger_manifest_sha256_satisfies_lineage(self):
-        """manifest_sha256 alone is sufficient to satisfy lineage requirement."""
+        """All mandatory lineage fields required: manifest_sha256, policy_id, strategy_digest, assumptions_digest."""
         opp = self._make_opp("OPP-LIN-002")
         fill = self._make_fill("OPP-LIN-002")
-        # Should NOT raise
+        # All four lineage fields required per F4_LINEAGE_MISSING enforcement
         state, report = build_ledger(
             [opp], [fill],
             trial_id="LIN-TEST-2",
             manifest_sha256="abc" * 21 + "d",
+            policy_id="P0-SYNTHETIC-TEST",
+            strategy_digest="synthetic-strategy-v1",
+            assumptions_digest="synthetic-assumptions-v1",
         )
         assert report is not None
 
@@ -1167,22 +1170,28 @@ class TestF4LineageAndDuplicateGap3:
         """_load_receipts_file() must raise LedgerReceiptCorrupted(DUPLICATE_EVENT_ID_CONFLICT)
         when same event_id appears with different payload_hash.
 
+        Both records must have valid payload_hash values (canonical hash of body minus
+        payload_hash field, matching exactly what _load_receipts_file verifies).
+
         FAIL on baseline: duplicate silently overwritten (last-write-wins).
         PASS after fix: raises LedgerReceiptCorrupted STOP.
         """
+        from research_wp_r0.aql_p0_c1_source import _canonical_bytes, _sha256_hex
+        from research_wp_r0.aql_p0_f4_ledger import _load_receipts_file
+
+        def _make_canonical_record(event_id, record_version):
+            body = {"event_id": event_id, "record_version": record_version}
+            payload_hash = _sha256_hex(_canonical_bytes(body))
+            return json.dumps({**body, "payload_hash": payload_hash},
+                               sort_keys=True, separators=(",", ":"))
+
         receipt_path = tmp_path / "receipts.jsonl"
         event_id = "EVT-DUP-001"
-        line1 = json.dumps({
-            "event_id": event_id,
-            "payload_hash": "a" * 64,
-        }, sort_keys=True, separators=(",", ":"))
-        line2 = json.dumps({
-            "event_id": event_id,
-            "payload_hash": "b" * 64,  # DIFFERENT hash = conflict
-        }, sort_keys=True, separators=(",", ":"))
+        # Both lines have the SAME event_id but DIFFERENT bodies → different hashes
+        line1 = _make_canonical_record(event_id, "v1")
+        line2 = _make_canonical_record(event_id, "v2")
         receipt_path.write_text(line1 + "\n" + line2 + "\n", encoding="utf-8")
 
-        from research_wp_r0.aql_p0_f4_ledger import _load_receipts_file
         with pytest.raises(LedgerReceiptCorrupted) as exc_info:
             _load_receipts_file(receipt_path)
         err = str(exc_info.value)
@@ -1194,18 +1203,21 @@ class TestF4LineageAndDuplicateGap3:
         """Same event_id with identical payload_hash is idempotent (no-op).
 
         Duplicate with SAME hash = crash-safe replay, must NOT raise.
+        The record must have a valid payload_hash computed from its canonical body
+        using the same algorithm as _load_receipts_file.
         """
+        from research_wp_r0.aql_p0_c1_source import _canonical_bytes, _sha256_hex
+        from research_wp_r0.aql_p0_f4_ledger import _load_receipts_file
+
         receipt_path = tmp_path / "receipts.jsonl"
         event_id = "EVT-IDEM-001"
-        same_hash = "c" * 64
-        line = json.dumps({
-            "event_id": event_id,
-            "payload_hash": same_hash,
-        }, sort_keys=True, separators=(",", ":"))
+        body = {"event_id": event_id, "record_version": "v1"}
+        real_hash = _sha256_hex(_canonical_bytes(body))
+        line = json.dumps({**body, "payload_hash": real_hash},
+                          sort_keys=True, separators=(",", ":"))
         # Write same entry twice
         receipt_path.write_text(line + "\n" + line + "\n", encoding="utf-8")
 
-        from research_wp_r0.aql_p0_f4_ledger import _load_receipts_file
         loaded = _load_receipts_file(receipt_path)
         assert event_id in loaded
-        assert loaded[event_id] == same_hash, "Idempotent replay must preserve hash"
+        assert loaded[event_id] == real_hash, "Idempotent replay must preserve hash"

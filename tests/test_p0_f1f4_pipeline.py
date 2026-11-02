@@ -430,11 +430,16 @@ class TestFix3ChronologicalStateMachine:
 
         _, _, opps, fills, state, report = _run_full_pipeline(bars)
 
-        # Look for REJECTED fills with POSITION_ALREADY_OPEN
+        # Look for REJECTED fills with POSITION_ALREADY_OPEN (event-time) or
+        # POSITION_ALREADY_OPEN_AT_DECISION (decision-time check when decision_ms
+        # falls inside a held position window).  Both are valid Fix 3 outcomes.
         rejected_fills = [f for f in fills if f.signal_state == "REJECTED"
-                          and f.reason_code == "POSITION_ALREADY_OPEN"]
+                          and f.reason_code in (
+                              "POSITION_ALREADY_OPEN",
+                              "POSITION_ALREADY_OPEN_AT_DECISION",
+                          )]
         assert len(rejected_fills) >= 1, (
-            "Expected at least one REJECTED(POSITION_ALREADY_OPEN) when signals overlap"
+            "Expected at least one REJECTED(POSITION_ALREADY_OPEN[_AT_DECISION]) when signals overlap"
         )
 
     def test_rejected_in_denominator_counts(self):
