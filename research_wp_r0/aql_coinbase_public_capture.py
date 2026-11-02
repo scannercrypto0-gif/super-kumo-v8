@@ -90,7 +90,8 @@ def capture(*, product_id, folder, request, now_ms):
         write_once(folder / "normalized-bars.json", normalized_bytes)
         result = dict(status="UNVERIFIED_CAPTURED", source="coinbase_exchange_public_rest",
                       product_id=product_id, interval="15m", bars=len(bars),
-                      raw_sha256=digest(raw), normalized_sha256=digest(normalized_bytes),\n                      first_open_ms=bars[0].open_time_ms,
+                      raw_sha256=digest(raw), normalized_sha256=digest(normalized_bytes),
+                      first_open_ms=bars[0].open_time_ms,
                       last_close_ms=bars[-1].close_time_ms,
                       source_custody="LOCAL_UNVERIFIED", execution="DISABLED",
                       binance_execution_price_verified=False,
