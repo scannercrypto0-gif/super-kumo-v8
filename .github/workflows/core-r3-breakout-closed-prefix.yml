@@ -1,0 +1,22 @@
+name: Core R3 closed-prefix Breakout (delta only)
+on:
+  push:
+    branches:
+      - aql/core-f1-prospective-capture-20261101
+    paths:
+      - 'research_wp_r0/aql_r3_breakout_closed_prefix.py'
+      - 'tests/test_aql_r3_breakout_closed_prefix.py'
+      - '.github/workflows/core-r3-breakout-closed-prefix.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r3-delta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: R3 new cutoff-only adversarial tests
+        run: python -m unittest -v tests.test_aql_r3_breakout_closed_prefix

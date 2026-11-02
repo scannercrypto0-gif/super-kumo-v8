@@ -1,0 +1,48 @@
+name: Core R5B OFFLINE changed-seam validation only
+on:
+  push:
+    branches: [aql/core-f1-prospective-capture-20261101]
+    paths:
+      - research_wp_r0/aql_r5b_public_pilot.py
+      - tests/test_aql_r5b_public_pilot.py
+      - .github/workflows/core-r5b-focused.yml
+      - .github/workflows/sf-dev-admission.yml
+      - research_wp_r0/aql_r5b_run_authorization.py
+      - .github/workflows/core-f1-focused.yml
+      - .github/workflows/core-b2-integrity-input.yml
+      - .github/workflows/core-b3-vault-parent.yml
+      - .github/workflows/core-r1-research-producer.yml
+permissions:
+  contents: read
+jobs:
+  r5b-offline-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install websocket-client==1.8.0
+      - name: Only NEW R5B tests, all market transports injected/blocked
+        env:
+          PYTHONPATH: src:.
+        run: |
+          set -euo pipefail
+          mkdir r5b-offline-evidence
+          git rev-parse HEAD | tee r5b-offline-evidence/source-sha.txt
+          git rev-parse HEAD^{tree} | tee r5b-offline-evidence/tree-sha.txt
+          python -m unittest -v tests.test_aql_r5b_public_pilot 2>&1 | tee r5b-offline-evidence/offline-tests.log
+          python - <<'PY'
+          import pathlib,json
+          pathlib.Path('r5b-offline-evidence/scope.json').write_text(json.dumps({
+              'scope':'OFFLINE_TEST_ONLY_NOT_BINANCE_CAPTURE','network_pilot_executed':False,
+              'R1_R4_tests_rerun':False,'owner_manual_network_approval':'REQUIRED'},sort_keys=True)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-r5b-offline-only-validation
+          path: r5b-offline-evidence/
+          retention-days: 7

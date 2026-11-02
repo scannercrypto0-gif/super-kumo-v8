@@ -1,0 +1,39 @@
+name: Core R4 nontrading invocation (delta only)
+on:
+  push:
+    branches:
+      - aql/core-f1-prospective-capture-20261101
+    paths:
+      - 'research_wp_r0/aql_r4_nontrading_g2_host.py'
+      - 'tests/test_aql_r4_nontrading_g2_host.py'
+      - 'examples/aql_r4_invoke_nontrading_host.py'
+      - '.github/workflows/core-r4-nontrading-host.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r4-delta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Focused R4 host tests only
+        run: python -m unittest -v tests.test_aql_r4_nontrading_g2_host
+      - name: Two identical independent fixture-only host invocations
+        run: |
+          mkdir -p out/a out/b
+          python -m examples.aql_r4_invoke_nontrading_host --out-dir out/a
+          python -m examples.aql_r4_invoke_nontrading_host --out-dir out/b
+          cmp out/a/*.schedule.json out/b/*.schedule.json
+          cmp out/a/*.result.json out/b/*.result.json
+          sha256sum out/a/*.result.json
+      - name: Upload bounded offline evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-r4-fixture-only-invocation
+          path: |
+            out/a/*.schedule.json
+            out/a/*.result.json
+          if-no-files-found: error

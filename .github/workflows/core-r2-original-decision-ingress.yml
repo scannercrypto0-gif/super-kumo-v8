@@ -1,0 +1,45 @@
+name: Core R2 original decision ingress (delta only)
+on:
+  push:
+    branches:
+      - aql/core-f1-prospective-capture-20261101
+    paths:
+      - 'research_wp_r0/aql_r2_original_decision_ingress.py'
+      - 'tests/test_aql_r2_original_decision_ingress.py'
+      - 'examples/aql_r2_emit_not_connected.py'
+      - '.github/workflows/core-r2-original-decision-ingress.yml'
+  workflow_dispatch:
+jobs:
+  r2-delta:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: R2 changed-only tests
+        run: python -m unittest -v tests.test_aql_r2_original_decision_ingress
+      - name: Deterministic nontrading capability artifact
+        run: |
+          mkdir -p out
+          python -m examples.aql_r2_emit_not_connected --out out/not-connected-a.json
+          python -m examples.aql_r2_emit_not_connected --out out/not-connected-b.json
+          cmp out/not-connected-a.json out/not-connected-b.json
+          sha256sum out/not-connected-a.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x = json.loads(Path("out/not-connected-a.json").read_bytes())
+          assert x["connection_status"] == "NOT_CONNECTED"
+          assert x["proof_status"] == "BLOCKED_EXTERNAL_EVIDENCE"
+          assert x["arm_statuses"] == {"BASE":"MISSING_CAPTURE","SHADOW":"MISSING_CAPTURE"}
+          assert "pair_id" not in x and "handoff_sha256" not in x
+          PY
+      - name: Publish nontrading capability artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-r2-not-connected-capability
+          path: out/not-connected-a.json
+          if-no-files-found: error

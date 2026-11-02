@@ -1,0 +1,143 @@
+name: Core prospective F1 focused tests
+on:
+  push:
+    branches:
+      - aql/core-f1-prospective-capture-20261101
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_f1_*.py'
+      - 'tests/test_aql_f1_*.py'
+      - '.github/workflows/core-f1-focused.yml'
+permissions:
+  contents: read
+jobs:
+  changed-legacy-scope:
+    runs-on: ubuntu-latest
+    outputs:
+      required: ${{ steps.delta.outputs.required }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: delta
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          EVENT_KIND: ${{ github.event_name }}
+        run: |
+          python - <<'PYCODE'
+          import os,re,subprocess
+          from research_wp_r0.aql_r5b_run_authorization import legacy_delta_needed
+          base=os.environ.get('BEFORE_SHA','')
+          if not re.fullmatch(r'[a-f0-9]{40}',base) or subprocess.run(['git','cat-file','-e',base],capture_output=True).returncode:
+              base='17f2c45bc63f688b81c761e250b5d7685e25063f'
+          changed=subprocess.check_output(['git','diff','--name-only',base,'HEAD'],text=True).splitlines()
+          required=os.environ.get('EVENT_KIND')=='workflow_dispatch' or legacy_delta_needed(changed,['research_wp_r0/aql_f1_*.py', 'tests/test_aql_f1_*.py'])
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:f.write('required='+str(required).lower()+'\n')
+          print('LEGACY_SCOPE_REQUIRED='+str(required)+' CHANGED='+repr(changed))
+          PYCODE
+  b1-signal-handoff:
+    needs: changed-legacy-scope
+    if: needs.changed-legacy-scope.outputs.required == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Exact Core SHA and focused B1 signal-path tests
+        run: |
+          git rev-parse HEAD
+          python -m compileall -q research_wp_r0/aql_f1_research_signal_handoff_v1.py research_wp_r0/aql_f1_prospective_host_v1.py
+          python -m unittest -v tests.test_aql_f1_b1_research_signal_handoff
+  b1-factory-pinned-overlay:
+    needs: changed-legacy-scope
+    if: needs.changed-legacy-scope.outputs.required == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: e52a9fb9d091ce439278988bdb0c7ef4ffaeab99
+          path: .factory-pin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check exact Factory head and copy only read-only adapter to overlay
+        run: |
+          echo "PINNED_FACTORY_SHA=e52a9fb9d091ce439278988bdb0c7ef4ffaeab99"
+          test "$(git -C .factory-pin rev-parse HEAD)" = e52a9fb9d091ce439278988bdb0c7ef4ffaeab99
+          echo "CORE_HEAD_SHA=$(git rev-parse HEAD)"
+          cp .factory-pin/research_wp_r0/aql_w1_f1_prospective_consumer.py research_wp_r0/aql_w1_f1_prospective_consumer.py
+          python -m unittest -v tests.test_aql_f1_b1_factory_overlay
+          PYTHONPATH=. python examples/aql_f1_b1_emit_controlled_sample.py --out b1_evidence/core-b1-factory-controlled.json
+          sha256sum b1_evidence/core-b1-factory-controlled.json
+          {
+            echo "RESEARCH_ONLY_F3_CALLSITE_INVENTORY"
+            echo "CORE_PR_CHECKOUT=$(git rev-parse HEAD)"
+            echo "HISTORICAL_F3_MODEL_CALLS:"
+            git grep -n 'model_fills(' -- research_wp_r0 tests || true
+            echo "PROSPECTIVE_CAPTURE_WRAPPER_CALLS:"
+            git grep -n 'capture_then_call_f3(' -- research_wp_r0 tests || true
+            echo "C2_HISTORICAL_MARKERS:"
+            git grep -n 'RETROSPECTIVE_NON_PIT' -- research_wp_r0/aql_p0_c2_producer.py || true
+          } > b1_evidence/f3_callsites.txt
+          cat b1_evidence/f3_callsites.txt
+          sha256sum b1_evidence/f3_callsites.txt
+      - name: Preserve exact controlled-only research handoff bytes
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-b1-signal-factory-overlay
+          path: |
+            b1_evidence/core-b1-factory-controlled.json
+            b1_evidence/f3_callsites.txt
+          retention-days: 30
+  b1-claude-v2-independent-replay:
+    needs: changed-legacy-scope
+    if: needs.changed-legacy-scope.outputs.required == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 2ddfb2f4a6e145c6579820beb03e4d678594de21
+          path: .vault-pin
+      - uses: actions/checkout@v4
+        with:
+          ref: e52a9fb9d091ce439278988bdb0c7ef4ffaeab99
+          path: .factory-pin
+      - uses: actions/checkout@v4
+        with:
+          ref: 2e19949042e4912d6e17154c7e2382f1dbe9f127
+          path: .core-v2-pin
+      - uses: actions/checkout@v4
+        with:
+          ref: 64d88eb98113312189170b7dbae18de569b3c1a3
+          path: .claude-pin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Independently pin and rehash original Claude V2 evidence bytes
+        run: |
+          test "$(git -C .vault-pin rev-parse HEAD)" = 2ddfb2f4a6e145c6579820beb03e4d678594de21
+          test "$(git -C .factory-pin rev-parse HEAD)" = e52a9fb9d091ce439278988bdb0c7ef4ffaeab99
+          test "$(git -C .core-v2-pin rev-parse HEAD)" = 2e19949042e4912d6e17154c7e2382f1dbe9f127
+          test "$(git -C .claude-pin rev-parse HEAD)" = 64d88eb98113312189170b7dbae18de569b3c1a3
+          echo "86e8ae53ae990de42cbfd13cfe52e1a5ac4044da6a25ab05d18f0e3b24d47961  .claude-pin/integration_tests/option_b_v2_cross_pr_harness.py" | sha256sum -c -
+          echo "b8860ae4a8d90bdd19100ff0f92e2db1673ed75d1170156658b0866da1b79ad6  .claude-pin/integration_tests/option_b_v2_evidence_bundle.json" | sha256sum -c -
+          mkdir -p b1_evidence /tmp/aql-overlay
+          sudo mkdir -p /home/claude
+          sudo ln -s "$PWD/.vault-pin" /home/claude/super-kumo-v8
+          ln -s "$PWD/.factory-pin" /tmp/aql-overlay/factory
+          ln -s "$PWD/.core-v2-pin" /tmp/aql-overlay/core
+          PYTHONPATH="$PWD/.vault-pin" python .claude-pin/integration_tests/option_b_v2_cross_pr_harness.py > b1_evidence/claude_v2_independent_replay.log
+          tail -45 b1_evidence/claude_v2_independent_replay.log
+          grep -E 'PASS=22.*FAIL=0.*BLOCKED=2' b1_evidence/claude_v2_independent_replay.log
+          sha256sum b1_evidence/claude_v2_independent_replay.log
+      - name: Preserve independent pinned replay log
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-b1-claude-v2-independent-replay
+          path: b1_evidence/claude_v2_independent_replay.log
+          retention-days: 30
