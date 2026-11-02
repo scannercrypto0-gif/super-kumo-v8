@@ -1,5 +1,6 @@
 """R3 closed-prefix Breakout rule tests: never consume future bars or mint G2."""
 import unittest
+from decimal import Decimal
 
 from research_wp_r0.aql_f1_decision_capture_v1 import CaptureError, digest
 from research_wp_r0.aql_r3_breakout_closed_prefix import evaluate_breakout_closed_prefix
@@ -66,7 +67,7 @@ class R3BreakoutClosedPrefix(unittest.TestCase):
 
     def test_prefix_sha_tamper_fails(self):
         r = bars()
-        pinned = digest([list(v) for v in r])
+        pinned = digest([[v[0], v[1]] + [format(Decimal(str(x)).normalize(), 'f') for x in v[2:]] for v in r])
         self.assertEqual(self.evaluate(r,expected_prefix_sha256=pinned)["prefix_sha256"], pinned)
         modified = list(r)
         modified[0] = tuple(list(modified[0][:-1])+[99.0])
