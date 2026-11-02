@@ -271,7 +271,13 @@ def build_handoff(months: Mapping[int, list[dict]], source: Mapping[str, Any]) -
     _check(source.get("mode") == SOURCE_STATUS and
            source.get("external_evidence") == PROOF_STATUS and
            source.get("source_available_at_ms") is None and
-           source.get("correction_published_at_ms") is None,
+           source.get("correction_published_at_ms") is None and
+           source.get("source_version") == "2024-retrospective-original-archive-snapshot" and
+           source.get("correction_generation") == "UNKNOWN_UNATTESTED" and
+           source.get("archive_artifact_sha256") == B1_ARTIFACT_SHA256 and
+           source.get("accepted_market_report_sha256") == B1_REPORT_SHA256 and
+           source.get("market_lock_sha256") ==
+               "267964c81772b1a118cd740c8d8a6bc6a757e615a98d80769a68e5a12df34679",
            "SOURCE_SCOPE_OR_PROVENANCE_DRIFT")
     sources = {int(x["name"][-6:-4]): x for x in source["months"]}
     items = []
