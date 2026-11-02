@@ -7,6 +7,7 @@ RETROSPECTIVE_NON_PIT input stays research-only and UNVERIFIED.
 from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
+from decimal import Decimal
 
 from .aql_f1_decision_capture_v1 import CaptureError, digest
 from .aql_p0_f1f2_opportunities import ENTRY_LOOKBACK, EXIT_LOOKBACK
@@ -65,7 +66,7 @@ def evaluate_breakout_closed_prefix(
     if checked[-1][1] + 1 != decision_cutoff_ms:
         raise CaptureError("R3_LAST_BAR_NOT_AT_CUTOFF")
     # Binds all input bars including OHLCV, never a digest claimed from a later bar.
-    prefix_sha = digest([list(r) for r in checked])
+    prefix_sha = digest([[r[0], r[1]] + [format(Decimal(str(v)).normalize(), 'f') for v in r[2:]] for r in checked])
     if expected_prefix_sha256 is not None and prefix_sha != expected_prefix_sha256:
         raise CaptureError("R3_PREFIX_SHA_DRIFT")
     eval_bar = checked[-1]
