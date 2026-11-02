@@ -35,6 +35,16 @@ class CaptureTests(unittest.TestCase):
             self.assertEqual((out / "raw-response.json").read_bytes(),
                              b'{"error":"unavailable"}')
 
+    def test_stale_response_fails_closed(self):
+        with tempfile.TemporaryDirectory() as root:
+            out = Path(root) / "capture"
+            stale = json.dumps([[1800000000 - 900, 100, 110, 102, 108, 15]]).encode()
+            result = capture(product_id="BTC-USD", folder=out,
+                             request=lambda _: stale,
+                             now_ms=(1800000000 + 900) * 1000)
+            self.assertEqual(result["status"], "NOT_ESTABLISHED")
+            self.assertIn("LATEST_COMPLETED_BAR_MISSING", result["reason"])
+
     def test_transport_error_still_records_failure(self):
         with tempfile.TemporaryDirectory() as root:
             def fail(_):
