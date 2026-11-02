@@ -1,0 +1,22 @@
+name: Core R2 original decision ingress (delta only)
+on:
+  push:
+    branches:
+      - aql/core-f1-prospective-capture-20261101
+    paths:
+      - 'research_wp_r0/aql_r2_original_decision_ingress.py'
+      - 'tests/test_aql_r2_original_decision_ingress.py'
+      - '.github/workflows/core-r2-original-decision-ingress.yml'
+  workflow_dispatch:
+jobs:
+  r2-delta:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: R2 changed-only tests
+        run: python -m unittest -v tests.test_aql_r2_original_decision_ingress
