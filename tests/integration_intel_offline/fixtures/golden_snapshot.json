@@ -1,0 +1,67 @@
+{
+  "schema_version": "integration-intel-snapshot-1",
+  "snapshot_at": "2026-10-31T14:00:00Z",
+  "main_head_sha": "dbc191d",
+  "access_limits": [
+    "Cross-chat ChatGPT sessions and PM notebook #205 inaccessible — not verified",
+    "Issue #207 RAW vault delivery: UNKNOWN — no delivery comment in accessible snapshot",
+    "PR body claims (SELF_REPORTED) not independently verified"
+  ],
+  "prs": [
+    {
+      "number": 208,
+      "head_sha": "0af141cc9e",
+      "base_ref": "main",
+      "draft": true,
+      "title": "[NO MERGE] AQL-CLAUDE-RESEARCH-FOUNDATION-HARDENING-001",
+      "state": "open",
+      "evidence_kind": "VERIFIED_REMOTE_METADATA",
+      "merged": false,
+      "merged_evidence_kind": "VERIFIED_REMOTE_METADATA"
+    },
+    {
+      "number": 209,
+      "head_sha": "57c8d35822",
+      "base_ref": "aql/w1-core-retrospective-outcomes-20261031",
+      "draft": true,
+      "title": "[DRAFT][FACTORY W1] Read-only research selection and outcome",
+      "state": "open",
+      "evidence_kind": "VERIFIED_REMOTE_METADATA",
+      "merged": false,
+      "merged_evidence_kind": "VERIFIED_REMOTE_METADATA"
+    },
+    {
+      "number": 204,
+      "head_sha": "2bfd691d78",
+      "base_ref": "main",
+      "draft": true,
+      "title": "[DRAFT] feat(p0): aql.p0.historical-decision.v1",
+      "state": "open",
+      "evidence_kind": "VERIFIED_REMOTE_METADATA",
+      "merged": false,
+      "merged_evidence_kind": "VERIFIED_REMOTE_METADATA"
+    },
+    {
+      "number": 118,
+      "head_sha": "3b1d02f64f",
+      "base_ref": "main",
+      "draft": true,
+      "title": "G2: bounded offline observation worker with independent fail",
+      "state": "open",
+      "evidence_kind": "VERIFIED_REMOTE_METADATA",
+      "merged": false,
+      "merged_evidence_kind": "VERIFIED_REMOTE_METADATA"
+    },
+    {
+      "number": 46,
+      "head_sha": "a4c106a02c",
+      "base_ref": "fix/research-r41-checkpoint-export-sync-20261022",
+      "draft": false,
+      "title": "feat(research): Strategy Factory Batch 01 — synthetic candidates",
+      "state": "open",
+      "evidence_kind": "VERIFIED_REMOTE_METADATA",
+      "merged": false,
+      "merged_evidence_kind": "VERIFIED_REMOTE_METADATA"
+    }
+  ]
+}
