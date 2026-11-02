@@ -79,9 +79,18 @@ def capture(*, product_id, folder, request, now_ms):
             raise CoinbaseSourceError("OUTSIDE_REQUEST_WINDOW")
         if bars[0].open_time_ms < start_s * 1000:
             raise CoinbaseSourceError("OUTSIDE_REQUEST_WINDOW")
+        normalized = [dict(source=b.source, product_id=b.product_id,
+                           interval=b.interval, open_time_ms=b.open_time_ms,
+                           close_time_ms=b.close_time_ms, open=b.open,
+                           high=b.high, low=b.low, close=b.close,
+                           volume=b.volume, custody=b.custody,
+                           executable_on_binance=b.executable_on_binance)
+                      for b in bars]
+        normalized_bytes = encode(normalized)
+        write_once(folder / "normalized-bars.json", normalized_bytes)
         result = dict(status="UNVERIFIED_CAPTURED", source="coinbase_exchange_public_rest",
                       product_id=product_id, interval="15m", bars=len(bars),
-                      raw_sha256=digest(raw), first_open_ms=bars[0].open_time_ms,
+                      raw_sha256=digest(raw), normalized_sha256=digest(normalized_bytes),\n                      first_open_ms=bars[0].open_time_ms,
                       last_close_ms=bars[-1].close_time_ms,
                       source_custody="LOCAL_UNVERIFIED", execution="DISABLED",
                       binance_execution_price_verified=False,
