@@ -140,16 +140,35 @@ def build_readiness_report(
         ),
     )
 
-    # EVIDENCE_VERIFIED
+    # EVIDENCE_VERIFIED — all PRs in pr_summary must have verified evidence.
+    # "any-one-PR" shortcut is not acceptable: a PR without evidence is unverified
+    # regardless of how many other PRs are verified.
     pr_summary = evidence_report.get("pr_summary", {})
-    any_verified = any(
-        v.get("highest_level") is not None for v in pr_summary.values()
-    )
-    rpt.set_gate(
-        "EVIDENCE_VERIFIED",
-        "PASS" if any_verified else "PENDING",
-        evidence="Some PRs have verified evidence" if any_verified else "No verified evidence found",
-    )
+    if not pr_summary:
+        # No PRs in scope yet — evidence collection has not started
+        rpt.set_gate(
+            "EVIDENCE_VERIFIED",
+            "PENDING",
+            evidence="No PR evidence summary provided",
+        )
+    else:
+        unverified = [
+            str(pr)
+            for pr, v in pr_summary.items()
+            if v.get("highest_level") is None
+        ]
+        if unverified:
+            rpt.set_gate(
+                "EVIDENCE_VERIFIED",
+                "PENDING",
+                evidence=f"PR(s) without verified evidence: {', '.join(sorted(unverified))}",
+            )
+        else:
+            rpt.set_gate(
+                "EVIDENCE_VERIFIED",
+                "PASS",
+                evidence=f"All {len(pr_summary)} PR(s) have verified evidence",
+            )
 
     # NO_UNRESOLVED_CLAIMS
     review_required = [r for r in claim_results if r.get("verdict") == "REVIEW_REQUIRED"]

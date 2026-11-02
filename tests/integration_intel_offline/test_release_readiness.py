@@ -99,3 +99,48 @@ class TestBuildReadinessReport:
         claims = [{"pr_number": 1, "verdict": "REVIEW_REQUIRED", "hit_count": 2}]
         rpt = build_readiness_report(clean_dag(), [], clean_evidence(), claims, snapshot_age_hours=1.0)
         assert rpt.verdict() == "BLOCKED"
+
+    # ── EVIDENCE_VERIFIED: no any-one-PR shortcut (Issue #215 audit delta) ──
+
+    def test_evidence_verified_requires_all_prs(self):
+        """PASS only when every PR in pr_summary has a highest_level."""
+        evidence = {"pr_summary": {
+            "1": {"highest_level": "W1"},
+            "2": {"highest_level": None},   # unverified
+        }}
+        rpt = build_readiness_report(clean_dag(), [], evidence, clean_claims(), snapshot_age_hours=1.0)
+        # Gate must be PENDING (not PASS) because PR 2 is unverified
+        gate = next(g for g in rpt.pending_gates() if g["name"] == "EVIDENCE_VERIFIED")
+        assert "2" in gate["evidence"]
+        assert rpt.verdict() == "BLOCKED"
+
+    def test_evidence_verified_empty_summary_is_pending(self):
+        """Empty pr_summary must stay PENDING, not be shortcut to PASS."""
+        evidence = {"pr_summary": {}}
+        rpt = build_readiness_report(clean_dag(), [], evidence, clean_claims(), snapshot_age_hours=1.0)
+        pending_names = [g["name"] for g in rpt.pending_gates()]
+        assert "EVIDENCE_VERIFIED" in pending_names
+        assert rpt.verdict() == "BLOCKED"
+
+    def test_evidence_verified_all_prs_pass(self):
+        """PASS only when every PR in pr_summary is verified."""
+        evidence = {"pr_summary": {
+            "1": {"highest_level": "W1"},
+            "2": {"highest_level": "W2"},
+        }}
+        rpt = build_readiness_report(clean_dag(), [], evidence, clean_claims(), snapshot_age_hours=1.0)
+        gates = {g["name"]: g for g in rpt.report()["gates"]}
+        assert gates["EVIDENCE_VERIFIED"]["status"] == "PASS"
+        assert rpt.verdict() == "READY_FOR_OWNER_REVIEW"
+
+    def test_evidence_verified_single_unverified_pr_blocks(self):
+        """A single unverified PR among many blocks the gate."""
+        evidence = {"pr_summary": {
+            "208": {"highest_level": "W1"},
+            "211": {"highest_level": "W2"},
+            "213": {"highest_level": None},  # this PR is unverified
+            "214": {"highest_level": "W1"},
+        }}
+        rpt = build_readiness_report(clean_dag(), [], evidence, clean_claims(), snapshot_age_hours=1.0)
+        gate = next(g for g in rpt.pending_gates() if g["name"] == "EVIDENCE_VERIFIED")
+        assert "213" in gate["evidence"]
