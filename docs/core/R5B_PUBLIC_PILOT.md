@@ -110,6 +110,13 @@ warmup insufficiency, missing approval, owner/exact-SHA/freshness/single-use
 approval and manual-only workflow gate. Actual websocket.create_connection and
 REST are blocked in tests; synthetic injected messages are OFFLINE_TEST_ONLY.
 Old R1–R4 tests/runners and any real Binance acquisition are not executed by CI.
+This refers to the new R5B job. The first publication automatically triggered
+existing cumulative-PR F1/B2/B3/R1 workflows (41437076588/41437076584/41437076835/
+41437076869, plus push41437067211). This unintended automatic repeat is
+disclosed and excluded from R5B evidence. Their workflow selection now compares
+the actual incremental code/test delta (accepted starting17f2c45 fallback), so
+R5B/CI-selection-only changes skip those old jobs; old code/test changes and
+explicit legacy manual runs still select them. No old source code was changed.
 Published exact SHA, real offline CI and offline artifact hashes are recorded
 on Issue180 after completion. Do not treat offline validation artifact as a
 Binance event artifact.

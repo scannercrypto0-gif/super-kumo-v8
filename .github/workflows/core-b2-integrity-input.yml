@@ -17,7 +17,35 @@ on:
 permissions:
   contents: read
 jobs:
+  changed-legacy-scope:
+    runs-on: ubuntu-latest
+    outputs:
+      required: ${{ steps.delta.outputs.required }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: delta
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          EVENT_KIND: ${{ github.event_name }}
+        run: |
+          python - <<'PYCODE'
+          import os,re,subprocess
+          from research_wp_r0.aql_r5b_run_authorization import legacy_delta_needed
+          base=os.environ.get('BEFORE_SHA','')
+          if not re.fullmatch(r'[a-f0-9]{40}',base) or subprocess.run(['git','cat-file','-e',base],capture_output=True).returncode:
+              base='17f2c45bc63f688b81c761e250b5d7685e25063f'
+          changed=subprocess.check_output(['git','diff','--name-only',base,'HEAD'],text=True).splitlines()
+          required=os.environ.get('EVENT_KIND')=='workflow_dispatch' or legacy_delta_needed(changed,['research_wp_r0/aql_f1_b2_integrity_input.py', 'examples/aql_f1_b2_emit_integrity_input.py', 'tests/test_aql_f1_b2_integrity_input.py'])
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:f.write('required='+str(required).lower()+'\n')
+          print('LEGACY_SCOPE_REQUIRED='+str(required)+' CHANGED='+repr(changed))
+          PYCODE
   b2-test-only-input:
+    needs: changed-legacy-scope
+    if: needs.changed-legacy-scope.outputs.required == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

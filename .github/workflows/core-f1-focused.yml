@@ -11,7 +11,35 @@ on:
 permissions:
   contents: read
 jobs:
+  changed-legacy-scope:
+    runs-on: ubuntu-latest
+    outputs:
+      required: ${{ steps.delta.outputs.required }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: delta
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          EVENT_KIND: ${{ github.event_name }}
+        run: |
+          python - <<'PYCODE'
+          import os,re,subprocess
+          from research_wp_r0.aql_r5b_run_authorization import legacy_delta_needed
+          base=os.environ.get('BEFORE_SHA','')
+          if not re.fullmatch(r'[a-f0-9]{40}',base) or subprocess.run(['git','cat-file','-e',base],capture_output=True).returncode:
+              base='17f2c45bc63f688b81c761e250b5d7685e25063f'
+          changed=subprocess.check_output(['git','diff','--name-only',base,'HEAD'],text=True).splitlines()
+          required=os.environ.get('EVENT_KIND')=='workflow_dispatch' or legacy_delta_needed(changed,['research_wp_r0/aql_f1_*.py', 'tests/test_aql_f1_*.py'])
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:f.write('required='+str(required).lower()+'\n')
+          print('LEGACY_SCOPE_REQUIRED='+str(required)+' CHANGED='+repr(changed))
+          PYCODE
   b1-signal-handoff:
+    needs: changed-legacy-scope
+    if: needs.changed-legacy-scope.outputs.required == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +52,8 @@ jobs:
           python -m compileall -q research_wp_r0/aql_f1_research_signal_handoff_v1.py research_wp_r0/aql_f1_prospective_host_v1.py
           python -m unittest -v tests.test_aql_f1_b1_research_signal_handoff
   b1-factory-pinned-overlay:
+    needs: changed-legacy-scope
+    if: needs.changed-legacy-scope.outputs.required == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +94,8 @@ jobs:
             b1_evidence/f3_callsites.txt
           retention-days: 30
   b1-claude-v2-independent-replay:
+    needs: changed-legacy-scope
+    if: needs.changed-legacy-scope.outputs.required == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

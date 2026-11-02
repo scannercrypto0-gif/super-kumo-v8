@@ -7,6 +7,11 @@ on:
       - tests/test_aql_r5b_public_pilot.py
       - .github/workflows/core-r5b-focused.yml
       - .github/workflows/sf-dev-admission.yml
+      - research_wp_r0/aql_r5b_run_authorization.py
+      - .github/workflows/core-f1-focused.yml
+      - .github/workflows/core-b2-integrity-input.yml
+      - .github/workflows/core-b3-vault-parent.yml
+      - .github/workflows/core-r1-research-producer.yml
 permissions:
   contents: read
 jobs:

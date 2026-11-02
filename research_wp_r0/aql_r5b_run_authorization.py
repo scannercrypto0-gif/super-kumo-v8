@@ -1,6 +1,7 @@
 """R5B workflow approval policy only; no network, source/PIT or trading authority."""
 import datetime
 import re
+import fnmatch
 
 PHRASE='GO_RUN_R5B_PUBLIC_WS_UNVERIFIED_960S_1BAR'
 
@@ -30,3 +31,8 @@ def verify_comment(comment,*,repo,actor,approved_sha,comment_id,now):
 def deny_previous_runs(runs,*,title,current_run_id):
     if any(int(r['id'])<int(current_run_id) and r['display_title']==title for r in runs):
         raise ValueError('ONE_TIME_APPROVAL_ALREADY_CONSUMED')
+
+
+def legacy_delta_needed(changed,patterns):
+    """Keep accepted legacy suites scoped to THEIR code/tests, not PR base diff."""
+    return any(fnmatch.fnmatchcase(path,pattern) for path in changed for pattern in patterns)

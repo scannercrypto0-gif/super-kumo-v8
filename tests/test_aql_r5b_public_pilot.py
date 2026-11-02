@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 import datetime
-from research_wp_r0.aql_r5b_run_authorization import verify_comment,deny_previous_runs,approval_body
+from research_wp_r0.aql_r5b_run_authorization import verify_comment,deny_previous_runs,approval_body,legacy_delta_needed
 
 from research_wp_r0.aql_r5b_public_pilot import (
     APPROVAL, BAR_MS, DURATION_SECONDS, Pilot, PilotStopped, canonical,
@@ -207,6 +207,12 @@ class R5BOnly(unittest.TestCase):
                           'github.run_attempt == 1','timeout --signal=TERM --kill-after=5s 960s'):
             self.assertIn(condition,workflow)
         self.assertNotIn('pytest',workflow)
+
+    def test_old_core_suites_select_only_their_actual_changed_paths(self):
+        patterns=['research_wp_r0/aql_f1_*.py','tests/test_aql_f1_*.py']
+        self.assertFalse(legacy_delta_needed(['research_wp_r0/aql_r5b_public_pilot.py',
+                                             '.github/workflows/core-f1-focused.yml'],patterns))
+        self.assertTrue(legacy_delta_needed(['research_wp_r0/aql_f1_decision_capture_v1.py'],patterns))
 
 
 if __name__=='__main__': unittest.main()
