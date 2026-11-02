@@ -1,0 +1,20 @@
+name: AQL B2 Factory changed-path integrity gate
+on:
+  push:
+    branches:
+      - aql/w1-factory-research-consumer-20261031
+    paths:
+      - research_wp_r0/aql_b2_system_integrity_gate.py
+      - tests/test_aql_b2_system_integrity_gate.py
+      - .github/workflows/aql-b2-factory-integrity.yml
+  workflow_dispatch:
+jobs:
+  b2-contract-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run only B2 changed-path negative and contract tests
+        run: python -m unittest tests.test_aql_b2_system_integrity_gate -v

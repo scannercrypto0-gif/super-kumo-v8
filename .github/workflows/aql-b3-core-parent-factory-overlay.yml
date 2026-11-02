@@ -1,0 +1,108 @@
+# Exact-head B3 final rerun after B1 trigger narrowing; B1 accepted suites excluded.
+name: AQL B3 exact Core parent Vault Factory consumer replay
+on:
+  push:
+    branches:
+      - aql/w1-factory-research-consumer-20261031
+    paths:
+      - research_wp_r0/aql_b3_core_parent_factory_overlay.py
+      - tests/test_aql_b3_core_parent_factory_overlay.py
+      - .github/workflows/aql-b3-core-parent-factory-overlay.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  b3-pinned-parent-vault-factory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Retrieve exact Core B2 and B3 emitted artifact bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p b3-core-input b3-final-report
+          api="https://api.github.com/repos/scannercrypto0-gif/super-kumo-v8/actions/artifacts"
+          curl --fail --location --retry 2 -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${api}/13084853700/zip" -o b3-core-input/core-b2.zip
+          curl --fail --location --retry 2 -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${api}/13085672296/zip" -o b3-core-input/core-b3.zip
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,zipfile
+          root=Path('b3-core-input')
+          for stem, filename, expected in (
+             ('core-b2','core-b2-integrity-input.json','42005d09e3674420ddd8a761d40540c8e6509e8e79943d1f6a9821f692823b09'),
+             ('core-b3','core-b3-vault-parent.json','01a934a90dc6ca72e7b1fca8b352fd1f425d9c0a9eb4c05c9d59a8c3ed69400b'),
+          ):
+              with zipfile.ZipFile(root/(stem+'.zip')) as z:
+                  raw=z.read(filename)
+              assert hashlib.sha256(raw).hexdigest() == expected, stem
+              (root/filename).write_bytes(raw)
+          print('EXACT_CORE_B2_B3_ARTIFACT_BYTES_OK')
+          PY
+      - name: Read-only overlay of exact Core B3 witness/parent and actual Vault implementation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/scannercrypto0-gif/super-kumo-v8/contents"
+          mkdir -p tools/raw_vault_offline
+          for file in aql_f1_decision_capture_v1.py aql_f1_provenance_v1.py aql_f1_parent_witness_v1.py aql_f1_b3_vault_parent_adapter.py; do
+            curl --fail --location --retry 2 -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github.raw+json" \
+              "${api}/research_wp_r0/${file}?ref=17955e295263340b5cfbcfed8ae8e2a3e8a70c32" \
+              -o "research_wp_r0/${file}"
+          done
+          for file in __init__.py schema.py vault.py; do
+            curl --fail --location --retry 2 -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github.raw+json" \
+              "${api}/tools/raw_vault_offline/${file}?ref=7d97b09c0c6ee2650a61d523acb8d8c771a99c46" \
+              -o "tools/raw_vault_offline/${file}"
+            curl --fail --location --retry 2 -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github.raw+json" \
+              "${api}/tools/raw_vault_offline/${file}?ref=2ddfb2f4a6e145c6579820beb03e4d678594de21" \
+              -o "b3-core-input/vault-original-${file}"
+            cmp "tools/raw_vault_offline/${file}" "b3-core-input/vault-original-${file}"
+          done
+          python -m py_compile research_wp_r0/aql_f1_b3_vault_parent_adapter.py \
+            research_wp_r0/aql_f1_parent_witness_v1.py tools/raw_vault_offline/vault.py
+          echo "CORE_B3_PIN=17955e295263340b5cfbcfed8ae8e2a3e8a70c32"
+          echo "VAULT_HANDOFF_PIN=2ddfb2f4a6e145c6579820beb03e4d678594de21"
+          echo "VAULT_LIVE_EXECUTED=7d97b09c0c6ee2650a61d523acb8d8c771a99c46"
+          echo "VAULT_SCHEMA_VAULT_PY_AND_PACKAGE_INIT_UNCHANGED=YES"
+      - name: Run only 8 changed-seam Factory B3 Core parent tests
+        env:
+          AQL_B3_CORE_B2: b3-core-input/core-b2-integrity-input.json
+          AQL_B3_CORE_B3: b3-core-input/core-b3-vault-parent.json
+        run: python -m unittest tests.test_aql_b3_core_parent_factory_overlay -v
+      - name: Run one real Core parent Vault Factory consumer replay and verify bytes
+        run: |
+          set -euo pipefail
+          python -m research_wp_r0.aql_b3_core_parent_factory_overlay \
+            --core-b2 b3-core-input/core-b2-integrity-input.json \
+            --core-b3 b3-core-input/core-b3-vault-parent.json \
+            --vault-root b3-exercised-raw-vault \
+            --out b3-final-report/system-integrity.json
+          python -m research_wp_r0.aql_b3_core_parent_factory_overlay \
+            --core-b2 b3-core-input/core-b2-integrity-input.json \
+            --core-b3 b3-core-input/core-b3-vault-parent.json \
+            --vault-root b3-exercised-raw-vault \
+            --out b3-final-report/identical-second-run.json
+          cmp b3-final-report/system-integrity.json b3-final-report/identical-second-run.json
+          sha256sum b3-final-report/system-integrity.json | tee b3-final-report/sha256.txt
+          rm b3-final-report/identical-second-run.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: factory-b3-core-parent-vault-factory-consumer
+          path: b3-final-report/
+          if-no-files-found: warn

@@ -1,0 +1,53 @@
+name: Factory R4 Core host fixture-only handoff
+on:
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_r4_factory_host_handoff.py'
+      - 'tests/test_aql_r4_factory_host_handoff.py'
+      - '.github/workflows/aql-r4-factory-host-handoff.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  factory-r4-focused:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run only Factory R4 focused tests
+        run: python -m unittest -v tests.test_aql_r4_factory_host_handoff
+      - name: Download exact Core R4 fixture artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -H "Accept: application/vnd.github+json" /repos/${{ github.repository }}/actions/artifacts/13128218153/zip > /tmp/core-r4.zip
+          mkdir -p /tmp/core-r4
+          unzip -q /tmp/core-r4.zip -d /tmp/core-r4
+      - name: Validate actual Core R4 schedule and result without promotion
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          from research_wp_r0.aql_r4_factory_host_handoff import consume_r4_json
+          from research_wp_r0.aql_r3_factory_event_outcome_consumer import jcs
+          p=Path('/tmp/core-r4')
+          schedules=list(p.rglob('*.schedule.json'))
+          results=list(p.rglob('*.result.json'))
+          assert len(schedules)==len(results)==1, (schedules,results)
+          s=schedules[0].read_bytes();r=results[0].read_bytes()
+          report=consume_r4_json(s,r,asof_ms=1704087000000)
+          assert report['software_handoff_status']=='SOFTWARE_HANDOFF_ACCEPTED'
+          assert report['genuine_original_event_status']=='BLOCKED_ON_REAL_G2_EVENT'
+          assert report['scheduled_opportunities']==report['horizon_rows']==0
+          Path('factory-r4-handoff.json').write_bytes(jcs(report)+b'\n')
+          print('FACTORY_R4_SOFTWARE_HANDOFF_ACCEPTED_FIXTURE_ONLY')
+          PY
+          sha256sum factory-r4-handoff.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: factory-r4-core-fixture-handoff
+          path: factory-r4-handoff.json
+          if-no-files-found: error
