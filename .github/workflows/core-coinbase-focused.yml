@@ -1,0 +1,25 @@
+name: Core Coinbase source focused offline tests
+on:
+  push:
+    branches:
+      - aql/coinbase-source-adapter-20261102
+  pull_request:
+    paths:
+      - research_wp_r0/aql_coinbase_public_candles.py
+      - research_wp_r0/aql_coinbase_public_capture.py
+      - tests/test_aql_coinbase_public_candles.py
+      - tests/test_aql_coinbase_public_capture.py
+      - .github/workflows/core-coinbase-focused.yml
+permissions:
+  contents: read
+jobs:
+  offline-coinbase-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Focused offline Coinbase source tests (no network request)
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -s tests -p 'test_aql_coinbase_public_*.py' -v
