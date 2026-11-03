@@ -358,6 +358,8 @@ def build_independent_opportunity_package(trade_reports, policy, cohort_bounds, 
         sid=report["source_id"]
         if test_only and not sid.startswith("TEST_ONLY_"):
             fail("REAL_SOURCE_CANNOT_BE_CALLED_TEST_ONLY")
+        if test_only is not True and sid.startswith("TEST_ONLY_"):
+            fail("TEST_ONLY_SOURCE_FORBIDDEN_IN_REAL_SCORING")
         if sid in seen or sid not in cohort_bounds:
             fail("DUPLICATE_OR_UNBOUND_SOURCE_COHORT")
         seen.add(sid)
