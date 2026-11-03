@@ -29,7 +29,7 @@ jobs:
       - name: Checkout pinned isolated Core #221
         uses: actions/checkout@v4
         with:
-          ref: 0842fc0a753ec6a3327c00c24e74908e8f6ca39c
+          ref: 58e423431cc639958736337a65db8a17bfdbaa85
           path: _core_p2_pinned
           persist-credentials: false
       - uses: actions/setup-python@v5
