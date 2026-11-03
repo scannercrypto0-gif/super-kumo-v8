@@ -1,0 +1,40 @@
+name: P1-A original-653 new adapter tests only
+on:
+  push:
+    branches: [work/aql-p1a-original-653-20261103]
+    paths:
+      - research_wp_r0/aql_p1a_original_653.py
+      - tests/test_aql_p1a_original_653.py
+      - .github/workflows/aql-p1a-original-653.yml
+  pull_request:
+    paths:
+      - research_wp_r0/aql_p1a_original_653.py
+      - tests/test_aql_p1a_original_653.py
+      - .github/workflows/aql-p1a-original-653.yml
+permissions:
+  contents: read
+jobs:
+  p1a-focused:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Only new TEST_ONLY adapter fixtures, no private data or old suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir p1a-ci-evidence
+          git rev-parse HEAD | tee p1a-ci-evidence/code-sha.txt
+          python -m unittest -v tests.test_aql_p1a_original_653 2>&1 | tee p1a-ci-evidence/tests.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p1a-focused-offline-fixtures-only
+          path: p1a-ci-evidence/
+          retention-days: 7
