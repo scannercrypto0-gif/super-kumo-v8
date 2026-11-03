@@ -1,0 +1,85 @@
+name: AQL R1 Actual Core Factory Research Consumer
+on:
+  push:
+    branches: [aql/w1-factory-research-consumer-20261031]
+    paths:
+      - research_wp_r0/aql_r1_factory_consumer.py
+      - tests/test_aql_r1_factory_consumer.py
+      - .github/workflows/aql-r1-factory-consumer.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  r1-consumer-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: factory
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46
+          path: vault
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Fetch actual pinned Core R1 and retained accepted B1 artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir r1-inputs
+          api="https://api.github.com/repos/scannercrypto0-gif/super-kumo-v8/actions/artifacts"
+          curl --fail --location --retry 2 -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "${api}/13120952732" -o r1-inputs/core-artifact-metadata.json
+          curl --fail --location --retry 2 -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "${api}/13120952732/zip" -o r1-inputs/core-r1.zip
+          curl --fail --location --retry 2 -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "${api}/13084775420/zip" -o r1-inputs/b1-original.zip
+          python - <<'PY'
+          import pathlib,json,zipfile,hashlib
+          p=pathlib.Path('r1-inputs')
+          meta=json.loads((p/'core-artifact-metadata.json').read_bytes())
+          assert meta['workflow_run']['head_sha']=='4ab3cd6b1cbf83a52f941f22d35892376c6feee7'
+          assert meta['name']=='core-r1-2024-market-only-handoff' and not meta['expired']
+          with zipfile.ZipFile(p/'core-r1.zip') as z:
+              raw=z.read('core-r1-market-research.json')
+          assert hashlib.sha256(raw).hexdigest()=='4798de0525be3d94190429b653125d6f3f00d2719d9dbe3e8d5cbda4fbb6c8d6'
+          (p/'core-r1-market-research.json').write_bytes(raw)
+          assert hashlib.sha256((p/'b1-original.zip').read_bytes()).hexdigest()=='265b7ade1be307bd2efafbd0a8438e6846c869df6205af717133d490e38aeb59'
+          print('ACTUAL_CORE_PRODUCER_ARTIFACT_AND_ACCEPTED_PARENT_PINS_OK')
+          PY
+      - name: Exact source pins and only NEW R1 focused tests
+        working-directory: factory
+        env:
+          PYTHONPATH: .:../vault
+          AQL_R1_CORE: ../r1-inputs/core-r1-market-research.json
+          AQL_R1_B1: ../r1-inputs/b1-original.zip
+        run: |
+          set -euo pipefail
+          echo "FACTORY_HEAD_SHA=$(git rev-parse HEAD)"
+          echo "FACTORY_TREE_SHA=$(git rev-parse HEAD^{tree})"
+          test "$(git rev-parse HEAD:research_wp_r0/indicator_library_v2.py)" = 87aa21841c7b649d3b860ee1337ccc45fd08e0bf
+          test "$(git -C ../vault rev-parse HEAD)" = 7d97b09c0c6ee2650a61d523acb8d8c771a99c46
+          python -m unittest -v tests.test_aql_r1_factory_consumer
+      - name: Actual Core producer artifact to Factory evaluation and independent-process replay
+        working-directory: factory
+        env:
+          PYTHONPATH: .:../vault
+        run: |
+          set -euo pipefail
+          python -m research_wp_r0.aql_r1_factory_consumer --core ../r1-inputs/core-r1-market-research.json --b1-artifact ../r1-inputs/b1-original.zip --out ../r1-evaluation
+          python -m research_wp_r0.aql_r1_factory_consumer --core ../r1-inputs/core-r1-market-research.json --b1-artifact ../r1-inputs/b1-original.zip --out ../r1-replay
+          cmp ../r1-evaluation/evaluation.json ../r1-replay/evaluation.json
+          cmp ../r1-evaluation/SUMMARY.md ../r1-replay/SUMMARY.md
+          sha256sum ../r1-evaluation/*
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: factory-r1-actual-core-market-evaluation
+          path: |
+            r1-evaluation/
+            r1-inputs/core-r1-market-research.json
+            r1-inputs/core-artifact-metadata.json
+          if-no-files-found: error
+          retention-days: 90

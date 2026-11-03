@@ -1,0 +1,41 @@
+name: Factory R2 disconnected capability consumer
+on:
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_r2_factory_capability_consumer.py'
+      - 'tests/test_aql_r2_factory_capability_consumer.py'
+      - '.github/workflows/aql-r2-factory-capability.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  r2-factory-delta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Focused R2 factory tests only
+        run: python -m unittest -v tests.test_aql_r2_factory_capability_consumer
+      - name: Download pinned actual Core R2 capability
+        uses: actions/download-artifact@v4
+        with:
+          name: core-r2-not-connected-capability
+          run-id: 41406694953
+          github-token: ${{ github.token }}
+          repository: scannercrypto0-gif/super-kumo-v8
+          path: core-r2
+      - name: Verify actual Core bytes and replay consumer twice
+        run: |
+          echo '7efbf04f32e4624dc20676be4d0344ba2e62397fe3e48c18c39b1e70799e34a9  core-r2/not-connected-a.json' | sha256sum -c -
+          python -m research_wp_r0.aql_r2_factory_capability_consumer --core-capability core-r2/not-connected-a.json --out out/evaluation-a.json
+          python -m research_wp_r0.aql_r2_factory_capability_consumer --core-capability core-r2/not-connected-a.json --out out/evaluation-b.json
+          cmp out/evaluation-a.json out/evaluation-b.json
+          sha256sum out/evaluation-a.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: factory-r2-not-connected-evaluation
+          path: out/evaluation-a.json
+          if-no-files-found: error
