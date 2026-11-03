@@ -10,6 +10,8 @@ from __future__ import annotations
 from collections import Counter
 from copy import deepcopy
 from decimal import Decimal
+from hashlib import sha256
+import json
 
 from research_wp_r0.aql_p2_factory_lab import digest, hash_ok, validate_schedule
 from research_wp_r0.aql_p2_factory_real_development import (
@@ -210,7 +212,7 @@ def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decis
                 "cost_class": "MODEL_ONLY_NOT_EXECUTION",
                 "status": "INELIGIBLE" if status in ("NO_SIGNAL", "REJECTED") else
                           "UNKNOWN" if status == "UNKNOWN" else "MODELED_COMPLETE",
-                "missingness_reason": d.get("modeled_exit_missingness_reason") if status == "UNKNOWN" else None,
+                "missingness_reason": d.get("modeled_exit_missingness_reason"),
                 "execution_status": "NOT_OBSERVED",
             }
             # Core stores entry/exit eligibility for rejected arms too (signal
@@ -256,6 +258,24 @@ def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decis
         })
     if schedule != before:
         fail("SOURCE_SCHEDULE_MUTATED")
+    arm_summary = {}
+    for name in ("BASE", "SHADOW"):
+        values = [dec(r["modeled_net_return"]) for r in modeled
+                  if r["arm"] == name and r["modeled_net_return"] is not None]
+        gross_values = [dec(r["modeled_gross_return"]) for r in modeled
+                        if r["arm"] == name and r["modeled_gross_return"] is not None]
+        arm_summary[name] = {
+            "scheduled_opportunity_denominator": len(pairs),
+            "modeled_complete_count": len(values),
+            "null_or_ineligible_count": len(pairs) - len(values),
+            "modeled_net_mean_on_complete_only": str(sum(values) / len(values)) if values else None,
+            "modeled_gross_mean_on_complete_only": str(sum(gross_values) / len(gross_values))
+                if gross_values else None,
+            "positive_net_on_complete_only": sum(v > 0 for v in values),
+            "zero_net_on_complete_only": sum(v == 0 for v in values),
+            "negative_net_on_complete_only": sum(v < 0 for v in values),
+            "conditioning": "ELIGIBLE_MODELED_COMPLETE_ONLY; NOT_UNCONDITIONAL_OR_PORTFOLIO_PNL",
+        }
     report = {
         "schema": "aql.p2.factory.breakout-modeled-trades.v1",
         "scope": "RETROSPECTIVE_NON_PIT_DEVELOPMENT_ONLY",
@@ -270,6 +290,7 @@ def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decis
         "pair_count": len(pairs), "arm_count": len(modeled),
         "status_counts": {a: {s: counts[(a, s)] for s in ("TRIGGERED", "NO_SIGNAL", "REJECTED", "UNKNOWN")}
                           for a in ("BASE", "SHADOW")},
+        "descriptive_arm_summaries": arm_summary,
         "modeled_trades": modeled, "paired_comparison": paired,
         "both_arms_modeled_complete_pairs": sum(x["both_modeled_complete"] for x in paired),
         "paired_delta_effect_interpretation": "SAME_POLICY_ENTRY_EXIT_ON_BOTH_ELIGIBLE_PAIRS; FILTERED_EXCLUSIONS_ARE_NULL_NOT_ZERO_RETURNS",
@@ -282,3 +303,17 @@ def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decis
     }
     report["artifact_sha256"] = digest(report)
     return report
+
+
+def canonical_receipt_bytes(report):
+    """Reproducible private JSON receipt bytes, including internal artifact digest."""
+    if (not isinstance(report, dict) or not _full_hash(report, "artifact_sha256")
+        or report.get("schema") != "aql.p2.factory.breakout-modeled-trades.v1"):
+        fail("BAD_MODELED_REPORT_DIGEST")
+    return (json.dumps(report, sort_keys=True, separators=(",", ":"),
+                       ensure_ascii=True, allow_nan=False) + "\\n").encode("utf-8")
+
+
+def raw_receipt_sha256(report):
+    """Raw canonical serialized file digest (distinct from artifact_sha256)."""
+    return sha256(canonical_receipt_bytes(report)).hexdigest()
