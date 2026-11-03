@@ -204,6 +204,8 @@ def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decis
                 "entry_open_ms": entry_ms, "exit_open_ms": exit_ms,
                 "entry_open": None, "exit_open": None,
                 "modeled_gross_return": None, "modeled_net_return": None,
+                "holding_period_bars": 10, "modeled_trade_mfe": None,
+                "modeled_trade_mae": None,
                 "fee_bps": "20", "slippage_bps": "10",
                 "cost_class": "MODEL_ONLY_NOT_EXECUTION",
                 "status": "INELIGIBLE" if status in ("NO_SIGNAL", "REJECTED") else
@@ -221,11 +223,21 @@ def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decis
                 entry, exit_ = (_bar_at(bs[j], cutoff, j) for j in (0, 10))
                 gross = exit_ / entry - 1  # Core strategy is LONG only
                 net = gross - total_cost_bps / Decimal(10000)
+                # Exactly the 10 HELD completed bars [i+1..i+10] plus
+                # the exit open[i+11]. Never inspect exit bar high/low:
+                # they occur after the modeled exit clock.
+                held_highs = [dec(b["high"]) for b in bs[:10]]
+                held_lows = [dec(b["low"]) for b in bs[:10]]
+                mfe = max(max(held_highs), exit_) / entry - 1
+                mae = min(min(held_lows), exit_) / entry - 1
                 row.update(entry_open=str(entry), exit_open=str(exit_),
-                           modeled_gross_return=str(gross), modeled_net_return=str(net))
+                           modeled_gross_return=str(gross), modeled_net_return=str(net),
+                           modeled_trade_mfe=str(mfe), modeled_trade_mae=str(mae))
             elif status == "UNKNOWN":
                 if entry_ms != cutoff or exit_ms is not None:
                     fail("UNKNOWN_EXIT_TIME_CONTRACT_MISMATCH")
+                if len(bs) >= 11:
+                    fail("MODEL_EXIT_UNKNOWN_WITH_AVAILABLE_SOURCE")
             rows[name] = row
             modeled.append(row)
             counts[(name, status)] += 1
