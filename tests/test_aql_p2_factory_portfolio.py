@@ -86,6 +86,8 @@ def fixture(*, negative_second=False, no_triggers=False, other_month=False):
                 "missingness_reason": "END_OF_COHORT" if effective_status == "UNKNOWN" else None,
                 "censored": effective_status == "UNKNOWN",
                 "execution_status": "NOT_OBSERVED",
+                "cost_class": "MODEL_ONLY_NOT_EXECUTION",
+                "fee_bps": "20", "slippage_bps": "10",
             }
             parent["modeled_trades"].append(row)
         both = not no_triggers and base_status == "TRIGGERED" and shadow_status == "TRIGGERED"
@@ -275,6 +277,33 @@ class PortfolioTests(unittest.TestCase):
         self.assertEqual(out["pit_status"], "NOT_ATTESTED")
         self.assertEqual(out["oos_status"], "NOT_ATTESTED")
         self.assertEqual(out["holdout_status"], "SEALED_UNOPENED")
+
+    def test_false_model_cost_class_and_real_data_test_mode_rejected(self):
+        r,p,b=fixture()
+        r[0]["modeled_trades"][0]["cost_class"] = "ACTUAL_FILL"
+        r[0] = sealed(r[0])
+        with self.assertRaisesRegex(LabContractError, "UNTRUSTED_PARENT_MODELED_COST_CLASS"):
+            run((r,p,b))
+        r,p,b=fixture()
+        old_id = r[0]["source_id"]
+        r[0]["source_id"] = "BINANCE_SPOT_REAL"
+        r[0] = sealed(r[0])
+        b["BINANCE_SPOT_REAL"] = b.pop(old_id)
+        b["BINANCE_SPOT_REAL"]["source_id"] = "BINANCE_SPOT_REAL"
+        with self.assertRaisesRegex(LabContractError, "REAL_SOURCE_FORBIDDEN_IN_TEST_ONLY_PORTFOLIO"):
+            run((r,p,b))
+
+    def test_no_insolvent_cash_or_silent_loss_clamping(self):
+        r,p,b=fixture()
+        # Preserve well-formed modeled return while forcing an extreme price
+        # that would make the frozen additive 30bps fee overdraw all capital.
+        row=r[0]["modeled_trades"][0]
+        row["exit_open"] = "0.1"
+        row["modeled_gross_return"] = "-0.999"
+        row["modeled_net_return"] = "-1.002"
+        r[0] = sealed(r[0])
+        with self.assertRaisesRegex(LabContractError, "MODELED_PORTFOLIO_INSOLVENT"):
+            run((r,p,b))
 
     def test_receipt_tamper_rejected_and_private_readiness_not_asserted(self):
         out=run(fixture())
