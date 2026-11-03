@@ -6,6 +6,7 @@ bytes, never re-computes bar outcomes, never invents fills/PnL/direction.
 
 Role:
   - Validate inbound row schema (fail-closed)
+  - Validate full renderer artifact contract (validate_report)
   - Aggregate: coverage counts, descriptive stats (COMPLETE market-only only)
   - Render: deterministic canonical JSON artifact + Markdown report
   - No W1, no Core producer, no G2 runtime imported
@@ -23,6 +24,12 @@ Contract alignment: Work PR #220 HEAD 3d045048
 SCOPE      = RETROSPECTIVE_NON_PIT_DESCRIPTIVE
 EVIDENCE   = BASE_DESCRIPTIVE
 FILLS/PnL  = never inferred; not_available for NO_SIGNAL/REJECTED
+
+Patch v2 (Factory/Audit review):
+  - validate_report(): schema_version/scope/SHA256 self-excluding re-check
+  - Cross-horizon identity + F3 consistency enforced in validate_rows()
+  - Exact timing/bar-count/availability-reason invariants in __post_init__
+  - market_high >= market_low + observed_high >= reference_price reconciliation
 """
 from __future__ import annotations
 
@@ -58,6 +65,14 @@ SHADOW_STATUS_REQUIRED = "NOT_EVALUABLE_NO_PREDECLARED_PAIRED_CANDIDATE"
 DIRECTIONAL_STATUS_REQUIRED = "NOT_EVALUABLE_MISSING_ORIGINAL_DIRECTION"
 REFERENCE_KIND_REQUIRED = "OPEN_AT_CUTOFF_NON_EXECUTABLE"
 
+# Timing convention (Work PR #220): decision_ms = decision_cutoff_ms + 2000
+DECISION_OFFSET_MS: int = 2000
+
+# Bar convention: 15-minute bars → bars per horizon hour
+BARS_PER_HOUR: int = 4
+
+# Float tolerance for return reconciliation checks
+_RETURN_RECONCILE_TOL: float = 1e-9
 
 # ---------------------------------------------------------------------------
 # Errors
@@ -86,7 +101,7 @@ class InboundRow:
 
     # Decision timing
     decision_cutoff_ms: int     # bar-aligned cutoff; NON_EXECUTABLE reference
-    decision_ms: int            # +2000ms by convention (MODELED, never fill)
+    decision_ms: int            # cutoff + DECISION_OFFSET_MS (2000ms convention)
 
     # F3
     f3_disposition: str         # NO_SIGNAL | REJECTED | TRIGGERED | …
@@ -95,7 +110,7 @@ class InboundRow:
     # Horizon
     horizon_hours: int          # 4 | 24 | 72
     window_end_exclusive_ms: int
-    expected_bars: int          # 16 | 96 | 288
+    expected_bars: int          # horizon_hours * BARS_PER_HOUR (16|96|288)
     observed_bars: int | None
 
     # Coverage (Work field name: 'availability')
@@ -103,7 +118,6 @@ class InboundRow:
     availability_reason: str | None
 
     # Market-only metrics (COMPLETE only; null otherwise)
-    # Work emits a nested dict 'market_metrics' or null
     market_metrics: dict | None   # {reference_price, observed_high, observed_low,
                                   #  market_high_return, market_low_return,
                                   #  market_close_return}
@@ -119,25 +133,92 @@ class InboundRow:
     reference_kind: str         # OPEN_AT_CUTOFF_NON_EXECUTABLE
 
     def __post_init__(self) -> None:
-        # Identity
+        # ── Identity ──────────────────────────────────────────────────────────
         if not self.trial_id or not self.opportunity_id:
             raise P1AError("empty C2 identity field")
         if not _is_sha256(self.envelope_sha256):
             raise P1AError(f"envelope_sha256 not a 64-char hex digest: {self.envelope_sha256!r}")
 
-        # F3
+        # ── F3 ────────────────────────────────────────────────────────────────
         if self.f3_disposition not in F3_DISPOSITIONS_VALID:
             raise P1AError(f"unknown f3_disposition: {self.f3_disposition!r}")
 
-        # Horizon
+        # ── Horizon ───────────────────────────────────────────────────────────
         if self.horizon_hours not in HORIZON_HOURS_VALID:
             raise P1AError(f"unsupported horizon_hours: {self.horizon_hours}")
 
-        # Coverage
+        # ── FIX-3: Exact expected_bars = horizon_hours * BARS_PER_HOUR ────────
+        required_bars = self.horizon_hours * BARS_PER_HOUR
+        if self.expected_bars != required_bars:
+            raise P1AError(
+                f"expected_bars={self.expected_bars} for horizon_hours={self.horizon_hours}; "
+                f"required {required_bars} ({self.horizon_hours}h × {BARS_PER_HOUR} bars/h)"
+            )
+
+        # ── FIX-3: window_end_exclusive = cutoff + horizon*3_600_000 ──────────
+        required_end = self.decision_cutoff_ms + self.horizon_hours * 3_600_000
+        if self.window_end_exclusive_ms != required_end:
+            raise P1AError(
+                f"window_end_exclusive_ms={self.window_end_exclusive_ms} for "
+                f"horizon_hours={self.horizon_hours} at cutoff={self.decision_cutoff_ms}; "
+                f"required {required_end} (cutoff + {self.horizon_hours}h)"
+            )
+
+        # ── FIX-3: decision_ms = cutoff + DECISION_OFFSET_MS exactly ──────────
+        required_decision = self.decision_cutoff_ms + DECISION_OFFSET_MS
+        if self.decision_ms != required_decision:
+            raise P1AError(
+                f"decision_ms={self.decision_ms} != decision_cutoff_ms+{DECISION_OFFSET_MS} "
+                f"({required_decision}); non-EXECUTABLE offset violated"
+            )
+
+        # ── Coverage ──────────────────────────────────────────────────────────
         if self.availability not in AVAILABILITY_VALID:
             raise P1AError(f"unknown availability: {self.availability!r}")
 
-        # market_metrics consistency
+        # ── FIX-3: observed_bars range + reason consistency ────────────────────
+        if self.availability == "COMPLETE":
+            # COMPLETE: observed_bars must equal expected_bars; reason must be null
+            if self.observed_bars is None:
+                raise P1AError("COMPLETE row: observed_bars must not be null")
+            if not (0 <= self.observed_bars <= self.expected_bars):
+                raise P1AError(
+                    f"COMPLETE row: observed_bars={self.observed_bars} out of range "
+                    f"[0, {self.expected_bars}]"
+                )
+            if self.observed_bars != self.expected_bars:
+                raise P1AError(
+                    f"COMPLETE row: observed_bars={self.observed_bars} != "
+                    f"expected_bars={self.expected_bars} (full grid required for COMPLETE)"
+                )
+            if self.availability_reason is not None:
+                raise P1AError(
+                    "COMPLETE row: availability_reason must be null "
+                    f"(got {self.availability_reason!r})"
+                )
+        elif self.availability == "CENSORED":
+            # CENSORED: observed_bars must be null; reason required (archive-end)
+            if self.observed_bars is not None:
+                raise P1AError(
+                    f"CENSORED row: observed_bars must be null (got {self.observed_bars})"
+                )
+            if not self.availability_reason:
+                raise P1AError(
+                    "CENSORED row: availability_reason must not be null/empty"
+                )
+        else:
+            # UNKNOWN: observed_bars must be null; reason must be an honest non-empty string
+            if self.observed_bars is not None:
+                raise P1AError(
+                    f"UNKNOWN row: observed_bars must be null (got {self.observed_bars})"
+                )
+            if not self.availability_reason:
+                raise P1AError(
+                    "UNKNOWN row: availability_reason must not be null/empty "
+                    "(explicit honest reason required)"
+                )
+
+        # ── market_metrics consistency ─────────────────────────────────────────
         if self.availability == "COMPLETE":
             if self.market_metrics is None:
                 raise P1AError("COMPLETE row must have market_metrics")
@@ -149,7 +230,7 @@ class InboundRow:
                     f"(availability={self.availability})"
                 )
 
-        # Direction always null
+        # ── Direction always null ──────────────────────────────────────────────
         if self.direction is not None:
             raise P1AError(
                 "direction must be null (no original direction in source)"
@@ -158,27 +239,19 @@ class InboundRow:
             raise P1AError(
                 "directional_metrics must be null (no original direction)"
             )
-
-        # No fills/PnL — not a field here, but validate directional_status
         if self.directional_status != DIRECTIONAL_STATUS_REQUIRED:
             raise P1AError(
                 f"directional_status must be {DIRECTIONAL_STATUS_REQUIRED!r}, "
                 f"got {self.directional_status!r}"
             )
 
-        # Immutable constants
+        # ── Immutable constants ────────────────────────────────────────────────
         if self.f1_status != F1_STATUS_REQUIRED:
             raise P1AError(f"f1_status must be {F1_STATUS_REQUIRED!r}")
         if self.g2_prospective_status != G2_STATUS_REQUIRED:
             raise P1AError(f"g2_prospective_status must be {G2_STATUS_REQUIRED!r}")
         if self.reference_kind != REFERENCE_KIND_REQUIRED:
             raise P1AError(f"reference_kind must be {REFERENCE_KIND_REQUIRED!r}")
-
-        # decision_ms should be after or equal to cutoff (never before)
-        if self.decision_ms < self.decision_cutoff_ms:
-            raise P1AError(
-                "decision_ms < decision_cutoff_ms (impossible lookahead)"
-            )
 
 
 def _is_sha256(v: Any) -> bool:
@@ -190,6 +263,13 @@ def _is_sha256(v: Any) -> bool:
 
 
 def _validate_market_metrics(mm: dict) -> None:
+    """Validate market_metrics dict — fail-closed on any inconsistency.
+
+    FIX-4: adds cross-field reconciliation:
+      - observed_high >= reference_price (high must be at or above open)
+      - market_high_return >= market_low_return (return ordering)
+      - All values finite (NaN/Inf rejected)
+    """
     required = ("reference_price", "observed_high", "observed_low",
                  "market_high_return", "market_low_return", "market_close_return")
     for k in required:
@@ -198,14 +278,39 @@ def _validate_market_metrics(mm: dict) -> None:
         v = mm[k]
         if not isinstance(v, (int, float)) or not math.isfinite(v):
             raise P1AError(f"market_metrics[{k!r}] must be finite float, got {v!r}")
-    if mm["reference_price"] <= 0:
+
+    ref   = mm["reference_price"]
+    high  = mm["observed_high"]
+    low   = mm["observed_low"]
+    r_high  = mm["market_high_return"]
+    r_low   = mm["market_low_return"]
+
+    if ref <= 0:
         raise P1AError("market_metrics.reference_price must be > 0")
-    if mm["observed_low"] > mm["reference_price"]:
-        raise P1AError("market_metrics.observed_low > reference_price is suspicious")
-    # market_low_return should be ≤ 0 (low is below open)
-    # — warn via error only for grossly wrong values (low > open is impossible)
-    if mm["market_low_return"] > 0:
+
+    # FIX-4: observed_high >= reference_price (high must be at or above open)
+    if high < ref - _RETURN_RECONCILE_TOL:
+        raise P1AError(
+            f"market_metrics.observed_high={high} < reference_price={ref}; "
+            "high must be >= open (internally inconsistent)"
+        )
+
+    # observed_low <= reference_price (low is at or below open)
+    if low > ref + _RETURN_RECONCILE_TOL:
+        raise P1AError(
+            f"market_metrics.observed_low={low} > reference_price={ref} (suspicious)"
+        )
+
+    # market_low_return <= 0 (physically impossible otherwise)
+    if r_low > _RETURN_RECONCILE_TOL:
         raise P1AError("market_metrics.market_low_return > 0 is impossible")
+
+    # FIX-4: market_high_return >= market_low_return (return ordering)
+    if r_high < r_low - _RETURN_RECONCILE_TOL:
+        raise P1AError(
+            f"market_metrics.market_high_return={r_high} < market_low_return={r_low}; "
+            "return ordering violated (internally inconsistent)"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -223,12 +328,16 @@ def validate_rows(
     - Exact denominator (unique opportunity_ids)
     - No duplicate (opportunity_id, horizon_hours) slots
     - All required fields present; all invariants satisfied
+    - FIX-2: Cross-horizon identity + F3 consistency per opportunity
 
     Raises P1AError on the first violation (fail-closed).
     """
-    # Extract and deduplicate opportunities
-    seen_opps: dict[str, set] = {}     # opportunity_id → {horizon_hours seen}
-    seen_identity: dict[tuple, None] = {}  # full C2 4-tuple → present
+    seen_opps: dict[str, set] = {}          # opportunity_id → {horizon_hours seen}
+    seen_identity: dict[tuple, None] = {}   # 5-field C2 tuple → present
+    # FIX-2: per-opportunity anchor for cross-horizon consistency
+    opp_anchor: dict[str, dict] = {}        # opp_id → {trial_id, producer_event_id,
+                                            #             envelope_sha256, cutoff_ms,
+                                            #             decision_ms, f3_disposition}
 
     parsed: list[InboundRow] = []
     for i, raw in enumerate(rows):
@@ -245,12 +354,26 @@ def validate_rows(
             )
         seen_opps[opp_id].add(h)
 
-        # C2 identity includes horizon_hours: same envelope can have 3 horizon rows
+        # 5-field C2 identity check
         identity = (row.trial_id, row.opportunity_id,
                     row.producer_event_id, row.envelope_sha256, row.horizon_hours)
         if identity in seen_identity:
             raise P1AError(f"duplicate C2 identity at index {i}: {identity}")
         seen_identity[identity] = None
+
+        # FIX-2: cross-horizon immutable identity + F3 consistency
+        if opp_id not in opp_anchor:
+            opp_anchor[opp_id] = {
+                "trial_id":           row.trial_id,
+                "producer_event_id":  row.producer_event_id,
+                "envelope_sha256":    row.envelope_sha256,
+                "decision_cutoff_ms": row.decision_cutoff_ms,
+                "decision_ms":        row.decision_ms,
+                "f3_disposition":     row.f3_disposition,
+            }
+        else:
+            anchor = opp_anchor[opp_id]
+            _check_cross_horizon_consistency(row, anchor, i)
 
     n_opps = len(seen_opps)
     if n_opps != expected_denominator:
@@ -272,6 +395,24 @@ def validate_rows(
             )
 
     return parsed
+
+
+def _check_cross_horizon_consistency(row: InboundRow, anchor: dict, index: int) -> None:
+    """FIX-2: all horizon rows for the same opportunity must share immutable fields."""
+    checks = [
+        ("trial_id",           row.trial_id),
+        ("producer_event_id",  row.producer_event_id),
+        ("envelope_sha256",    row.envelope_sha256),
+        ("decision_cutoff_ms", row.decision_cutoff_ms),
+        ("decision_ms",        row.decision_ms),
+        ("f3_disposition",     row.f3_disposition),
+    ]
+    for field, value in checks:
+        if value != anchor[field]:
+            raise P1AError(
+                f"cross-horizon inconsistency for opportunity={row.opportunity_id!r} "
+                f"at index {index}: {field} changed from {anchor[field]!r} to {value!r}"
+            )
 
 
 def _parse_inbound_row(raw: dict, *, index: int) -> InboundRow:
@@ -453,6 +594,11 @@ def build_artifact(
 
     The renderer's own `renderer_content_sha256` covers the summary only
     (rows are not re-embedded — Work's result.json is the row authority).
+
+    FIX-1: renderer_content_sha256 is computed AFTER the content dict is
+    finalized (self-excluding: the hash key is not present when content is
+    hashed, then inserted).  The artifact also embeds schema_version and
+    scope so validate_report() can verify them.
     """
     if not _is_sha256(source_artifact_content_sha256):
         raise P1AError("source_artifact_content_sha256 must be 64-char hex")
@@ -461,10 +607,11 @@ def build_artifact(
 
     summary = aggregate_summary(rows)
 
-    content = {
-        "schema": SCHEMA_VERSION,
+    # FIX-1: build content WITHOUT the hash key first
+    content: dict = {
+        "schema_version": SCHEMA_VERSION,      # FIX-1: explicit schema_version field
         "renderer": RENDERER_VERSION,
-        "scope": SCOPE,
+        "scope": SCOPE,                         # FIX-1: explicit scope field
         "source_proof": {
             "work_source_artifact_content_sha256": source_artifact_content_sha256,
             "work_code_sha": work_code_sha,
@@ -474,8 +621,57 @@ def build_artifact(
         "summary": summary,
     }
 
+    # FIX-1: self-excluding SHA256 — hash content without the hash key present
     content["renderer_content_sha256"] = _sha256_hex(_canonical_bytes(content))
     return content
+
+
+# ---------------------------------------------------------------------------
+# FIX-1: validate_report() — full artifact contract verification
+# ---------------------------------------------------------------------------
+
+def validate_report(artifact: dict) -> None:
+    """Verify a renderer artifact satisfies the full P1-A contract.
+
+    Checks:
+    1. schema_version == SCHEMA_VERSION
+    2. scope == SCOPE
+    3. renderer_content_sha256 is self-excluding canonical recomputation
+       (recomputes SHA256 over artifact without the hash key and compares)
+
+    Raises P1AError on any violation.  Call before passing artifact to renderer.
+    """
+    # 1. schema_version
+    got_schema = artifact.get("schema_version")
+    if got_schema != SCHEMA_VERSION:
+        raise P1AError(
+            f"artifact schema_version mismatch: got {got_schema!r}, "
+            f"expected {SCHEMA_VERSION!r}"
+        )
+
+    # 2. scope
+    got_scope = artifact.get("scope")
+    if got_scope != SCOPE:
+        raise P1AError(
+            f"artifact scope mismatch: got {got_scope!r}, expected {SCOPE!r}"
+        )
+
+    # 3. renderer_content_sha256 — self-excluding recomputation
+    claimed_sha = artifact.get("renderer_content_sha256")
+    if not _is_sha256(claimed_sha):
+        raise P1AError(
+            f"artifact renderer_content_sha256 is not a valid 64-char hex digest: "
+            f"{claimed_sha!r}"
+        )
+    # Recompute: build a copy without the hash key, compute SHA256, compare
+    content_without_hash = {k: v for k, v in artifact.items()
+                            if k != "renderer_content_sha256"}
+    expected_sha = _sha256_hex(_canonical_bytes(content_without_hash))
+    if claimed_sha != expected_sha:
+        raise P1AError(
+            f"artifact renderer_content_sha256 does not match recomputed digest; "
+            f"artifact may be corrupted or tampered"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -486,7 +682,10 @@ def render_markdown_report(artifact: dict) -> str:
     """Human-readable Markdown summary from a renderer artifact dict.
 
     Never claims alpha, PIT, fills, PnL, or forward-looking results.
+    Calls validate_report() first — raises P1AError if artifact is invalid.
     """
+    validate_report(artifact)   # FIX-1: always verify before rendering
+
     s = artifact["summary"]
     sp = artifact["source_proof"]
     sha = artifact.get("renderer_content_sha256", "—")
@@ -494,6 +693,7 @@ def render_markdown_report(artifact: dict) -> str:
     lines: list[str] = [
         "# P1-A Retrospective Opportunity-Outcome Report",
         "",
+        f"**Schema version:** `{artifact['schema_version']}`  ",
         f"**Scope:** `{artifact['scope']}`  ",
         f"**Renderer:** `{artifact['renderer']}`  ",
         f"**Generated:** `{sp['generated_at_utc']}`  ",

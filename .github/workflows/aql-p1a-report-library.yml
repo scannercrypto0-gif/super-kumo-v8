@@ -52,6 +52,6 @@ jobs:
           COUNT=$(python -m pytest tests/test_aql_p1a_report_library.py \
             --collect-only -q 2>&1 | grep -E "^[0-9]+ test" | grep -o "^[0-9]*" | head -1)
           echo "Collected $COUNT tests"
-          [ "$COUNT" = "19" ] || (echo "EXPECTED 19 tests, got $COUNT"; exit 1)
+          [ "$COUNT" = "56" ] || (echo "EXPECTED 56 tests, got $COUNT"; exit 1)
         env:
           PYTHONPATH: "."
