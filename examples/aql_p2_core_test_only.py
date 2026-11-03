@@ -28,9 +28,8 @@ def main():
         decision_cutoff_ms=cutoff, decision_ms=cutoff + 2000,
         disposition="NO_SIGNAL", direction=None, direction_evidence_ref=None,
         regime=None, regime_source_sha256=None)
-    result = schedule_pair(trial, source, bars, [opportunity])
-    result["test_only"] = True
-    # Demo display flag is outside the cryptographically sealed source output.
+    result = schedule_pair(trial, source, bars, [opportunity], test_only=True)
+    # TEST_ONLY is part of the immutable digest-bound producer artifact.
     print(json.dumps(result, sort_keys=True, indent=2))
 
 
