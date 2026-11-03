@@ -75,25 +75,27 @@ jobs:
           name: p2-ten-bar-execution-anchor
           path: ten-bar-execution-anchor.json
           retention-days: 90
-      - name: Anchor PROPOSED portfolio policy (not owner approved, no market scoring)
+      - name: Anchor OWNER-APPROVED provisional Option C policy (NO private scoring)
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          from research_wp_r0.aql_p2_factory_portfolio import propose_portfolio_policy
-          policy = propose_portfolio_policy("10000")
-          assert policy["approval_status"] == "PROPOSED_NOT_OWNER_APPROVED"
-          Path("p2-proposed-portfolio-policy.json").write_text(
+          from research_wp_r0.aql_p2_factory_portfolio import frozen_option_c_policy, OWNER_C_URL
+          policy = frozen_option_c_policy()
+          assert policy["approval_status"] == "OWNER_APPROVED_PROVISIONAL"
+          assert policy["owner_decision_url"] == OWNER_C_URL
+          Path("p2-option-c-independent-opportunity-policy.json").write_text(
               json.dumps(policy, sort_keys=True, separators=(",", ":"),
                          ensure_ascii=True, allow_nan=False) + "\n",
               encoding="utf-8")
-          print("PORTFOLIO_PROPOSED_NOT_APPROVED_SHA256=" + policy["artifact_sha256"])
+          print("OPTION_C_FROZEN_POLICY_SHA256=" + policy["artifact_sha256"])
+          print("OPTION_C_PRIVATE_SCORING=NOT_PERFORMED")
           PY
-      - name: Upload proposed-only portfolio policy fingerprint
+      - name: Upload frozen Option C policy anchor
         uses: actions/upload-artifact@v4
         with:
-          name: p2-proposed-portfolio-policy-no-approval
-          path: p2-proposed-portfolio-policy.json
+          name: p2-option-c-owner-policy-pre-score-anchor
+          path: p2-option-c-independent-opportunity-policy.json
           retention-days: 90
           if-no-files-found: error
       - name: Generate machine-readable TEST_ONLY handshake receipt
