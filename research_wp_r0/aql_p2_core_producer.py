@@ -194,12 +194,13 @@ class P2HistoricalOpportunityV1:
 def schedule_pair(trial: FrozenTrialV1, source: HistoricalSourceV1,
                   bars: Iterable[HistoricalBarV1],
                   opportunities: Iterable[P2HistoricalOpportunityV1],
-                  *, permit_holdout: bool = False) -> dict:
+                  *, permit_holdout: bool = False, test_only: bool = False) -> dict:
     """Frozen two-arm *schedule*, not strategy decisions or actual outcomes.
 
     This development-only entrypoint cannot open a holdout, even by toggling a flag.
     """
     _require(permit_holdout is False, "HOLDOUT_LOCKED")
+    _require(type(test_only) is bool, "BAD_TEST_ONLY_FLAG")
     valid_bars = validate_bars(source, bars)
     by_close = {b.close_ms + 1: i for i, b in enumerate(valid_bars)}
     opportunities = tuple(opportunities)
@@ -231,7 +232,7 @@ def schedule_pair(trial: FrozenTrialV1, source: HistoricalSourceV1,
         shadow = dict(arm="SHADOW", definition_sha256=trial.shadow_definition_sha256)
         pairs.append(dict(pair_id=pair_id, opportunity=asdict(item),
                           arms=[base, shadow]))
-    result = dict(schema="aql.p2.core.paired-schedule.v1", test_only=False,
+    result = dict(schema="aql.p2.core.paired-schedule.v1", test_only=test_only,
                   evidence_class=EVIDENCE_CLASS, source=asdict(source),
                   source_bar_count=len(valid_bars), protocol=asdict(trial),
                   scheduled_total=len(pairs), pairs=pairs,
