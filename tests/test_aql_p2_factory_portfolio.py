@@ -9,6 +9,7 @@ from research_wp_r0.aql_p2_factory_portfolio import (
     BAR_MS, OWNER_C_URL, frozen_option_c_policy,
     build_independent_opportunity_package, canonical_opportunity_receipt_bytes,
     raw_opportunity_receipt_sha256, render_opportunity_research_report,
+    canonical_option_c_policy_bytes, raw_option_c_policy_sha256,
 )
 
 
@@ -306,6 +307,37 @@ class IndependentOptionCTests(unittest.TestCase):
         b["REAL_BINANCE_2024"]["source_id"]="REAL_BINANCE_2024"
         with self.assertRaisesRegex(LabContractError,"REAL_SOURCE_CANNOT_BE_CALLED_TEST_ONLY"):
             run((r,p,b))
+
+    def test_exact_owner_c_anchor_bytes_and_fake_external_hash_rejected(self):
+        r,p,b=fixture()
+        actual=canonical_option_c_policy_bytes(p)
+        self.assertTrue(actual.endswith(b"\n"))
+        self.assertEqual(raw_option_c_policy_sha256(p),sha256(actual).hexdigest())
+        with self.assertRaisesRegex(LabContractError,"FROZEN_OPTION_C_ANCHOR_BYTES_MISMATCH"):
+            build_independent_opportunity_package(
+                r,p,b,test_only=False,owner_decision_verified=True,
+                before_scoring_anchor_verified=True,
+                independent_parent_receipts_verified=True,
+                policy_anchor_raw_sha256="a"*64)
+
+    def test_real_gate_cannot_promote_test_only_source_even_with_flags(self):
+        r,p,b=fixture()
+        with self.assertRaisesRegex(LabContractError,"TEST_ONLY_SOURCE_FORBIDDEN_IN_REAL_SCORING"):
+            build_independent_opportunity_package(
+                r,p,b,test_only=False,owner_decision_verified=True,
+                before_scoring_anchor_verified=True,
+                independent_parent_receipts_verified=True,
+                policy_anchor_raw_sha256=raw_option_c_policy_sha256(p))
+
+    def test_shuffled_original_cohort_input_order_is_canonical(self):
+        f=fixture()
+        a=fixture(other_month=True)
+        bounds={**f[2],**a[2]}
+        r1=run((f[0]+a[0],f[1],bounds))
+        r2=run((a[0]+f[0],f[1],bounds))
+        self.assertEqual(r1,r2)
+        self.assertEqual(raw_opportunity_receipt_sha256(r1),
+                         raw_opportunity_receipt_sha256(r2))
 
     def test_receipt_tamper_rejected(self):
         out=run(fixture())
