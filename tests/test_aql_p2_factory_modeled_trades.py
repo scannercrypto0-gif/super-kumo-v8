@@ -7,7 +7,7 @@ import unittest
 
 from research_wp_r0.aql_p2_factory_lab import LabContractError, digest
 from research_wp_r0.aql_p2_factory_modeled_trades import (
-    build_modeled_trade_package, BAR_MS,
+    build_modeled_trade_package, canonical_receipt_bytes, raw_receipt_sha256, BAR_MS,
 )
 from test_aql_p2_factory_real_development import test_contract
 
@@ -131,6 +131,28 @@ class ModeledTradeTests(unittest.TestCase):
         self.assertIsNone(result["paired_comparison"][0]["shadow_minus_base"])
         self.assertEqual(result["descriptive_coverage_by_horizon"]["4"]["COMPLETE"], 1)
         self.assertEqual(result["execution_status"], "NOT_OBSERVED")
+
+    def test_receipt_canonical_raw_sha_and_tamper_guard(self):
+        from hashlib import sha256
+        report = run(fixture())
+        raw = canonical_receipt_bytes(report)
+        self.assertTrue(raw.endswith(bytes([10])))
+        self.assertEqual(raw_receipt_sha256(report), sha256(raw).hexdigest())
+        self.assertNotEqual(raw_receipt_sha256(report), report["artifact_sha256"])
+        report["modeled_trades"][0]["modeled_net_return"] = "999"
+        with self.assertRaisesRegex(LabContractError, "BAD_MODELED_REPORT_DIGEST"):
+            canonical_receipt_bytes(report)
+
+    def test_arm_summary_conditional_denominators_not_zero_imputation(self):
+        report = run(fixture())
+        b = report["descriptive_arm_summaries"]["BASE"]
+        s = report["descriptive_arm_summaries"]["SHADOW"]
+        self.assertEqual(b["modeled_complete_count"], 1)
+        self.assertEqual(b["scheduled_opportunity_denominator"], 1)
+        self.assertEqual(b["modeled_net_mean_on_complete_only"], "0.017")
+        self.assertEqual(s["modeled_complete_count"], 0)
+        self.assertIsNone(s["modeled_net_mean_on_complete_only"])
+        self.assertEqual(s["null_or_ineligible_count"], 1)
 
     def test_deterministic_receipt_and_unmodified_inputs(self):
         inp = fixture()
