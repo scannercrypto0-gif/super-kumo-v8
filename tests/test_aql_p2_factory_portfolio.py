@@ -234,7 +234,7 @@ class PortfolioTests(unittest.TestCase):
         with self.assertRaises(LabContractError):
             run((r,p,b))
         r,p,b = fixture()
-        r[0]["modeled_trades"][0]["pair_id"] = r[0]["modeled_trades"][1]["pair_id"]
+        r[0]["modeled_trades"][1]["arm"] = "BASE"
         r[0] = sealed(r[0])
         with self.assertRaises(LabContractError):
             run((r,p,b))
