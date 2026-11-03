@@ -311,7 +311,7 @@ def canonical_receipt_bytes(report):
         or report.get("schema") != "aql.p2.factory.breakout-modeled-trades.v1"):
         fail("BAD_MODELED_REPORT_DIGEST")
     return (json.dumps(report, sort_keys=True, separators=(",", ":"),
-                       ensure_ascii=True, allow_nan=False) + "\\n").encode("utf-8")
+                       ensure_ascii=True, allow_nan=False) + "\n").encode("utf-8")
 
 
 def raw_receipt_sha256(report):
