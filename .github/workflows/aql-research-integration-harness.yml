@@ -1,0 +1,54 @@
+name: Work offline research integration gate
+on:
+  pull_request:
+    paths:
+      - 'tools/research_integration_harness/**'
+      - '.github/workflows/aql-research-integration-harness.yml'
+permissions:
+  contents: read
+jobs:
+  offline-contract-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # Provision public pinned code only. Harness execution itself has no network API.
+      - uses: actions/checkout@v4
+        with:
+          ref: '58e423431cc639958736337a65db8a17bfdbaa85'
+          path: '.harness-pins/core'
+      - uses: actions/checkout@v4
+        with:
+          ref: '6b93abf975648d3ce5ee9c28c7b33c72686f4e6b'
+          path: '.harness-pins/factory'
+      - uses: actions/checkout@v4
+        with:
+          ref: '7d97b09c0c6ee2650a61d523acb8d8c771a99c46'
+          path: '.harness-pins/vault'
+      - uses: actions/checkout@v4
+        with:
+          ref: '0f0c4377db7682187dca78b2c556b00ae1a81bab'
+          path: '.harness-pins/prior'
+      - name: One consolidated offline integration gate (TEST_ONLY)
+        run: |
+          python -m tools.research_integration_harness.gate \
+            --checkout history=. \
+            --checkout core=.harness-pins/core \
+            --checkout factory=.harness-pins/factory \
+            --checkout vault=.harness-pins/vault \
+            --checkout prior=.harness-pins/prior \
+            --output gate-evidence
+      - name: Preserve public TEST_ONLY evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: work-research-integration-TEST-ONLY-${{ github.event.pull_request.head.sha }}
+          path: |
+            gate-evidence/
+            tools/research_integration_harness/fixtures/
+          retention-days: 7
+          if-no-files-found: error
