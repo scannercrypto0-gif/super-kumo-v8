@@ -118,7 +118,8 @@ def _bar_record(spec, opened, closed, values, *, receipt_ms):
     return HistoricalBar(
         symbol=spec["symbol"], interval=spec["interval"], bar_open=opened,
         bar_close=closed, open=o, high=h, low=l, close=c, volume=v,
-        quality=BarQuality.FINAL, source=(SourceType.SYNTHETIC if spec["test_only"]\n                                        else SourceType.ARCHIVE),
+        quality=BarQuality.FINAL, source=(SourceType.SYNTHETIC if spec["test_only"]
+                                        else SourceType.ARCHIVE),
         source_label=spec["source_label"],
         observation_cutoff_ms=lower_bound, ingest_time_ms=receipt_ms,
         availability_kind=DataAvailabilityKind.RETROSPECTIVE,
