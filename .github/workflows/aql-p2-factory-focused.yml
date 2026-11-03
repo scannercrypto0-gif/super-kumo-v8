@@ -4,17 +4,21 @@ on:
     paths:
       - 'research_wp_r0/aql_p2_factory_lab.py'
       - 'research_wp_r0/aql_p2_factory_real_development.py'
+      - 'research_wp_r0/aql_p2_factory_modeled_trades.py'
       - 'tests/test_aql_p2_factory_lab.py'
       - 'tests/test_aql_p2_factory_core_handshake.py'
       - 'tests/test_aql_p2_factory_real_development.py'
+      - 'tests/test_aql_p2_factory_modeled_trades.py'
       - '.github/workflows/aql-p2-factory-focused.yml'
   pull_request:
     paths:
       - 'research_wp_r0/aql_p2_factory_lab.py'
       - 'research_wp_r0/aql_p2_factory_real_development.py'
+      - 'research_wp_r0/aql_p2_factory_modeled_trades.py'
       - 'tests/test_aql_p2_factory_lab.py'
       - 'tests/test_aql_p2_factory_core_handshake.py'
       - 'tests/test_aql_p2_factory_real_development.py'
+      - 'tests/test_aql_p2_factory_modeled_trades.py'
       - '.github/workflows/aql-p2-factory-focused.yml'
   workflow_dispatch:
 jobs:
@@ -42,6 +46,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_aql_p2_factory_lab.py' -v
           python -m unittest discover -s tests -p 'test_aql_p2_factory_core_handshake.py' -v
           python -m unittest discover -s tests -p 'test_aql_p2_factory_real_development.py' -v
+          python -m unittest discover -s tests -p 'test_aql_p2_factory_modeled_trades.py' -v
       - name: Generate machine-readable TEST_ONLY handshake receipt
         env:
           PYTHONPATH: .
