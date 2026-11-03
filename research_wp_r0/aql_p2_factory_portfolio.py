@@ -74,6 +74,17 @@ def _validate_policy(policy):
     return policy["artifact_sha256"]
 
 
+def canonical_option_c_policy_bytes(policy):
+    """Exact metadata-only byte form published as the GitHub pre-score artifact."""
+    _validate_policy(policy)
+    return (json.dumps(policy, sort_keys=True, separators=(",", ":"),
+                       ensure_ascii=True, allow_nan=False) + "\n").encode("utf-8")
+
+
+def raw_option_c_policy_sha256(policy):
+    return sha256(canonical_option_c_policy_bytes(policy)).hexdigest()
+
+
 def _validate_parent(report):
     if not _canonical_hash_valid(report) or report.get("schema") != PARENT_SCHEMA:
         fail("INVALID_PARENT_MODELED_TRADE_RECEIPT")
@@ -334,6 +345,8 @@ def build_independent_opportunity_package(trade_reports, policy, cohort_bounds, 
             or independent_parent_receipts_verified is not True
             or not hash_ok(policy_anchor_raw_sha256)):
             fail("INDEPENDENT_OWNER_C_AND_PRE_SCORE_ANCHOR_REQUIRED")
+        if policy_anchor_raw_sha256 != raw_option_c_policy_sha256(policy):
+            fail("FROZEN_OPTION_C_ANCHOR_BYTES_MISMATCH")
     if not isinstance(trade_reports,list) or not trade_reports:
         fail("MISSING_PARENT_REPORTS")
     if not isinstance(cohort_bounds,dict):
