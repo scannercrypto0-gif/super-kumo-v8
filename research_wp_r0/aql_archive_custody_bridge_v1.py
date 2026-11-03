@@ -295,7 +295,9 @@ def _build_packet(raw, spec, meta):
             "bars":packed,"origin_lineage":origin,
             "bar_checksums_sha256":digest([b.checksum for b in bars]),
             "dataset_content_sha256":digest(packed),
-            "availability_class":"RETROSPECTIVE_NOT_CONFIRMED",\n            "evidence_class":"SYNTHETIC_TEST" if spec["test_only"]\n                             else "RETROSPECTIVE_NON_PIT",
+            "availability_class":"RETROSPECTIVE_NOT_CONFIRMED",
+            "evidence_class":"SYNTHETIC_TEST" if spec["test_only"]
+                             else "RETROSPECTIVE_NON_PIT",
             "source_confidence":"SOURCE_PIN_AND_LOCAL_INTEGRITY_ONLY",
             "coverage":"COMPLETE_VALIDATED_GRID",
             "external_custody_verified":False}
