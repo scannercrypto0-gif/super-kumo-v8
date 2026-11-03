@@ -1,0 +1,38 @@
+name: AQL P2 Core immutable producer TEST_ONLY
+on:
+  push:
+    branches:
+      - p2/core-immutable-producer-20261103
+    paths:
+      - 'research_wp_r0/aql_p2_core_producer.py'
+      - 'tests/test_aql_p2_core_producer.py'
+      - 'examples/aql_p2_core_test_only.py'
+      - '.github/workflows/aql-p2-core-focused.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Exact-head focused TEST_ONLY contract tests
+        shell: bash
+        run: |
+          echo "CORE_P2_HEAD_SHA=$(git rev-parse HEAD)"
+          python --version
+          python -m unittest discover -s tests -p 'test_aql_p2_core_producer.py' -v
+          python examples/aql_p2_core_test_only.py > /tmp/aql-p2-core-test-only.json
+          python - <<'PY'
+          import json
+          data = json.load(open('/tmp/aql-p2-core-test-only.json'))
+          assert data['test_only'] is True
+          assert data['scheduled_total'] == 1
+          assert data['holdout_status'] == 'SEALED_UNOPENED'
+          assert data['outcome_evaluation'] == 'NOT_PERFORMED'
+          print('TEST_ONLY_DEMO_OK')
+          PY
