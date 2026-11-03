@@ -5,7 +5,9 @@ on:
       - p2/core-immutable-producer-20261103
     paths:
       - 'research_wp_r0/aql_p2_core_producer.py'
+      - 'research_wp_r0/aql_p2_breakout_trial.py'
       - 'tests/test_aql_p2_core_producer.py'
+      - 'tests/test_aql_p2_breakout_trial.py'
       - 'examples/aql_p2_core_test_only.py'
       - '.github/workflows/aql-p2-core-focused.yml'
   workflow_dispatch:
@@ -26,6 +28,7 @@ jobs:
           echo "CORE_P2_HEAD_SHA=$(git rev-parse HEAD)"
           python --version
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_p2_core_producer.py' -v
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_p2_breakout_trial.py' -v
           PYTHONPATH=. python examples/aql_p2_core_test_only.py > /tmp/aql-p2-core-test-only.json
           python - <<'PY'
           import json
