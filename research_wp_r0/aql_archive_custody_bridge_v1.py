@@ -118,7 +118,7 @@ def _bar_record(spec, opened, closed, values, *, receipt_ms):
     return HistoricalBar(
         symbol=spec["symbol"], interval=spec["interval"], bar_open=opened,
         bar_close=closed, open=o, high=h, low=l, close=c, volume=v,
-        quality=BarQuality.FINAL, source=SourceType.ARCHIVE,
+        quality=BarQuality.FINAL, source=(SourceType.SYNTHETIC if spec["test_only"]\n                                        else SourceType.ARCHIVE),
         source_label=spec["source_label"],
         observation_cutoff_ms=lower_bound, ingest_time_ms=receipt_ms,
         availability_kind=DataAvailabilityKind.RETROSPECTIVE,
@@ -294,7 +294,7 @@ def _build_packet(raw, spec, meta):
             "bars":packed,"origin_lineage":origin,
             "bar_checksums_sha256":digest([b.checksum for b in bars]),
             "dataset_content_sha256":digest(packed),
-            "availability_class":"RETROSPECTIVE_NOT_CONFIRMED",
+            "availability_class":"RETROSPECTIVE_NOT_CONFIRMED",\n            "evidence_class":"SYNTHETIC_TEST" if spec["test_only"]\n                             else "RETROSPECTIVE_NON_PIT",
             "source_confidence":"SOURCE_PIN_AND_LOCAL_INTEGRITY_ONLY",
             "coverage":"COMPLETE_VALIDATED_GRID",
             "external_custody_verified":False}
@@ -518,7 +518,7 @@ class OfflineBridgeStager:
                  "destination":"HISTORICAL_LIBRARY_IN_MEMORY_ONLY",
                  "independent_custody_verified":False,
                  "production_integration":"NOT_ACTIVATED",
-                 "evidence_class":"RETROSPECTIVE_NOT_CONFIRMED"}
+                 "evidence_class":packet["evidence_class"]}
         receipt={**receipt,"receipt_sha256":digest(receipt)}
         # Immutable committed marker must not change upon a retry.
         marker=folder/"receipt.json"
