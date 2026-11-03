@@ -93,12 +93,15 @@ def vault_payload(*,mutation=0):
     meta={"schema_version":"raw_object.v1","content_sha256":raw_sha(raw),
           "byte_length":len(raw),"source_format":"RAW_CSV",
           "instrument":"BTCUSDT","market":"SPOT","interval":"1m",
-          "logical_identity_key":"b"*64,
+          "vendor":"FIXTURE_TEST","format_version":"v1",
           "coverage_start_utc":iso(START),
           "coverage_end_utc":iso(START+N*WIDTH),
           "correction_generation":0,"parent_content_sha256":"",
           "trust_status":"UNVERIFIED","evidence_class":"FIXTURE_SYNTHETIC",
           "admitted_at_utc":iso(START+N*WIDTH+2000)}
+    meta["logical_identity_key"] = digest({k: meta[k] for k in (
+        "vendor","instrument","market","interval","coverage_start_utc",
+        "coverage_end_utc","source_format","format_version")})
     return raw,meta
 
 
@@ -307,6 +310,45 @@ class OfflineArchiveCustodyBridgeG6(unittest.TestCase):
                                 parent_source_sha256="a"*64,
                                 correction_reason="RETAINED_CORRECTION"))
         self.assertEqual(p["spec"]["version"],2)
+
+    def test_existing_archive_adapter_is_read_only_source_boundary(self):
+        from unittest.mock import patch
+        from research_wp_r0.aql_archive_custody_bridge_v1 import export_existing_archive_backup
+        raw=archive_payload()
+        with patch("src.aql.archive.offline.snapshot", return_value=raw) as snap:
+            packet, same_raw=export_existing_archive_backup(
+                "/detached/sealed-backup",expected_inventory_hash=H,spec=spec())
+        self.assertEqual(same_raw,raw)
+        self.assertEqual(packet,exported(raw)[0])
+        self.assertEqual(snap.call_count,1)
+        self.assertEqual(snap.call_args.kwargs["expected_digest"],H)
+
+    def test_existing_vault_adapter_uses_original_readback_only(self):
+        from research_wp_r0.aql_archive_custody_bridge_v1 import export_existing_raw_vault
+        raw,meta=vault_payload()
+        class OnlyReadVault:
+            def read(self, content_sha256):
+                if content_sha256!=raw_sha(raw):
+                    raise ValueError("Wrong content pin")
+                return raw
+            def manifest_entries(self):
+                return [meta]
+        packet,same_raw=export_existing_raw_vault(
+            OnlyReadVault(),content_sha256=raw_sha(raw),spec=spec())
+        self.assertEqual(same_raw,raw)
+        self.assertEqual(packet["source_meta"]["object"],meta)
+
+    def test_vault_forged_identity_or_future_admission_rejected(self):
+        raw,meta=vault_payload()
+        meta["logical_identity_key"]="f"*64
+        with self.assertRaisesRegex(BridgeError,"VAULT_LOGICAL_IDENTITY_MISMATCH"):
+            export_vault_csv(raw,expected_source_sha256=raw_sha(raw),
+                             object_metadata=meta,spec=spec())
+        _,meta=vault_payload()
+        meta["admitted_at_utc"]=iso(spec()["as_of_ms"]+1000)
+        with self.assertRaisesRegex(BridgeError,"FUTURE_VAULT_ADMISSION"):
+            export_vault_csv(raw,expected_source_sha256=raw_sha(raw),
+                             object_metadata=meta,spec=spec())
 
     def test_invalid_price_after_source_rehash_rejected(self):
         raw,meta=vault_payload()
