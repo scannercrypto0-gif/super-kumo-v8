@@ -4,19 +4,48 @@ on:
     paths:
       - 'research_wp_r0/aql_p2_factory_lab.py'
       - 'tests/test_aql_p2_factory_lab.py'
+      - 'tests/test_aql_p2_factory_core_handshake.py'
       - '.github/workflows/aql-p2-factory-focused.yml'
   pull_request:
     paths:
       - 'research_wp_r0/aql_p2_factory_lab.py'
       - 'tests/test_aql_p2_factory_lab.py'
+      - 'tests/test_aql_p2_factory_core_handshake.py'
       - '.github/workflows/aql-p2-factory-focused.yml'
+  workflow_dispatch:
 jobs:
   focused:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Factory exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Checkout pinned isolated Core #221
+        uses: actions/checkout@v4
+        with:
+          ref: 0842fc0a753ec6a3327c00c24e74908e8f6ca39c
+          path: _core_p2_pinned
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Run Factory P2 TEST_ONLY contracts
-        run: python -m unittest discover -s tests -p 'test_aql_p2_factory_lab.py' -v
+      - name: Run focused Factory and real Core cross-PR TEST_ONLY tests
+        env:
+          AQL_P2_CORE_FILE: _core_p2_pinned/research_wp_r0/aql_p2_core_producer.py
+        run: |
+          python -m unittest discover -s tests -p 'test_aql_p2_factory_lab.py' -v
+          python -m unittest discover -s tests -p 'test_aql_p2_factory_core_handshake.py' -v
+      - name: Generate machine-readable TEST_ONLY handshake receipt
+        env:
+          AQL_P2_CORE_FILE: _core_p2_pinned/research_wp_r0/aql_p2_core_producer.py
+        run: |
+          python tests/test_aql_p2_factory_core_handshake.py --emit-receipt _p2_test_only_receipt/factory-core-handshake.json
+          python -m json.tool _p2_test_only_receipt/factory-core-handshake.json
+      - name: Upload TEST_ONLY receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: factory-p2-core-exact-head-test-only-receipt
+          path: _p2_test_only_receipt/factory-core-handshake.json
+          if-no-files-found: error
