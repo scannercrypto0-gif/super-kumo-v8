@@ -1,4 +1,4 @@
-"""Focused TEST_ONLY offline portfolio lifecycle and fail-closed provenance."""
+"""Owner Option C: focused synthetic-only independent opportunity tests."""
 from copy import deepcopy
 from decimal import Decimal
 from hashlib import sha256
@@ -6,307 +6,309 @@ import unittest
 
 from research_wp_r0.aql_p2_factory_lab import LabContractError, digest
 from research_wp_r0.aql_p2_factory_portfolio import (
-    BAR_MS, build_offline_portfolio_package, propose_portfolio_policy,
-    canonical_portfolio_receipt_bytes, raw_portfolio_receipt_sha256,
-    render_portfolio_report,
+    BAR_MS, OWNER_C_URL, frozen_option_c_policy,
+    build_independent_opportunity_package, canonical_opportunity_receipt_bytes,
+    raw_opportunity_receipt_sha256, render_opportunity_research_report,
 )
 
 
 def sealed(obj):
-    row = deepcopy(obj)
-    row.pop("artifact_sha256", None)
-    row["artifact_sha256"] = digest(row)
-    return row
+    r=deepcopy(obj)
+    r.pop("artifact_sha256",None)
+    r["artifact_sha256"]=digest(r)
+    return r
 
 
-def fixture(*, negative_second=False, no_triggers=False, other_month=False):
-    start = (0 if not other_month else 1000 * BAR_MS)
-    sid = "TEST_ONLY_FEB" if not other_month else "TEST_ONLY_AUG"
-    parent = {
-        "schema": "aql.p2.factory.breakout-modeled-trades.v1",
-        "scope": "RETROSPECTIVE_NON_PIT_DEVELOPMENT_ONLY",
-        "source_id": sid,
-        "source_package_sha256": "a" * 64 if not other_month else "b" * 64,
-        "source_schedule_sha256": "c" * 64,
-        "preregistration_artifact_sha256": "d" * 64,
-        "cost_model_artifact_sha256": "e" * 64,
-        "descriptive_4_24_72h_artifact_sha256": "f" * 64,
-        "execution_status": "NOT_OBSERVED",
-        "holdout_status": "SEALED_UNOPENED",
-        "pit_status": "NOT_ATTESTED",
-        "oos_status": "NOT_ATTESTED",
-        "modeled_exit_spec": "NEXT_OPEN_I_PLUS_1_EXIT_OPEN_I_PLUS_11_V1",
-        "modeled_cost_round_trip_bps": "30",
-        "modeled_trades": [], "paired_comparison": [],
+def fixture(*, no_triggers=False, other_month=False, negative=False):
+    start=0 if not other_month else 1000*BAR_MS
+    source_id="TEST_ONLY_FEB" if not other_month else "TEST_ONLY_AUG"
+    report={
+        "schema":"aql.p2.factory.breakout-modeled-trades.v1",
+        "scope":"RETROSPECTIVE_NON_PIT_DEVELOPMENT_ONLY",
+        "source_id":source_id,
+        "source_package_sha256":"a"*64 if not other_month else "b"*64,
+        "source_schedule_sha256":"c"*64,
+        "preregistration_artifact_sha256":"d"*64,
+        "cost_model_artifact_sha256":"e"*64,
+        "descriptive_4_24_72h_artifact_sha256":"f"*64,
+        "execution_status":"NOT_OBSERVED","holdout_status":"SEALED_UNOPENED",
+        "pit_status":"NOT_ATTESTED","oos_status":"NOT_ATTESTED",
+        "modeled_exit_spec":"NEXT_OPEN_I_PLUS_1_EXIT_OPEN_I_PLUS_11_V1",
+        "modeled_cost_round_trip_bps":"30",
+        "modeled_trades":[],"paired_comparison":[],
     }
-    # Two same-time competing eligible opportunities at t=11 bars, alongside
-    # occupied and original null dispositions.
-    specs = [
-        ("first", 1, "TRIGGERED", "TRIGGERED", "102"),
-        ("occupied", 5, "TRIGGERED", "REJECTED", "95"),
-        ("tie-A", 11, "TRIGGERED", "TRIGGERED",
-         "95" if negative_second else "101"),
-        ("tie-B", 11, "TRIGGERED", "TRIGGERED",
-         "95" if negative_second else "101"),
-        ("no-signal", 3, "NO_SIGNAL", "NO_SIGNAL", None),
-        ("unknown", 4, "UNKNOWN", "UNKNOWN", None),
+    # Half-open clock: first exits exactly when two more begin; occupied
+    # original signal overlaps first and both later entries.
+    scenarios=[
+        ("first",1,"TRIGGERED","TRIGGERED","102"),
+        ("occupied",5,"TRIGGERED","REJECTED","95"),
+        ("same-clock-A",11,"TRIGGERED","TRIGGERED",
+         "95" if negative else "101"),
+        ("same-clock-B",11,"TRIGGERED","TRIGGERED",
+         "95" if negative else "101"),
+        ("no-signal",3,"NO_SIGNAL","NO_SIGNAL",None),
+        ("censored",4,"UNKNOWN","UNKNOWN",None),
     ]
-    for label, index, base_status, shadow_status, exit_px in specs:
-        pid = digest({"source_id": sid, "label": label})
-        for arm, status in (("BASE", base_status), ("SHADOW", shadow_status)):
-            full = status == "TRIGGERED" and not no_triggers
-            effective_status = status if not no_triggers else "NO_SIGNAL"
+    for label,index,base_state,shadow_state,price in scenarios:
+        pid=digest({"source_id":source_id,"label":label})
+        for arm,state in (("BASE",base_state),("SHADOW",shadow_state)):
             if no_triggers:
-                full = False
-            row = {
-                "pair_id": pid, "arm": arm, "disposition": effective_status,
-                "signal_disposition": "TRIGGERED" if effective_status != "NO_SIGNAL" else "NO_SIGNAL",
-                "status": ("MODELED_COMPLETE" if full else "UNKNOWN" if
-                           effective_status == "UNKNOWN" else "INELIGIBLE"),
-                "modeled_trade_availability": "COMPLETE" if full else "UNKNOWN",
-                "arm_decision_sha256": digest({"pid": pid, "arm": arm}),
-                "four_hour_source_window_sha256": digest({"window": pid}),
-                "entry_open_ms": start + index * BAR_MS if full else None,
-                "exit_open_ms": start + (index + 10) * BAR_MS if full else None,
-                "entry_open": "100" if full else None,
-                "exit_open": exit_px if full else None,
-                "holding_period_bars": 10,
-                "modeled_net_return": (
-                    str(Decimal(exit_px) / Decimal(100) - Decimal("1.003"))
-                    if full else None),
-                "modeled_gross_return": (
-                    str(Decimal(exit_px) / Decimal(100) - Decimal(1))
-                    if full else None),
-                "fee_entry_return": "0.001" if full else None,
-                "fee_exit_return": "0.001" if full else None,
-                "slippage_entry_return": "0.0005" if full else None,
-                "slippage_exit_return": "0.0005" if full else None,
-                "entry_availability": "COMPLETE" if full else "UNKNOWN",
-                "exit_availability": "COMPLETE" if full else "UNKNOWN",
-                "missingness_reason": "END_OF_COHORT" if effective_status == "UNKNOWN" else None,
-                "censored": effective_status == "UNKNOWN",
-                "execution_status": "NOT_OBSERVED",
-                "cost_class": "MODEL_ONLY_NOT_EXECUTION",
-                "fee_bps": "20", "slippage_bps": "10",
+                state="NO_SIGNAL"
+            full=state=="TRIGGERED"
+            r={
+                "pair_id":pid,"arm":arm,
+                "disposition":state,
+                "signal_disposition":"NO_SIGNAL" if state=="NO_SIGNAL" else "TRIGGERED",
+                "status":"MODELED_COMPLETE" if full else "UNKNOWN" if state=="UNKNOWN" else "INELIGIBLE",
+                "modeled_trade_availability":"COMPLETE" if full else "UNKNOWN",
+                "arm_decision_sha256":digest({"pid":pid,"arm":arm}),
+                "four_hour_source_window_sha256":digest({"window":pid}),
+                "entry_open_ms":start+index*BAR_MS if full else None,
+                "exit_open_ms":start+(index+10)*BAR_MS if full else None,
+                "entry_open":"100" if full else None,
+                "exit_open":price if full else None,
+                "holding_period_bars":10,
+                "modeled_gross_return":(str(Decimal(price)/100-1) if full else None),
+                "modeled_net_return":(str(Decimal(price)/100-Decimal("1.003"))
+                                       if full else None),
+                "fee_entry_return":"0.001" if full else None,
+                "fee_exit_return":"0.001" if full else None,
+                "slippage_entry_return":"0.0005" if full else None,
+                "slippage_exit_return":"0.0005" if full else None,
+                "cost_class":"MODEL_ONLY_NOT_EXECUTION",
+                "fee_bps":"20","slippage_bps":"10",
+                "missingness_reason":"END_OF_COHORT" if state=="UNKNOWN" else None,
+                "censored":state=="UNKNOWN",
+                "execution_status":"NOT_OBSERVED",
             }
-            parent["modeled_trades"].append(row)
-        both = not no_triggers and base_status == "TRIGGERED" and shadow_status == "TRIGGERED"
-        parent["paired_comparison"].append({
-            "pair_id": pid,
-            "base_disposition": base_status if not no_triggers else "NO_SIGNAL",
-            "shadow_disposition": shadow_status if not no_triggers else "NO_SIGNAL",
-            "both_modeled_complete": both,
+            report["modeled_trades"].append(r)
+        report["paired_comparison"].append({
+            "pair_id":pid,
+            "base_disposition":base_state if not no_triggers else "NO_SIGNAL",
+            "shadow_disposition":shadow_state if not no_triggers else "NO_SIGNAL",
+            "both_modeled_complete":(base_state=="TRIGGERED" and
+                shadow_state=="TRIGGERED" and not no_triggers),
         })
-    parent["pair_count"] = len(specs)
-    parent["arm_count"] = 2 * len(specs)
-    parent = sealed(parent)
-    bounds = {sid: {
-        "source_id": sid, "source_package_sha256": parent["source_package_sha256"],
-        "start_ms": start, "end_exclusive_ms": start + 50 * BAR_MS,
+    report["pair_count"]=len(scenarios)
+    report["arm_count"]=2*len(scenarios)
+    report=sealed(report)
+    bounds={source_id:{
+        "source_id":source_id,
+        "source_package_sha256":report["source_package_sha256"],
+        "start_ms":start,"end_exclusive_ms":start+50*BAR_MS,
     }}
-    policy = propose_portfolio_policy("10000")
-    policy["approval_status"] = "TEST_ONLY_SYNTHETIC"
-    policy["test_only"] = True
-    policy = sealed(policy)
-    return [parent], policy, bounds
+    return [report],frozen_option_c_policy(),bounds
 
 
 def run(inputs):
-    return build_offline_portfolio_package(*inputs, test_only=True)
+    return build_independent_opportunity_package(*inputs,test_only=True)
 
 
-class PortfolioTests(unittest.TestCase):
-    def test_proposed_policy_cannot_score_private_or_synthetic(self):
-        r, p, b = fixture()
-        candidate = propose_portfolio_policy("10000")
-        self.assertEqual(candidate["approval_status"], "PROPOSED_NOT_OWNER_APPROVED")
-        with self.assertRaisesRegex(LabContractError, "OWNER_PORTFOLIO_POLICY_APPROVAL_AND_PRE_SCORE_ANCHOR_REQUIRED"):
-            build_offline_portfolio_package(r, candidate, b,
-                                            independent_parent_receipts_verified=True)
-        with self.assertRaisesRegex(LabContractError, "TEST_ONLY_POLICY_REQUIRED"):
-            build_offline_portfolio_package(r, candidate, b, test_only=True)
+class IndependentOptionCTests(unittest.TestCase):
+    def test_frozen_owner_c_policy_has_no_funded_portfolio_assumption(self):
+        p=frozen_option_c_policy()
+        self.assertEqual(p["owner_decision_url"],OWNER_C_URL)
+        self.assertEqual(p["approval_status"],"OWNER_APPROVED_PROVISIONAL")
+        self.assertEqual(p["capital_account"],"NONE")
+        self.assertEqual(p["overlaps"],"KEEP_EVERY_ELIGIBLE_OPPORTUNITY_NO_ARBITRATION")
+        self.assertEqual(p["position_cap"],"NONE")
+        self.assertEqual(p["artifact_sha256"],digest({k:v for k,v in p.items()
+                                                     if k!="artifact_sha256"}))
 
-    def test_owner_approval_and_anchor_not_forgeable_by_test_flag(self):
-        r, p, b = fixture()
-        p["test_only"] = False
-        p["approval_status"] = "OWNER_APPROVED_PROVISIONAL"
-        p["owner_approval_url"] = "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/77#issuecomment-123"
-        p["pre_score_anchor_receipt_sha256"] = "0" * 64
-        p = sealed(p)
-        with self.assertRaisesRegex(LabContractError, "OWNER_PORTFOLIO_POLICY_APPROVAL_AND_PRE_SCORE_ANCHOR_REQUIRED"):
-            build_offline_portfolio_package(r, p, b,
-                                            independent_parent_receipts_verified=True)
+    def test_all_eligible_trades_including_overlap_are_preserved(self):
+        out=run(fixture())
+        c=out["cohorts"][0]
+        b=c["arms"]["BASE"]["summary"]
+        s=c["arms"]["SHADOW"]["summary"]
+        self.assertEqual(out["total_pair_denominator"],6)
+        self.assertEqual(out["total_arm_slots"],12)
+        self.assertEqual(b["complete_modeled_count"],4)
+        self.assertEqual(s["complete_modeled_count"],3)
+        self.assertEqual(b["null_or_ineligible_count"],2)
+        self.assertEqual(s["null_or_ineligible_count"],3)
+        self.assertEqual(b["max_simultaneous_eligible_opportunities"],3)
+        self.assertEqual(s["max_simultaneous_eligible_opportunities"],2)
+        self.assertEqual(b["eligible_opportunities_with_overlap"],4)
+        self.assertEqual(s["eligible_opportunities_with_overlap"],2)
+        self.assertIsNone(out["funded_equity"])
+        self.assertIsNone(out["drawdown"])
+        self.assertIsNone(out["common_cash_account"])
+        self.assertIsNone(out["leverage_assumption"])
 
-    def test_full_one_position_occupied_skip_and_exit_first(self):
-        out = run(fixture())
-        cohort = out["cohorts"][0]
-        base, shadow = (cohort["arms"][x] for x in ("BASE", "SHADOW"))
-        self.assertEqual(out["total_scheduled_pairs"], 6)
-        self.assertEqual(out["total_arm_slots"], 12)
-        self.assertEqual(base["summary"]["modeled_selected_count"], 2)
-        self.assertEqual(base["summary"]["skipped_occupied_or_tie_count"], 2)
-        self.assertEqual(base["summary"]["ineligible_null_count"], 2)
-        self.assertEqual(shadow["summary"]["modeled_selected_count"], 2)
-        self.assertEqual(shadow["summary"]["skipped_occupied_or_tie_count"], 1)
-        self.assertEqual(shadow["summary"]["ineligible_null_count"], 3)
-        self.assertEqual(len(base["opportunity_census"]), 6)
-        events = base["ledger_events"]
-        self.assertEqual([x["event"] for x in events],
-                         ["MODEL_ENTRY", "MODEL_EXIT", "MODEL_ENTRY", "MODEL_EXIT"])
-        self.assertEqual(events[1]["at_ms"], events[2]["at_ms"])
-        self.assertEqual(events[0]["cash_after"], "0")
-        self.assertEqual(events[-1]["execution_status"], "NOT_OBSERVED")
-        self.assertEqual(base["summary"]["time_exposure_fraction"], "0.4")
+    def test_exit_before_entry_at_same_clock_does_not_create_false_overlap(self):
+        out=run(fixture())
+        rows=out["cohorts"][0]["arms"]["SHADOW"]["opportunities"]
+        first=next(x for x in rows if x["eligible"] and
+                   x["entry_open_ms"]==BAR_MS)
+        self.assertFalse(first["overlaps_other_eligible_opportunity"])
+        late=[x for x in rows if x["eligible"] and
+              x["entry_open_ms"]==11*BAR_MS]
+        self.assertEqual(len(late),2)
+        self.assertTrue(all(x["overlapping_partner_count"]==1 for x in late))
+        events=out["cohorts"][0]["arms"]["SHADOW"]["overlap_timeline"]
+        at_time=[x["event"] for x in events if x["at_ms"]==11*BAR_MS]
+        self.assertEqual(at_time[0],"MODELED_EXIT_BOUNDARY")
 
-    def test_exit_cash_cost_and_deterministic_tie(self):
-        out = run(fixture())
-        base = out["cohorts"][0]["arms"]["BASE"]
-        selected = base["position_rows"]
-        self.assertEqual(selected[0]["cash_after_exit"], "10170.000")
-        self.assertEqual(selected[0]["modeled_cost_amount"], "30.000")
-        self.assertEqual(selected[1]["cash_after_exit"], "10241.190000")
-        self.assertEqual(base["summary"]["terminal_realized_cash_equity"], "10241.190000")
-        self.assertEqual(selected[1]["pair_id"], min(
-            x["pair_id"] for x in fixture()[0][0]["modeled_trades"]
-            if x["entry_open_ms"] == 11 * BAR_MS))
-        self.assertEqual(out["cohorts"][0]["shadow_minus_base_terminal_modeled_equity"], "0.000000")
+    def test_independent_opportunity_time_exposure_integral(self):
+        b=run(fixture())["cohorts"][0]["arms"]["BASE"]["summary"]
+        self.assertEqual(b["concurrent_opportunity_unit_ms"],40*BAR_MS)
+        self.assertEqual(b["any_eligible_active_ms"],20*BAR_MS)
+        self.assertEqual(b["two_or_more_eligible_active_ms"],16*BAR_MS)
+        self.assertEqual(b["eligible_count_time_average_over_cohort"],"0.8")
+        self.assertIsNone(b["cash_ledger"])
+        self.assertIsNone(b["funded_portfolio_drawdown"])
 
-    def test_realized_only_drawdown_no_mark_to_market_claim(self):
-        out = run(fixture(negative_second=True))
-        s = out["cohorts"][0]["arms"]["BASE"]["summary"]
-        self.assertEqual(s["realized_only_max_drawdown"], "-0.053")
-        self.assertTrue(Decimal(s["terminal_realized_cash_equity"]) < Decimal("10000"))
-        self.assertEqual(s["equity_valuation"],
-                         "REALIZED_SETTLEMENT_ONLY_NOT_INTRATRADE_MARK_TO_MARKET")
-        self.assertTrue(all(x["marked_equity"] is None for x in
-                            out["cohorts"][0]["arms"]["BASE"]["ledger_events"]))
+    def test_rejected_unknown_and_no_signal_remain_null_not_skipped_or_zero(self):
+        out=run(fixture())
+        b=out["cohorts"][0]["arms"]["BASE"]
+        s=out["cohorts"][0]["arms"]["SHADOW"]
+        self.assertEqual(b["summary"]["dispositions"]["NO_SIGNAL"],1)
+        self.assertEqual(b["summary"]["dispositions"]["UNKNOWN"],1)
+        self.assertEqual(s["summary"]["dispositions"]["REJECTED"],1)
+        self.assertEqual(s["summary"]["dispositions"]["UNKNOWN"],1)
+        self.assertTrue(all(x["modeled_net_unit_return"] is None
+                            for x in b["opportunities"] if not x["eligible"]))
+        self.assertTrue(all(x["overlaps_other_eligible_opportunity"] is None
+                            for x in s["opportunities"] if not x["eligible"]))
+        self.assertEqual(len(out["cohorts"][0]["paired_comparison"]),6)
+        self.assertTrue(any(x["shadow_minus_base_unit_return"] is None
+                            for x in out["cohorts"][0]["paired_comparison"]))
 
-    def test_no_signal_all_null_remain_cash_and_zero_exposure(self):
-        r, p, b = fixture(no_triggers=True)
-        out = run((r, p, b))
-        for arm in ("BASE", "SHADOW"):
-            s = out["cohorts"][0]["arms"][arm]["summary"]
-            self.assertEqual(s["terminal_realized_cash_equity"], "10000")
-            self.assertEqual(s["selected_count"] if "selected_count" in s else
-                             s["modeled_selected_count"], 0)
-            self.assertEqual(s["ineligible_null_count"], 6)
-            self.assertEqual(s["time_exposure_fraction"], "0")
+    def test_distribution_is_conditional_not_funded_equity(self):
+        b=run(fixture())["cohorts"][0]["arms"]["BASE"]["summary"]
+        self.assertEqual(b["complete_modeled_count"],4)
+        self.assertEqual(b["positive_net_complete_count"],3)
+        self.assertEqual(b["negative_net_complete_count"],1)
+        self.assertEqual(b["modeled_net_min_complete_only"],"-0.053")
+        self.assertEqual(b["modeled_net_max_complete_only"],"0.017")
+        self.assertIsNotNone(b["modeled_net_median_nearest_rank_complete_only"])
+        self.assertNotIn("terminal_realized_cash_equity",b)
 
-    def test_cohort_independent_no_cash_stitch(self):
-        f = fixture()
-        a = fixture(other_month=True)
-        r = f[0] + a[0]
-        b = {**f[2], **a[2]}
-        out = run((r, f[1], b))
-        self.assertEqual(len(out["cohorts"]), 2)
-        self.assertEqual(out["total_scheduled_pairs"], 12)
-        self.assertTrue(all(c["arms"]["BASE"]["summary"]["initial_capital"] == "10000"
-                            for c in out["cohorts"]))
-        self.assertEqual(out["capital_linking"], "RESET_PER_MONTH_NO_CROSS_COHORT_COMPOUNDING")
+    def test_negative_previously_observed_returns_do_not_drive_policy_tuning(self):
+        inp=fixture(negative=True)
+        out=run(inp)
+        self.assertEqual(out["policy_artifact_sha256"],inp[1]["artifact_sha256"])
+        self.assertEqual(out["scientific_acceptance"],"NOT_OBTAINED")
+        self.assertEqual(out["alpha_claim"],"NOT_ESTABLISHED")
 
-    def test_determinism_and_input_immutability(self):
-        inp = fixture()
-        original = deepcopy(inp)
-        x = run(inp)
-        self.assertEqual(x, run(inp))
-        self.assertEqual(inp, original)
-        raw = canonical_portfolio_receipt_bytes(x)
+    def test_null_only_cohort_has_no_arbitrary_return_or_overlap(self):
+        out=run(fixture(no_triggers=True))
+        for arm in ("BASE","SHADOW"):
+            s=out["cohorts"][0]["arms"][arm]["summary"]
+            self.assertEqual(s["complete_modeled_count"],0)
+            self.assertEqual(s["max_simultaneous_eligible_opportunities"],0)
+            self.assertEqual(s["two_or_more_eligible_active_ms"],0)
+            self.assertIsNone(s["modeled_net_mean_complete_only"])
+            self.assertIsNone(s["modeled_net_median_nearest_rank_complete_only"])
+
+    def test_separate_source_cohorts_no_cross_month_stitch(self):
+        f=fixture()
+        a=fixture(other_month=True)
+        out=run((f[0]+a[0],f[1],{**f[2],**a[2]}))
+        self.assertEqual(len(out["cohorts"]),2)
+        self.assertEqual(out["total_pair_denominator"],12)
+        self.assertEqual(out["total_arm_slots"],24)
+        self.assertEqual(out["source_cohort_handling"],
+                         "SEPARATE_NO_CROSS_MONTH_STITCH")
+
+    def test_determinism_and_immutable_parent(self):
+        inp=fixture()
+        saved=deepcopy(inp)
+        out=run(inp)
+        self.assertEqual(out,run(inp))
+        self.assertEqual(inp,saved)
+        raw=canonical_opportunity_receipt_bytes(out)
         self.assertTrue(raw.endswith(b"\n"))
-        self.assertEqual(raw_portfolio_receipt_sha256(x), sha256(raw).hexdigest())
-        self.assertIn("Realized", render_portfolio_report(x).replace("realized", "Realized"))
+        self.assertEqual(raw_opportunity_receipt_sha256(out),sha256(raw).hexdigest())
+        self.assertIn("No common capital",render_opportunity_research_report(out))
 
-    def test_rehashed_price_or_cost_forgery_still_rejected(self):
-        r, p, b = fixture()
-        trade = r[0]["modeled_trades"][0]
-        trade["modeled_net_return"] = "0.50"
-        r[0] = sealed(r[0])
-        with self.assertRaisesRegex(LabContractError, "PARENT_TRADE_RETURN_MISMATCH"):
-            run((r, p, b))
-        r,p,b = fixture()
-        r[0]["modeled_trades"][0]["fee_entry_return"] = "0"
-        r[0] = sealed(r[0])
-        with self.assertRaisesRegex(LabContractError, "TRADE_MODELED_ENTRY_EXIT_OR_COST_DRIFT"):
-            run((r,p,b))
+    def test_real_execution_blocked_without_independent_anchor(self):
+        inp=fixture()
+        with self.assertRaisesRegex(LabContractError,"INDEPENDENT_OWNER_C_AND_PRE_SCORE_ANCHOR_REQUIRED"):
+            build_independent_opportunity_package(*inp)
+        with self.assertRaisesRegex(LabContractError,"INDEPENDENT_OWNER_C_AND_PRE_SCORE_ANCHOR_REQUIRED"):
+            build_independent_opportunity_package(
+                *inp,owner_decision_verified=True,before_scoring_anchor_verified=True,
+                independent_parent_receipts_verified=True)
 
-    def test_malformed_or_duplicate_parent_arms_fail_closed(self):
-        r,p,b = fixture()
-        r[0]["modeled_trades"].append(deepcopy(r[0]["modeled_trades"][0]))
-        r[0]["arm_count"] += 1
-        r[0] = sealed(r[0])
-        with self.assertRaises(LabContractError):
-            run((r,p,b))
-        r,p,b = fixture()
-        r[0]["modeled_trades"][1]["arm"] = "BASE"
-        r[0] = sealed(r[0])
-        with self.assertRaises(LabContractError):
-            run((r,p,b))
-
-    def test_hash_mismatch_policy_and_parent_rejected(self):
+    def test_policy_tamper_and_rehash_fail_closed(self):
         r,p,b=fixture()
-        p["max_open_positions"] = 2
-        with self.assertRaisesRegex(LabContractError, "PORTFOLIO_POLICY_HASH_MISMATCH"):
+        p["position_cap"]="1"
+        with self.assertRaisesRegex(LabContractError,"OPTION_C_POLICY_DIGEST_MISMATCH"):
             run((r,p,b))
-        r,p,b=fixture()
-        p["max_open_positions"] = 2
         p=sealed(p)
-        with self.assertRaisesRegex(LabContractError, "UNAPPROVED_PORTFOLIO_SEMANTIC_CHANGE"):
-            run((r,p,b))
-        r,p,b=fixture()
-        r[0]["pair_count"] += 1
-        with self.assertRaisesRegex(LabContractError, "PARENT_TRADE_REPORT_DIGEST_MISMATCH"):
+        with self.assertRaisesRegex(LabContractError,"OPTION_C_POLICY_CHANGED_OR_UNAPPROVED"):
             run((r,p,b))
 
-    def test_nonfinite_capital_and_cross_cohort_boundary_rejected(self):
-        with self.assertRaises(LabContractError):
-            propose_portfolio_policy("NaN")
-        with self.assertRaises(LabContractError):
-            propose_portfolio_policy("-10")
+    def test_parent_price_rehash_cannot_forge_returns(self):
         r,p,b=fixture()
-        b["TEST_ONLY_FEB"]["end_exclusive_ms"] = 10 * BAR_MS
-        with self.assertRaisesRegex(LabContractError, "CROSS_COHORT_TRADE_OR_NON_GRID_TIME"):
-            run((r,p,b))
-
-    def test_bad_parent_fills_held_mfe_not_portfolio_equity(self):
-        r,p,b=fixture()
-        r[0]["modeled_trades"][0]["status"] = "ACTUAL_FILLED"
-        r[0] = sealed(r[0])
-        with self.assertRaisesRegex(LabContractError, "TRADE_MODELED_ENTRY_EXIT_OR_COST_DRIFT"):
-            run((r,p,b))
-        out=run(fixture())
-        self.assertEqual(out["alpha_claim"], "NOT_ESTABLISHED")
-        self.assertEqual(out["pit_status"], "NOT_ATTESTED")
-        self.assertEqual(out["oos_status"], "NOT_ATTESTED")
-        self.assertEqual(out["holdout_status"], "SEALED_UNOPENED")
-
-    def test_false_model_cost_class_and_real_data_test_mode_rejected(self):
-        r,p,b=fixture()
-        r[0]["modeled_trades"][0]["cost_class"] = "ACTUAL_FILL"
-        r[0] = sealed(r[0])
-        with self.assertRaisesRegex(LabContractError, "UNTRUSTED_PARENT_MODELED_COST_CLASS"):
-            run((r,p,b))
-        r,p,b=fixture()
-        old_id = r[0]["source_id"]
-        r[0]["source_id"] = "BINANCE_SPOT_REAL"
-        r[0] = sealed(r[0])
-        b["BINANCE_SPOT_REAL"] = b.pop(old_id)
-        b["BINANCE_SPOT_REAL"]["source_id"] = "BINANCE_SPOT_REAL"
-        with self.assertRaisesRegex(LabContractError, "REAL_SOURCE_FORBIDDEN_IN_TEST_ONLY_PORTFOLIO"):
-            run((r,p,b))
-
-    def test_no_insolvent_cash_or_silent_loss_clamping(self):
-        r,p,b=fixture()
-        # Preserve well-formed modeled return while forcing an extreme price
-        # that would make the frozen additive 30bps fee overdraw all capital.
         row=r[0]["modeled_trades"][0]
-        row["exit_open"] = "0.1"
-        row["modeled_gross_return"] = "-0.999"
-        row["modeled_net_return"] = "-1.002"
-        r[0] = sealed(r[0])
-        with self.assertRaisesRegex(LabContractError, "MODELED_PORTFOLIO_INSOLVENT"):
+        row["modeled_net_return"]="999"
+        r[0]=sealed(r[0])
+        with self.assertRaisesRegex(LabContractError,"PARENT_MODELED_RETURN_MISMATCH"):
             run((r,p,b))
 
-    def test_receipt_tamper_rejected_and_private_readiness_not_asserted(self):
+    def test_parent_hash_and_cost_contract_fail(self):
+        r,p,b=fixture()
+        r[0]["modeled_cost_round_trip_bps"]="20"
+        with self.assertRaisesRegex(LabContractError,"INVALID_PARENT_MODELED_TRADE_RECEIPT"):
+            run((r,p,b))
+        r,p,b=fixture()
+        r[0]["modeled_cost_round_trip_bps"]="20"
+        r[0]=sealed(r[0])
+        with self.assertRaisesRegex(LabContractError,"PARENT_TRADE_CONTRACT_OR_LINEAGE_MISMATCH"):
+            run((r,p,b))
+
+    def test_null_forged_model_return_rejected(self):
+        r,p,b=fixture()
+        row=next(x for x in r[0]["modeled_trades"]
+                 if x["disposition"]=="UNKNOWN")
+        row["modeled_net_return"]="0"
+        r[0]=sealed(r[0])
+        with self.assertRaisesRegex(LabContractError,"NULL_ARM_PROMOTED_TO_TRADE"):
+            run((r,p,b))
+
+    def test_duplicate_or_missing_pair_arm_rejected(self):
+        r,p,b=fixture()
+        r[0]["modeled_trades"][1]["arm"]="BASE"
+        r[0]=sealed(r[0])
+        with self.assertRaisesRegex(LabContractError,"DUPLICATE_OR_UNVERIFIED_PARENT_ARM"):
+            run((r,p,b))
+        r,p,b=fixture()
+        r[0]["modeled_trades"].pop()
+        r[0]=sealed(r[0])
+        with self.assertRaisesRegex(LabContractError,"PARENT_SOURCE_OR_PAIRED_DENOMINATOR_MISMATCH"):
+            run((r,p,b))
+
+    def test_cross_cohort_forged_time_rejected(self):
+        r,p,b=fixture()
+        b["TEST_ONLY_FEB"]["end_exclusive_ms"]=10*BAR_MS
+        with self.assertRaisesRegex(LabContractError,"CROSS_COHORT_OR_OFF_GRID_MODELED_OPPORTUNITY"):
+            run((r,p,b))
+
+    def test_same_pair_price_divergence_rejected(self):
+        r,p,b=fixture()
+        row=next(x for x in r[0]["modeled_trades"]
+                 if x["arm"]=="SHADOW" and x["disposition"]=="TRIGGERED")
+        row["exit_open"]="103"
+        row["modeled_gross_return"]="0.03"
+        row["modeled_net_return"]="0.027"
+        r[0]=sealed(r[0])
+        with self.assertRaisesRegex(LabContractError,"SAME_PAIR_ARMS_MODEL_PRICE_DRIFT"):
+            run((r,p,b))
+
+    def test_no_source_disguised_as_test_only(self):
+        r,p,b=fixture()
+        old=r[0]["source_id"]
+        r[0]["source_id"]="REAL_BINANCE_2024"
+        r[0]=sealed(r[0])
+        b["REAL_BINANCE_2024"]=b.pop(old)
+        b["REAL_BINANCE_2024"]["source_id"]="REAL_BINANCE_2024"
+        with self.assertRaisesRegex(LabContractError,"REAL_SOURCE_CANNOT_BE_CALLED_TEST_ONLY"):
+            run((r,p,b))
+
+    def test_receipt_tamper_rejected(self):
         out=run(fixture())
-        out["cohorts"][0]["arms"]["BASE"]["summary"]["terminal_realized_cash_equity"]="1"
-        with self.assertRaisesRegex(LabContractError, "PORTFOLIO_RECEIPT_HASH_MISMATCH"):
-            canonical_portfolio_receipt_bytes(out)
+        out["cohorts"][0]["arms"]["BASE"]["summary"]["complete_modeled_count"]=0
+        with self.assertRaisesRegex(LabContractError,"BAD_INDEPENDENT_OPPORTUNITY_RECEIPT"):
+            canonical_opportunity_receipt_bytes(out)
