@@ -280,8 +280,8 @@ def intake(plan, plan_raw, cache, *, verified_at_utc, fetch=False,
         'historical_known_at_ms': None, 'historical_publication_ms': None,
         'terms': plan['terms'], 'sealed_holdout': plan['sealed_holdout'], 'embargo_ms': plan['embargo_ms'],
         'holdout_fetched': False, 'holdout_evaluated': False,
-        'core_opportunity_producer': 'PENDING_SEPARATE_CORE_CONTRACT_DELIVERY',
-        'paired_lab_consumer': 'PENDING_SEPARATE_FACTORY_DELIVERY',
+        'core_opportunity_producer': 'NOT_INVOKED_SEPARATE_CORE_CONTRACT',
+        'paired_lab_consumer': 'NOT_INVOKED_SEPARATE_FACTORY_CONSUMER',
         'base_shadow_comparison': 'NOT_EXECUTED_NO_FROZEN_BASE_SHADOW_PROOF',
         'opportunities': None, 'comparative_alpha': None, 'market_only_opportunity_probe': 'NOT_RUN',
         'no_trading': True, 'g0_approval': False}
@@ -320,10 +320,38 @@ def asof_features(rows, plan, *, dataset_id, cutoff_ms):
     return tuple(r for r in rows if r['dataset_id'] == dataset_id and r['close_ms'] < cutoff_ms)
 
 
+def core_source_handoff(manifest, index_raw):
+    """Constructor arguments for Core #221 source types only, NOT opportunities.
+
+    Core pin 9823f68221cc31e4b12dc11d5713513df22c69fb; no cross-branch import.
+    """
+    rows = [parse(line) for line in index_raw.splitlines() if line.strip()]
+    sources = []
+    if manifest['status'] == 'COMPLETE_DEVELOPMENT_INTAKE':
+        for window in manifest['development_windows']:
+            selected = [r for r in rows if r['dataset_id'] == window['dataset_id']]
+            sources.append({'source_kwargs': {
+                'source_id': window['dataset_id'], 'exchange': 'BINANCE', 'market': 'SPOT', 'symbol': 'BTCUSDT',
+                'source_package_sha256': window['source']['archive_sha256'],
+                'manifest_sha256': sha(canonical(manifest)),
+                'normalized_sha256': sha(b''.join(canonical(r) for r in selected)),
+                'correction_generation': 'UNKNOWN_NOT_ATTESTED', 'interval_ms': BAR_MS,
+                'evidence_class': 'RETROSPECTIVE_NON_PIT'},
+                'normalized_hash_domain': 'CANONICAL_JSONL_OF_THIS_DATASET_WORK_BAR_RECORDS',
+                'bar_kwargs': [{'open_ms': r['open_ms'], 'close_ms': r['close_ms'],
+                    'content_sha256': r['bar_sha256'], 'finalized': r['is_final'],
+                    'available_at_ms': None, 'availability_evidence_ref': None} for r in selected]})
+    return {'schema': 'aql.p2a.core-source-constructor-handoff.v1',
+            'core_contract_sha': '9823f68221cc31e4b12dc11d5713513df22c69fb',
+            'status': 'SOURCE_ARGUMENTS_ONLY_NO_CORE_SCHEDULE_EXECUTED', 'sources': sources,
+            'opportunities': None, 'frozen_trial': None, 'comparison_executed': False}
+
+
 def persist(out, manifest, index_raw, raw_files, plan_raw):
     target = Path(out)
     require(not target.exists(), 'IMMUTABLE_OUTPUT_ALREADY_EXISTS')
     files = {'frozen-plan.json': plan_raw, 'intake-manifest.json': canonical(manifest),
+             'core-source-handoff.json': canonical(core_source_handoff(manifest, index_raw)),
              'bars.jsonl': index_raw, **{'raw/' + n: b for n, b in raw_files.items()}}
     files['coverage.md'] = ('# P2-A development data intake only\n\nAttribution: Binance Vision. '
         'CC BY-NC-SA4.0, personal noncommercial nonproduction research.\n\n'

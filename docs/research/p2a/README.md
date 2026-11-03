@@ -115,7 +115,19 @@ dataset and its native grid. It is an event-time retrospective prefix, NOT PIT.
 Core owns actual feature/regime/direction evidence, opportunity scheduling and
 frozen BASE/SHADOW proof; Factory owns outcomes/pairs. No duplicate producer or
 Lab consumer is implemented here. The exact Core P2HistoricalOpportunityV1 schema
-is pending, so interface mapping/integration remains an explicit dependency.
+is now available in separate Draft #221 at
+9823f68221cc31e4b12dc11d5713513df22c69fb. core-source-handoff.json maps each
+development dataset to HistoricalSourceV1/ HistoricalBarV1 constructor arguments
+without importing/editing that branch or executing a schedule. The source-package
+hash is that dataset's actual monthly ZIP; manifest hash is the intake manifest;
+normalized hash is canonical JSONL of that dataset's Work bar records only.
+Core content_sha256 maps to bar_sha256; finalized maps to archived-closed status;
+available_at_ms/evidence remain null. The OHLCV records remain in bars.jsonl.
+Factory Draft #222 at832a7fd9db92291a72b105d1f50a95dc20ac77fd is separately
+present, not invoked. Transport contract mapping is supplied, but source argument
+shape is not paired schedule or candidate execution; no compatibility/acceptance
+of their entire pipelines is asserted. Their code delivery is not a blocker to
+intake, and is not evidence that genuine candidate/preregistration bytes exist.
 
 ## What the offline driver actually does
 

@@ -208,6 +208,22 @@ class PublicIntakeSeams(unittest.TestCase):
             root=Path(d);m,index,raw=self.intake(root)
             out=root/'out';anchor=p.persist(out,m,index,raw,p.canonical(self.plan))
             with self.assertRaises(p.IntakeError):p.read_validated_index(out,expected_manifest_sha256=anchor)
+            self.assertEqual(p.core_source_handoff(m,index)['sources'],[])
+
+    def test_core_source_mapping_is_per_period_not_paired_opportunities(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);self.make_cache(root);m,index,_=self.intake(root)
+            h=p.core_source_handoff(m,index)
+            self.assertEqual(len(h['sources']),2);self.assertIsNone(h['opportunities'])
+            self.assertFalse(h['comparison_executed'])
+            rows=[p.parse(x) for x in index.splitlines()]
+            for src in h['sources']:
+                kw=src['source_kwargs'];bs=src['bar_kwargs']
+                selected=[r for r in rows if r['dataset_id']==kw['source_id']]
+                self.assertEqual(kw['normalized_sha256'],p.sha(b''.join(p.canonical(r) for r in selected)))
+                self.assertEqual(kw['manifest_sha256'],p.sha(p.canonical(m)))
+                self.assertEqual(len(selected),len(bs))
+                self.assertTrue(all(b['available_at_ms'] is None and b['availability_evidence_ref'] is None for b in bs))
 
     def test_predeclaration_and_nonfinite_json_fail_closed(self):
         with self.assertRaises(p.IntakeError):
