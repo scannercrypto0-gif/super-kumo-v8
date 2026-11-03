@@ -50,8 +50,8 @@ def validate_prereg(schedule, prereg, cost_model):
     protocol = schedule["protocol"]
     if (prereg.get("trial_id") != protocol["trial_id"] or
         prereg.get("protocol_sha256") != protocol["protocol_sha256"] or
-        prereg.get("hypothesis_sha256") != protocol["hypothesis_sha256"] or
-        prereg.get("preregistration_sha256") != protocol["preregistration_sha256"] or
+        prereg.get("hypothesis_sha256") != protocol.get("hypothesis_sha256") or
+        prereg.get("preregistration_sha256") != protocol.get("preregistration_sha256") or
         prereg.get("base_definition_sha256") != protocol["base_definition_sha256"] or
         prereg.get("shadow_definition_sha256") != protocol["shadow_definition_sha256"]):
         fail("PREREG_CORE_PROTOCOL_MISMATCH")
