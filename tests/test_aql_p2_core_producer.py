@@ -40,6 +40,33 @@ def fixture():
 
 
 class CoreP2ContractsTests(unittest.TestCase):
+    def test_factory_schedule_contract_pure_cross_branch(self):
+        # Directly load Factory #222 source without editing/copying its implementation.
+        # In this isolated branch, mirror only the exact externally documented
+        # test_only requirement and invariant-digest protocol; full integration is
+        # separately owned by Factory.
+        trial, source, bars, item = fixture()
+        result = schedule_pair(trial, source, bars, (item,), test_only=True)
+        self.assertIs(result["test_only"], True)
+        self.assertEqual(result["schema"], "aql.p2.core.paired-schedule.v1")
+        self.assertEqual(result["scheduled_total"], len(result["pairs"]))
+        self.assertEqual(result["pairs"][0]["arms"][0]["arm"], "BASE")
+        self.assertEqual(result["pairs"][0]["arms"][1]["arm"], "SHADOW")
+        import hashlib
+        import json
+        canonical = json.dumps({k: v for k, v in result.items()
+                                if k != "artifact_sha256"}, sort_keys=True,
+                               separators=(",", ":"), allow_nan=False)
+        self.assertEqual(hashlib.sha256(canonical.encode()).hexdigest(),
+                         result["artifact_sha256"])
+
+    def test_core_schedule_default_never_claims_test_only(self):
+        trial, source, bars, item = fixture()
+        result = schedule_pair(trial, source, bars, (item,))
+        self.assertIs(result["test_only"], False)
+        with self.assertRaisesRegex(ContractError, "BAD_TEST_ONLY_FLAG"):
+            schedule_pair(trial, source, bars, (item,), test_only="true")
+
     def test_valid_deterministic_two_arm_schedule(self):
         trial, source, bars, item = fixture()
         first = schedule_pair(trial, source, bars, (item,))
