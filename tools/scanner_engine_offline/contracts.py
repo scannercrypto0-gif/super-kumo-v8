@@ -261,6 +261,11 @@ class ScannerNominationEnvelope:
 
     Immutable once sealed.  Digest is SHA-256 of canonical JSON bytes of as_dict().
     Never a production signal, trade command, or delivery authorization.
+
+    P1-02 fix: After seal() is called, any subsequent __setattr__ raises
+    ValueError("SEALED_ENVELOPE_MUTATION") to enforce immutability.
+    publishable and delivery_authorized are hardcoded False in as_dict()
+    regardless of what the field holds.
     """
     scanner_id: str          # identifies this scanner instance / run
     candidate_id: str        # symbol + cutoff identity
@@ -278,11 +283,22 @@ class ScannerNominationEnvelope:
     publishable: bool = False
     delivery_authorized: bool = False
     _digest: str | None = field(default=None, repr=False, compare=False)
+    _sealed: bool = field(default=False, repr=False, compare=False)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        """P1-02: Block mutation after seal()."""
+        if getattr(self, "_sealed", False) and name not in ("_digest", "_sealed"):
+            raise ValueError(f"SEALED_ENVELOPE_MUTATION:field={name}")
+        object.__setattr__(self, name, value)
 
     def seal(self) -> "ScannerNominationEnvelope":
-        """Freeze digest.  Call once all fields are populated."""
+        """Freeze digest.  Call once all fields are populated.
+
+        After seal(), any field mutation raises ValueError("SEALED_ENVELOPE_MUTATION").
+        """
         d = self.as_dict(include_digest=False)
         object.__setattr__(self, "_digest", sha256_hex(canonical_bytes(d)))
+        object.__setattr__(self, "_sealed", True)
         return self
 
     @property

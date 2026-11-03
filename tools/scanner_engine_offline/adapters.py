@@ -68,7 +68,10 @@ def make_synthetic_bars(
     if last_bar_close > cutoff_at:
         last_bar_close -= bar_duration
 
-    seed = _symbol_seed(symbol) ^ hash(timeframe)
+    # P1-01 fix: hash() is NOT stable across Python processes (PYTHONHASHSEED).
+    # Use SHA-256 of the timeframe bytes for a stable, cross-process seed.
+    tf_seed = int(hashlib.sha256(timeframe.encode()).hexdigest()[:8], 16)
+    seed = _symbol_seed(symbol) ^ tf_seed
     bars: list[AdmittedBar] = []
     base_price = Decimal("100") + Decimal(seed % 900)  # 100–999
     vol_base_multiplier = Decimal("1000") + Decimal(seed % 9000)

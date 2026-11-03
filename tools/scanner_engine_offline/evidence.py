@@ -82,13 +82,19 @@ def _claim_receipt_id(
     symbol: str,
     profile: str,
     claim_at: datetime,
+    run_id: str = "",
 ) -> str:
-    """Deterministic receipt ID before computation: hash of identity fields."""
+    """Deterministic receipt ID before computation: hash of identity fields.
+
+    P0-03 fix: run_id is included so distinct runs at the same cutoff cannot
+    produce the same receipt_id for different payloads.
+    """
     seed = canonical_bytes({
         "scanner_id": scanner_id,
         "symbol": symbol,
         "profile": profile,
         "claim_at": claim_at.isoformat(),
+        "run_id": run_id,
     })
     return sha256_hex(seed)
 
@@ -103,14 +109,21 @@ def commit_receipt(
     payload: dict,
     claim_at: datetime,
     committed_at: datetime | None = None,
+    run_id: str = "",
 ) -> EvidenceReceipt:
-    """Create and commit a receipt for a completed scan result."""
+    """Create and commit a receipt for a completed scan result.
+
+    P0-03 fix: run_id included in receipt_id derivation to prevent same-ID
+    collision across runs at the same cutoff.
+    P1-01 fix: committed_at defaults to claim_at (not wall clock) for
+    deterministic research output; callers may pass explicit value.
+    """
     claim_at = _utc(claim_at)
     if committed_at is None:
-        committed_at = datetime.now(UTC)
+        committed_at = claim_at  # deterministic: not wall clock
     else:
         committed_at = _utc(committed_at)
-    receipt_id = _claim_receipt_id(scanner_id, symbol, profile, claim_at)
+    receipt_id = _claim_receipt_id(scanner_id, symbol, profile, claim_at, run_id)
     payload_digest = sha256_hex(canonical_bytes(payload))
     return EvidenceReceipt(
         receipt_id=receipt_id,
@@ -142,12 +155,24 @@ class BoundedSpool:
     _index: dict[str, EvidenceReceipt] = field(default_factory=dict, repr=False)
 
     def append(self, receipt: EvidenceReceipt) -> EvidenceReceipt:
-        """Append a receipt; verify integrity; evict oldest if over capacity."""
+        """Append a receipt; verify integrity; evict oldest if over capacity.
+
+        P0-03 fix: duplicate receipt_id with DIFFERENT payload digest raises
+        ValueError(RECEIPT_ID_CONFLICT) rather than silently returning stale result.
+        Same receipt_id with same digest is idempotent (exact replay).
+        """
         if not receipt.verify_integrity():
             raise ValueError(
                 f"INTEGRITY_FAILURE:receipt_id={receipt.receipt_id}")
         if receipt.receipt_id in self._index:
-            return self._index[receipt.receipt_id]  # idempotent
+            existing = self._index[receipt.receipt_id]
+            if existing.payload_digest != receipt.payload_digest:
+                raise ValueError(
+                    f"RECEIPT_ID_CONFLICT:receipt_id={receipt.receipt_id}"
+                    f",existing_digest={existing.payload_digest}"
+                    f",new_digest={receipt.payload_digest}"
+                )
+            return existing  # exact idempotent replay
         self._receipts.append(receipt)
         self._index[receipt.receipt_id] = receipt
         if len(self._receipts) > self.capacity:

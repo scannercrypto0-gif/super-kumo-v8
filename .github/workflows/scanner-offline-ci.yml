@@ -3,6 +3,13 @@ name: Scanner Engine Offline CI
 # Scope: tools/scanner_engine_offline/** ONLY
 # No network calls, no live market data, no paper trading.
 # This workflow is fully offline — all tests use deterministic synthetic fixtures.
+#
+# P1-03 fixes applied (audit AQL-SCANNER-V1-SCIENTIFIC-ENGINEERING-REVIEW-001):
+#   - Safety check now uses AST-based scan scoped to PRODUCTION source only
+#     (excludes tests/), preventing false-positives from negative-test code that
+#     intentionally passes publishable=True to assert it is overridden.
+#   - Demo smoke saves output to a file then reads it, avoiding stdin conflict
+#     when using a here-doc to provide the Python consumer script.
 
 on:
   push:
@@ -55,26 +62,61 @@ jobs:
           ! grep -r "from research_wp_r0" tools/scanner_engine_offline/ || \
             (echo "ISOLATION VIOLATION: research_wp_r0 import found" && exit 1)
 
-      - name: Verify publishable/delivery_authorized safety constraints
+      - name: Verify publishable/delivery_authorized safety constraints (production source only)
+        # P1-03 fix: AST-based scan scoped to production files only (excludes tests/).
+        # Negative tests that pass publishable=True to assert it's overridden are NOT a violation.
+        # Only production code (non-test files) must never assign publishable=True.
         run: |
-          # Every assignment of publishable must be False
-          python - <<'EOF'
-          import re, pathlib, sys
+          python -c "
+          import ast, pathlib, sys
           issues = []
-          for f in pathlib.Path("tools/scanner_engine_offline").rglob("*.py"):
-              text = f.read_text()
-              # Find any publishable=True or delivery_authorized=True
-              if re.search(r'publishable\s*=\s*True', text):
-                  issues.append(f"{f}: publishable=True found")
-              if re.search(r'delivery_authorized\s*=\s*True', text):
-                  issues.append(f"{f}: delivery_authorized=True found")
+          scanner_root = pathlib.Path('tools/scanner_engine_offline')
+          prod_files = [
+              f for f in scanner_root.rglob('*.py')
+              if 'tests' not in f.parts and f.name != '__init__.py' or f.name == '__init__.py'
+          ]
+          # More precisely: exclude anything under a 'tests' directory
+          prod_files = [
+              f for f in scanner_root.rglob('*.py')
+              if not any(part == 'tests' for part in f.parts)
+          ]
+          for fpath in prod_files:
+              try:
+                  tree = ast.parse(fpath.read_text(), filename=str(fpath))
+              except SyntaxError as e:
+                  issues.append(f'{fpath}: SyntaxError: {e}')
+                  continue
+              for node in ast.walk(tree):
+                  # Look for keyword arguments publishable=True or delivery_authorized=True
+                  if isinstance(node, ast.keyword):
+                      if node.arg in ('publishable', 'delivery_authorized'):
+                          if isinstance(node.value, ast.Constant) and node.value.value is True:
+                              issues.append(f'{fpath}:{node.col_offset}: {node.arg}=True in production code')
+                  # Also catch simple assignments like: self.publishable = True
+                  if isinstance(node, (ast.Assign, ast.AnnAssign)):
+                      targets = []
+                      if isinstance(node, ast.Assign):
+                          targets = node.targets
+                          val = node.value
+                      else:
+                          targets = [node.target] if node.target else []
+                          val = node.value
+                      for tgt in targets:
+                          name = ''
+                          if isinstance(tgt, ast.Name):
+                              name = tgt.id
+                          elif isinstance(tgt, ast.Attribute):
+                              name = tgt.attr
+                          if name in ('publishable', 'delivery_authorized'):
+                              if isinstance(val, ast.Constant) and val.value is True:
+                                  issues.append(f'{fpath}:{getattr(node, \"lineno\", \"?\")}: {name} = True in production code')
           if issues:
-              print("SAFETY CONSTRAINT VIOLATIONS:")
+              print('SAFETY CONSTRAINT VIOLATIONS (production source):')
               for i in issues:
-                  print(f"  {i}")
+                  print(f'  {i}')
               sys.exit(1)
-          print("Safety check passed: publishable and delivery_authorized are never True")
-          EOF
+          print(f'Safety check passed: checked {len(prod_files)} production files')
+          "
 
       - name: Run scanner offline tests
         run: |
@@ -85,15 +127,19 @@ jobs:
             -p no:cacheprovider
 
       - name: Run demo (smoke test — no network)
+        # P1-03 fix: Save demo JSON to a temp file, then read it with a separate
+        # Python invocation. Avoids stdin conflict between pipe and here-doc.
         run: |
-          python -m tools.scanner_engine_offline.demo 2>&1 | python - <<'EOF'
-          import sys, json
-          data = json.loads(sys.stdin.read())
-          assert data.get("publishable_check") is True, "publishable_check must be True (all False)"
-          assert data.get("delivery_authorized_check") is True, "delivery_authorized_check must be True (all False)"
-          assert "run_id" in data, "run_id missing from demo output"
-          print(f"Demo smoke test passed: run_id={data['run_id']}, nominated={data.get('nominated_count', 0)}")
-          EOF
+          python -m tools.scanner_engine_offline.demo > /tmp/scanner_demo_out.json 2>&1
+          python -c "
+          import json, sys
+          with open('/tmp/scanner_demo_out.json') as f:
+              data = json.load(f)
+          assert data.get('publishable_check') is True, f'publishable_check must be True (all False), got: {data.get(\"publishable_check\")}'
+          assert data.get('delivery_authorized_check') is True, f'delivery_authorized_check must be True (all False), got: {data.get(\"delivery_authorized_check\")}'
+          assert 'run_id' in data, f'run_id missing from demo output: {list(data.keys())}'
+          print(f'Demo smoke test passed: run_id={data[\"run_id\"]}, nominated={data.get(\"nominated_count\", 0)}')
+          "
 
   scanner-offline-lint:
     name: Scanner Offline — Lint
