@@ -141,6 +141,10 @@ def _validate_report(report):
         status = row.get("status")
         if disposition not in CANDIDATE_STATUSES:
             fail("BAD_TRADE_DISPOSITION")
+        if (row.get("cost_class") != "MODEL_ONLY_NOT_EXECUTION"
+            or row.get("fee_bps") != "20"
+            or row.get("slippage_bps") != "10"):
+            fail("UNTRUSTED_PARENT_MODELED_COST_CLASS")
         if disposition == "TRIGGERED":
             if (status != "MODELED_COMPLETE" or row.get("modeled_trade_availability") != "COMPLETE"
                 or row.get("missingness_reason") is not None
@@ -359,6 +363,10 @@ def build_offline_portfolio_package(trade_reports, policy, cohort_bounds, *,
     ids = set()
     cohorts = []
     for report in sorted(trade_reports, key=lambda x: x.get("source_id", "")):
+        if not isinstance(report.get("source_id"), str) or not report["source_id"]:
+            fail("BAD_PARENT_COHORT_ID")
+        if test_only is True and not report["source_id"].startswith("TEST_ONLY_"):
+            fail("REAL_SOURCE_FORBIDDEN_IN_TEST_ONLY_PORTFOLIO")
         if report.get("source_id") in ids or report["source_id"] not in cohort_bounds:
             fail("DUPLICATE_OR_UNKNOWN_PORTFOLIO_COHORT")
         ids.add(report["source_id"])
