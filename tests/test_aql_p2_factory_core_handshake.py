@@ -20,7 +20,7 @@ from research_wp_r0.aql_p2_factory_lab import (
 )
 
 CORE_PR = 221
-CORE_PIN = "0842fc0a753ec6a3327c00c24e74908e8f6ca39c"
+CORE_PIN = "58e423431cc639958736337a65db8a17bfdbaa85"
 START = 1704067200000  # TEST_ONLY synthetic aligned UTC clock
 BAR_MS = 900000
 
