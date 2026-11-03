@@ -352,3 +352,52 @@ def test_missing_horizon_for_one_opportunity():
     rows = [r for r in rows if not (r["opportunity_id"] == "opp-0001" and r["horizon_hours"] == 72)]
     with pytest.raises(P1AError, match="missing"):
         validate_rows(rows, expected_denominator=2)
+
+
+# ---------------------------------------------------------------------------
+# 18. Nonfinite metric value rejected (NaN / Inf)
+# ---------------------------------------------------------------------------
+
+def test_nonfinite_market_metric_rejected():
+    """market_metrics containing NaN or Inf must be rejected fail-closed."""
+    import math
+    bad_mm = _market_metrics()
+    bad_mm["market_high_return"] = math.nan
+    raw = _make_raw_row("opp-nan", override={"market_metrics": bad_mm})
+    with pytest.raises(P1AError, match="finite"):
+        validate_rows([raw, *[_make_raw_row("opp-nan", h) for h in (24, 72)]],
+                      expected_denominator=1)
+
+    bad_mm2 = _market_metrics()
+    bad_mm2["market_close_return"] = math.inf
+    raw2 = _make_raw_row("opp-inf", override={"market_metrics": bad_mm2})
+    with pytest.raises(P1AError, match="finite"):
+        validate_rows([raw2, *[_make_raw_row("opp-inf", h) for h in (24, 72)]],
+                      expected_denominator=1)
+
+
+# ---------------------------------------------------------------------------
+# 19. Disposition-stratified market stats present for each disposition
+# ---------------------------------------------------------------------------
+
+def test_disposition_stratified_stats_present():
+    """market_stats_by_horizon_and_disposition must be keyed by disposition."""
+    rows: list[dict] = []
+    for i in range(4):
+        disp = "NO_SIGNAL" if i < 3 else "REJECTED"
+        for h in (4, 24, 72):
+            rows.append(_make_raw_row(f"opp-{i:04d}", h, f3_disposition=disp))
+    parsed = validate_rows(rows, expected_denominator=4)
+    summary = aggregate_summary(parsed)
+
+    dstats = summary["market_stats_by_horizon_and_disposition"]
+    assert "NO_SIGNAL" in dstats
+    assert "REJECTED" in dstats
+    # NO_SIGNAL has 3 opps × 3 horizons = 9 COMPLETE rows
+    assert dstats["NO_SIGNAL"][4]["complete_count"] == 3
+    assert dstats["NO_SIGNAL"][24]["complete_count"] == 3
+    assert dstats["NO_SIGNAL"][72]["complete_count"] == 3
+    # REJECTED has 1 opp × 3 horizons
+    assert dstats["REJECTED"][4]["complete_count"] == 1
+    # Median is numeric (not None) when ≥ 2 samples
+    assert dstats["NO_SIGNAL"][4]["market_high_return"]["median"] is not None

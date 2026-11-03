@@ -358,7 +358,7 @@ def aggregate_summary(rows: list[InboundRow]) -> dict:
                 if any(r.availability == av for r in sub)
             }
 
-    # Descriptive stats — COMPLETE market-only only
+    # Descriptive stats — COMPLETE market-only only, by horizon
     market_stats: dict[int, dict] = {}
     for h in (4, 24, 72):
         complete = [
@@ -376,6 +376,28 @@ def aggregate_summary(rows: list[InboundRow]) -> dict:
             "market_close_return": _descriptive_stats(closes),
         }
 
+    # Descriptive stats — by horizon × f3_disposition (COMPLETE only)
+    market_stats_by_disp: dict[str, dict[int, dict]] = {}
+    for disp in f3_counts:
+        market_stats_by_disp[disp] = {}
+        for h in (4, 24, 72):
+            sub = [
+                r for r in rows
+                if r.horizon_hours == h
+                and r.f3_disposition == disp
+                and r.availability == "COMPLETE"
+                and r.market_metrics is not None
+            ]
+            highs  = [r.market_metrics["market_high_return"]  for r in sub]
+            lows   = [r.market_metrics["market_low_return"]   for r in sub]
+            closes = [r.market_metrics["market_close_return"] for r in sub]
+            market_stats_by_disp[disp][h] = {
+                "complete_count": len(sub),
+                "market_high_return":  _descriptive_stats(highs),
+                "market_low_return":   _descriptive_stats(lows),
+                "market_close_return": _descriptive_stats(closes),
+            }
+
     return {
         "renderer_version": RENDERER_VERSION,
         "scope": SCOPE,
@@ -386,6 +408,7 @@ def aggregate_summary(rows: list[InboundRow]) -> dict:
         "coverage_by_horizon": coverage,
         "coverage_by_horizon_and_disposition": coverage_by_disp,
         "market_stats_by_horizon": market_stats,
+        "market_stats_by_horizon_and_disposition": market_stats_by_disp,
         "directional_stats": "NOT_EVALUABLE_MISSING_ORIGINAL_DIRECTION",
         "shadow_status": SHADOW_STATUS_REQUIRED,
         "f1_status": F1_STATUS_REQUIRED,
@@ -522,6 +545,29 @@ def render_markdown_report(artifact: dict) -> str:
             )
         else:
             lines.append(f"- {high.get('note', 'INSUFFICIENT_SAMPLE')}")
+        lines.append("")
+
+    # Disposition-stratified stats
+    lines += ["", "## Market Stats by Disposition × Horizon (COMPLETE only)", ""]
+    dstats = s.get("market_stats_by_horizon_and_disposition", {})
+    for disp in sorted(dstats):
+        lines.append(f"### {disp}")
+        for h in (4, 24, 72):
+            ms = dstats[disp].get(h, {})
+            n = ms.get("complete_count", 0)
+            high = ms.get("market_high_return", {})
+            if n == 0:
+                lines.append(f"- {h}h: 0 COMPLETE rows")
+            elif high.get("median") is not None:
+                low = ms["market_low_return"]
+                close = ms["market_close_return"]
+                lines.append(
+                    f"- {h}h (n={n}): high median={high['median']:.4%} "
+                    f"low median={low['median']:.4%} "
+                    f"close median={close['median']:.4%}"
+                )
+            else:
+                lines.append(f"- {h}h (n={n}): INSUFFICIENT_SAMPLE")
         lines.append("")
 
     lines += [
