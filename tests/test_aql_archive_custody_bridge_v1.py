@@ -128,7 +128,7 @@ class OfflineArchiveCustodyBridgeG6(unittest.TestCase):
                                  START+N*WIDTH,START+N*WIDTH+2000)
             self.assertEqual(queried["status"],"COMPLETE")
             self.assertEqual(queried["available_bar_count"],4)
-            self.assertEqual(queried["availability_class"],"RETROSPECTIVE_NOT_PIT")
+            self.assertEqual(queried["availability_class"],"SYNTHETIC_TEST")
 
     def test_g3_partial_cutoff_and_no_pit_upgrade(self):
         with TemporaryDirectory() as temp:
