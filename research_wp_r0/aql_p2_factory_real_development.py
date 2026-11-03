@@ -107,7 +107,7 @@ def prepare_real_development(schedule, prereg, cost_model, windows, arm_decision
             fail("DUPLICATE_OR_UNKNOWN_WINDOW")
         if win.get("source_package_sha256") != schedule["source"]["source_package_sha256"]:
             fail("WINDOW_SOURCE_MISMATCH")
-        if not hash_ok(win.get("source_window_sha256")) or seal_hash(win) != win["source_window_sha256"]:
+        if not hash_ok(win.get("source_window_sha256")) or digest({k: v for k, v in win.items() if k != "source_window_sha256"}) != win["source_window_sha256"]:
             fail("WINDOW_DIGEST_MISMATCH")
         seen_windows[key] = win
     if set(seen_windows) != expected_windows:
@@ -129,7 +129,7 @@ def prepare_real_development(schedule, prereg, cost_model, windows, arm_decision
             fail("BAD_ARM_DIRECTION")
         if not hash_ok(decision.get("decision_evidence_sha256")):
             fail("UNVERIFIED_ARM_DECISION")
-        if not hash_ok(decision.get("decision_sha256")) or seal_hash(decision) != decision["decision_sha256"]:
+        if not hash_ok(decision.get("decision_sha256")) or digest({k: v for k, v in decision.items() if k != "decision_sha256"}) != decision["decision_sha256"]:
             fail("ARM_DECISION_DIGEST_MISMATCH")
         if decision.get("decision_cutoff_ms") != pair["opportunity"]["decision_cutoff_ms"]:
             fail("ARM_DECISION_TIME_MISMATCH")
