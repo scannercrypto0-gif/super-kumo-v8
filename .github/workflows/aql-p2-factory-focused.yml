@@ -1,0 +1,22 @@
+name: AQL P2 Factory Lab Focused
+on:
+  push:
+    paths:
+      - 'research_wp_r0/aql_p2_factory_lab.py'
+      - 'tests/test_aql_p2_factory_lab.py'
+      - '.github/workflows/aql-p2-factory-focused.yml'
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_p2_factory_lab.py'
+      - 'tests/test_aql_p2_factory_lab.py'
+      - '.github/workflows/aql-p2-factory-focused.yml'
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run Factory P2 TEST_ONLY contracts
+        run: python -m unittest discover -s tests -p 'test_aql_p2_factory_lab.py' -v
