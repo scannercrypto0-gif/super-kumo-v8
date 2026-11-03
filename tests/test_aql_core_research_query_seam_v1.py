@@ -98,6 +98,47 @@ class TestCoreResearchQuerySeam(unittest.TestCase):
             ):
                 self.assertEqual(query_custody(self.library, request())["evidence_class"], expected)
 
+    def test_c4_actual_archive_bridge_library_research_query_test_only(self):
+        """One real in-process seam chain, reusing the established synthetic fixture."""
+        from tempfile import TemporaryDirectory
+        from test_aql_archive_custody_bridge_v1 import (
+            START, WIDTH, N, exported,
+        )
+        from research_wp_r0.aql_archive_custody_bridge_v1 import OfflineBridgeStager
+        packet, raw = exported()
+        with TemporaryDirectory() as temp:
+            stager = OfflineBridgeStager(temp)
+            key = stager.stage(packet, raw)
+            self.assertEqual(stager.advance(key, batch_size=2), (2, N))
+            self.assertEqual(stager.advance(key, batch_size=2), (N, N))
+            stager.commit(key, self.library)
+            complete = query_custody(self.library, request(
+                dataset_id="BTCUSDT_1m_B3", start_ms=START,
+                end_exclusive_ms=START + N * WIDTH,
+                decision_cutoff_ms=START + N * WIDTH + 2000,
+            ))
+            self.assertEqual(complete["status"], "OK")
+            self.assertEqual(complete["result"]["status"], "COMPLETE")
+            self.assertEqual(complete["evidence_class"], "SYNTHETIC_TEST")
+            self.assertEqual(complete["result"]["source_bytes_sha256"],
+                             packet["source_bytes_sha256"])
+            partial = query_custody(self.library, request(
+                dataset_id="BTCUSDT_1m_B3", start_ms=START,
+                end_exclusive_ms=START + N * WIDTH,
+                decision_cutoff_ms=START + WIDTH + 1000,
+                require_complete=False,
+            ))
+            self.assertEqual(partial["result"]["status"], "PARTIAL")
+            denied = query_custody(self.library, request(
+                dataset_id="BTCUSDT_1m_B3", start_ms=START,
+                end_exclusive_ms=START + N * WIDTH,
+                decision_cutoff_ms=START + N * WIDTH + 2000,
+                confirmed_only=True,
+            ))
+            self.assertEqual(denied["status"], "ERROR")
+            self.assertEqual(denied["error"]["code"],
+                             "INCOMPLETE_OR_FUTURE_CUSTODY_RANGE")
+
 
 if __name__ == "__main__":
     unittest.main()
