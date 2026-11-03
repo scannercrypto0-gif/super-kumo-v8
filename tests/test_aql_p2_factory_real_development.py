@@ -104,5 +104,58 @@ class RealDevelopmentGateTests(unittest.TestCase):
             validate_prereg(s, p, c)
 
 
+    def _paired_censored_fixture(self):
+        # TEST_ONLY shape fixture, never genuine Core/Work research.
+        s, p, costs = test_contract()
+        s["test_only"] = False
+        s["artifact_sha256"] = digest({k:v for k,v in s.items() if k!="artifact_sha256"})
+        pair = s["pairs"][0]
+        pid = pair["pair_id"]
+        cutoff = pair["opportunity"]["decision_cutoff_ms"]
+        windows = []
+        for h in (4, 24, 72):
+            w = dict(pair_id=pid, horizon_hours=h,
+                     source_package_sha256=s["source"]["source_package_sha256"],
+                     reference_price="100", reference_bar_close_ms=cutoff-1,
+                     bars=[], availability="CENSORED", availability_reason="COHORT_END")
+            w["source_window_sha256"] = digest(w)
+            windows.append(w)
+        decisions = []
+        for arm, status, direction in (("BASE", "TRIGGERED", "LONG"),
+                                       ("SHADOW", "REJECTED", None)):
+            d = dict(pair_id=pid, arm=arm,
+                     policy_sha256=next(x["definition_sha256"] for x in pair["arms"] if x["arm"]==arm),
+                     decision_cutoff_ms=cutoff, decision_evidence_sha256="b"*64,
+                     direction=direction, disposition=status,
+                     signal_disposition="TRIGGERED", modeled_trade_availability="COMPLETE")
+            d["decision_sha256"] = digest(d)
+            decisions.append(d)
+        return s, p, costs, windows, decisions
+
+    def test_rejected_arm_keeps_denominator_and_null_censored_returns(self):
+        s,p,c,w,d = self._paired_censored_fixture()
+        out = prepare_real_development(s,p,c,w,d)
+        self.assertEqual((out["pair_count"],out["outcome_slots"]),(1,6))
+        self.assertEqual({r["arm_disposition"] for r in out["outcomes"]},
+                         {"TRIGGERED","REJECTED"})
+        self.assertTrue(all(r["modeled_net_directional_return"] is None
+                            for r in out["outcomes"]))
+
+    def test_forged_rejected_direction_rejected_even_if_rehashed(self):
+        s,p,c,w,d = self._paired_censored_fixture()
+        d[1]["direction"] = "LONG"
+        d[1]["decision_sha256"] = digest({k:v for k,v in d[1].items() if k!="decision_sha256"})
+        with self.assertRaisesRegex(LabContractError,"INELIGIBLE_ARM_HAS_DIRECTION"):
+            prepare_real_development(s,p,c,w,d)
+
+    def test_false_unknown_with_complete_exit_rejected(self):
+        s,p,c,w,d = self._paired_censored_fixture()
+        d[0]["direction"] = None
+        d[0]["disposition"] = "UNKNOWN"
+        d[0]["decision_sha256"] = digest({k:v for k,v in d[0].items() if k!="decision_sha256"})
+        with self.assertRaisesRegex(LabContractError,"FALSE_UNKNOWN_ELIGIBILITY"):
+            prepare_real_development(s,p,c,w,d)
+
+
 if __name__ == "__main__":
     unittest.main()
