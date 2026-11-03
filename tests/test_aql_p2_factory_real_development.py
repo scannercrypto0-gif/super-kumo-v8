@@ -12,6 +12,9 @@ from test_aql_p2_factory_lab import fixture
 def test_contract():
     schedule, _ = fixture()
     protocol = schedule["protocol"]
+    protocol["hypothesis_sha256"] = "e" * 64
+    protocol["preregistration_sha256"] = "f" * 64
+    schedule["artifact_sha256"] = digest({k:v for k,v in schedule.items() if k!="artifact_sha256"})
     prereg = {
         "schema": "aql.p2.breakout.preregistration.v1",
         "test_only": False,
@@ -81,7 +84,7 @@ class RealDevelopmentGateTests(unittest.TestCase):
         s["protocol"]["hypothesis_sha256"] = "e"*64
         s["protocol"]["preregistration_sha256"] = "f"*64
         s["artifact_sha256"] = digest({k:v for k,v in s.items() if k!="artifact_sha256"})
-        with self.assertRaisesRegex(LabContractError, "MISSING_REAL_INPUTS"):
+        with self.assertRaisesRegex(LabContractError, "INCOMPLETE_WINDOW_DENOMINATOR"):
             prepare_real_development(s, p, c, [], [])
 
     def test_nonfinite_or_negative_cost_rejected(self):
