@@ -1,4 +1,4 @@
-"""TEST_ONLY negative/positive tests: no original market outcomes or intake replay."""
+"""TEST_ONLY negative/positive tests; synthetic records and pins never market evidence."""
 import unittest
 from dataclasses import replace
 from unittest.mock import patch
@@ -11,47 +11,68 @@ from research_wp_r0 import aql_p2_breakout_trial as module
 H = "a" * 64
 J = "b" * 64
 K = "c" * 64
-PROOF = "c224025885b5186732fa21755c0f3fa7042f03c44d19f1b566be454a31518b44"
+PROOF = "d" * 64
 DATASET = "BINANCE-SPOT-BTCUSDT-15M-2024-02-DEV-v1"
 N = 35
 
 
-def synthetic_cohort():
-    """35 invented bars; the original 2784/2976 source bytes are NOT used."""
-    pin = module.SOURCE_ARCHIVES[DATASET]
-    source = HistoricalSourceV1(
-        DATASET, "BINANCE", "SPOT", "BTCUSDT",
-        pin[2], module.MANIFEST_SHA, pin[3], "UNKNOWN_NOT_ATTESTED")
-    bars, rows = [], []
+def synthetic_rows():
+    """Deliberately invented short source, never the retained Work private bars."""
+    rows = []
     for i in range(N):
         op = module.FEB_START + i * BAR_MS
-        content_hash = H if i != 20 else K
-        bars.append(HistoricalBarV1(op, op + BAR_MS - 1, content_hash))
         high = "103" if i == 20 else "112" if i == 25 else "121" if i == 33 else "101"
         close = "102" if i == 20 else "111" if i == 25 else "120" if i == 33 else "100"
         rows.append({
             "dataset_id": DATASET, "open_ms": op, "close_ms": op+BAR_MS-1,
-            "bar_sha256": content_hash, "open": "100", "high": high,
-            "low": "99", "close": close,
+            "open": "100", "high": high, "low": "99", "close": close,
+            "availability_mode": "RETROSPECTIVE_NON_PIT",
+            "historical_known_at_ms": None,
+            "historical_receipt_ms": None,
+            "historical_publication_ms": None,
+            "finality": "ARCHIVED_CLOSED_INTERVAL", "is_final": True,
         })
-    return source, tuple(bars), tuple(rows)
+    return rows
+
+
+def sealed_synthetic(rows):
+    """Recompute Work's row/index digests only for TEST_ONLY invented fixtures."""
+    indexed = []
+    for row in rows:
+        r = {k: v for k, v in row.items() if k != "bar_sha256"}
+        indexed.append({**r, "bar_sha256": module._work_sha(module._work_canonical(r))})
+    normalized_sha = module._work_sha(
+        b"".join(module._work_canonical(r) for r in indexed))
+    bars = tuple(HistoricalBarV1(
+        r["open_ms"], r["close_ms"], r["bar_sha256"]) for r in indexed)
+    return tuple(indexed), bars, normalized_sha
 
 
 class BreakoutTrialTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls._patch = patch.dict(module.SOURCE_ARCHIVES, {
-            DATASET: (module.FEB_START, module.FEB_START + N*BAR_MS,
-                      module.SOURCE_ARCHIVES[DATASET][2], J)
+        cls._manifest = patch.object(module, "MANIFEST_SHA", H)
+        cls._source_proof = patch.object(module, "WORK_VERIFIED_SOURCE_RECEIPT_SHA", PROOF)
+        cls._manifest.start()
+        cls._source_proof.start()
+        indexed, bars, normal = sealed_synthetic(synthetic_rows())
+        cls._source = patch.dict(module.SOURCE_ARCHIVES, {
+            DATASET: (module.FEB_START, module.FEB_START + N*BAR_MS, K, normal)
         }, clear=True)
-        cls._patch.start()
+        cls._source.start()
 
     @classmethod
     def tearDownClass(cls):
-        cls._patch.stop()
+        cls._source.stop()
+        cls._source_proof.stop()
+        cls._manifest.stop()
 
     def setUp(self):
-        self.source, self.bars, self.rows = synthetic_cohort()
+        self.rows, self.bars, _ = sealed_synthetic(synthetic_rows())
+        pin = module.SOURCE_ARCHIVES[DATASET]
+        self.source = HistoricalSourceV1(
+            DATASET, "BINANCE", "SPOT", "BTCUSDT",
+            pin[2], module.MANIFEST_SHA, pin[3], "UNKNOWN_NOT_ATTESTED")
         self.spec, self.trial = module.seal_protocol()
 
     def handoff(self, *, rows=None, bars=None, source=None, trial=None, proof=PROOF):
@@ -59,6 +80,16 @@ class BreakoutTrialTests(unittest.TestCase):
             source or self.source, bars or self.bars,
             self.rows if rows is None else rows, trial or self.trial,
             source_authentication_receipt_sha256=proof)
+
+    def repinned_handoff(self, rows):
+        rebuilt, bars, normal = sealed_synthetic(rows)
+        new_pin = (module.FEB_START, module.FEB_START + N*BAR_MS, K, normal)
+        with patch.dict(module.SOURCE_ARCHIVES, {DATASET: new_pin}, clear=True):
+            _, trial = module.seal_protocol()
+            source = replace(self.source, normalized_sha256=normal)
+            return module.build_factory_handoff(
+                source, bars, rebuilt, trial,
+                source_authentication_receipt_sha256=PROOF)
 
     def test_frozen_protocol_and_distinct_arms(self):
         self.assertEqual((self.spec, self.trial), module.seal_protocol())
@@ -75,10 +106,13 @@ class BreakoutTrialTests(unittest.TestCase):
         self.assertEqual(got[0].direction, "LONG")
         self.assertTrue(got[0].direction_evidence_ref.startswith("P2_MODELED_BREAKOUT:"))
         self.assertEqual(got[1].disposition, "NO_SIGNAL")
-        changed = list(self.rows)
-        changed[21] = {**changed[21], "close": "101"}
-        other = module.produce_cohort(self.source, self.bars, changed, self.trial)
-        self.assertEqual(got[0], other[0])
+        changed = [dict(r) for r in self.rows]
+        changed[21]["close"] = "101"
+        other = self.repinned_handoff(changed)["schedule"]["pairs"]
+        self.assertEqual(got[0].disposition,
+                         other[0]["opportunity"]["disposition"])
+        self.assertEqual(got[0].feature_prefix_sha256,
+                         other[0]["opportunity"]["feature_prefix_sha256"])
 
     def test_two_independent_arm_decisions_and_common_denominator(self):
         handoff = self.handoff()
@@ -86,40 +120,37 @@ class BreakoutTrialTests(unittest.TestCase):
         self.assertEqual(schedule["scheduled_total"], N-21)
         self.assertEqual(len(arms), 2*(N-21))
         self.assertEqual(schedule["outcome_evaluation"], "NOT_PERFORMED")
-        self.assertEqual(handoff["windows"], None)
-        first = schedule["pairs"][0]
-        self.assertEqual([x["pair_id"] for x in arms[:2]], [first["pair_id"]]*2)
+        self.assertIsNone(handoff["windows"])
+        pair = schedule["pairs"][0]
+        self.assertEqual([a["pair_id"] for a in arms[:2]], [pair["pair_id"]]*2)
         self.assertEqual({a["arm"] for a in arms[:2]}, {"BASE", "SHADOW"})
         self.assertEqual([a["disposition"] for a in arms[:2]],
                          ["TRIGGERED", "TRIGGERED"])
-        self.assertEqual(arms[0]["direction"], "LONG")
-        self.assertEqual(arms[1]["direction"], "LONG")
+        self.assertEqual([a["direction"] for a in arms[:2]], ["LONG", "LONG"])
         self.assertNotEqual(arms[0]["decision_sha256"], arms[1]["decision_sha256"])
-        for item in arms:
-            self.assertEqual(item["decision_sha256"],
-                             module._hash({k: v for k, v in item.items()
+        for a in arms:
+            self.assertEqual(a["decision_sha256"],
+                             module._hash({k: v for k, v in a.items()
                                            if k != "decision_sha256"}))
         self.assertEqual(arms[0]["modeled_entry_open_ms"], self.bars[21].open_ms)
         self.assertEqual(arms[0]["modeled_exit_open_ms"], self.bars[31].open_ms)
 
-    def test_shadow_rejects_high_volatility_but_base_stays_triggered(self):
-        arms = self.handoff()["arm_decisions"]
-        # signal i=25 is the sixth scheduled cutoff (index 5).
-        base, shadow = arms[10:12]
+    def test_shadow_rejects_high_volatility_but_base_keeps_signal(self):
+        base, shadow = self.handoff()["arm_decisions"][10:12]
         self.assertEqual((base["disposition"], base["direction"]),
-                         ("UNKNOWN", None))  # i+11 beyond cohort end
+                         ("UNKNOWN", None))  # i+11 unavailable
         self.assertEqual((shadow["disposition"], shadow["direction"]),
                          ("REJECTED", None))
         self.assertEqual(shadow["signal_disposition"], "TRIGGERED")
 
-    def test_tail_unknown_keeps_signal_truth_and_source_coverage(self):
+    def test_tail_unknown_keeps_signal_truth(self):
         handoff = self.handoff()
         last_pair = handoff["schedule"]["pairs"][-1]
         last_base, last_shadow = handoff["arm_decisions"][-2:]
         self.assertEqual(last_pair["opportunity"]["disposition"], "TRIGGERED")
         self.assertEqual(last_base["signal_disposition"], "TRIGGERED")
-        self.assertEqual(last_base["disposition"], "UNKNOWN")
-        self.assertIsNone(last_base["direction"])
+        self.assertEqual((last_base["disposition"], last_base["direction"]),
+                         ("UNKNOWN", None))
         self.assertEqual(last_base["modeled_exit_missingness_reason"],
                          "END_OF_COHORT_NO_I_PLUS_11")
         self.assertEqual(last_shadow["disposition"], "REJECTED")
@@ -143,19 +174,24 @@ class BreakoutTrialTests(unittest.TestCase):
                          module._hash({k: v for k, v in cost.items()
                                        if k != "artifact_sha256"}))
 
-    def test_exact_three_percent_volatility_equality_is_not_rejected(self):
-        rows = list(self.rows)
+    def test_exact_three_percent_equality_not_rejected(self):
+        changed = [dict(r) for r in self.rows]
         for i in range(20):
-            rows[i] = {**rows[i], "high": "102", "low": "99", "close": "100"}
-        rows[20] = {**rows[20], "high": "104", "close": "103"}
-        handoff = self.handoff(rows=rows)
-        first_base, first_shadow = handoff["arm_decisions"][:2]
-        self.assertEqual(first_base["disposition"], "TRIGGERED")
-        self.assertEqual(first_shadow["disposition"], "TRIGGERED")
+            changed[i].update(high="102", low="99", close="100")
+        changed[20].update(high="104", close="103")
+        base, shadow = self.repinned_handoff(changed)["arm_decisions"][:2]
+        self.assertEqual(base["disposition"], "TRIGGERED")
+        self.assertEqual(shadow["disposition"], "TRIGGERED")
 
-    def test_tampered_price_mapping_rejected(self):
-        rows = list(self.rows)
-        rows[0] = {**rows[0], "bar_sha256": K}
+    def test_changed_price_without_rehash_rejected(self):
+        rows = [dict(r) for r in self.rows]
+        rows[0]["high"] = "100.5"
+        with self.assertRaisesRegex(ContractError, "BAR_CONTENT_HASH_MISMATCH"):
+            self.handoff(rows=rows)
+
+    def test_wrong_bar_hash_rejected(self):
+        rows = [dict(r) for r in self.rows]
+        rows[0]["bar_sha256"] = J
         with self.assertRaisesRegex(ContractError, "UNVERIFIED_BAR_MAPPING"):
             self.handoff(rows=rows)
 
@@ -167,19 +203,21 @@ class BreakoutTrialTests(unittest.TestCase):
 
     def test_wrong_source_and_protocol_pins_rejected(self):
         with self.assertRaisesRegex(ContractError, "SOURCE_PIN_DRIFT"):
-            self.handoff(source=replace(self.source, source_package_sha256=K))
+            self.handoff(source=replace(self.source, source_package_sha256=J))
         with self.assertRaisesRegex(ContractError, "UNSEALED_OR_MUTATED_PROTOCOL"):
             self.handoff(trial=replace(self.trial, trial_id="FALSIFIED"))
 
-    def test_bad_ohlc_rejected(self):
-        rows = list(self.rows)
-        rows[0] = {**rows[0], "high": "98"}
+    def test_invalid_ohlc_rejected_even_with_new_fake_index_pin(self):
+        rows = [dict(r) for r in self.rows]
+        rows[0]["high"] = "98"
         with self.assertRaisesRegex(ContractError, "INVALID_OHLC_RANGE"):
-            self.handoff(rows=rows)
+            self.repinned_handoff(rows)
 
-    def test_missing_source_receipt_fails_closed(self):
+    def test_missing_or_unknown_source_receipt_fails_closed(self):
         with self.assertRaisesRegex(ContractError, "MISSING_INDEPENDENT_SOURCE_ATTESTATION"):
             self.handoff(proof=None)
+        with self.assertRaisesRegex(ContractError, "UNRECOGNIZED_WORK_SOURCE_ATTESTATION"):
+            self.handoff(proof=J)
 
 
 if __name__ == "__main__":
