@@ -1,0 +1,41 @@
+name: AQL Factory Gate B Exact-Head Focused 80
+on:
+  push:
+    branches:
+      - aql/w1-factory-research-consumer-20261031
+    paths:
+      - .github/workflows/aql-factory-gate-b-focused.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate-b-focused:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact Factory PR head
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install focused test dependency
+        run: python -m pip install pytest==9.1.1
+      - name: Pin commit and run only Gate B affected tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "FACTORY_GATE_B_HEAD_SHA=$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python --version
+          python -m pytest tests/test_p0_f1f4_pipeline.py tests/test_p0_blockers_adversarial.py -v --tb=short -p no:cacheprovider | tee gate-b-focused.log
+      - name: Preserve exact-run log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aql-factory-gate-b-focused-log
+          path: gate-b-focused.log
+          if-no-files-found: warn
