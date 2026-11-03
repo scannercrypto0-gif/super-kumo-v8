@@ -39,3 +39,64 @@ jobs:
           assert data['outcome_evaluation'] == 'NOT_PERFORMED'
           print('TEST_ONLY_DEMO_OK')
           PY
+
+      - name: Seal independently timestamped pre-outcome protocol hashes (NO market reads)
+        shell: bash
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. python - <<'PY'
+          import json
+          from hashlib import sha256
+          from pathlib import Path
+          from subprocess import check_output
+          from research_wp_r0.aql_p2_core_producer import HistoricalSourceV1
+          from research_wp_r0.aql_p2_breakout_trial import (
+              SOURCE_ARCHIVES, MANIFEST_SHA, BAR_INDEX_SHA, seal_protocol,
+              build_factory_prereg,
+          )
+          spec, trial = seal_protocol()
+          docs = []
+          for source_id, (start, end, archive, normalized) in sorted(SOURCE_ARCHIVES.items()):
+              source = HistoricalSourceV1(
+                  source_id, 'BINANCE', 'SPOT', 'BTCUSDT',
+                  archive, MANIFEST_SHA, normalized, 'UNKNOWN_NOT_ATTESTED')
+              prereg, cost = build_factory_prereg(source, trial)
+              docs.append({
+                  'source_id': source_id, 'start_ms': start, 'end_exclusive_ms': end,
+                  'source_package_sha256': archive, 'normalized_sha256': normalized,
+                  'preregistration_artifact_sha256': prereg['artifact_sha256'],
+                  'modeled_cost_artifact_sha256': cost['artifact_sha256'],
+              })
+          head = check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          receipt = {
+              'schema': 'aql.p2.core.pre-outcome-protocol-anchor.v1',
+              'scope': 'POLICY_AND_CONSUMER_ENVELOPE_ONLY_NO_PRIVATE_DATA_OR_OUTCOMES',
+              'head_sha': head,
+              'trial_id': trial.trial_id,
+              'protocol_sha256': trial.protocol_sha256,
+              'hypothesis_sha256': trial.hypothesis_sha256,
+              'base_definition_sha256': trial.base_definition_sha256,
+              'shadow_definition_sha256': trial.shadow_definition_sha256,
+              'preregistration_sha256': trial.preregistration_sha256,
+              'source_manifest_sha256': MANIFEST_SHA,
+              'source_index_sha256': BAR_INDEX_SHA,
+              'embargo_ms': trial.embargo_ms,
+              'holdout_status': 'SEALED_UNOPENED',
+              'evidence_class': 'RETROSPECTIVE_NON_PIT',
+              'proof_status': 'EXTERNAL_GITHUB_RUN_TIMESTAMP_MUST_BE_VERIFIED_BEFORE_SCORING',
+              'datasets': docs,
+              'market_rows_read': 0, 'outcomes_computed': 0,
+          }
+          raw = (json.dumps(receipt, sort_keys=True, separators=(',', ':'),
+                            allow_nan=False) + '\n').encode()
+          destination = Path('/tmp/p2-core-prereg-contract-receipt.json')
+          destination.write_bytes(raw)
+          print('CORE_P2_PREREG_PROTOCOL_HEAD=' + head)
+          print('CORE_P2_PREREG_RECEIPT_SHA256=' + sha256(raw).hexdigest())
+          print('CORE_P2_PREREG_HASHES=' + raw.decode().strip())
+          PY
+      - name: Retain public metadata-only protocol anchor artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aql-p2-core-prereg-contract-receipt
+          path: /tmp/p2-core-prereg-contract-receipt.json
+          retention-days: 90
