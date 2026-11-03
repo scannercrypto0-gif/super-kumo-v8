@@ -13,7 +13,7 @@ from decimal import Decimal
 
 from research_wp_r0.aql_p2_factory_lab import digest, hash_ok, validate_schedule
 from research_wp_r0.aql_p2_factory_real_development import (
-    BAR_MS, dec, fail, validate_prereg,
+    BAR_MS, dec, fail, validate_prereg, prepare_real_development,
 )
 
 ENTRY_OFFSET = 0
@@ -142,6 +142,13 @@ def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decis
         fail("COST_BPS_MISMATCH")
     pairs = validate_schedule(schedule)
     arms = _validate_pair_arms(pairs, arm_decisions)
+    # Reuse the ALREADY DELIVERED complete real 4/24/72h consumer, including
+    # independent missingness, window contiguity and arm-identity guards.
+    descriptive = prepare_real_development(
+        schedule, prereg, cost_model, windows, arm_decisions)
+    if (descriptive["source_schedule_sha256"] != schedule["artifact_sha256"]
+        or descriptive["outcome_slots"] != 6 * len(pairs)):
+        fail("DESCRIPTIVE_CONSUMER_LINEAGE_MISMATCH")
     expected = {(pid, h) for pid in pairs for h in (4, 24, 72)}
     all_windows = {}
     if not isinstance(windows, list):
@@ -244,12 +251,16 @@ def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decis
         "source_id": schedule["source"]["source_id"],
         "source_package_sha256": schedule["source"]["source_package_sha256"],
         "source_schedule_sha256": schedule["artifact_sha256"],
+        "descriptive_4_24_72h_artifact_sha256": descriptive["artifact_sha256"],
+        "descriptive_coverage_by_horizon": descriptive["coverage_by_horizon"],
         "preregistration_artifact_sha256": prereg["artifact_sha256"],
         "cost_model_artifact_sha256": cost_model["artifact_sha256"],
         "pair_count": len(pairs), "arm_count": len(modeled),
         "status_counts": {a: {s: counts[(a, s)] for s in ("TRIGGERED", "NO_SIGNAL", "REJECTED", "UNKNOWN")}
                           for a in ("BASE", "SHADOW")},
         "modeled_trades": modeled, "paired_comparison": paired,
+        "both_arms_modeled_complete_pairs": sum(x["both_modeled_complete"] for x in paired),
+        "paired_delta_effect_interpretation": "SAME_POLICY_ENTRY_EXIT_ON_BOTH_ELIGIBLE_PAIRS; FILTERED_EXCLUSIONS_ARE_NULL_NOT_ZERO_RETURNS",
         "modeled_exit_spec": TRADE_RULE,
         "modeled_cost_round_trip_bps": "30",
         "effect_status": "DESCRIPTIVE_ONLY_NO_STATISTICAL_OR_ALPHA_CLAIM",
