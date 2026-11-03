@@ -129,7 +129,8 @@ def run_handshake(core):
         raise AssertionError("PRODUCER_ARTIFACT_MUTATED")
     if result["source_schedule_sha256"] != input_sha:
         raise AssertionError("CONSUMER_LOST_SOURCE_PIN")
-    if len(pairs) != len(schedule["pairs"]) != result["scheduled_opportunities"]:
+    if (len(pairs) != len(schedule["pairs"]) or
+            len(pairs) != result["scheduled_opportunities"]):
         raise AssertionError("PAIR_CARDINALITY_MISMATCH")
     if any(len(p["arms"]) != 2 or
            {a["arm"] for a in p["arms"]} != {"BASE", "SHADOW"}
