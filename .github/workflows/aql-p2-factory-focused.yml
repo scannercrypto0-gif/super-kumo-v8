@@ -85,7 +85,7 @@ jobs:
           assert policy["approval_status"] == "PROPOSED_NOT_OWNER_APPROVED"
           Path("p2-proposed-portfolio-policy.json").write_text(
               json.dumps(policy, sort_keys=True, separators=(",", ":"),
-                         ensure_ascii=True, allow_nan=False) + "\\n",
+                         ensure_ascii=True, allow_nan=False) + "\n",
               encoding="utf-8")
           print("PORTFOLIO_PROPOSED_NOT_APPROVED_SHA256=" + policy["artifact_sha256"])
           PY
