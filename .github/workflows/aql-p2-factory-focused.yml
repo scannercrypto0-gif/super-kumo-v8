@@ -12,6 +12,7 @@ on:
       - 'tests/test_aql_p2_factory_modeled_trades.py'
       - 'tests/test_aql_p2_factory_portfolio.py'
       - 'docs/research/p2a/factory-modeled-breakout-trades.md'
+      - 'docs/research/p2a/factory-offline-portfolio.md'
       - 'tests/test_aql_p2_factory_source_open_bridge.py'
       - '.github/workflows/aql-p2-factory-focused.yml'
   pull_request:
@@ -26,6 +27,7 @@ on:
       - 'tests/test_aql_p2_factory_modeled_trades.py'
       - 'tests/test_aql_p2_factory_portfolio.py'
       - 'docs/research/p2a/factory-modeled-breakout-trades.md'
+      - 'docs/research/p2a/factory-offline-portfolio.md'
       - 'tests/test_aql_p2_factory_source_open_bridge.py'
       - '.github/workflows/aql-p2-factory-focused.yml'
   workflow_dispatch:
