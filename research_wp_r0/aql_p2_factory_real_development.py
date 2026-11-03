@@ -133,6 +133,29 @@ def prepare_real_development(schedule, prereg, cost_model, windows, arm_decision
             fail("ARM_DECISION_DIGEST_MISMATCH")
         if decision.get("decision_cutoff_ms") != pair["opportunity"]["decision_cutoff_ms"]:
             fail("ARM_DECISION_TIME_MISMATCH")
+        # Core #221 frozen Breakout decisions distinguish signal truth from
+        # modeled-trade eligibility. Never score rejected, no-signal or
+        # exit-unknown arms as if a modeled trade were eligible.
+        status = decision.get("disposition")
+        signal = decision.get("signal_disposition")
+        availability = decision.get("modeled_trade_availability")
+        if status not in ("TRIGGERED", "NO_SIGNAL", "REJECTED", "UNKNOWN"):
+            fail("ARM_DISPOSITION_MISSING_OR_INVALID")
+        if signal not in ("TRIGGERED", "NO_SIGNAL"):
+            fail("SIGNAL_DISPOSITION_MISSING_OR_INVALID")
+        if status == "TRIGGERED":
+            if signal != "TRIGGERED" or availability != "COMPLETE" or direction != "LONG":
+                fail("TRIGGERED_ARM_NOT_ELIGIBLE")
+        elif direction is not None:
+            fail("INELIGIBLE_ARM_HAS_DIRECTION")
+        if status == "NO_SIGNAL" and (signal != "NO_SIGNAL" or availability != "NOT_APPLICABLE"):
+            fail("NO_SIGNAL_CONTRACT_MISMATCH")
+        if status in ("REJECTED", "UNKNOWN") and signal != "TRIGGERED":
+            fail("NONTRIGGER_SIGNAL_MISMATCH")
+        if status == "UNKNOWN" and availability == "COMPLETE":
+            fail("FALSE_UNKNOWN_ELIGIBILITY")
+        if status == "REJECTED" and key[1] != "SHADOW":
+            fail("BASE_CANNOT_BE_SHADOW_REJECTED")
         seen_arms[key] = decision
     if set(seen_arms) != expected_arms:
         fail("INCOMPLETE_ARM_DECISIONS")
@@ -201,7 +224,10 @@ def prepare_real_development(schedule, prereg, cost_model, windows, arm_decision
                     "availability": status, "availability_reason": reason,
                     "source_window_sha256": win["source_window_sha256"],
                     "arm_decision_sha256": decision["decision_sha256"],
-                    "direction": direction, "cost_class": "MODEL_ONLY_NOT_EXECUTION",
+                    "direction": direction, "arm_disposition": decision["disposition"],
+                    "signal_disposition": decision["signal_disposition"],
+                    "modeled_trade_availability": decision["modeled_trade_availability"],
+                    "cost_class": "MODEL_ONLY_NOT_EXECUTION",
                     "gross_directional_return": str(gross) if gross is not None else None,
                     "modeled_net_directional_return": str(modeled_net) if modeled_net is not None else None,
                     "directional_mfe": str(mfe) if mfe is not None else None,
