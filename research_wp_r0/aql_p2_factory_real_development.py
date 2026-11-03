@@ -6,11 +6,8 @@ Requires externally frozen real preregistration, real Core schedule and source-b
 """
 from __future__ import annotations
 
-from collections import Counter
 from copy import deepcopy
 from decimal import Decimal, InvalidOperation
-from hashlib import sha256
-import json
 
 from research_wp_r0.aql_p2_factory_lab import (
     HORIZONS, LabContractError, build_lab, digest, hash_ok, validate_schedule,
@@ -58,6 +55,8 @@ def validate_prereg(schedule, prereg, cost_model):
         prereg.get("base_definition_sha256") != protocol["base_definition_sha256"] or
         prereg.get("shadow_definition_sha256") != protocol["shadow_definition_sha256"]):
         fail("PREREG_CORE_PROTOCOL_MISMATCH")
+    if prereg.get("test_only") is not False:
+        fail("REAL_PREREG_REQUIRED")
     if prereg.get("strategy_family") != "BREAKOUT" or prereg.get("horizons_hours") != list(HORIZONS):
         fail("UNSUPPORTED_OR_UNFROZEN_OUTCOME_RULE")
     if prereg.get("outcome_rule") != "CUTOFF_REFERENCE_TO_4_24_72H_CLOSE_AND_EXCURSIONS_V1":
@@ -70,6 +69,8 @@ def validate_prereg(schedule, prereg, cost_model):
         fail("MISSING_MODELED_COSTS")
     if seal_hash(cost_model) != cost_model["artifact_sha256"]:
         fail("UNSEALED_COST_MODEL")
+    if cost_model.get("test_only") is not False:
+        fail("REAL_COST_MODEL_REQUIRED")
     if (cost_model.get("schema") != "aql.p2.factory.modeled-costs.v1" or
         cost_model.get("model_kind") != "MODEL_ONLY_NOT_EXECUTION" or
         cost_model.get("trial_id") != protocol["trial_id"] or
@@ -206,10 +207,12 @@ def prepare_real_development(schedule, prereg, cost_model, windows, arm_decision
                     "directional_mfe": str(mfe) if mfe is not None else None,
                     "directional_mae": str(mae) if mae is not None else None,
                 })
-    base = build_lab({**schedule, "test_only": True,
-                      "artifact_sha256": digest({**{k:v for k,v in schedule.items()
-                          if k != "artifact_sha256"}, "test_only": True})}, observations,
-                     test_only=True)
+    # Reuse existing strict TEST_ONLY shape validator on a detached, explicitly
+    # internal validation copy. Never persist or claim that copy is Core evidence.
+    validation_copy = deepcopy(schedule)
+    validation_copy["test_only"] = True
+    validation_copy["artifact_sha256"] = seal_hash(validation_copy)
+    base = build_lab(validation_copy, observations, test_only=True)
     if schedule != original:
         fail("INPUT_MUTATED")
     receipt = {
@@ -217,6 +220,7 @@ def prepare_real_development(schedule, prereg, cost_model, windows, arm_decision
         "scope": "RETROSPECTIVE_NON_PIT_DEVELOPMENT_ONLY",
         "evidence_class": "SOURCE_BACKED_ONLY_IF_INPUTS_INDEPENDENTLY_VERIFIED",
         "source_schedule_sha256": schedule["artifact_sha256"],
+        "validation_mode": "EXISTING_FACTORY_SHAPE_CHECK_ONLY",
         "source_package_sha256": schedule["source"]["source_package_sha256"],
         "preregistration_artifact_sha256": prereg["artifact_sha256"],
         "modeled_cost_artifact_sha256": cost_model["artifact_sha256"],
