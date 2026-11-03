@@ -75,6 +75,27 @@ jobs:
           name: p2-ten-bar-execution-anchor
           path: ten-bar-execution-anchor.json
           retention-days: 90
+      - name: Anchor PROPOSED portfolio policy (not owner approved, no market scoring)
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from research_wp_r0.aql_p2_factory_portfolio import propose_portfolio_policy
+          policy = propose_portfolio_policy("10000")
+          assert policy["approval_status"] == "PROPOSED_NOT_OWNER_APPROVED"
+          Path("p2-proposed-portfolio-policy.json").write_text(
+              json.dumps(policy, sort_keys=True, separators=(",", ":"),
+                         ensure_ascii=True, allow_nan=False) + "\\n",
+              encoding="utf-8")
+          print("PORTFOLIO_PROPOSED_NOT_APPROVED_SHA256=" + policy["artifact_sha256"])
+          PY
+      - name: Upload proposed-only portfolio policy fingerprint
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-proposed-portfolio-policy-no-approval
+          path: p2-proposed-portfolio-policy.json
+          retention-days: 90
+          if-no-files-found: error
       - name: Generate machine-readable TEST_ONLY handshake receipt
         env:
           PYTHONPATH: .
