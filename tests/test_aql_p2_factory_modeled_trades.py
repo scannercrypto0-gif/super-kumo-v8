@@ -147,6 +147,38 @@ class ModeledTradeTests(unittest.TestCase):
         self.assertEqual(r["paired_comparison"][0]["shadow_minus_base"], "0.000")
         self.assertEqual(r["effect_status"], "DESCRIPTIVE_ONLY_NO_STATISTICAL_OR_ALPHA_CLAIM")
 
+    def test_trade_excursion_excludes_post_exit_high_low(self):
+        inp = fixture()
+        before = run(inp)
+        self.assertEqual(before["modeled_trades"][0]["modeled_trade_mfe"], "0.04")
+        self.assertEqual(before["modeled_trades"][0]["modeled_trade_mae"], "-0.02")
+        # Bar 10 is the exit bar. Its HIGH/LOW are after exit open.
+        inp[3][0]["bars"][10]["high"] = "1000"
+        inp[3][0]["bars"][10]["low"] = "1"
+        seal(inp[3][0], "source_window_sha256")
+        after = run(inp)
+        self.assertEqual(after["modeled_trades"][0]["modeled_trade_mfe"],
+                         before["modeled_trades"][0]["modeled_trade_mfe"])
+        self.assertEqual(after["modeled_trades"][0]["modeled_trade_mae"],
+                         before["modeled_trades"][0]["modeled_trade_mae"])
+
+    def test_four_hour_censored_can_still_complete_ten_bar_trade(self):
+        inp = fixture()
+        inp[3][0]["bars"] = inp[3][0]["bars"][:11]
+        inp[3][0]["availability"] = "CENSORED"
+        inp[3][0]["availability_reason"] = "FOUR_HOUR_WINDOW_CENSORED"
+        seal(inp[3][0], "source_window_sha256")
+        out = run(inp)
+        self.assertEqual(out["descriptive_coverage_by_horizon"]["4"]["CENSORED"], 1)
+        self.assertEqual(out["modeled_trades"][0]["status"], "MODELED_COMPLETE")
+
+    def test_unknown_exit_with_available_bar_fails_even_if_rehashed(self):
+        inp = fixture(unknown=True)
+        inp[3][0]["bars"] = fixture()[3][0]["bars"][:11]
+        seal(inp[3][0], "source_window_sha256")
+        with self.assertRaisesRegex(LabContractError, "MODEL_EXIT_UNKNOWN_WITH_AVAILABLE_SOURCE"):
+            run(inp)
+
     def test_tail_unknown_retains_signal_and_nulls(self):
         r = run(fixture(unknown=True))
         self.assertEqual(r["status_counts"]["BASE"]["UNKNOWN"], 1)
