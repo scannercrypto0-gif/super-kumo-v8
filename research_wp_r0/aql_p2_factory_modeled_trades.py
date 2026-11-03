@@ -22,6 +22,10 @@ ENTRY_OFFSET = 0
 EXIT_OFFSET = 10
 FOUR_HOURS = 4
 TRADE_RULE = "NEXT_OPEN_I_PLUS_1_EXIT_OPEN_I_PLUS_11_V1"
+CORE_BREAKOUT_HEAD_SHA = "58e423431cc639958736337a65db8a17bfdbaa85"
+WORK_SOURCE_PROOF_SHA = "c224025885b5186732fa21755c0f3fa7042f03c44d19f1b566be454a31518b44"
+CORE_PREOUTCOME_ANCHOR_RAW_SHA = "5a5b7248ddfedf602cb1be840eff834b98edc250f2240b9d83374825b9b16949"
+WORK_WINDOWS_DELIVERY_RECEIPT_SHA = "4edd70fa422b690a079386ee831adf66ba1b3f8b65e30e33fba736a30b90bb91"
 
 
 def _full_hash(row, key):
@@ -32,6 +36,9 @@ def _frozen_policy(prereg, cost_model):
     spec = prereg.get("full_protocol")
     if not isinstance(spec, dict) or spec.get("schema") != "aql.p2.breakout-policy.v1":
         fail("MISSING_FROZEN_FULL_TRADE_POLICY")
+    if (digest(spec) != prereg.get("preregistration_sha256")
+        or spec.get("trial_id") != prereg.get("trial_id")):
+        fail("FROZEN_POLICY_SPEC_DIGEST_MISMATCH")
     if (spec.get("modeled_entry") != "open[i+1], requires finalized same-cohort bar; NO_ACTUAL_FILL"
         or spec.get("modeled_exit") != "open[i+11], requires finalized same-cohort bar; NO_ACTUAL_FILL"
         or spec.get("modeled_trade_missingness") !=
@@ -127,7 +134,9 @@ def _bar_at(bar, cutoff, offset):
 
 
 def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decisions,
-                               *, provenance_verified=False, prereg_time_verified=False):
+                               *, provenance_verified=False, prereg_time_verified=False,
+                               source_proof_sha256=None, prereg_anchor_raw_sha256=None,
+                               windows_delivery_receipt_sha256=None):
     """Produce fixed-denominator modeled next-open/ten-bar artifacts, no scientific acceptance.
 
     Inputs are the exact unchanged genuine Core handoff and independent Work
@@ -140,6 +149,10 @@ def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decis
     _frozen_policy(prereg, cost_model)
     if provenance_verified is not True or prereg_time_verified is not True:
         fail("INDEPENDENT_SOURCE_AND_TIME_ATTESTATION_REQUIRED")
+    if (source_proof_sha256 != WORK_SOURCE_PROOF_SHA
+        or prereg_anchor_raw_sha256 != CORE_PREOUTCOME_ANCHOR_RAW_SHA
+        or windows_delivery_receipt_sha256 != WORK_WINDOWS_DELIVERY_RECEIPT_SHA):
+        fail("PINNED_EXTERNAL_PROOF_RECEIPT_MISMATCH")
     if total_cost_bps != Decimal(30):
         fail("COST_BPS_MISMATCH")
     pairs = validate_schedule(schedule)
@@ -283,6 +296,11 @@ def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decis
         "source_id": schedule["source"]["source_id"],
         "source_package_sha256": schedule["source"]["source_package_sha256"],
         "source_schedule_sha256": schedule["artifact_sha256"],
+        "core_frozen_policy_head_sha": CORE_BREAKOUT_HEAD_SHA,
+        "source_authentication_receipt_sha256": source_proof_sha256,
+        "prereg_anchor_raw_sha256": prereg_anchor_raw_sha256,
+        "windows_delivery_receipt_sha256": windows_delivery_receipt_sha256,
+        "external_attestation_semantics": "CALLER_MUST_INDEPENDENTLY_VALIDATE_BYTES_AND_GITHUB_TIMESTAMP; PINS_ALONE_NOT_PROOF",
         "descriptive_4_24_72h_artifact_sha256": descriptive["artifact_sha256"],
         "descriptive_coverage_by_horizon": descriptive["coverage_by_horizon"],
         "preregistration_artifact_sha256": prereg["artifact_sha256"],
