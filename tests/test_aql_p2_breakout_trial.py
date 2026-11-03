@@ -168,7 +168,7 @@ class BreakoutTrialTests(unittest.TestCase):
     def test_wrong_source_and_protocol_pins_rejected(self):
         with self.assertRaisesRegex(ContractError, "SOURCE_PIN_DRIFT"):
             self.handoff(source=replace(self.source, source_package_sha256=K))
-        with self.assertRaisesRegex(ContractError, "UNFROZEN_OR_DRIFTED_PROTOCOL"):
+        with self.assertRaisesRegex(ContractError, "UNSEALED_OR_MUTATED_PROTOCOL"):
             self.handoff(trial=replace(self.trial, trial_id="FALSIFIED"))
 
     def test_bad_ohlc_rejected(self):
