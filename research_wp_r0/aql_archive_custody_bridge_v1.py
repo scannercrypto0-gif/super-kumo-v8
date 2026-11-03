@@ -135,7 +135,8 @@ def _archive_records(raw, spec, meta):
             and source.get("inventory_hash") == meta["inventory_hash"]
             and source.get("retrospective_only") is True
             and source.get("pit_eligibility") == "NOT_ATTESTED"
-            and source.get("independent_custody_verified") is False,
+            and source.get("independent_custody_verified") is False
+            and source.get("coverage") == "ARCHIVED_RECORDS_ONLY_NOT_FULL_MARKET",
             "ARCHIVE_EVIDENCE_BOUNDARY")
     selection = source.get("selection")
     require(type(selection) is dict and
@@ -150,7 +151,7 @@ def _archive_records(raw, spec, meta):
             and source.get("record_content_hash") == digest(records),
             "ARCHIVE_RECORD_DIGEST")
     from src.aql.models.bar import MarketBar
-    converted, origin, ids, seqs = [], [], set(), set()
+    converted, origin, ids, seqs, journal_ids = [], [], set(), set(), set()
     for record in records:
         require(type(record) is dict, "INVALID_ARCHIVE_RECORD")
         obj = dict(record)
@@ -187,7 +188,7 @@ def _archive_records(raw, spec, meta):
                 and seq not in seqs
                 and record["record_id"] not in ids,
                 "DUPLICATE_OR_INVALID_SOURCE_ID")
-        ids.add(record["record_id"]); seqs.add(seq)
+        ids.add(record["record_id"]); seqs.add(seq); journal_ids.add(record["journal_id"])
         require(market_bar.symbol == spec["symbol"] and
                 market_bar.interval == spec["interval"], "ARCHIVE_CROSS_SOURCE")
         converted.append(_bar_record(
@@ -202,6 +203,7 @@ def _archive_records(raw, spec, meta):
                        "original_source_label":market_bar.source,
                        "source_receipt_ms":market_bar.ingested_at,
                        "source_commit_recorded_ms":market_bar.committed_at})
+    require(len(journal_ids) == 1, "MIXED_ARCHIVE_JOURNAL_IDENTITIES")
     return converted, origin
 
 
