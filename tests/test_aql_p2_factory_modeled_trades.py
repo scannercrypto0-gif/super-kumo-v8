@@ -8,6 +8,8 @@ import unittest
 from research_wp_r0.aql_p2_factory_lab import LabContractError, digest
 from research_wp_r0.aql_p2_factory_modeled_trades import (
     build_modeled_trade_package, canonical_receipt_bytes, raw_receipt_sha256, BAR_MS,
+    WORK_SOURCE_PROOF_SHA, CORE_PREOUTCOME_ANCHOR_RAW_SHA,
+    WORK_WINDOWS_DELIVERY_RECEIPT_SHA,
 )
 from test_aql_p2_factory_real_development import test_contract
 
@@ -26,6 +28,7 @@ def fixture(*, both_trigger=False, unknown=False):
     source = schedule["source"]
     spec = {
         "schema": "aql.p2.breakout-policy.v1",
+        "trial_id": schedule["protocol"]["trial_id"],
         "modeled_entry": "open[i+1], requires finalized same-cohort bar; NO_ACTUAL_FILL",
         "modeled_exit": "open[i+11], requires finalized same-cohort bar; NO_ACTUAL_FILL",
         "modeled_trade_missingness": (
@@ -44,7 +47,11 @@ def fixture(*, both_trigger=False, unknown=False):
             }
         },
     }
+    spec_sha = digest(spec)
+    schedule["protocol"]["preregistration_sha256"] = spec_sha
+    seal(schedule)
     prereg.update(
+        preregistration_sha256=spec_sha,
         full_protocol=spec,
         source_id=source["source_id"],
         source_manifest_sha256=spec["manifest_sha256"],
@@ -110,7 +117,11 @@ def fixture(*, both_trigger=False, unknown=False):
 
 
 def run(inputs):
-    return build_modeled_trade_package(*inputs, provenance_verified=True, prereg_time_verified=True)
+    return build_modeled_trade_package(
+        *inputs, provenance_verified=True, prereg_time_verified=True,
+        source_proof_sha256=WORK_SOURCE_PROOF_SHA,
+        prereg_anchor_raw_sha256=CORE_PREOUTCOME_ANCHOR_RAW_SHA,
+        windows_delivery_receipt_sha256=WORK_WINDOWS_DELIVERY_RECEIPT_SHA)
 
 
 class ModeledTradeTests(unittest.TestCase):
@@ -216,6 +227,18 @@ class ModeledTradeTests(unittest.TestCase):
         with self.assertRaisesRegex(LabContractError, "INDEPENDENT_SOURCE_AND_TIME"):
             build_modeled_trade_package(*inp, provenance_verified=True)
 
+    def test_external_proof_pins_are_required_not_just_boolean_flags(self):
+        inp = fixture()
+        with self.assertRaisesRegex(LabContractError, "PINNED_EXTERNAL_PROOF_RECEIPT_MISMATCH"):
+            build_modeled_trade_package(*inp, provenance_verified=True,
+                                        prereg_time_verified=True)
+        with self.assertRaisesRegex(LabContractError, "PINNED_EXTERNAL_PROOF_RECEIPT_MISMATCH"):
+            build_modeled_trade_package(
+                *inp, provenance_verified=True, prereg_time_verified=True,
+                source_proof_sha256="0"*64,
+                prereg_anchor_raw_sha256=CORE_PREOUTCOME_ANCHOR_RAW_SHA,
+                windows_delivery_receipt_sha256=WORK_WINDOWS_DELIVERY_RECEIPT_SHA)
+
     def test_window_digest_mutation_rejected(self):
         inp = fixture()
         inp[3][0]["bars"][10]["open"] = "999"
@@ -267,7 +290,7 @@ class ModeledTradeTests(unittest.TestCase):
         seal(inp[1])
         inp[2]["preregistration_sha256"] = inp[1]["artifact_sha256"]
         seal(inp[2])
-        with self.assertRaisesRegex(LabContractError, "UNFROZEN_TRADE_POLICY_MISMATCH"):
+        with self.assertRaisesRegex(LabContractError, "FROZEN_POLICY_SPEC_DIGEST_MISMATCH"):
             run(inp)
 
     def test_cost_drift_even_when_resealed_rejected(self):
