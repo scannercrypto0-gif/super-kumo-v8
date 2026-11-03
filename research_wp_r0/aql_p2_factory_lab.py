@@ -27,7 +27,7 @@ def require(ok, code):
 
 def digest(obj):
     return sha256(json.dumps(obj, sort_keys=True, separators=(",", ":"),
-                             ensure_ascii=False, allow_nan=False).encode("utf-8")).hexdigest()
+                             ensure_ascii=True, allow_nan=False).encode("utf-8")).hexdigest()
 
 
 def hash_ok(s):
@@ -76,6 +76,17 @@ def validate_schedule(schedule):
         opportunity = pair.get("opportunity")
         require(isinstance(opportunity, dict), "BAD_OPPORTUNITY")
         require(opportunity.get("disposition") in DISPOSITIONS, "BAD_DISPOSITION")
+        direction = opportunity.get("direction")
+        direction_ref = opportunity.get("direction_evidence_ref")
+        require(direction in (None, "LONG", "SHORT"), "BAD_ORIGINAL_DIRECTION")
+        require((direction is None and direction_ref is None) or
+                (direction is not None and isinstance(direction_ref, str)
+                 and bool(direction_ref.strip())), "DIRECTION_WITHOUT_EVIDENCE")
+        regime = opportunity.get("regime")
+        regime_pin = opportunity.get("regime_source_sha256")
+        require((regime is None and regime_pin is None) or
+                (isinstance(regime, str) and bool(regime.strip())
+                 and hash_ok(regime_pin)), "REGIME_WITHOUT_SOURCE")
         require(opportunity.get("evidence_class") == "RETROSPECTIVE_NON_PIT", "PIT_OPPORTUNITY")
         require(opportunity.get("trial_id") == protocol.get("trial_id") and
                 opportunity.get("source_id") == source.get("source_id") and
