@@ -165,7 +165,7 @@ class ModeledTradeTests(unittest.TestCase):
     def test_window_digest_mutation_rejected(self):
         inp = fixture()
         inp[3][0]["bars"][10]["open"] = "999"
-        with self.assertRaisesRegex(LabContractError, "WINDOW_LINEAGE_OR_DIGEST"):
+        with self.assertRaisesRegex(LabContractError, "WINDOW_DIGEST_MISMATCH"):
             run(inp)
 
     def test_rehashed_window_price_outside_ohlc_rejected(self):
@@ -203,7 +203,7 @@ class ModeledTradeTests(unittest.TestCase):
             run(inp)
         inp = fixture()
         inp[3].pop()
-        with self.assertRaisesRegex(LabContractError, "INCOMPLETE_SOURCE_WINDOW_DENOMINATOR"):
+        with self.assertRaisesRegex(LabContractError, "INCOMPLETE_WINDOW_DENOMINATOR"):
             run(inp)
 
     def test_policy_exit_drift_even_when_resealed_rejected(self):
