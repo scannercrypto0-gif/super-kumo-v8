@@ -1,0 +1,42 @@
+name: P2-A public intake focused TEST_ONLY
+on:
+  push:
+    branches: [work/aql-p2a-public-intake-20261103]
+    paths:
+      - research_wp_r0/aql_p2a_public_intake.py
+      - tests/test_aql_p2a_public_intake.py
+      - docs/research/p2a/development-plan.json
+      - .github/workflows/aql-p2a-public-intake.yml
+  pull_request:
+    paths:
+      - research_wp_r0/aql_p2a_public_intake.py
+      - tests/test_aql_p2a_public_intake.py
+      - docs/research/p2a/development-plan.json
+      - .github/workflows/aql-p2a-public-intake.yml
+permissions:
+  contents: read
+jobs:
+  p2a-focused:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Only new P2-A tests, fixtures not market results
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir p2a-ci-evidence
+          git rev-parse HEAD | tee p2a-ci-evidence/code-sha.txt
+          python -m unittest -v tests.test_aql_p2a_public_intake 2>&1 | tee p2a-ci-evidence/tests.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p2a-public-intake-TEST_ONLY
+          path: p2a-ci-evidence/
+          retention-days: 7
