@@ -1,0 +1,113 @@
+name: AQL P2 Factory Lab Focused
+on:
+  push:
+    paths:
+      - 'research_wp_r0/aql_p2_factory_lab.py'
+      - 'research_wp_r0/aql_p2_factory_real_development.py'
+      - 'research_wp_r0/aql_p2_factory_modeled_trades.py'
+      - 'research_wp_r0/aql_p2_factory_portfolio.py'
+      - 'tests/test_aql_p2_factory_lab.py'
+      - 'tests/test_aql_p2_factory_core_handshake.py'
+      - 'tests/test_aql_p2_factory_real_development.py'
+      - 'tests/test_aql_p2_factory_modeled_trades.py'
+      - 'tests/test_aql_p2_factory_portfolio.py'
+      - 'docs/research/p2a/factory-modeled-breakout-trades.md'
+      - 'docs/research/p2a/factory-offline-portfolio.md'
+      - 'tests/test_aql_p2_factory_source_open_bridge.py'
+      - '.github/workflows/aql-p2-factory-focused.yml'
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_p2_factory_lab.py'
+      - 'research_wp_r0/aql_p2_factory_real_development.py'
+      - 'research_wp_r0/aql_p2_factory_modeled_trades.py'
+      - 'research_wp_r0/aql_p2_factory_portfolio.py'
+      - 'tests/test_aql_p2_factory_lab.py'
+      - 'tests/test_aql_p2_factory_core_handshake.py'
+      - 'tests/test_aql_p2_factory_real_development.py'
+      - 'tests/test_aql_p2_factory_modeled_trades.py'
+      - 'tests/test_aql_p2_factory_portfolio.py'
+      - 'docs/research/p2a/factory-modeled-breakout-trades.md'
+      - 'docs/research/p2a/factory-offline-portfolio.md'
+      - 'tests/test_aql_p2_factory_source_open_bridge.py'
+      - '.github/workflows/aql-p2-factory-focused.yml'
+  workflow_dispatch:
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Factory exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Checkout pinned isolated Core #221
+        uses: actions/checkout@v4
+        with:
+          ref: 58e423431cc639958736337a65db8a17bfdbaa85
+          path: _core_p2_pinned
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run focused Factory and real Core cross-PR TEST_ONLY tests
+        env:
+          AQL_P2_CORE_FILE: _core_p2_pinned/research_wp_r0/aql_p2_core_producer.py
+        run: |
+          python -m unittest discover -s tests -p 'test_aql_p2_factory_lab.py' -v
+          python -m unittest discover -s tests -p 'test_aql_p2_factory_core_handshake.py' -v
+          python -m unittest discover -s tests -p 'test_aql_p2_factory_real_development.py' -v
+          python -m unittest discover -s tests -p 'test_aql_p2_factory_modeled_trades.py' -v
+          python -m unittest discover -s tests -p 'test_aql_p2_factory_source_open_bridge.py' -v
+          python -m unittest discover -s tests -p 'test_aql_p2_factory_portfolio.py' -v
+      - name: Anchor frozen ten-bar implementation before private trade evaluation
+        run: |
+          git rev-parse HEAD
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from research_wp_r0.aql_p2_factory_modeled_trades import execution_contract, digest
+          contract = execution_contract()
+          Path('ten-bar-execution-anchor.json').write_text(json.dumps({'execution_contract':contract,'execution_contract_sha256':digest(contract)},sort_keys=True)+'\n')
+          print('TRADE_EXECUTION_CONTRACT_SHA256='+digest(contract))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2-ten-bar-execution-anchor
+          path: ten-bar-execution-anchor.json
+          retention-days: 90
+      - name: Anchor OWNER-APPROVED provisional Option C policy (NO private scoring)
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from research_wp_r0.aql_p2_factory_portfolio import frozen_option_c_policy, OWNER_C_URL
+          policy = frozen_option_c_policy()
+          assert policy["approval_status"] == "OWNER_APPROVED_PROVISIONAL"
+          assert policy["owner_decision_url"] == OWNER_C_URL
+          Path("p2-option-c-independent-opportunity-policy.json").write_text(
+              json.dumps(policy, sort_keys=True, separators=(",", ":"),
+                         ensure_ascii=True, allow_nan=False) + "\n",
+              encoding="utf-8")
+          print("OPTION_C_FROZEN_POLICY_SHA256=" + policy["artifact_sha256"])
+          print("OPTION_C_PRIVATE_SCORING=NOT_PERFORMED")
+          PY
+      - name: Upload frozen Option C policy anchor
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-option-c-owner-policy-pre-score-anchor
+          path: p2-option-c-independent-opportunity-policy.json
+          retention-days: 90
+          if-no-files-found: error
+      - name: Generate machine-readable TEST_ONLY handshake receipt
+        env:
+          PYTHONPATH: .
+          AQL_P2_CORE_FILE: _core_p2_pinned/research_wp_r0/aql_p2_core_producer.py
+        run: |
+          python tests/test_aql_p2_factory_core_handshake.py --emit-receipt _p2_test_only_receipt/factory-core-handshake.json
+          python -m json.tool _p2_test_only_receipt/factory-core-handshake.json
+      - name: Upload TEST_ONLY receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: factory-p2-core-exact-head-test-only-receipt
+          path: _p2_test_only_receipt/factory-core-handshake.json
+          if-no-files-found: error
