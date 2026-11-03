@@ -151,7 +151,7 @@ def seal_protocol():
 def _work_canonical(row):
     """Exact Work #223 canonical JSONL hashing domain (including newline)."""
     return (json.dumps(row, sort_keys=True, separators=(",", ":"),
-                       ensure_ascii=False, allow_nan=False) + "\\n").encode("utf-8")
+                       ensure_ascii=False, allow_nan=False) + "\n").encode("utf-8")
 
 
 def _work_sha(raw):
