@@ -9,7 +9,8 @@ An independent reviewer MUST verify that anchor predates outcome observation.
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
-from dataclasses import asdict
+from hashlib import sha256
+import json
 
 from .aql_p2_core_producer import (
     BAR_MS, EMBARGO_MIN_MS, ContractError, FrozenTrialV1,
@@ -26,6 +27,7 @@ HORIZONS = (4, 24, 72)
 MANIFEST_SHA = "9b34e972e05002a7d6b11152e72164af825960b60e36c65ccf8049ce411eb4ff"
 BAR_INDEX_SHA = "0988fda2d3fa04d3ec99b135e549aa08a684a2c9d77157811d6b882af757cc17"
 HANDOFF_SHA = "4031aea0b421d3749441cf40a09699d8bb0b27cee9320b848b3d1fd1345101bc"
+WORK_VERIFIED_SOURCE_RECEIPT_SHA = "c224025885b5186732fa21755c0f3fa7042f03c44d19f1b566be454a31518b44"
 SOURCE_ARCHIVES = {
     "BINANCE-SPOT-BTCUSDT-15M-2024-02-DEV-v1": (
         FEB_START, FEB_END,
@@ -146,6 +148,16 @@ def seal_protocol():
     return spec, trial
 
 
+def _work_canonical(row):
+    """Exact Work #223 canonical JSONL hashing domain (including newline)."""
+    return (json.dumps(row, sort_keys=True, separators=(",", ":"),
+                       ensure_ascii=False, allow_nan=False) + "\\n").encode("utf-8")
+
+
+def _work_sha(raw):
+    return sha256(raw).hexdigest()
+
+
 def _decimal(value):
     try:
         x = Decimal(str(value))
@@ -182,17 +194,32 @@ def _check_source(source, bars, rows, trial):
     _require(valid[0].open_ms == start and valid[-1].close_ms + 1 == end,
              "COHORT_BOUNDARY_DRIFT")
     prices = []
+    indexed_bytes = []
     for b, row in zip(valid, rows):
+        _require(isinstance(row, dict)
+                 and row.get("availability_mode") == "RETROSPECTIVE_NON_PIT"
+                 and row.get("historical_known_at_ms") is None
+                 and row.get("historical_receipt_ms") is None
+                 and row.get("historical_publication_ms") is None
+                 and row.get("finality") == "ARCHIVED_CLOSED_INTERVAL"
+                 and row.get("is_final") is True,
+                 "HISTORICAL_SOURCE_FINALITY_OR_PIT_DRIFT")
         _require(row.get("dataset_id") == source.source_id
                  and row.get("open_ms") == b.open_ms
                  and row.get("close_ms") == b.close_ms
                  and row.get("bar_sha256") == b.content_sha256,
                  "UNVERIFIED_BAR_MAPPING")
+        unsealed_row = {k: v for k, v in row.items() if k != "bar_sha256"}
+        _require(_work_sha(_work_canonical(unsealed_row)) == b.content_sha256,
+                 "BAR_CONTENT_HASH_MISMATCH")
+        indexed_bytes.append(_work_canonical(row))
         op, high, low, close = (_decimal(row.get(k))
                                 for k in ("open", "high", "low", "close"))
         _require(low <= op <= high and low <= close <= high,
                  "INVALID_OHLC_RANGE")
         prices.append((op, high, low, close))
+    _require(_work_sha(b"".join(indexed_bytes)) == normalized_sha,
+             "FULL_COHORT_INDEX_SHA_MISMATCH")
     return valid, prices
 
 
@@ -343,10 +370,14 @@ def build_factory_handoff(source, bars, authenticated_rows, trial,
     from .aql_p2_core_producer import _sha
     _require(_sha(source_authentication_receipt_sha256),
              "MISSING_INDEPENDENT_SOURCE_ATTESTATION")
+    _require(source_authentication_receipt_sha256 == WORK_VERIFIED_SOURCE_RECEIPT_SHA,
+             "UNRECOGNIZED_WORK_SOURCE_ATTESTATION")
+    # Construct frozen consumer envelope BEFORE reading any price observations.
+    # An external GitHub timestamp and artifact hash check is still mandatory.
+    prereg, cost = build_factory_prereg(source, trial)
     opportunities, evidences = _analyze_cohort(
         source, bars, authenticated_rows, trial)
     schedule = schedule_pair(trial, source, bars, opportunities, test_only=False)
-    prereg, cost = build_factory_prereg(source, trial)
     decisions = []
     for pair, ev in zip(schedule["pairs"], evidences):
         _require(pair["opportunity"]["opportunity_id"] == ev["identity"],
