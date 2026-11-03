@@ -1,13 +1,13 @@
-"""AQL-P2-PORTFOLIO-001: independent offline capital-ledger consumer.
+"""AQL-P2-PORTFOLIO-001 Option C: independent overlapping opportunity research.
 
-Consumes immutable Factory ten-bar *modeled* returns. No signal generation,
-market-data access, execution venue, or portfolio-policy auto-approval.
-Current policy is a PROPOSAL; only synthetic TEST_ONLY cases may run until a
-distinct owner approval and independent pre-score policy anchor are verified.
+Owner C approval #77/6603278584 supersedes the never-approved full-cash
+single-position proposal. This is NOT a funded portfolio or order backtester.
+Consumes exact original immutable Factory 10-bar model outcomes and retains all
+NO_SIGNAL, REJECTED, UNKNOWN, CENSORED without zero-imputation.
 """
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 from copy import deepcopy
 from decimal import Decimal
 from hashlib import sha256
@@ -16,95 +16,67 @@ import json
 from research_wp_r0.aql_p2_factory_lab import digest, hash_ok
 from research_wp_r0.aql_p2_factory_real_development import BAR_MS, dec, fail
 
-RULE = "P2_OFFLINE_SINGLE_POSITION_FULL_CASH_V1"
-MODEL_COST = Decimal("0.003")
-CANDIDATE_STATUSES = ("NO_SIGNAL", "REJECTED", "UNKNOWN", "TRIGGERED")
-SOURCE_SCHEMA = "aql.p2.factory.breakout-modeled-trades.v1"
-POLICY_SCHEMA = "aql.p2.factory.portfolio-policy.v1"
-REPORT_SCHEMA = "aql.p2.factory.offline-portfolio.v1"
+RULE = "ALL_INDEPENDENT_ELIGIBLE_OVERLAPS_INCLUDED_V1"
+POLICY_SCHEMA = "aql.p2.factory.independent-opportunity-policy.v1"
+REPORT_SCHEMA = "aql.p2.factory.independent-opportunity-study.v1"
+PARENT_SCHEMA = "aql.p2.factory.breakout-modeled-trades.v1"
+OWNER_C_URL = (
+    "https://github.com/scannercrypto0-gif/super-kumo-v8/"
+    "issues/77#issuecomment-6603278584"
+)
+COST_PER_RAW_ENTRY = Decimal("0.003")
+DISPOSITIONS = ("TRIGGERED", "NO_SIGNAL", "REJECTED", "UNKNOWN")
 
 
-def seal(obj):
-    result = deepcopy(obj)
-    result["artifact_sha256"] = digest(result)
-    return result
-
-
-def propose_portfolio_policy(initial_capital="10000"):
-    """Candidate envelope: NOT an owner approval or a retroactive prereg."""
-    cash = dec(initial_capital)
-    if cash <= 0:
-        fail("BAD_INITIAL_CAPITAL")
-    return seal({
+def frozen_option_c_policy():
+    """Already owner-approved C *rule*, not a claim of temporal prereg of data."""
+    policy = {
         "schema": POLICY_SCHEMA,
-        "research_scope": "EXPLORATORY_PORTFOLIO_SEPARATE_FROM_FROZEN_P2_TRIAL",
+        "decision_id": "AQL-P2-PORTFOLIO-001-OPTION-C",
+        "owner_decision_url": OWNER_C_URL,
+        "approval_status": "OWNER_APPROVED_PROVISIONAL",
         "policy_rule": RULE,
-        "approval_status": "PROPOSED_NOT_OWNER_APPROVED",
-        "test_only": False,
-        "owner_approval_url": None,
-        "pre_score_anchor_receipt_sha256": None,
-        "initial_capital": str(cash),
-        "max_open_positions": 1,
-        "leverage": "1",
-        "allocation": "FULL_AVAILABLE_CASH_NORMALIZED_MODELED_ENTRY",
-        "cash_constraint": "ONE_POSITION_100_PERCENT_RESERVED_DURING_HOLD",
-        "occupied_signal": "SKIP_AND_PRESERVE_ORIGINAL_SIGNAL",
-        "tie_break": "PAIR_ID_ASCENDING_AT_SAME_ENTRY_TIME",
-        "same_clock_order": "EXIT_BEFORE_ENTRY",
-        "modeled_exit": "OPEN_I_PLUS_11_AFTER_TEN_BARS",
-        "modeled_cost_method": "FROZEN_ADDITIVE_GROSS_MINUS_30BPS_ON_ENTRY_NOTIONAL",
-        "entry_fee_accounting": "MODEL_ONLY_DEFERRED_TO_EXIT_SETTLEMENT_NO_REAL_FEE_CASHFLOW",
-        "mark_to_market": "NOT_AVAILABLE_REALIZED_SETTLEMENT_EQUITY_ONLY",
-        "cohorts": "SEPARATE_RESET_INITIAL_CAPITAL_NO_CROSS_MONTH_STITCH",
-        "source_evidence": "SOURCE_BACKED_ONLY_IF_PARENT_REPORT_INDEPENDENTLY_VERIFIED",
+        "source": "EXISTING_PINNED_FACTORY_TEN_BAR_REPORTS_ONLY",
+        "eligibility": "EACH_TRIGGGERED_MODELED_COMPLETE_LONG_INDEPENDENTLY",
+        "overlaps": "KEEP_EVERY_ELIGIBLE_OPPORTUNITY_NO_ARBITRATION",
+        "capital_account": "NONE",
+        "allocation_budget": "NONE",
+        "position_cap": "NONE",
+        "leverage_assumption": "NONE",
+        "occupied_signal_behavior": "NOT_APPLICABLE_NO_SHARED_POSITION",
+        "model_entry_exit": "ORIGINAL_OPEN_I_PLUS_1_TO_OPEN_I_PLUS_11",
+        "modeled_cost": "FROZEN_ADDITIVE_30BPS_PER_RAW_ENTRY_NO_REPRICING",
+        "outcomes": "MODEL_ONLY_PER_OPPORTUNITY_UNIT_RETURN_DISTRIBUTION",
+        "overlap_clock": "HALF_OPEN_INTERVAL_EXIT_BEFORE_SAME_TIME_ENTRY",
+        "cohort_boundary": "SEPARATE_MONTHS_NO_CROSS_COHORT_POOLING",
+        "nulls": "RETAIN_ALL_NO_SIGNAL_REJECTED_UNKNOWN_CENSORED_AS_NULL",
+        "aggregation": "DESCRIPTIVE_COUNTS_MEDIAN_MEANS_NO_FUNDED_EQUITY",
+        "portfolio_equity_drawdown_cashflow": "NOT_APPLICABLE_NOT_FUNDED",
+        "trial_relation": "EXPLORATORY_AFTER_PRIOR_TRADE_OUTCOMES_EXPOSED",
+        "pit_oos_alpha": "NOT_CLAIMED",
         "holdout_status": "SEALED_UNOPENED",
-    })
+    }
+    policy["artifact_sha256"] = digest(policy)
+    return policy
 
 
-def _validate_policy(policy, *, test_only, approval_verified, pre_score_anchor_verified):
-    if not isinstance(policy, dict) or policy.get("schema") != POLICY_SCHEMA:
-        fail("MISSING_FROZEN_PORTFOLIO_POLICY")
-    if not hash_ok(policy.get("artifact_sha256")) or digest({
-        k: v for k, v in policy.items() if k != "artifact_sha256"
-    }) != policy["artifact_sha256"]:
-        fail("PORTFOLIO_POLICY_HASH_MISMATCH")
-    proposed = propose_portfolio_policy(policy.get("initial_capital"))
-    fixed = (
-        "research_scope", "policy_rule", "initial_capital", "max_open_positions",
-        "leverage", "allocation", "cash_constraint", "occupied_signal",
-        "tie_break", "same_clock_order", "modeled_exit", "modeled_cost_method",
-        "entry_fee_accounting", "mark_to_market", "cohorts",
-        "source_evidence", "holdout_status",
-    )
-    if any(policy.get(x) != proposed[x] for x in fixed):
-        fail("UNAPPROVED_PORTFOLIO_SEMANTIC_CHANGE")
-    if test_only is True:
-        if (policy.get("test_only") is not True
-            or policy.get("approval_status") != "TEST_ONLY_SYNTHETIC"
-            or policy.get("owner_approval_url") is not None
-            or policy.get("pre_score_anchor_receipt_sha256") is not None):
-            fail("TEST_ONLY_POLICY_REQUIRED")
-    else:
-        if (policy.get("test_only") is not False
-            or policy.get("approval_status") != "OWNER_APPROVED_PROVISIONAL"
-            or not isinstance(policy.get("owner_approval_url"), str)
-            or not policy["owner_approval_url"].startswith(
-                "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/")
-            or not hash_ok(policy.get("pre_score_anchor_receipt_sha256"))
-            or approval_verified is not True
-            or pre_score_anchor_verified is not True):
-            fail("OWNER_PORTFOLIO_POLICY_APPROVAL_AND_PRE_SCORE_ANCHOR_REQUIRED")
-    return dec(policy["initial_capital"])
+def _canonical_hash_valid(obj, key="artifact_sha256"):
+    return isinstance(obj, dict) and hash_ok(obj.get(key)) and digest({
+        k: v for k, v in obj.items() if k != key
+    }) == obj[key]
 
 
-def _validate_report(report):
-    if not isinstance(report, dict) or report.get("schema") != SOURCE_SCHEMA:
-        fail("UNSUPPORTED_PARENT_TRADE_REPORT")
-    pin = report.get("artifact_sha256")
-    if not hash_ok(pin) or digest({
-        k: v for k, v in report.items() if k != "artifact_sha256"
-    }) != pin:
-        fail("PARENT_TRADE_REPORT_DIGEST_MISMATCH")
+def _validate_policy(policy):
+    if not _canonical_hash_valid(policy):
+        fail("OPTION_C_POLICY_DIGEST_MISMATCH")
+    if policy != frozen_option_c_policy():
+        fail("OPTION_C_POLICY_CHANGED_OR_UNAPPROVED")
+    return policy["artifact_sha256"]
+
+
+def _validate_parent(report):
+    if not _canonical_hash_valid(report) or report.get("schema") != PARENT_SCHEMA:
+        fail("INVALID_PARENT_MODELED_TRADE_RECEIPT")
     if (report.get("scope") != "RETROSPECTIVE_NON_PIT_DEVELOPMENT_ONLY"
         or report.get("execution_status") != "NOT_OBSERVED"
         or report.get("holdout_status") != "SEALED_UNOPENED"
@@ -112,336 +84,346 @@ def _validate_report(report):
         or report.get("oos_status") != "NOT_ATTESTED"
         or report.get("modeled_exit_spec") != "NEXT_OPEN_I_PLUS_1_EXIT_OPEN_I_PLUS_11_V1"
         or dec(report.get("modeled_cost_round_trip_bps")) != Decimal(30)
-        or not hash_ok(report.get("source_schedule_sha256"))
-        or not hash_ok(report.get("source_package_sha256"))
-        or not hash_ok(report.get("preregistration_artifact_sha256"))
-        or not hash_ok(report.get("cost_model_artifact_sha256"))
-        or not hash_ok(report.get("descriptive_4_24_72h_artifact_sha256"))):
-        fail("PARENT_TRADE_CONTRACT_MISMATCH")
-    rows = report.get("modeled_trades")
-    matches = report.get("paired_comparison")
+        or any(not hash_ok(report.get(k)) for k in (
+            "source_schedule_sha256", "source_package_sha256",
+            "preregistration_artifact_sha256", "cost_model_artifact_sha256",
+            "descriptive_4_24_72h_artifact_sha256"))):
+        fail("PARENT_TRADE_CONTRACT_OR_LINEAGE_MISMATCH")
+    sid = report.get("source_id")
     n = report.get("pair_count")
-    if (not isinstance(n, int) or isinstance(n, bool) or n <= 0
-        or not isinstance(rows, list) or len(rows) != 2 * n
-        or report.get("arm_count") != 2 * n or not isinstance(matches, list)
-        or len(matches) != n):
-        fail("PARENT_PAIRED_DENOMINATOR_MISMATCH")
-    observed = {}
-    for row in rows:
-        if not isinstance(row, dict):
+    rows = report.get("modeled_trades")
+    comparisons = report.get("paired_comparison")
+    if (not isinstance(sid, str) or not sid or type(n) is not int or n < 1
+        or not isinstance(rows, list) or len(rows) != 2*n
+        or report.get("arm_count") != 2*n
+        or not isinstance(comparisons, list) or len(comparisons) != n):
+        fail("PARENT_SOURCE_OR_PAIRED_DENOMINATOR_MISMATCH")
+    keyed = {}
+    for r in rows:
+        if not isinstance(r, dict):
             fail("BAD_PARENT_TRADE_ROW")
-        pid, arm = row.get("pair_id"), row.get("arm")
-        k = (pid, arm)
+        pid, arm = r.get("pair_id"), r.get("arm")
+        key = (pid, arm)
         if (not hash_ok(pid) or arm not in ("BASE", "SHADOW")
-            or k in observed or not hash_ok(row.get("arm_decision_sha256"))
-            or not hash_ok(row.get("four_hour_source_window_sha256"))
-            or row.get("execution_status") != "NOT_OBSERVED"):
-            fail("BAD_OR_DUPLICATE_TRADE_PROVENANCE")
-        disposition = row.get("disposition")
-        status = row.get("status")
-        if disposition not in CANDIDATE_STATUSES:
-            fail("BAD_TRADE_DISPOSITION")
-        if (row.get("cost_class") != "MODEL_ONLY_NOT_EXECUTION"
-            or row.get("fee_bps") != "20"
-            or row.get("slippage_bps") != "10"):
-            fail("UNTRUSTED_PARENT_MODELED_COST_CLASS")
-        if disposition == "TRIGGERED":
-            if (status != "MODELED_COMPLETE" or row.get("modeled_trade_availability") != "COMPLETE"
-                or row.get("missingness_reason") is not None
-                or row.get("holding_period_bars") != 10
-                or not isinstance(row.get("entry_open_ms"), int)
-                or not isinstance(row.get("exit_open_ms"), int)
-                or row["exit_open_ms"] - row["entry_open_ms"] != 10 * BAR_MS
-                or row.get("fee_entry_return") != "0.001"
-                or row.get("fee_exit_return") != "0.001"
-                or row.get("slippage_entry_return") != "0.0005"
-                or row.get("slippage_exit_return") != "0.0005"):
-                fail("TRADE_MODELED_ENTRY_EXIT_OR_COST_DRIFT")
-            entry, exit_ = dec(row.get("entry_open")), dec(row.get("exit_open"))
+            or key in keyed
+            or not hash_ok(r.get("arm_decision_sha256"))
+            or not hash_ok(r.get("four_hour_source_window_sha256"))
+            or r.get("execution_status") != "NOT_OBSERVED"
+            or r.get("cost_class") != "MODEL_ONLY_NOT_EXECUTION"
+            or r.get("fee_bps") != "20" or r.get("slippage_bps") != "10"):
+            fail("DUPLICATE_OR_UNVERIFIED_PARENT_ARM")
+        state = r.get("disposition")
+        if state not in DISPOSITIONS:
+            fail("BAD_PARENT_ARM_DISPOSITION")
+        if state == "TRIGGERED":
+            if (r.get("status") != "MODELED_COMPLETE"
+                or r.get("modeled_trade_availability") != "COMPLETE"
+                or r.get("holding_period_bars") != 10
+                or r.get("missingness_reason") is not None
+                or r.get("fee_entry_return") != "0.001"
+                or r.get("fee_exit_return") != "0.001"
+                or r.get("slippage_entry_return") != "0.0005"
+                or r.get("slippage_exit_return") != "0.0005"
+                or type(r.get("entry_open_ms")) is not int
+                or type(r.get("exit_open_ms")) is not int
+                or r["exit_open_ms"] - r["entry_open_ms"] != 10*BAR_MS):
+                fail("MODELED_ENTRY_EXIT_OR_COST_DRIFT")
+            entry, exit_ = dec(r.get("entry_open")), dec(r.get("exit_open"))
             if entry <= 0 or exit_ <= 0:
-                fail("NONPOSITIVE_TRADE_PRICE")
-            gross = exit_ / entry - 1
-            net = gross - MODEL_COST
-            if (dec(row.get("modeled_gross_return")) != gross
-                or dec(row.get("modeled_net_return")) != net):
-                fail("PARENT_TRADE_RETURN_MISMATCH")
+                fail("NONPOSITIVE_PARENT_PRICE")
+            gross = exit_ / entry - Decimal(1)
+            net = gross - COST_PER_RAW_ENTRY
+            if (dec(r.get("modeled_gross_return")) != gross
+                or dec(r.get("modeled_net_return")) != net):
+                fail("PARENT_MODELED_RETURN_MISMATCH")
+            if (r.get("modeled_gross_pnl_per_base_unit") is not None and
+                dec(r["modeled_gross_pnl_per_base_unit"]) != exit_ - entry):
+                fail("PARENT_GROSS_UNIT_PNL_MISMATCH")
+            if (r.get("modeled_net_pnl_per_base_unit") is not None and
+                dec(r["modeled_net_pnl_per_base_unit"]) != (exit_ - entry) -
+                entry*COST_PER_RAW_ENTRY):
+                fail("PARENT_NET_UNIT_PNL_MISMATCH")
         else:
-            expected = "UNKNOWN" if disposition == "UNKNOWN" else "INELIGIBLE"
-            if (status != expected or row.get("modeled_net_return") is not None
-                or row.get("modeled_gross_return") is not None
-                or row.get("entry_open") is not None or row.get("exit_open") is not None):
-                fail("INELIGIBLE_TRADE_FABRICATED_RETURN")
-        observed[k] = row
-    if len(observed) != 2 * n:
-        fail("INCOMPLETE_PARENT_ARM_DENOMINATOR")
-    pairs = {k[0] for k in observed}
-    pair_index = {}
-    for m in matches:
-        if not isinstance(m, dict) or m.get("pair_id") in pair_index:
-            fail("DUPLICATE_PARENT_PAIR")
-        pid = m.get("pair_id")
-        if pid not in pairs:
-            fail("UNKNOWN_PARENT_PAIR")
-        base, shadow = observed[(pid, "BASE")], observed[(pid, "SHADOW")]
-        if (m.get("base_disposition") != base["disposition"]
-            or m.get("shadow_disposition") != shadow["disposition"]
-            or m.get("both_modeled_complete") !=
-              (base["status"] == "MODELED_COMPLETE" and shadow["status"] == "MODELED_COMPLETE")):
-            fail("PARENT_PAIR_IDENTITY_MISMATCH")
-        pair_index[pid] = m
-    if set(pair_index) != pairs:
-        fail("INCOMPLETE_PARENT_PAIR_COMPARISON")
-    return observed
+            if (r.get("status") != ("UNKNOWN" if state == "UNKNOWN" else "INELIGIBLE")
+                or any(r.get(k) is not None for k in (
+                    "modeled_gross_return", "modeled_net_return", "entry_open",
+                    "exit_open"))):
+                fail("NULL_ARM_PROMOTED_TO_TRADE")
+        keyed[key] = r
+    pids = {k[0] for k in keyed}
+    if len(pids) != n:
+        fail("INCOMPLETE_PAIR_SET")
+    comparison_ids = set()
+    for c in comparisons:
+        if not isinstance(c, dict):
+            fail("BAD_PARENT_PAIR_COMPARISON")
+        pid = c.get("pair_id")
+        if pid in comparison_ids or pid not in pids:
+            fail("MISSING_OR_DUPLICATE_PAIR_COMPARISON")
+        b, s = keyed[(pid, "BASE")], keyed[(pid, "SHADOW")]
+        complete = (b["disposition"] == "TRIGGERED"
+                    and s["disposition"] == "TRIGGERED")
+        if (c.get("base_disposition") != b["disposition"]
+            or c.get("shadow_disposition") != s["disposition"]
+            or c.get("both_modeled_complete") is not complete):
+            fail("PAIR_COMPARISON_PARENT_DRIFT")
+        if complete and any(b[k] != s[k] for k in (
+            "entry_open_ms", "exit_open_ms", "entry_open", "exit_open")):
+            fail("SAME_PAIR_ARMS_MODEL_PRICE_DRIFT")
+        comparison_ids.add(pid)
+    if comparison_ids != pids:
+        fail("UNPAIRED_SOURCE_DECISIONS")
+    return keyed
 
 
-def _validate_bounds(report, bounds):
-    if not isinstance(bounds, dict):
-        fail("MISSING_COHORT_SOURCE_BOUNDS")
-    sid = report["source_id"]
-    if (bounds.get("source_id") != sid
+def _check_bounds(report, bounds):
+    if (not isinstance(bounds, dict)
+        or bounds.get("source_id") != report["source_id"]
         or bounds.get("source_package_sha256") != report["source_package_sha256"]
-        or not isinstance(bounds.get("start_ms"), int)
-        or not isinstance(bounds.get("end_exclusive_ms"), int)
-        or bounds["start_ms"] >= bounds["end_exclusive_ms"]
-        or (bounds["end_exclusive_ms"] - bounds["start_ms"]) % BAR_MS):
-        fail("BAD_COHORT_BOUNDARY_OR_SOURCE_PIN")
+        or type(bounds.get("start_ms")) is not int
+        or type(bounds.get("end_exclusive_ms")) is not int
+        or bounds["end_exclusive_ms"] <= bounds["start_ms"]
+        or (bounds["end_exclusive_ms"] - bounds["start_ms"]) % BAR_MS != 0):
+        fail("SOURCE_COHORT_BOUNDARY_OR_PIN_MISMATCH")
     return bounds["start_ms"], bounds["end_exclusive_ms"]
 
 
-def _arm_ledger(report, observed, arm, start, end, initial):
-    selected, decisions, events = [], [], []
-    candidates = []
-    for (pid, name), row in observed.items():
-        if name != arm:
+def _quantile_nearest_rank(values, percent):
+    if not values:
+        return None
+    n = len(values)
+    # transparent nearest-rank, no inference of independent observations.
+    idx = max(0, (n*percent + 99)//100 - 1)
+    return str(values[idx])
+
+
+def _arm_study(report, arm, keyed, start, end):
+    decisions, completed = [], []
+    intervals = {}
+    for (pid, a), r in keyed.items():
+        if a != arm:
             continue
-        base = {
+        record = {
             "pair_id": pid, "arm": arm, "source_id": report["source_id"],
-            "arm_decision_sha256": row["arm_decision_sha256"],
-            "four_hour_source_window_sha256": row["four_hour_source_window_sha256"],
-            "signal_disposition": row.get("signal_disposition"),
-            "original_disposition": row["disposition"],
-            "original_model_status": row["status"],
-            "original_censored": row.get("censored"),
-            "original_missingness_reason": row.get("missingness_reason"),
-            "portfolio_action": None,
-            "portfolio_reason": None,
+            "arm_decision_sha256": r["arm_decision_sha256"],
+            "four_hour_source_window_sha256": r["four_hour_source_window_sha256"],
+            "original_signal_disposition": r.get("signal_disposition"),
+            "original_disposition": r["disposition"],
+            "original_status": r["status"],
+            "original_censored": r.get("censored"),
+            "original_missingness_reason": r.get("missingness_reason"),
+            "eligible": r["disposition"] == "TRIGGERED",
+            "entry_open_ms": r.get("entry_open_ms") if r["disposition"] == "TRIGGERED" else None,
+            "exit_open_ms": r.get("exit_open_ms") if r["disposition"] == "TRIGGERED" else None,
+            "modeled_gross_unit_return": r.get("modeled_gross_return"),
+            "modeled_net_unit_return": r.get("modeled_net_return"),
+            "overlaps_other_eligible_opportunity": None,
+            "overlapping_partner_count": None,
+            "account_cash": None, "funded_equity": None,
+            "execution_status": "NOT_OBSERVED",
         }
-        if row["status"] != "MODELED_COMPLETE":
-            base["portfolio_action"] = "NOT_ELIGIBLE"
-            base["portfolio_reason"] = row["disposition"]
-            decisions.append(base)
-        else:
-            if (not start <= row["entry_open_ms"] < row["exit_open_ms"] < end
-                or (row["entry_open_ms"] - start) % BAR_MS != 0):
-                fail("CROSS_COHORT_TRADE_OR_NON_GRID_TIME")
-            candidates.append((row["entry_open_ms"], pid, row, base))
-    candidates.sort(key=lambda x: (x[0], x[1]))
-    cash = initial
-    current_exit = None
-    active = None
-    peak = initial
-    max_drawdown = Decimal(0)
-    exposure_ms = 0
-    for entry_ms, pid, row, decision in candidates:
-        if active is not None and current_exit <= entry_ms:
-            old, invested, exit_ms, selected_row = active
-            settled = invested * (Decimal(1) + dec(old["modeled_net_return"]))
-            if settled <= 0:
-                fail("MODELED_PORTFOLIO_INSOLVENT")
-            cash = settled
-            peak = max(peak, cash)
-            dd = cash / peak - 1
-            max_drawdown = min(max_drawdown, dd)
-            events.append({
-                "event": "MODEL_EXIT", "at_ms": exit_ms, "pair_id": old["pair_id"],
-                "arm_decision_sha256": old["arm_decision_sha256"],
-                "cash_after": str(cash), "realized_cash_equity": str(cash),
-                "modeled_pnl": str(settled - invested),
-                "realized_only_drawdown": str(dd),
-                "marked_equity": None, "execution_status": "NOT_OBSERVED",
-            })
-            selected_row["cash_after_exit"] = str(cash)
-            active = None
-        if active is not None:
-            decision["portfolio_action"] = "SKIPPED"
-            decision["portfolio_reason"] = ("SIMULTANEOUS_PRIORITY_LOSS" if entry_ms ==
-                active[0]["entry_open_ms"] else "POSITION_ALREADY_OCCUPIED")
-            decisions.append(decision)
-            continue
-        if cash <= 0:
-            fail("NO_AVAILABLE_CASH")
-        invested = cash
-        cash = Decimal(0)
-        decision["portfolio_action"] = "MODELED_SELECTED"
-        decision["portfolio_reason"] = None
-        decisions.append(decision)
-        selected_row = {
-            "pair_id": pid, "arm": arm, "entry_open_ms": entry_ms,
-            "exit_open_ms": row["exit_open_ms"],
-            "entry_price": row["entry_open"], "exit_price": row["exit_open"],
-            "notional_entry_cash": str(invested),
-            "modeled_units": str(invested / dec(row["entry_open"])),
-            "modeled_unit_gross_return": row["modeled_gross_return"],
-            "modeled_unit_net_return": row["modeled_net_return"],
-            "modeled_cost_amount": str(invested * MODEL_COST),
-            "cash_after_exit": None,
-            "parent_arm_decision_sha256": row["arm_decision_sha256"],
-            "parent_four_hour_window_sha256": row["four_hour_source_window_sha256"],
-            "model_only_deferred_entry_cost": True,
-        }
-        selected.append(selected_row)
-        events.append({
-            "event": "MODEL_ENTRY", "at_ms": entry_ms, "pair_id": pid,
-            "arm_decision_sha256": row["arm_decision_sha256"],
-            "cash_before": str(invested), "cash_after": "0",
-            "reserved_capital": str(invested),
-            "realized_cash_equity": str(invested),
-            "marked_equity": None, "execution_status": "NOT_OBSERVED",
-        })
-        exposure_ms += row["exit_open_ms"] - entry_ms
-        current_exit = row["exit_open_ms"]
-        active = (row, invested, current_exit, selected_row)
-    if active is not None:
-        old, invested, exit_ms, selected_row = active
-        settled = invested * (Decimal(1) + dec(old["modeled_net_return"]))
-        if settled <= 0:
-            fail("MODELED_PORTFOLIO_INSOLVENT")
-        cash = settled
-        peak = max(peak, cash)
-        dd = cash / peak - 1
-        max_drawdown = min(max_drawdown, dd)
-        events.append({
-            "event": "MODEL_EXIT", "at_ms": exit_ms, "pair_id": old["pair_id"],
-            "arm_decision_sha256": old["arm_decision_sha256"],
-            "cash_after": str(cash), "realized_cash_equity": str(cash),
-            "modeled_pnl": str(settled - invested),
-            "realized_only_drawdown": str(dd),
-            "marked_equity": None, "execution_status": "NOT_OBSERVED",
-        })
-        selected_row["cash_after_exit"] = str(cash)
-    events.sort(key=lambda e: (e["at_ms"], 0 if e["event"] == "MODEL_EXIT" else 1,
-                               e["pair_id"]))
-    decisions.sort(key=lambda d: d["pair_id"])
+        if record["eligible"]:
+            entry_ms, exit_ms = r["entry_open_ms"], r["exit_open_ms"]
+            if (not start <= entry_ms < exit_ms < end
+                or (entry_ms-start) % BAR_MS or (exit_ms-start) % BAR_MS):
+                fail("CROSS_COHORT_OR_OFF_GRID_MODELED_OPPORTUNITY")
+            completed.append(record)
+            intervals[pid] = (entry_ms, exit_ms)
+        decisions.append(record)
+    decisions.sort(key=lambda x:x["pair_id"])
     if len(decisions) != report["pair_count"]:
-        fail("PORTFOLIO_CENSUS_DROPPED_OPPORTUNITIES")
-    activity = Counter(d["portfolio_action"] for d in decisions)
-    summary = {
-        "arm": arm,
-        "initial_capital": str(initial), "terminal_realized_cash_equity": str(cash),
-        "realized_only_total_return": str(cash / initial - 1),
-        "realized_only_max_drawdown": str(max_drawdown),
-        "time_exposure_fraction": str(Decimal(exposure_ms) / Decimal(end - start)),
-        "occupied_ms": exposure_ms,
-        "modeled_selected_count": activity["MODELED_SELECTED"],
-        "skipped_occupied_or_tie_count": activity["SKIPPED"],
-        "ineligible_null_count": activity["NOT_ELIGIBLE"],
-        "scheduled_opportunity_denominator": report["pair_count"],
-        "equity_valuation": "REALIZED_SETTLEMENT_ONLY_NOT_INTRATRADE_MARK_TO_MARKET",
-        "cost_accounting": "FROZEN_ADDITIVE_30BPS_DEFERRED_TO_MODEL_EXIT_NOT_EXCHANGE_CASH",
-    }
-    if summary["modeled_selected_count"] != len(selected):
-        fail("SELECTED_LEDGER_COUNT_MISMATCH")
-    return {"arm": arm, "ledger_events": events, "position_rows": selected,
-            "opportunity_census": decisions, "summary": summary}
+        fail("ARM_SCHEDULED_OPPORTUNITY_DENOMINATOR_LOST")
 
-
-def build_offline_portfolio_package(trade_reports, policy, cohort_bounds, *,
-                                    test_only=False, owner_approval_verified=False,
-                                    pre_score_anchor_verified=False,
-                                    independent_parent_receipts_verified=False):
-    """Ledger per arm per cohort. Real scoring gated by owner-approved policy."""
-    original = deepcopy(trade_reports)
-    initial = _validate_policy(policy, test_only=test_only,
-                               approval_verified=owner_approval_verified,
-                               pre_score_anchor_verified=pre_score_anchor_verified)
-    if test_only is not True and independent_parent_receipts_verified is not True:
-        fail("INDEPENDENT_PARENT_TRADE_RECEIPT_ATTESTATION_REQUIRED")
-    if not isinstance(trade_reports, list) or not trade_reports:
-        fail("MISSING_PARENT_TRADE_REPORTS")
-    if not isinstance(cohort_bounds, dict):
-        fail("MISSING_COHORT_BOUNDS")
-    ids = set()
-    cohorts = []
-    for report in sorted(trade_reports, key=lambda x: x.get("source_id", "")):
-        if not isinstance(report.get("source_id"), str) or not report["source_id"]:
-            fail("BAD_PARENT_COHORT_ID")
-        if test_only is True and not report["source_id"].startswith("TEST_ONLY_"):
-            fail("REAL_SOURCE_FORBIDDEN_IN_TEST_ONLY_PORTFOLIO")
-        if report.get("source_id") in ids or report["source_id"] not in cohort_bounds:
-            fail("DUPLICATE_OR_UNKNOWN_PORTFOLIO_COHORT")
-        ids.add(report["source_id"])
-        observed = _validate_report(report)
-        start, end = _validate_bounds(report, cohort_bounds[report["source_id"]])
-        arms = {arm: _arm_ledger(report, observed, arm, start, end, initial)
-                for arm in ("BASE", "SHADOW")}
-        b = dec(arms["BASE"]["summary"]["terminal_realized_cash_equity"])
-        s = dec(arms["SHADOW"]["summary"]["terminal_realized_cash_equity"])
-        cohorts.append({
-            "source_id": report["source_id"],
-            "source_package_sha256": report["source_package_sha256"],
-            "parent_trade_report_sha256": report["artifact_sha256"],
-            "original_source_schedule_sha256": report["source_schedule_sha256"],
-            "interval": {"start_ms": start, "end_exclusive_ms": end},
-            "pair_count": report["pair_count"],
-            "arms": arms,
-            "shadow_minus_base_terminal_modeled_equity": str(s - b),
-            "comparison_limit": "SELECTION_AND_OVERLAP_DEPENDENT_EXPLORATORY_NOT_CAUSAL_UPLIFT",
+    # Exact half-open intervals [entry,exit): a closing trade at t does not
+    # overlap a new one beginning at the very same t.
+    events = []
+    for pid,(begin,finish) in intervals.items():
+        events.extend([(begin,1,pid),(finish,0,pid)])  # exit (0) first
+    events.sort(key=lambda x:(x[0],x[1],x[2]))
+    active = set()
+    partners = defaultdict(set)
+    prev = start
+    exposure_ms, concurrent_unit_ms, overlap_ms, maximum = 0,0,0,0
+    timeline = []
+    for t,kind,pid in events:
+        if t < prev or t > end:
+            fail("BAD_OPPORTUNITY_SWEEP_TIME")
+        delta = t-prev
+        if active:
+            exposure_ms += delta
+        concurrent_unit_ms += len(active)*delta
+        if len(active)>1:
+            overlap_ms += delta
+        prev=t
+        if kind==0:
+            if pid not in active:
+                fail("ORPHAN_EXIT_EVENT")
+            active.remove(pid)
+        else:
+            for other in active:
+                partners[pid].add(other)
+                partners[other].add(pid)
+            active.add(pid)
+            maximum=max(maximum,len(active))
+        timeline.append({
+            "at_ms": t,
+            "event": "MODELED_EXIT_BOUNDARY" if kind==0 else "MODELED_ENTRY_BOUNDARY",
+            "pair_id": pid, "concurrent_after_event": len(active),
+            "cash_ledger": None, "execution_status": "NOT_OBSERVED",
         })
-    if set(cohort_bounds) != ids:
-        fail("UNUSED_OR_MISSING_COHORT_BOUNDS")
-    if trade_reports != original:
-        fail("PARENT_REPORT_MUTATED")
-    result = {
-        "schema": REPORT_SCHEMA,
-        "evidence_class": "TEST_ONLY_SYNTHETIC" if test_only else
-            "RETROSPECTIVE_NON_PIT_EXPLORATORY_SOURCE_BACKED_IF_EXTERNALLY_ATTESTED",
-        "policy_artifact_sha256": policy["artifact_sha256"],
-        "policy_approval_url": policy.get("owner_approval_url"),
-        "policy_pre_score_anchor_raw_sha256": policy.get("pre_score_anchor_receipt_sha256"),
-        "scope": "SEPARATE_EXPLORATORY_PORTFOLIO_NOT_FROZEN_BREAKOUT_TRADE_PREREG",
-        "cohorts": cohorts,
-        "capital_linking": "RESET_PER_MONTH_NO_CROSS_COHORT_COMPOUNDING",
-        "total_scheduled_pairs": sum(x["pair_count"] for x in cohorts),
-        "total_arm_slots": sum(2*x["pair_count"] for x in cohorts),
-        "valuation_scope": "REALIZED_SETTLEMENT_ONLY_INTRATRADE_MARK_TO_MARKET_UNKNOWN",
-        "execution_status": "NOT_OBSERVED",
-        "alpha_claim": "NOT_ESTABLISHED", "pit_status": "NOT_ATTESTED",
-        "oos_status": "NOT_ATTESTED", "holdout_status": "SEALED_UNOPENED",
+    if active:
+        fail("UNCLOSED_MODELED_OPPORTUNITY")
+    for row in decisions:
+        if row["eligible"]:
+            row["overlapping_partner_count"] = len(partners[row["pair_id"]])
+            row["overlaps_other_eligible_opportunity"] = bool(partners[row["pair_id"]])
+    values = sorted(dec(r["modeled_net_unit_return"]) for r in completed)
+    gross = sorted(dec(r["modeled_gross_unit_return"]) for r in completed)
+    disposition_counts = Counter(r["original_disposition"] for r in decisions)
+    if sum(disposition_counts.values()) != report["pair_count"]:
+        fail("BAD_DISPOSITION_CENSUS")
+    summary = {
+        "arm": arm, "scheduled_pair_denominator": report["pair_count"],
+        "dispositions": {x:disposition_counts[x] for x in DISPOSITIONS},
+        "complete_modeled_count": len(completed),
+        "null_or_ineligible_count": report["pair_count"]-len(completed),
+        "modeled_net_mean_complete_only": str(sum(values)/len(values)) if values else None,
+        "modeled_net_median_nearest_rank_complete_only":
+            _quantile_nearest_rank(values,50),
+        "modeled_net_p25_nearest_rank_complete_only": _quantile_nearest_rank(values,25),
+        "modeled_net_p75_nearest_rank_complete_only": _quantile_nearest_rank(values,75),
+        "modeled_net_min_complete_only": str(values[0]) if values else None,
+        "modeled_net_max_complete_only": str(values[-1]) if values else None,
+        "modeled_gross_mean_complete_only": str(sum(gross)/len(gross)) if gross else None,
+        "positive_net_complete_count": sum(v>0 for v in values),
+        "zero_net_complete_count": sum(v==0 for v in values),
+        "negative_net_complete_count": sum(v<0 for v in values),
+        "eligible_opportunities_with_overlap": sum(bool(partners[x["pair_id"]])
+                                                   for x in completed),
+        "max_simultaneous_eligible_opportunities": maximum,
+        "any_eligible_active_ms": exposure_ms,
+        "two_or_more_eligible_active_ms": overlap_ms,
+        "concurrent_opportunity_unit_ms": concurrent_unit_ms,
+        "eligible_count_time_average_over_cohort":
+            str(Decimal(concurrent_unit_ms)/Decimal(end-start)),
+        "funded_portfolio_equity": None,
+        "funded_portfolio_drawdown": None,
+        "cash_ledger": None,
+        "interpretation": "DEPENDENT_OVERLAPPING_UNIT_RETURNS_NO_FUNDED_PORTFOLIO_OR_ALPHA",
     }
-    result["artifact_sha256"] = digest(result)
-    return result
+    if len(timeline)!=2*len(completed):
+        fail("BAD_CONCURRENCY_EVENT_DENOMINATOR")
+    return {
+        "arm": arm, "opportunities": decisions, "overlap_timeline": timeline,
+        "summary": summary,
+    }
 
 
-def canonical_portfolio_receipt_bytes(receipt):
-    if not isinstance(receipt, dict) or receipt.get("schema") != REPORT_SCHEMA:
-        fail("BAD_PORTFOLIO_RECEIPT")
-    if not hash_ok(receipt.get("artifact_sha256")) or digest({
-        k:v for k,v in receipt.items() if k!="artifact_sha256"
-    }) != receipt["artifact_sha256"]:
-        fail("PORTFOLIO_RECEIPT_HASH_MISMATCH")
-    return (json.dumps(receipt, sort_keys=True, separators=(",", ":"),
-                       ensure_ascii=True, allow_nan=False) + "\n").encode("utf-8")
+def build_independent_opportunity_package(trade_reports, policy, cohort_bounds, *,
+                                          test_only=False,
+                                          owner_decision_verified=False,
+                                          before_scoring_anchor_verified=False,
+                                          independent_parent_receipts_verified=False,
+                                          policy_anchor_raw_sha256=None):
+    """Owner C, no capital budget. Independent Work proof needed for real inputs."""
+    before=deepcopy(trade_reports)
+    policy_sha=_validate_policy(policy)
+    if test_only is not True:
+        if (owner_decision_verified is not True
+            or before_scoring_anchor_verified is not True
+            or independent_parent_receipts_verified is not True
+            or not hash_ok(policy_anchor_raw_sha256)):
+            fail("INDEPENDENT_OWNER_C_AND_PRE_SCORE_ANCHOR_REQUIRED")
+    if not isinstance(trade_reports,list) or not trade_reports:
+        fail("MISSING_PARENT_REPORTS")
+    if not isinstance(cohort_bounds,dict):
+        fail("MISSING_SOURCE_BOUNDARIES")
+    result_rows=[]
+    seen=set()
+    for report in sorted(trade_reports,key=lambda r:r.get("source_id","")):
+        keyed=_validate_parent(report)
+        sid=report["source_id"]
+        if test_only and not sid.startswith("TEST_ONLY_"):
+            fail("REAL_SOURCE_CANNOT_BE_CALLED_TEST_ONLY")
+        if sid in seen or sid not in cohort_bounds:
+            fail("DUPLICATE_OR_UNBOUND_SOURCE_COHORT")
+        seen.add(sid)
+        start,end=_check_bounds(report,cohort_bounds[sid])
+        arms={name:_arm_study(report,name,keyed,start,end)
+              for name in ("BASE","SHADOW")}
+        compared=[]
+        for pid in sorted({k[0] for k in keyed}):
+            b,s=keyed[(pid,"BASE")],keyed[(pid,"SHADOW")]
+            common=b["disposition"]=="TRIGGERED" and s["disposition"]=="TRIGGERED"
+            delta=(str(dec(s["modeled_net_return"])-dec(b["modeled_net_return"]))
+                   if common else None)
+            if common and dec(delta)!=0:
+                fail("PAIRED_IDENTICAL_TRADE_PRICE_WITH_NONZERO_DELTA")
+            compared.append({
+                "pair_id":pid, "base_disposition":b["disposition"],
+                "shadow_disposition":s["disposition"],
+                "paired_complete":common, "shadow_minus_base_unit_return":delta,
+                "filtered_arm_outcome":None if s["disposition"]!="TRIGGERED"
+                                     else s["modeled_net_return"],
+            })
+        result_rows.append({
+            "source_id":sid,"source_package_sha256":report["source_package_sha256"],
+            "parent_trade_report_sha256":report["artifact_sha256"],
+            "original_source_schedule_sha256":report["source_schedule_sha256"],
+            "start_ms":start,"end_exclusive_ms":end,
+            "pair_count":report["pair_count"],"arms":arms,
+            "paired_comparison":compared,
+            "paired_evidence_class":"DESCRIPTIVE_SELECTED_POPULATIONS_NOT_CAUSAL_EFFECT",
+        })
+    if seen!=set(cohort_bounds):
+        fail("UNUSED_OR_MISSING_SOURCE_BOUNDARY")
+    if trade_reports!=before:
+        fail("MUTATED_PARENT_REPORT")
+    out={
+        "schema":REPORT_SCHEMA,"owner_decision_url":OWNER_C_URL,
+        "policy_artifact_sha256":policy_sha,
+        "policy_anchor_raw_sha256":policy_anchor_raw_sha256,
+        "scope":"EXPLORATORY_INDEPENDENT_OVERLAPPING_DEVELOPMENT_OPPORTUNITIES",
+        "evidence_class":("TEST_ONLY_SYNTHETIC" if test_only else
+                          "RETROSPECTIVE_NON_PIT_SOURCE_BACKED_IF_EXTERNALLY_VERIFIED"),
+        "cohorts":result_rows,
+        "source_cohort_handling":"SEPARATE_NO_CROSS_MONTH_STITCH",
+        "total_pair_denominator":sum(x["pair_count"] for x in result_rows),
+        "total_arm_slots":sum(2*x["pair_count"] for x in result_rows),
+        "common_cash_account":None,"funded_equity":None,"drawdown":None,
+        "leverage_assumption":None,"position_cap":None,
+        "execution_status":"NOT_OBSERVED","holdout_status":"SEALED_UNOPENED",
+        "pit_status":"NOT_ATTESTED","oos_status":"NOT_ATTESTED",
+        "alpha_claim":"NOT_ESTABLISHED",
+        "scientific_acceptance":"NOT_OBTAINED",
+    }
+    out["artifact_sha256"]=digest(out)
+    return out
 
 
-def raw_portfolio_receipt_sha256(receipt):
-    return sha256(canonical_portfolio_receipt_bytes(receipt)).hexdigest()
+def canonical_opportunity_receipt_bytes(report):
+    if not _canonical_hash_valid(report) or report.get("schema")!=REPORT_SCHEMA:
+        fail("BAD_INDEPENDENT_OPPORTUNITY_RECEIPT")
+    return (json.dumps(report,sort_keys=True,separators=(",",":"),
+                       ensure_ascii=True,allow_nan=False)+"\n").encode("utf-8")
 
 
-def render_portfolio_report(receipt):
-    """Public-ready *technical* summary, not an alpha or prospective result."""
-    canonical_portfolio_receipt_bytes(receipt)
-    out = ["# ATLAS P2 — exploratory offline portfolio scenario", "",
-           "Policy SHA: " + receipt["policy_artifact_sha256"],
-           "Retrospective NON_PIT; no actual fills, trading, alpha, or unseen OOS.",
-           "Settlement-only equity/drawdown; intratrade mark-to-market unknown.",
-           "Cohorts simulated separately (capital reset).", "",
-           "| Cohort | Arm | Scheduled | Selected | Skipped | NULL/ineligible | Terminal modeled cash | Realized-only drawdown | Exposure |",
-           "|---|---|---:|---:|---:|---:|---:|---:|---:|"]
-    for cohort in receipt["cohorts"]:
+def raw_opportunity_receipt_sha256(report):
+    return sha256(canonical_opportunity_receipt_bytes(report)).hexdigest()
+
+
+def render_opportunity_research_report(report):
+    canonical_opportunity_receipt_bytes(report)
+    lines=["# ATLAS P2 — Option C independent overlapping opportunity research","",
+           "No common capital, position cap, leverage, cash, funded equity, or feasible drawdown.",
+           "Already exposed retrospective NON_PIT development only; no alpha/PIT/OOS claim.",
+           "FROZEN BASE/SHADOW next-open/i+11 30bps model-only results, independent opportunities.","",
+           "| Source cohort | Arm | Scheduled | Eligible | NULL | Mean net on eligible only | Max concurrent | Eligible with overlaps |",
+           "|---|---|---:|---:|---:|---:|---:|---:|"]
+    for cohort in report["cohorts"]:
         for arm in ("BASE","SHADOW"):
             s=cohort["arms"][arm]["summary"]
-            out.append(f"| {cohort['source_id']} | {arm} | {s['scheduled_opportunity_denominator']} | {s['modeled_selected_count']} | {s['skipped_occupied_or_tie_count']} | {s['ineligible_null_count']} | {s['terminal_realized_cash_equity']} | {s['realized_only_max_drawdown']} | {s['time_exposure_fraction']} |")
-    out.extend(["", "No cross-month equity curve or statistical uplift inferred.",
-                "Full provenance, tie skips, NULL and original reasons are retained in private receipts.",
-                "Scientific acceptance deferred; no G0, holdout, paper/live or orders.", ""])
-    return "\n".join(out)
+            lines.append(f"| {cohort['source_id']} | {arm} | {s['scheduled_pair_denominator']} | {s['complete_modeled_count']} | {s['null_or_ineligible_count']} | {s['modeled_net_mean_complete_only']} | {s['max_simultaneous_eligible_opportunities']} | {s['eligible_opportunities_with_overlap']} |")
+    lines.extend(["","Overlapping signals are counted as dependent research opportunities, NOT simultaneously funded positions.",
+                  "No exploratory strategy promotion, no real execution, no G0, holdout or scientific acceptance.",""])
+    return "\n".join(lines)
