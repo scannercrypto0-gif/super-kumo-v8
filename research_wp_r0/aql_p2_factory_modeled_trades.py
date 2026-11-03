@@ -36,8 +36,7 @@ def _frozen_policy(prereg, cost_model):
     spec = prereg.get("full_protocol")
     if not isinstance(spec, dict) or spec.get("schema") != "aql.p2.breakout-policy.v1":
         fail("MISSING_FROZEN_FULL_TRADE_POLICY")
-    if (digest(spec) != prereg.get("preregistration_sha256")
-        or spec.get("trial_id") != prereg.get("trial_id")):
+    if digest(spec)!=prereg.get("preregistration_sha256") or spec.get("trial_id")!=prereg.get("trial_id"):
         fail("FROZEN_POLICY_SPEC_DIGEST_MISMATCH")
     if (spec.get("modeled_entry") != "open[i+1], requires finalized same-cohort bar; NO_ACTUAL_FILL"
         or spec.get("modeled_exit") != "open[i+11], requires finalized same-cohort bar; NO_ACTUAL_FILL"
@@ -121,22 +120,72 @@ def _validate_pair_arms(pairs, decisions):
     return got
 
 
-def _bar_at(bar, cutoff, offset):
+def execution_contract():
+    return {"schema":"aql.p2.factory.ten-bar-execution-contract.v1",
+        "trade_rule":TRADE_RULE,"entry_offset":0,"exit_offset":10,
+        "cost_method":"FROZEN_ADDITIVE_RETURNS_NORMALIZED_TO_RAW_ENTRY",
+        "fee_entry_return":"0.001","fee_exit_return":"0.001",
+        "slippage_entry_return":"0.0005","slippage_exit_return":"0.0005",
+        "missingness":"INELIGIBLE_OR_UNKNOWN_NULL_NOT_ZERO_NO_CROSS_COHORT_FILL",
+        "source":"UNCHANGED_ORIGINAL_WINDOWS_PLUS_SEPARATE_AUTHENTICATED_SOURCE_ROWS_FOR_OPEN",
+        "scope":"RETROSPECTIVE_NON_PIT_MODEL_ONLY_DEPENDENT_OVERLAPPING_OPPORTUNITIES"}
+
+
+def _source_opens(rows, schedule, prereg):
+    if rows is None:
+        return None  # backward-compatible explicit TEST_ONLY fixtures with open in window
+    source=schedule["source"]; spec=prereg["full_protocol"]
+    if digest(spec)!=schedule["protocol"]["preregistration_sha256"]:
+        fail("FULL_FROZEN_PROTOCOL_DIGEST_MISMATCH")
+    pin=spec["source_pins"][source["source_id"]]
+    if len(rows)!=schedule["source_bar_count"] or not rows:
+        fail("SOURCE_ROW_DENOMINATOR")
+    h=sha256(); result={}
+    for i,r in enumerate(rows):
+        if (r.get("dataset_id")!=source["source_id"]
+            or r.get("source_archive_sha256")!=source["source_package_sha256"]
+            or r.get("open_ms")!=pin["start_ms"]+i*BAR_MS
+            or r.get("close_ms")!=r["open_ms"]+BAR_MS-1
+            or r.get("is_final") is not True
+            or r.get("finality")!="ARCHIVED_CLOSED_INTERVAL"
+            or any(r.get(k) is not None for k in ("historical_known_at_ms","historical_receipt_ms","historical_publication_ms"))):
+            fail("SOURCE_ROW_IDENTITY_GRID_OR_FINALITY")
+        def raw(obj):
+            return (json.dumps(obj,sort_keys=True,separators=(",",":"),ensure_ascii=False,allow_nan=False)+"\n").encode()
+        if sha256(raw({k:v for k,v in r.items() if k!="bar_sha256"})).hexdigest()!=r.get("bar_sha256"):
+            fail("SOURCE_ROW_CONTENT_HASH_MISMATCH")
+        h.update(raw(r));result[r["open_ms"]]=r
+    if (rows[-1]["close_ms"]+1!=pin["end_exclusive_ms"]
+        or h.hexdigest()!=source.get("normalized_sha256")
+        or h.hexdigest()!=pin.get("dataset_normalized_sha256")):
+        fail("SOURCE_NORMALIZED_OR_COHORT_DRIFT")
+    return result
+
+
+def _bar_at(bar, cutoff, offset, source_opens=None):
     if not isinstance(bar, dict) or not hash_ok(bar.get("content_sha256")):
         fail("UNPINNED_TRADE_BAR")
     if (bar.get("open_ms") != cutoff + BAR_MS * offset
         or bar.get("close_ms") != cutoff + BAR_MS * (offset + 1) - 1):
         fail("TRADE_BAR_TIME_OR_COHORT_MISMATCH")
-    op, hi, lo, cl = [dec(bar.get(k)) for k in ("open", "high", "low", "close")]
+    op_value=bar.get("open")
+    if source_opens is not None:
+        r=source_opens.get(bar["open_ms"])
+        if (r is None or r.get("bar_sha256")!=bar["content_sha256"]
+            or any(r.get(k)!=bar.get(k) for k in ("open_ms","close_ms","high","low","close"))
+            or (op_value is not None and op_value!=r.get("open"))):
+            fail("TRADE_WINDOW_OR_SOURCE_OPEN_DRIFT")
+        op_value=r.get("open")
+    op=dec(op_value)
+    hi,lo,cl=[dec(bar.get(k)) for k in ("high","low","close")]
     if not (Decimal(0) < lo <= op <= hi and lo <= cl <= hi):
         fail("BAD_TRADE_BAR_OHLC")
     return op
 
 
 def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decisions,
-                               *, provenance_verified=False, prereg_time_verified=False,
-                               source_proof_sha256=None, prereg_anchor_raw_sha256=None,
-                               windows_delivery_receipt_sha256=None):
+                               *, provenance_verified=False, prereg_time_verified=False, source_rows=None,
+                               source_proof_sha256=None, prereg_anchor_raw_sha256=None, windows_delivery_receipt_sha256=None):
     """Produce fixed-denominator modeled next-open/ten-bar artifacts, no scientific acceptance.
 
     Inputs are the exact unchanged genuine Core handoff and independent Work
@@ -149,14 +198,14 @@ def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decis
     _frozen_policy(prereg, cost_model)
     if provenance_verified is not True or prereg_time_verified is not True:
         fail("INDEPENDENT_SOURCE_AND_TIME_ATTESTATION_REQUIRED")
-    if (source_proof_sha256 != WORK_SOURCE_PROOF_SHA
-        or prereg_anchor_raw_sha256 != CORE_PREOUTCOME_ANCHOR_RAW_SHA
-        or windows_delivery_receipt_sha256 != WORK_WINDOWS_DELIVERY_RECEIPT_SHA):
+    if (source_proof_sha256!=WORK_SOURCE_PROOF_SHA or prereg_anchor_raw_sha256!=CORE_PREOUTCOME_ANCHOR_RAW_SHA
+        or windows_delivery_receipt_sha256!=WORK_WINDOWS_DELIVERY_RECEIPT_SHA):
         fail("PINNED_EXTERNAL_PROOF_RECEIPT_MISMATCH")
     if total_cost_bps != Decimal(30):
         fail("COST_BPS_MISMATCH")
     pairs = validate_schedule(schedule)
     arms = _validate_pair_arms(pairs, arm_decisions)
+    source_opens=_source_opens(source_rows,schedule,prereg)
     # Reuse the ALREADY DELIVERED complete real 4/24/72h consumer, including
     # independent missingness, window contiguity and arm-identity guards.
     descriptive = prepare_real_development(
@@ -202,7 +251,7 @@ def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decis
             or len(bs) >= 16):
             fail("BAD_CENSORED_WINDOW")
         for i, bar in enumerate(bs):
-            _bar_at(bar, cutoff, i)
+            _bar_at(bar, cutoff, i, source_opens)
         rows = {}
         for name in ("BASE", "SHADOW"):
             d = arms[(pid, name)]
@@ -218,9 +267,15 @@ def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decis
                 "modeled_trade_availability": d["modeled_trade_availability"],
                 "entry_open_ms": entry_ms, "exit_open_ms": exit_ms,
                 "entry_open": None, "exit_open": None,
+                "entry_availability":"COMPLETE" if len(bs)>0 else "UNKNOWN",
+                "exit_availability":"COMPLETE" if len(bs)>10 else "UNKNOWN",
+                "censored":status=="UNKNOWN" and len(bs)<11,
                 "modeled_gross_return": None, "modeled_net_return": None,
                 "holding_period_bars": 10, "modeled_trade_mfe": None,
                 "modeled_trade_mae": None,
+                "fee_entry_return": None, "fee_exit_return": None,
+                "slippage_entry_return": None, "slippage_exit_return": None,
+                "modeled_gross_pnl_per_base_unit":None,"modeled_net_pnl_per_base_unit":None,
                 "fee_bps": "20", "slippage_bps": "10",
                 "cost_class": "MODEL_ONLY_NOT_EXECUTION",
                 "status": "INELIGIBLE" if status in ("NO_SIGNAL", "REJECTED") else
@@ -235,7 +290,7 @@ def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decis
                     fail("FROZEN_TRADE_ENTRY_EXIT_TIME_DRIFT")
                 if len(bs) < 11:
                     fail("ELIGIBLE_TRADE_MISSING_EXIT_BAR")
-                entry, exit_ = (_bar_at(bs[j], cutoff, j) for j in (0, 10))
+                entry, exit_ = (_bar_at(bs[j], cutoff, j, source_opens) for j in (0, 10))
                 gross = exit_ / entry - 1  # Core strategy is LONG only
                 net = gross - total_cost_bps / Decimal(10000)
                 # Exactly the 10 HELD completed bars [i+1..i+10] plus
@@ -247,7 +302,11 @@ def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decis
                 mae = min(min(held_lows), exit_) / entry - 1
                 row.update(entry_open=str(entry), exit_open=str(exit_),
                            modeled_gross_return=str(gross), modeled_net_return=str(net),
-                           modeled_trade_mfe=str(mfe), modeled_trade_mae=str(mae))
+                           modeled_trade_mfe=str(mfe), modeled_trade_mae=str(mae),
+                           fee_entry_return="0.001",fee_exit_return="0.001",
+                           slippage_entry_return="0.0005",slippage_exit_return="0.0005",
+                           modeled_gross_pnl_per_base_unit=str(exit_-entry),
+                           modeled_net_pnl_per_base_unit=str((exit_-entry)-entry*Decimal("0.003")))
             elif status == "UNKNOWN":
                 if entry_ms != cutoff or exit_ms is not None:
                     fail("UNKNOWN_EXIT_TIME_CONTRACT_MISMATCH")
@@ -296,11 +355,11 @@ def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decis
         "source_id": schedule["source"]["source_id"],
         "source_package_sha256": schedule["source"]["source_package_sha256"],
         "source_schedule_sha256": schedule["artifact_sha256"],
-        "core_frozen_policy_head_sha": CORE_BREAKOUT_HEAD_SHA,
-        "source_authentication_receipt_sha256": source_proof_sha256,
-        "prereg_anchor_raw_sha256": prereg_anchor_raw_sha256,
-        "windows_delivery_receipt_sha256": windows_delivery_receipt_sha256,
-        "external_attestation_semantics": "CALLER_MUST_INDEPENDENTLY_VALIDATE_BYTES_AND_GITHUB_TIMESTAMP; PINS_ALONE_NOT_PROOF",
+        "core_frozen_policy_head_sha":CORE_BREAKOUT_HEAD_SHA,
+        "source_authentication_receipt_sha256":source_proof_sha256,
+        "prereg_anchor_raw_sha256":prereg_anchor_raw_sha256,
+        "windows_delivery_receipt_sha256":windows_delivery_receipt_sha256,
+        "external_attestation_semantics":"CALLER_MUST_INDEPENDENTLY_VALIDATE_BYTES_AND_GITHUB_TIMESTAMP; PINS_ALONE_NOT_PROOF",
         "descriptive_4_24_72h_artifact_sha256": descriptive["artifact_sha256"],
         "descriptive_coverage_by_horizon": descriptive["coverage_by_horizon"],
         "preregistration_artifact_sha256": prereg["artifact_sha256"],
@@ -314,6 +373,7 @@ def build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decis
         "paired_delta_effect_interpretation": "SAME_POLICY_ENTRY_EXIT_ON_BOTH_ELIGIBLE_PAIRS; FILTERED_EXCLUSIONS_ARE_NULL_NOT_ZERO_RETURNS",
         "modeled_exit_spec": TRADE_RULE,
         "modeled_cost_round_trip_bps": "30",
+        "execution_contract":execution_contract(),"execution_contract_sha256":digest(execution_contract()),
         "effect_status": "DESCRIPTIVE_ONLY_NO_STATISTICAL_OR_ALPHA_CLAIM",
         "execution_status": "NOT_OBSERVED",
         "pit_status": "NOT_ATTESTED", "oos_status": "NOT_ATTESTED",
@@ -335,3 +395,23 @@ def canonical_receipt_bytes(report):
 def raw_receipt_sha256(report):
     """Raw canonical serialized file digest (distinct from artifact_sha256)."""
     return sha256(canonical_receipt_bytes(report)).hexdigest()
+
+
+def render_research_report(results):
+    lines=["# ATLAS P2 modeled ten-bar development research", "",
+        "RETROSPECTIVE_NON_PIT / MODEL_ONLY. Entry open[i+1], exit open[i+11].",
+        "Fees0.10% + slippage0.05% per side, frozen additive returns normalized to raw entry; separate component fields.",
+        "One base unit per eligible overlapping opportunity; no feasible portfolio/equity, actual fills or execution.",
+        "4/24/72h descriptive outcomes remain separate. Previously exposed development data; regime UNKNOWN without source classification.","",
+        "| Cohort | Arm | Scheduled | Eligible complete | NULL | Mean gross return | Mean net return | Positive net |",
+        "|---|---|---:|---:|---:|---:|---:|---:|"]
+    for result in results:
+        for arm in ("BASE","SHADOW"):
+            slots=[r for r in result["modeled_trades"] if r["arm"]==arm]
+            valid=[r for r in slots if r["modeled_net_return"] is not None]
+            avg=lambda key:str(sum(dec(r[key]) for r in valid)/len(valid)) if valid else None
+            lines.append(f"| {result['source_id']} | {arm} | {len(slots)} | {len(valid)} | {len(slots)-len(valid)} | {avg('modeled_gross_return')} | {avg('modeled_net_return')} | {sum(dec(r['modeled_net_return'])>0 for r in valid)} |")
+        lines.extend(["",f"{result['source_id']}: matched complete pairs={result['both_arms_modeled_complete_pairs']}; common-pair deltas are descriptive, excluded-arm returns remain NULL.",
+          "Conditional arm means describe different selected populations; no causal uplift, statistical significance or alpha is established.",
+          f"Artifact SHA256: {result['artifact_sha256']}",""])
+    return "\n".join(lines+["Independent scientific acceptance DEFERRED; no holdout/OOS/PIT/G0/trading approval.",""])

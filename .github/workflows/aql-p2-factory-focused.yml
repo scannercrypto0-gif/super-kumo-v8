@@ -9,6 +9,7 @@ on:
       - 'tests/test_aql_p2_factory_core_handshake.py'
       - 'tests/test_aql_p2_factory_real_development.py'
       - 'tests/test_aql_p2_factory_modeled_trades.py'
+      - 'tests/test_aql_p2_factory_source_open_bridge.py'
       - '.github/workflows/aql-p2-factory-focused.yml'
   pull_request:
     paths:
@@ -19,6 +20,7 @@ on:
       - 'tests/test_aql_p2_factory_core_handshake.py'
       - 'tests/test_aql_p2_factory_real_development.py'
       - 'tests/test_aql_p2_factory_modeled_trades.py'
+      - 'tests/test_aql_p2_factory_source_open_bridge.py'
       - '.github/workflows/aql-p2-factory-focused.yml'
   workflow_dispatch:
 jobs:
@@ -47,6 +49,23 @@ jobs:
           python -m unittest discover -s tests -p 'test_aql_p2_factory_core_handshake.py' -v
           python -m unittest discover -s tests -p 'test_aql_p2_factory_real_development.py' -v
           python -m unittest discover -s tests -p 'test_aql_p2_factory_modeled_trades.py' -v
+          python -m unittest discover -s tests -p 'test_aql_p2_factory_source_open_bridge.py' -v
+      - name: Anchor frozen ten-bar implementation before private trade evaluation
+        run: |
+          git rev-parse HEAD
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from research_wp_r0.aql_p2_factory_modeled_trades import execution_contract, digest
+          contract = execution_contract()
+          Path('ten-bar-execution-anchor.json').write_text(json.dumps({'execution_contract':contract,'execution_contract_sha256':digest(contract)},sort_keys=True)+'\n')
+          print('TRADE_EXECUTION_CONTRACT_SHA256='+digest(contract))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2-ten-bar-execution-anchor
+          path: ten-bar-execution-anchor.json
+          retention-days: 90
       - name: Generate machine-readable TEST_ONLY handshake receipt
         env:
           PYTHONPATH: .
