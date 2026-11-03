@@ -597,6 +597,7 @@ def custody_range(library,dataset_id,start_ms,end_exclusive_ms,
             "available_bar_count":len(bars),"required_bar_count":len(expected),
             "missing_bar_opens":missing,
             "availability_class":"CONFIRMED_ONLY" if confirmed_only
+                                 else "SYNTHETIC_TEST" if any(b.source == SourceType.SYNTHETIC for b in bars)
                                  else "RETROSPECTIVE_NOT_PIT",
             "source_confidence":"LOCAL_CHECKSUM_AND_PIN_ONLY",
             "bars":[{"bar_open":b.bar_open,"bar_close":b.bar_close,
