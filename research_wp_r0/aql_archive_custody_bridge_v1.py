@@ -219,6 +219,13 @@ def _vault_records(raw, spec, meta):
             and type(item.get("logical_identity_key")) is str
             and bool(HEX.fullmatch(item["logical_identity_key"])),
             "VAULT_OBJECT_IDENTITY_OR_FORMAT")
+    identity_fields = ("vendor", "instrument", "market", "interval",
+                       "coverage_start_utc", "coverage_end_utc",
+                       "source_format", "format_version")
+    require(all(type(item.get(k)) is str and bool(item[k]) for k in identity_fields)
+            and item["logical_identity_key"] ==
+                digest({k: item[k] for k in identity_fields}),
+            "VAULT_LOGICAL_IDENTITY_MISMATCH")
     require(item.get("evidence_class") in
             ("DIRECT_DOWNLOAD","VENDOR_ARCHIVE","MANUAL_EXPORT",
              "FIXTURE_SYNTHETIC","UNKNOWN"), "VAULT_EVIDENCE_CLASS")
@@ -229,7 +236,8 @@ def _vault_records(raw, spec, meta):
     generation = item.get("correction_generation")
     require(type(generation) is int and generation >= 0
             and spec["version"] == generation + 1
-            and (generation == 0 or
+            and (generation == 0 and item.get("parent_content_sha256") in (None,"")
+                 or generation > 0 and
                  item.get("parent_content_sha256") == spec["parent_source_sha256"]),
             "VAULT_CORRECTION_LINEAGE")
     def utc_ms(value):
@@ -242,6 +250,8 @@ def _vault_records(raw, spec, meta):
     require(utc_ms(item.get("coverage_start_utc")) == spec["start_ms"]
             and utc_ms(item.get("coverage_end_utc")) == spec["end_exclusive_ms"],
             "VAULT_COVERAGE_SCOPE")
+    require(utc_ms(item.get("admitted_at_utc")) <= spec["as_of_ms"],
+            "FUTURE_VAULT_ADMISSION")
     try:
         body = raw.decode("utf-8-sig")
     except UnicodeError as exc:
