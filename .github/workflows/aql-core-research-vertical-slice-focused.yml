@@ -1,0 +1,36 @@
+name: AQL Core Research Vertical Slice C4 (TEST ONLY)
+on:
+  push:
+    branches:
+      - aql/historical-archive-custody-bridge-offline-20261103
+    paths:
+      - 'research_wp_r0/aql_core_research_query_seam_v1.py'
+      - 'research_wp_r0/aql_archive_custody_bridge_v1.py'
+      - 'research_wp_r0/historical_library.py'
+      - 'tests/test_aql_core_research_query_seam_v1.py'
+      - 'tests/test_aql_archive_custody_bridge_v1.py'
+      - '.github/workflows/aql-core-research-vertical-slice-focused.yml'
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_core_research_query_seam_v1.py'
+      - 'research_wp_r0/aql_archive_custody_bridge_v1.py'
+      - 'research_wp_r0/historical_library.py'
+      - 'tests/test_aql_core_research_query_seam_v1.py'
+      - 'tests/test_aql_archive_custody_bridge_v1.py'
+      - '.github/workflows/aql-core-research-vertical-slice-focused.yml'
+  workflow_dispatch:
+jobs:
+  offline-contract-and-bridge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: C3 focused seam negatives + existing G6 integration baseline
+        run: |
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_core_research_query_seam_v1.py' -v
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_archive_custody_bridge_v1.py' -v
