@@ -39,6 +39,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_aql_p2_factory_core_handshake.py' -v
       - name: Generate machine-readable TEST_ONLY handshake receipt
         env:
+          PYTHONPATH: .
           AQL_P2_CORE_FILE: _core_p2_pinned/research_wp_r0/aql_p2_core_producer.py
         run: |
           python tests/test_aql_p2_factory_core_handshake.py --emit-receipt _p2_test_only_receipt/factory-core-handshake.json
