@@ -457,6 +457,102 @@ class TestFix3ChronologicalStateMachine:
         )
         report.assert_denominator()
 
+    def test_overlap_rejected_fill_has_zero_entry_and_financial_effects(self):
+        """Direct negative invariant (Audit Gate B):
+        Each POSITION_ALREADY_OPEN[_AT_DECISION] rejection must produce ZERO
+        entry/exit price and fee fields — no financial effect whatsoever.
+        Denominator must be preserved with REJECTED counted.
+
+        Covers both reason codes:
+        - POSITION_ALREADY_OPEN_AT_DECISION: decision-time rejection (held_position
+          check fires before entry_bar lookup)
+        - POSITION_ALREADY_OPEN: event-time rejection (entry bar falls within held window)
+        """
+        # Bars 0-19: flat — no breakout signal
+        bars = [_make_bar(i, high_=101.0, close_=100.5, low_=99.0) for i in range(20)]
+        # Bar 20: first breakout close=112 > max(prior 20 highs=101) → TRIGGERED
+        bars.append(_make_bar(20, open_=100.0, high_=115.0, low_=99.0, close_=112.0))
+        # Bars 21-39: continuously climbing, no exit → subsequent ARMED signals rejected
+        for i in range(21, 40):
+            bars.append(_make_bar(i, open_=115.0, high_=120.0 + i, low_=114.0,
+                                  close_=118.0 + i))
+
+        _, _, opps, fills, state, report = _run_full_pipeline(bars)
+
+        # 1. There must be a fill that opened a position (TRIGGERED = opened+closed;
+        #    OPEN_UNRESOLVED = opened but not yet closed at window end).
+        #    Either state confirms a real entry happened that would block the next signal.
+        opened = [
+            f for f in fills
+            if f.signal_state in ("TRIGGERED", "OPEN_UNRESOLVED")
+            and f.entry_price_gross is not None
+        ]
+        assert len(opened) >= 1, (
+            "Scenario requires at least one fill that opened a position "
+            "(TRIGGERED or OPEN_UNRESOLVED with entry_price_gross)"
+        )
+
+        # 2. Every POSITION_ALREADY_OPEN[_AT_DECISION] fill must have ALL
+        #    price/financial fields set to None — zero entry, zero financial effect.
+        overlap_rejected = [
+            f for f in fills
+            if f.signal_state == "REJECTED"
+            and f.reason_code in (
+                "POSITION_ALREADY_OPEN",
+                "POSITION_ALREADY_OPEN_AT_DECISION",
+            )
+        ]
+        assert len(overlap_rejected) >= 1, (
+            "Climbing bars must produce at least one overlap-rejected fill"
+        )
+        for rf in overlap_rejected:
+            assert rf.entry_bar_open_ms is None,   f"entry_bar_open_ms must be None for {rf.opportunity_id}"
+            assert rf.entry_price_gross is None,   f"entry_price_gross must be None for {rf.opportunity_id}"
+            assert rf.entry_price_net is None,     f"entry_price_net must be None for {rf.opportunity_id}"
+            assert rf.entry_fee is None,           f"entry_fee must be None for {rf.opportunity_id}"
+            assert rf.exit_bar_open_ms is None,    f"exit_bar_open_ms must be None for {rf.opportunity_id}"
+            assert rf.exit_price_gross is None,    f"exit_price_gross must be None for {rf.opportunity_id}"
+            assert rf.exit_price_net is None,      f"exit_price_net must be None for {rf.opportunity_id}"
+            assert rf.exit_fee is None,            f"exit_fee must be None for {rf.opportunity_id}"
+            assert rf.gross_return is None,        f"gross_return must be None for {rf.opportunity_id}"
+            assert rf.net_return is None,          f"net_return must be None for {rf.opportunity_id}"
+
+        # 3. Denominator must include REJECTED and balance
+        assert "REJECTED" in report.denominator_counts, (
+            "REJECTED must appear in denominator_counts"
+        )
+        report.assert_denominator()
+
+    def test_no_overlap_no_position_already_open_rejection(self):
+        """Non-overlap negative control (Audit Gate B):
+        When positions do NOT overlap — exit fires before any subsequent ARMED decision —
+        zero POSITION_ALREADY_OPEN or POSITION_ALREADY_OPEN_AT_DECISION rejections
+        must appear. Confirms the rejection is scoped to actual overlap, not spurious.
+        """
+        # Bars 0-19: flat — no breakout signal
+        bars = [_make_bar(i, high_=101.0, close_=100.5, low_=99.0) for i in range(20)]
+        # Bar 20: first breakout close=112 → TRIGGERED, position opens at bar 21
+        bars.append(_make_bar(20, open_=100.0, high_=115.0, low_=99.0, close_=112.0))
+        # Bars 21-39: sharply declining — close=95 < prior 10-bar low (99).
+        # Exit triggers at bar 21 (close 95 < low 99), executes at bar 22 open.
+        # No new breakout signal fires because close stays well below any prior 20-bar high.
+        for i in range(21, 40):
+            bars.append(_make_bar(i, open_=99.0, high_=100.0, low_=94.0, close_=95.0))
+
+        _, _, _, fills, _, _ = _run_full_pipeline(bars)
+
+        position_rejected = [
+            f for f in fills
+            if f.reason_code in (
+                "POSITION_ALREADY_OPEN",
+                "POSITION_ALREADY_OPEN_AT_DECISION",
+            )
+        ]
+        assert len(position_rejected) == 0, (
+            f"Non-overlapping scenario must produce zero POSITION_ALREADY_OPEN rejections, "
+            f"got {len(position_rejected)}: {[(f.opportunity_id, f.reason_code) for f in position_rejected]}"
+        )
+
     def test_insufficient_cash_rejected(self):
         """INSUFFICIENT_CASH rejection when simulated cash drops below entry cost.
 
