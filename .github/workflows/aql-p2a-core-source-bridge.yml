@@ -1,0 +1,50 @@
+name: P2-A pinned Core source bridge focused
+on:
+  push:
+    branches: [work/aql-p2a-public-intake-20261103]
+    paths:
+      - research_wp_r0/aql_p2a_core_source_bridge.py
+      - tests/test_aql_p2a_core_source_bridge.py
+      - .github/workflows/aql-p2a-core-source-bridge.yml
+  pull_request:
+    paths:
+      - research_wp_r0/aql_p2a_core_source_bridge.py
+      - tests/test_aql_p2a_core_source_bridge.py
+      - .github/workflows/aql-p2a-core-source-bridge.yml
+permissions:
+  contents: read
+jobs:
+  source-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: work
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 0842fc0a753ec6a3327c00c24e74908e8f6ca39c
+          path: core-source-pin
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Only new source bridge fixtures against actual unchanged Core API
+        working-directory: work
+        shell: bash
+        env:
+          AQL_P2_CORE_MODULE: ${{ github.workspace }}/core-source-pin/research_wp_r0/aql_p2_core_producer.py
+        run: |
+          set -euo pipefail
+          mkdir bridge-ci-evidence
+          git rev-parse HEAD | tee bridge-ci-evidence/work-sha.txt
+          git -C ../core-source-pin rev-parse HEAD | tee bridge-ci-evidence/core-sha.txt
+          python -m unittest -v tests.test_aql_p2a_core_source_bridge 2>&1 | tee bridge-ci-evidence/tests.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p2a-core-source-bridge-TEST_ONLY
+          path: work/bridge-ci-evidence/
+          retention-days: 7
