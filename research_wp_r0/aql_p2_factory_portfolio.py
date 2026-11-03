@@ -37,7 +37,7 @@ def frozen_option_c_policy():
         "approval_status": "OWNER_APPROVED_PROVISIONAL",
         "policy_rule": RULE,
         "source": "EXISTING_PINNED_FACTORY_TEN_BAR_REPORTS_ONLY",
-        "eligibility": "EACH_TRIGGGERED_MODELED_COMPLETE_LONG_INDEPENDENTLY",
+        "eligibility": "EACH_TRIGGERED_MODELED_COMPLETE_LONG_INDEPENDENTLY",
         "overlaps": "KEEP_EVERY_ELIGIBLE_OPPORTUNITY_NO_ARBITRATION",
         "capital_account": "NONE",
         "allocation_budget": "NONE",
