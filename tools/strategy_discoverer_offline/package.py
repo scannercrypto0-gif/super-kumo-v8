@@ -114,7 +114,10 @@ class CandidatePackager:
         attempt_count = gen_result.submitted_count
 
         for (strategy_def, candidate_id) in gen_result.candidates:
-            attempt_id = f"{candidate_id}-{uuid.uuid4().hex[:8]}"
+            # Deterministic attempt_id derived from candidate + search plan content.
+            # uuid4() was replaced (C-03 fix) to ensure idempotent replay.
+            _id_source = (candidate_id + self._search_plan.plan_digest + self._family.family_id).encode()
+            attempt_id = f"{candidate_id}-{hashlib.sha256(_id_source).hexdigest()[:16]}"
 
             # STEP 1: Register attempt in ledger BEFORE packaging
             try:

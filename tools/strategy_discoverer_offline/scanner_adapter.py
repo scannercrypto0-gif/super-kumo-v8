@@ -195,9 +195,16 @@ class ScannerQuarantineAdapter:
             quarantine = ScannerQuarantineStatus.UNKNOWN_DEFERRED.value
             evidence_class = EvidenceClass.UNKNOWN_UNVERIFIED.value
         else:
-            # Future path: after P0 resolution, a separate policy review is needed
-            quarantine = ScannerQuarantineStatus.UNKNOWN_DEFERRED.value
-            evidence_class = EvidenceClass.UNKNOWN_UNVERIFIED.value
+            # C-04 fix: dead code replaced with explicit guard.
+            # This path must NOT be activated silently. P0 remediation requires
+            # a dedicated policy review, new evidence-class definitions, and
+            # explicit owner approval before quarantine can be lifted.
+            raise NotImplementedError(
+                "P0 remediation path is not yet implemented. "
+                "Set _SCANNER_P0_UNRESOLVED=False only after explicit owner "
+                "approval and a dedicated policy review. "
+                "AQL ref: scanner_adapter.py C-04"
+            )
 
         evidence = NominationEvidenceV1.build(
             schema_version="aql.discoverer.nomination-evidence.v1",

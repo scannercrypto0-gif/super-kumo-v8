@@ -162,7 +162,10 @@ _FAMILY_SPEC_DATA: dict = {
                  {"period": 20, "deviations": 2.0},
                  {"period": _INT_C, "deviations": _DEV_C}),
         ],
-        "entry": _gt(_ref("bbands", "middle"), _ref("bbands", "lower")),
+        # C-01 fix: original middle>lower was always True by BBands definition.
+        # Replacement: middle-band falling (lag-1 vs lag-0) signals potential
+        # mean-reversion entry — a genuine, falsifiable market condition.
+        "entry": _gt(_ref("bbands", "middle", lag=1), _ref("bbands", "middle")),
         "exit":  _gt(_ref("bbands", "upper"), _ref("bbands", "middle")),
         "axes": {
             "bbands.period":     [10, 20, 30],

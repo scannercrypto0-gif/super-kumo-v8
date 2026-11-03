@@ -124,12 +124,16 @@ class LedgerEntry:
             "nomination_digest": self.nomination_digest,
             "state": self.state,
             "reason": self.reason,
-            "wall_clock_ns": self.wall_clock_ns,
         }
+        # NOTE: wall_clock_ns is intentionally excluded from digest — it is
+        # observational metadata only; including it would make the digest
+        # non-deterministic and break idempotent replay (C-02 fix).
 
     def to_dict(self) -> dict:
         d = self._fields_for_digest()
         d["entry_digest"] = self.entry_digest
+        # wall_clock_ns is observational metadata — not in digest, but persisted for audit
+        d["wall_clock_ns"] = self.wall_clock_ns
         return d
 
     def verify(self) -> bool:
@@ -382,7 +386,8 @@ class DiscovererLedger:
                 "nomination_digest": nomination_digest,
                 "state": state.value,
                 "reason": reason,
-                "wall_clock_ns": wall_clock_ns,
+                # wall_clock_ns intentionally excluded (C-02 fix):
+                # observational metadata only — must not affect digest
             }),
         )
 
