@@ -1,6 +1,6 @@
 # AQL-P2-INTEGRATED-TRADE-001 — Factory frozen Breakout modeled-trade package
 
-**Status:** runnable Factory code and focused TEST_ONLY tests; separate Work-private real modeled-trade execution **NOT YET PERFORMED** at this delivery. Owner Option A #77/6602520077; integrated-build rule AQL-EXEC-01 #205/6602265245. Existing Draft Factory #222 ONLY; no merge/G0/holdout/orders, no strategy edits.
+**Status:** IMPLEMENTED + focused CI PASS + actual Work-private ten-bar execution completed at runtime `6683970b276dc91521199715dca187851aebfd19`; independent scientific acceptance DEFERRED. Feb173 BASE/153 SHADOW eligible complete; Aug130/103. Both deterministic receipts verified, all remaining slots NULL. Earlier readiness-only status is superseded by this actual execution. Owner Option A #77/6602520077; integrated-build rule AQL-EXEC-01 #205/6602265245. Existing Draft Factory #222 ONLY; no merge/G0/holdout/orders, no strategy edits.
 
 ## Reused, not rebuilt
 
@@ -10,9 +10,9 @@
 
 ## Public Factory API
 
-`research_wp_r0.aql_p2_factory_modeled_trades.build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decisions, *, provenance_verified, prereg_time_verified, source_proof_sha256, prereg_anchor_raw_sha256, windows_delivery_receipt_sha256)`
+`research_wp_r0.aql_p2_factory_modeled_trades.build_modeled_trade_package(schedule, prereg, cost_model, windows, arm_decisions, *, provenance_verified, prereg_time_verified, source_proof_sha256, prereg_anchor_raw_sha256, windows_delivery_receipt_sha256, source_rows=None)`
 
-`windows` are the existing Work 4/24/72h `source_window_sha256` self-pinned records, with original 15m `bars[]`. For each bar, the additional modeled-trade input is **the original source `open` decimal**; this must match the authenticated Work original bar, not be imputed from close/market reference. If the stored windows omit `open`, STOP with the precise missing field; Work may read the existing independently authenticated source record in its private runtime but must not fabricate an open or regenerate the universe. No new source download.
+`windows` are the existing Work 4/24/72h `source_window_sha256` self-pinned records, with original 15m `bars[]`. For each bar, the additional modeled-trade input is **the original source `open` decimal**; this must match the authenticated Work original bar, not be imputed from close/market reference. The original stored windows omit `open`. Pass `source_rows=` containing the separately authenticated original full cohort index rows. The consumer verifies canonical record/full normalized SHA, source/cohort/finality and joins each original window bar by time/hash/OHLC to obtain its source open. Keep original window dictionaries and source_window_sha256 unchanged; never enrich/reseal them or impute open from close. No new source download.
 
 **External attestation is mandatory.** Calling booleans with arbitrary values is NOT sufficient proof. Work must actually inspect and verify preserved private bytes and GitHub timing evidence, and pass these unchanged raw SHA identifiers:
 - Independent original source attestation receipt: `c224025885b5186732fa21755c0f3fa7042f03c44d19f1b566be454a31518b44`
@@ -52,6 +52,7 @@ from research_wp_r0.aql_p2_factory_modeled_trades import (
 report = build_modeled_trade_package(
     schedule, prereg, costs, windows, arms,
     provenance_verified=True, prereg_time_verified=True,
+    source_rows=original_authenticated_cohort_rows,
     source_proof_sha256=WORK_SOURCE_PROOF_SHA,
     prereg_anchor_raw_sha256=CORE_PREOUTCOME_ANCHOR_RAW_SHA,
     windows_delivery_receipt_sha256=WORK_WINDOWS_DELIVERY_RECEIPT_SHA,
@@ -64,6 +65,8 @@ print(raw_receipt_sha256(report))
 
 The sample path is **illustrative**, not a claim that the file or environment is present in Factory's session. Run twice on independently original inputs, with a new destination for the second receipt, compare raw SHA. Do not change Core/Work/Factory branches during actual private evaluation. If a field error occurs, publish only its exact minimal location/contract mismatch and STOP affected path; no fake outcome/receipt.
 
-Focused CI runs original 11 Factory lab + 9 pinned Core schedule handshake + 10 existing real-development readiness + additional modeled-trade negative/positive tests on exact Draft Factory HEAD. CI is **synthetic-only**, distinct from actual Work-private modeled-trade output; complete integrated checkpoint occurs when verified private receipt is returned.
+Focused CI runs 11 Factory lab + 9 pinned Core schedule handshake + 10 existing real-development readiness + 21 modeled-trade + 5 source-open bridge tests = 56 tests on exact Draft Factory HEAD. CI is **synthetic-only**, distinct from actual Work-private modeled-trade output; complete integrated checkpoint occurs when verified private receipt is returned.
 
-**Required next gate:** Work private execution *after exact new Factory HEAD CI passes*, then one consolidated technical Factory/Work handoff. Broad scientific Audit only when appropriate, per AQL-EXEC-01; no merge, G0, holdout, paper/live or trading.
+**Actual private receipts:** February rawSHA `a60a7ee3d22f0e58426cc9118344f41ab1e1fc2881895ba828f7e183e0a757b7`; August `2a6baf8960c144db9e9be5176edef5e5356575919533614928db3b55f675609c`; execution summary `071c8a7a775caf117687c18675fa186a946a7666ca96cb31c9090885d57869e4`. Original inputs and descriptive horizon artifact hashes unchanged. Runtime CI41628832085 passed56 tests and execution-contract metadata artifact13227540688 was created before first private ten-bar scoring. Post-runtime documentation changes do not change modeled computation. **Next gate:** independently authorized scientific review; this receipt is technical execution, not scientific acceptance. Broad scientific Audit only when appropriate, per AQL-EXEC-01; no merge, G0, holdout, paper/live or trading.
+
+Separate frozen modeled costs: fee_entry_return=.001, fee_exit_return=.001, slippage_entry_return=.0005, slippage_exit_return=.0005, only for complete eligible modeled trades. Cost and per-base-unit modeled PnL fields are NULL otherwise. Do not pool overlapping opportunities into portfolio/equity returns.
