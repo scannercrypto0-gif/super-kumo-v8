@@ -5,10 +5,12 @@ on:
       - 'research_wp_r0/aql_p2_factory_lab.py'
       - 'research_wp_r0/aql_p2_factory_real_development.py'
       - 'research_wp_r0/aql_p2_factory_modeled_trades.py'
+      - 'research_wp_r0/aql_p2_factory_portfolio.py'
       - 'tests/test_aql_p2_factory_lab.py'
       - 'tests/test_aql_p2_factory_core_handshake.py'
       - 'tests/test_aql_p2_factory_real_development.py'
       - 'tests/test_aql_p2_factory_modeled_trades.py'
+      - 'tests/test_aql_p2_factory_portfolio.py'
       - 'docs/research/p2a/factory-modeled-breakout-trades.md'
       - 'tests/test_aql_p2_factory_source_open_bridge.py'
       - '.github/workflows/aql-p2-factory-focused.yml'
@@ -17,10 +19,12 @@ on:
       - 'research_wp_r0/aql_p2_factory_lab.py'
       - 'research_wp_r0/aql_p2_factory_real_development.py'
       - 'research_wp_r0/aql_p2_factory_modeled_trades.py'
+      - 'research_wp_r0/aql_p2_factory_portfolio.py'
       - 'tests/test_aql_p2_factory_lab.py'
       - 'tests/test_aql_p2_factory_core_handshake.py'
       - 'tests/test_aql_p2_factory_real_development.py'
       - 'tests/test_aql_p2_factory_modeled_trades.py'
+      - 'tests/test_aql_p2_factory_portfolio.py'
       - 'docs/research/p2a/factory-modeled-breakout-trades.md'
       - 'tests/test_aql_p2_factory_source_open_bridge.py'
       - '.github/workflows/aql-p2-factory-focused.yml'
@@ -52,6 +56,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_aql_p2_factory_real_development.py' -v
           python -m unittest discover -s tests -p 'test_aql_p2_factory_modeled_trades.py' -v
           python -m unittest discover -s tests -p 'test_aql_p2_factory_source_open_bridge.py' -v
+          python -m unittest discover -s tests -p 'test_aql_p2_factory_portfolio.py' -v
       - name: Anchor frozen ten-bar implementation before private trade evaluation
         run: |
           git rev-parse HEAD
