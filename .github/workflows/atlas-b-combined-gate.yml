@@ -74,7 +74,6 @@ jobs:
           set -euo pipefail
           cp _pinned_core226/tests/test_aql_core_authorized_source_transfer_v1.py tests/
           echo "Only helper fixture imported by cross-PR Core tests"
-          PY
       - name: Check SHA-pinned ownership and code-only provenance
         run: |
           python - <<'PY'
