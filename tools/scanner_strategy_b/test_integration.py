@@ -360,7 +360,11 @@ class CoreSecretaryGate(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "FACTORY_HANDOFF_SOURCE_QUERY_DOMAIN"):
             prepare_factory_handoff(scan, pending.receipt(), wait.receipt(), **kwargs)
         forged = deepcopy(scan)
-        forged["payload"]["nominations"][0]["payload"]["status"] = "SELECTED"
+        original_nomination = forged["payload"]["nominations"][0]
+        original_nomination["payload"]["status"] = (
+            "SELECTED" if original_nomination["payload"]["status"] != "SELECTED"
+            else "REJECTED")
+        # Only reseal the outer run: the nested nomination seal MUST reject.
         forged = Frozen.build(forged["payload"]).receipt()
         kwargs["expected_core253_sha256"] = self.local["query_sha256"]
         with self.assertRaisesRegex(ValueError, "FROZEN_DIGEST_DRIFT"):
