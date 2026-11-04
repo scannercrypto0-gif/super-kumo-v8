@@ -4,11 +4,15 @@ on:
     paths:
       - 'research_wp_r0/aql_factory_unified_backbone_v1.py'
       - 'tests/test_aql_factory_unified_backbone_v1.py'
+      - 'research_wp_r0/aql_factory_authorized_original_run_v1.py'
+      - 'tests/test_aql_factory_authorized_original_run_v1.py'
       - '.github/workflows/aql-factory-unified-backbone.yml'
   pull_request:
     paths:
       - 'research_wp_r0/aql_factory_unified_backbone_v1.py'
       - 'tests/test_aql_factory_unified_backbone_v1.py'
+      - 'research_wp_r0/aql_factory_authorized_original_run_v1.py'
+      - 'tests/test_aql_factory_authorized_original_run_v1.py'
       - '.github/workflows/aql-factory-unified-backbone.yml'
 jobs:
   factory-unified-backbone:
@@ -52,4 +56,6 @@ jobs:
           AQL_RAW211_PATH: ${{ github.workspace }}/_raw211
           AQL_WORK235_PATH: ${{ github.workspace }}/_work235
           AQL_WORK228_PATH: ${{ github.workspace }}/_work228
-        run: python -m unittest discover -s tests -p 'test_aql_factory_unified_backbone_v1.py' -v
+        run: |
+          python -m unittest discover -s tests -p 'test_aql_factory_unified_backbone_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_factory_authorized_original_run_v1.py' -v
