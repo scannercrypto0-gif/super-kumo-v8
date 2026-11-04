@@ -95,8 +95,12 @@ class AuthorizedTransferGate(unittest.TestCase):
         self.assertEqual(len(self.vault.manifest_entries()),1)
 
     def test_private_original_integrity_refusal_without_partial_vault(self):
-        with self.assertRaisesRegex(BackboneError,"AUTHORIZED_RETAINED_SHA_DRIFT"):
+        with self.assertRaisesRegex(BackboneError,
+                                    "AUTHORIZED_ORIGINAL_BYTES_MISSING_OR_SIZE_DRIFT"):
             self.runit(raw=self.raw+b"z")
+        changed=bytes([self.raw[0]^1])+self.raw[1:]
+        with self.assertRaisesRegex(BackboneError,"AUTHORIZED_RETAINED_SHA_DRIFT"):
+            self.runit(raw=changed)
         with self.assertRaisesRegex(BackboneError,"AUTHORIZED_PUBLISHER_CHECKSUM_DRIFT"):
             wrong=(self.witness["archive_sha256"]+"  wrong.zip\n").encode()
             wit={**self.witness,"checksum_sha256":SHA(wrong),"checksum_bytes":len(wrong)}
