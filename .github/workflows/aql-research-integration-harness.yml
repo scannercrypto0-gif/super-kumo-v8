@@ -7,48 +7,51 @@ on:
 permissions:
   contents: read
 jobs:
-  offline-contract-gate:
+  current-seam-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-      # Provision public pinned code only. Harness execution itself has no network API.
+          python-version: ${{ matrix.python }}
+      # Public pinned code provisioning only. Runtime audit hook denies network/children.
       - uses: actions/checkout@v4
         with:
-          ref: '58e423431cc639958736337a65db8a17bfdbaa85'
+          ref: 'c1104955ae92153221cbe93f26b62cc50bdeb28a'
           path: '.harness-pins/core'
       - uses: actions/checkout@v4
         with:
-          ref: '6b93abf975648d3ce5ee9c28c7b33c72686f4e6b'
+          ref: '6177da84ce67b3dc81ef759521c6b52ffa2132b3'
           path: '.harness-pins/factory'
       - uses: actions/checkout@v4
         with:
-          ref: '7d97b09c0c6ee2650a61d523acb8d8c771a99c46'
-          path: '.harness-pins/vault'
+          ref: 'b9c9ff8602e79c534402f44bce83c56ec2fa6bb9'
+          path: '.harness-pins/scanner'
       - uses: actions/checkout@v4
         with:
-          ref: '0f0c4377db7682187dca78b2c556b00ae1a81bab'
-          path: '.harness-pins/prior'
-      - name: One consolidated offline integration gate (TEST_ONLY)
+          ref: 'f2006c0e431690ccea8b0532095bf4f2a2dc88ba'
+          path: '.harness-pins/discoverer'
+      - name: One consolidated current-seam boundary gate (TEST_ONLY)
         run: |
-          python -m tools.research_integration_harness.gate \
-            --checkout history=. \
+          python -m tools.research_integration_harness.gate_v2 \
             --checkout core=.harness-pins/core \
             --checkout factory=.harness-pins/factory \
-            --checkout vault=.harness-pins/vault \
-            --checkout prior=.harness-pins/prior \
+            --checkout scanner=.harness-pins/scanner \
+            --checkout discoverer=.harness-pins/discoverer \
             --output gate-evidence
       - name: Preserve public TEST_ONLY evidence
         uses: actions/upload-artifact@v4
         with:
-          name: work-research-integration-TEST-ONLY-${{ github.event.pull_request.head.sha }}
+          name: work-current-seams-TEST-ONLY-${{ github.event.pull_request.head.sha }}-py${{ matrix.python }}
           path: |
             gate-evidence/
-            tools/research_integration_harness/fixtures/
+            tools/research_integration_harness/fixtures_v2/
           retention-days: 7
           if-no-files-found: error

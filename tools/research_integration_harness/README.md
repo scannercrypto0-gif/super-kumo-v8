@@ -1,5 +1,7 @@
 # AQL-WORK-RESEARCH-INTEGRATION-001 — offline integration delta
 
+Current continuation: [v2 current-seam delivery and contract matrix](SEAMS_V2.md), owner-dispatched #205/6623595590 (2026-11-04). The sections below preserve the original v1 evidence and reproduction. The scoped workflow now runs the v2 gate only.
+
 Owner dispatch: [#205/6604708623](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/205#issuecomment-6604708623).
 Baseline main `dbc191df72f4b4d1ebb7d490926dcad4325dac12`. Work owns only NEW
 `tools/research_integration_harness/**` and ONE new workflow
