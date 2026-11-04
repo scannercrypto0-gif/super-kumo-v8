@@ -103,12 +103,20 @@ def _sealed(value, key):
 
 
 def _vault_admit(vault, raw, pin, spec):
-    """Optional #211 existing RawVault API; no copied Vault implementation."""
+    """Pinned PR #211 RawVault: immutable per-generation content and lineage.
+
+    RawVault logical identity is write-once, so each corrected generation gets
+    a DISTINCT versioned logical identity. CorrectionLedger uses the stable
+    base-family identity, preserving the parent chain without identity rewrite.
+    The evidence is local bytes/integrity, NOT independent vendor publication.
+    """
     if vault is None:
-        return {"vault":"NOT_CONNECTED", "sha256":raw_sha(raw)}
+        return {"vault":"NOT_CONNECTED_CORE_STAGE_ONLY","sha256":raw_sha(raw),
+                "correction_ledger":"NOT_CONNECTED"}
     from datetime import datetime, timezone
     from tools.raw_vault_offline.schema import RawObjectMeta,logical_identity_key
-    values={
+    from tools.raw_vault_offline.corrections import CorrectionLedger
+    original={
         "vendor":"BINANCE_SPOT","instrument":spec["symbol"],
         "market":spec["market"],"interval":spec["interval"],
         "coverage_start_utc":datetime.fromtimestamp(
@@ -117,18 +125,29 @@ def _vault_admit(vault, raw, pin, spec):
             spec["end_exclusive_ms"]/1000, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "source_format":"ZIP_CSV","format_version":"BINANCE_NATIVE_MONTHLY_V1",
     }
-    lid=logical_identity_key(**values)
-    existing=[i for i in vault.manifest_entries() if
-              i["logical_identity_key"] == lid]
+    base_identity=logical_identity_key(**original)
+    generation=spec["version"]-1
+    identity={**original,"format_version":f"BINANCE_NATIVE_MONTHLY_V1_G{generation}"}
+    lid=logical_identity_key(**identity)
+    entries=vault.manifest_entries()
+    existing=[i for i in entries if i["logical_identity_key"]==lid]
     require(len(existing)<=1,"VAULT_DUPLICATE_IDENTITY")
+    if generation:
+        require(any(i["content_sha256"]==spec["parent_source_sha256"]
+                    and i["instrument"]==spec["symbol"] and
+                    i["interval"]==spec["interval"] for i in entries),
+                "VAULT_CORRECTION_PARENT_NOT_RETAINED")
     if existing:
         data=RawObjectMeta.from_dict(existing[0])
-        require(data.content_sha256 == pin["original_sha256"],
-                "VAULT_CORRECTION_REQUIRES_NEW_GENERATION")
+        require(data.content_sha256==pin["original_sha256"] and
+                data.correction_generation==generation and
+                data.parent_content_sha256==
+                    (spec["parent_source_sha256"] or ""),
+                "VAULT_VERSION_CONTENT_CONFLICT")
     else:
         data=RawObjectMeta(
             schema_version="raw_object.v1",content_sha256=raw_sha(raw),
-            byte_length=len(raw),**values,coverage_status="UNKNOWN",
+            byte_length=len(raw),**identity,coverage_status="UNKNOWN",
             evidence_class="VENDOR_ARCHIVE",trust_status="UNVERIFIED",
             original_filename=pin["archive_name"],
             capture_provenance="OFFLINE_RETAINED_ORIGINAL_NOT_HISTORICAL_PIT",
@@ -136,13 +155,39 @@ def _vault_admit(vault, raw, pin, spec):
             archive_member_sha256=pin["csv_member_sha256"],
             logical_identity_key=lid,
             admitted_at_utc=datetime.now(timezone.utc).isoformat().replace("+00:00","Z"),
-            correction_generation=spec["version"]-1,
+            correction_generation=generation,
             parent_content_sha256=spec["parent_source_sha256"] or "",
         )
     admitted=vault.admit(raw,data)
     require(vault.read(admitted.content_sha256)==raw,"VAULT_READBACK_MISMATCH")
-    return {"vault":"EXISTING_RAW_VAULT","sha256":admitted.content_sha256,
-            "logical_identity_key":admitted.logical_identity_key}
+    ledger=CorrectionLedger(vault.root/"corrections.jsonl")
+    if generation:
+        chain=ledger.chain_for(base_identity)
+        old=[record for record in chain if
+             record.correction_generation==generation]
+        require(len(old)<=1,"VAULT_CORRECTION_DUPLICATE")
+        if old:
+            rec=old[0]
+            require(rec.content_sha256==admitted.content_sha256 and
+                    rec.parent_sha256==spec["parent_source_sha256"] and
+                    rec.reason==spec["correction_reason"],
+                    "VAULT_CORRECTION_LEDGER_CONFLICT")
+        else:
+            rec=ledger.add_correction(
+                new_content_sha256=admitted.content_sha256,
+                parent_content_sha256=spec["parent_source_sha256"],
+                logical_identity_key=base_identity,
+                reason=spec["correction_reason"],
+                evidence="LOCAL_ORIGINAL_BYTES_AND_PIN_NOT_ISSUER_PROOF",
+            )
+            require(rec.correction_generation==generation,
+                    "VAULT_CORRECTION_GENERATION_DRIFT")
+    return {"vault":"EXISTING_PINNED_RAW_VAULT",
+            "sha256":admitted.content_sha256,
+            "logical_identity_key":admitted.logical_identity_key,
+            "correction_ledger":"PINNED_APPEND_ONLY" if generation
+                                else "NO_CORRECTIONS",
+            "base_family_identity":base_identity}
 
 
 def admit_local_original(
@@ -236,7 +281,8 @@ def admit_local_original(
     finally:
         con.close()
     body={
-        "schema":WAREHOUSE_SCHEMA,"status":"OFFLINE_LOCAL_WAREHOUSE_COMMITTED",
+        "schema":WAREHOUSE_SCHEMA,"status":("OFFLINE_LOCAL_WAREHOUSE_COMMITTED" if vault is not None
+                  else "OFFLINE_LOCAL_STAGE_ONLY"),
         "dataset_id":spec["dataset_id"],"version":spec["version"],
         "source_zip_sha256":a["source_bytes_sha256"],
         "csv_member_sha256":a["native_csv_member_sha256"],
