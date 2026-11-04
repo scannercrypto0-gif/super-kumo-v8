@@ -598,7 +598,7 @@ class UnifiedBackboneTests(unittest.TestCase):
             enqueue_nomination,acknowledge_nomination,route_trace)
         start=1706745600000
         width=900000
-        member=(f"{start},100,102,99,101,5,{start+width-1},505,10,2,202,0\\n").encode()
+        member=(f"{start},100,102,99,101,5,{start+width-1},505,10,2,202,0\n").encode()
         out=io.BytesIO()
         with zipfile.ZipFile(out,"w",zipfile.ZIP_DEFLATED) as z:
             z.writestr("BTCUSDT-15m-2024-02.csv",member)
