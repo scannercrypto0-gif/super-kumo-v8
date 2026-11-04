@@ -1,0 +1,80 @@
+name: Factory #254 unified backbone focused
+on:
+  push:
+    paths:
+      - 'research_wp_r0/aql_factory_unified_backbone_v1.py'
+      - 'research_wp_r0/aql_factory_same_source_lab_paper_v1.py'
+      - 'research_wp_r0/aql_factory_core_query_bridge_v1.py'
+      - 'tests/test_aql_factory_same_source_lab_paper_v1.py'
+      - 'tests/test_aql_factory_core_query_bridge_v1.py'
+      - 'tests/test_aql_factory_unified_backbone_v1.py'
+      - 'research_wp_r0/aql_factory_authorized_original_run_v1.py'
+      - 'tests/test_aql_factory_authorized_original_run_v1.py'
+      - 'docs/research/factory-unified-backbone-v1.md'
+      - '.github/workflows/aql-factory-unified-backbone.yml'
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_factory_unified_backbone_v1.py'
+      - 'research_wp_r0/aql_factory_same_source_lab_paper_v1.py'
+      - 'research_wp_r0/aql_factory_core_query_bridge_v1.py'
+      - 'tests/test_aql_factory_same_source_lab_paper_v1.py'
+      - 'tests/test_aql_factory_core_query_bridge_v1.py'
+      - 'tests/test_aql_factory_unified_backbone_v1.py'
+      - 'research_wp_r0/aql_factory_authorized_original_run_v1.py'
+      - 'tests/test_aql_factory_authorized_original_run_v1.py'
+      - 'docs/research/factory-unified-backbone-v1.md'
+      - '.github/workflows/aql-factory-unified-backbone.yml'
+jobs:
+  factory-unified-backbone:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10','3.11','3.12','3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Checkout exact read-only Work #235 strategy route
+        uses: actions/checkout@v4
+        with:
+          ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8
+          path: _work235
+          persist-credentials: false
+      - name: Checkout exact read-only Work #228 immutable receipt store
+        uses: actions/checkout@v4
+        with:
+          ref: 607e88d69e9450ae66fd5090317c5c296ade8457
+          path: _work228
+          persist-credentials: false
+      - name: Checkout pinned Core #253 code (unmerged read-only)
+        uses: actions/checkout@v4
+        with:
+          ref: fef7e0df23e4b49f834239ee020d52265e1697f4
+          path: _core253
+          persist-credentials: false
+      - name: Checkout exact pinned RAW Vault #211 (read-only)
+        uses: actions/checkout@v4
+        with:
+          ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46
+          path: _raw211
+          persist-credentials: false
+      - name: Checkout exact pinned Scanner #227 native contract
+        uses: actions/checkout@v4
+        with:
+          ref: b9c9ff8602e79c534402f44bce83c56ec2fa6bb9
+          path: _scanner227
+          persist-credentials: false
+      - name: Run one bounded #254 cross-owner E2E contract and negative matrix
+        env:
+          AQL_CORE253_PATH: ${{ github.workspace }}/_core253
+          AQL_RAW211_PATH: ${{ github.workspace }}/_raw211
+          AQL_SCANNER227_PATH: ${{ github.workspace }}/_scanner227
+          AQL_WORK235_PATH: ${{ github.workspace }}/_work235
+          AQL_WORK228_PATH: ${{ github.workspace }}/_work228
+        run: |
+          python -m unittest discover -s tests -p 'test_aql_factory_unified_backbone_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_factory_authorized_original_run_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_factory_same_source_lab_paper_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_factory_core_query_bridge_v1.py' -v
