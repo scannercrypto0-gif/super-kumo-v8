@@ -4,7 +4,7 @@ TEST_ONLY/native Core objects are explicitly schema-shaped synthetic fixtures.
 import copy
 import unittest
 
-from research_wp_r0.aql_factory_authentic_research_admission import _digest
+from research_wp_r0.aql_factory_authentic_research_admission import _digest, seal
 from research_wp_r0.aql_factory_core_price_rule_port import (
     from_core_original_price_query,
 )
@@ -16,7 +16,8 @@ from research_wp_r0.aql_factory_unified_backbone_v1 import (
     build_lab_experiment_ledger, build_offline_paper_model_trace,
     build_unified_offline_e2e, frozen_work_receipt,
 )
-from research_wp_r0.strategy_definition import digest as research_digest
+from research_wp_r0.strategy_definition import StrategyDefinition, digest as research_digest
+from research_wp_r0.indicator_library_v2 import IndicatorRegistryV2
 from test_aql_factory_core_price_rule_port import (
     core_fixture, repin_admission, repin_price,
 )
@@ -159,6 +160,49 @@ class UnifiedBackboneTests(unittest.TestCase):
                          "NOT_CONNECTED_CORE_253_PENDING")
         self.assertEqual(build_unified_offline_e2e(source,x)["factory_lab_link"],
                          "CONNECTED_READ_ONLY_RECEIPTS")
+
+    def test_fifty_three_distinct_strategy_definitions_to_one_lab(self):
+        # One consolidated TEST_ONLY full candidate-census path. This reuses
+        # the actual Factory #246 rule evaluator 53 times only on synthetic
+        # bars; no accepted private historical results are rerun.
+        a,p,plan=core_fixture()
+        source=consume_core_warehouse_query(a,p,core_assessment(a,p))
+        definitions=[]
+        for i in range(53):
+            spec=copy.deepcopy(plan["strategy"]["definition"])
+            spec["strategy_id"]="synthetic-lab-%02d" % i
+            definitions.append(StrategyDefinition(
+                spec, registry=IndicatorRegistryV2()).to_dict())
+            plan["trials"][i]["candidate_digest"]=definitions[-1]["digest"]
+        comp=comparison_packet()
+        comp["source_pins"]={
+            "archive_sha256":a["source_bytes_sha256"],
+            "member_sha256":a["native_csv_member_sha256"],
+            "checksum_sha256":a["native_checksum_file_sha256"],
+            "core_price_query_sha256":p["price_query_sha256"],
+        }
+        comparison=assess_opportunity_comparison(comp)
+        ledger=[
+            {"attempt_id":t["attempt_id"],"candidate_digest":t["candidate_digest"],
+             "family_id":"F%03d" % (i % 7+1),"state":"PROPOSED"}
+            for i,t in enumerate(plan["trials"])]
+        ports=[]
+        for i in range(53):
+            owned=copy.deepcopy(plan)
+            owned["strategy"]=definitions[i]
+            owned["selected_attempt_id"]="attempt-%02d" % i
+            ports.append(from_core_original_price_query(a,p,seal(owned)))
+        x=build_lab_experiment_ledger(source,comparison,ledger,ports)
+        self.assertEqual(x["reported_attempts"],53)
+        self.assertEqual(x["not_evaluated_attempts"],0)
+        self.assertEqual(len({e["factory_port_sha256"]
+                              for e in x["ledger"]}),53)
+        self.assertEqual(x["trial_denominator"],53)
+        self.assertIsNone(x["base_shadow_results"])
+        self.assertEqual(x["scientific_result"],"INSUFFICIENT_EVIDENCE")
+        self.assertEqual(x["trial_ledger_sha256"],_digest(ledger))
+        self.assertEqual(x,build_lab_experiment_ledger(
+            source,comparison,ledger,ports))
 
     def test_core_missing_warehouse_fail_closed(self):
         a,p,assessment,*_=lab_inputs()
