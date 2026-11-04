@@ -28,7 +28,14 @@ jobs:
           ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8
           path: _work235
           persist-credentials: false
+      - name: Checkout exact read-only Work #228 immutable receipt store
+        uses: actions/checkout@v4
+        with:
+          ref: 607e88d69e9450ae66fd5090317c5c296ade8457
+          path: _work228
+          persist-credentials: false
       - name: Run one bounded #254 cross-owner E2E contract and negative matrix
         env:
           AQL_WORK235_PATH: ${{ github.workspace }}/_work235
+          AQL_WORK228_PATH: ${{ github.workspace }}/_work228
         run: python -m unittest discover -s tests -p 'test_aql_factory_unified_backbone_v1.py' -v
