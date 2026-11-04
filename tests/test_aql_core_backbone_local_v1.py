@@ -128,9 +128,12 @@ class CoreBackboneGate(unittest.TestCase):
                       (receipt["dataset_id"],))
         with self.assertRaisesRegex(BackboneError,"INDEX_TAMPER"):
             self.query(receipt)
+        # Restore all corrupted rows from sealed source, not one arbitrary
+        # constant (the earlier UPDATE intentionally corrupted ALL N bars).
         with sqlite3.connect(self.root/"warehouse.sqlite") as c:
-            c.execute("UPDATE price_bars SET close_px=101 WHERE open_ms=?",
-                      (START,))
+            for i in range(N):
+                c.execute("UPDATE price_bars SET close_px=? WHERE open_ms=?",
+                          (101+i,START+i*WIDTH))
         self.assertEqual(self.query(receipt)["coverage"],"COMPLETE")
 
     def test_strategy_route_fast_slow_and_idempotency(self):
