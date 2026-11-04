@@ -67,6 +67,8 @@ class SeamIntegrationGate(unittest.TestCase):
             self.assertEqual(sum(r['return'] is None for r in rows),16)
             self.assertEqual(summary['scanner_census'],{'NOMINATED':1,'REJECTED':1,'UNKNOWN':1,
                                                        'FAILED':1,'INELIGIBLE':2,'UNSCANNED':2})
+            self.assertEqual(summary['scanner_census_unit'],'SYMBOL_PROFILE_ATTEMPT_SLOT')
+            self.assertEqual(summary['cohort_symbol_members'],6)
             self.assertEqual(summary['discoverer_attempts'],4)
             self.assertEqual(summary['discoverer_eligible'],0)
             self.assertEqual(summary['candidates_generated'],0)
@@ -83,6 +85,10 @@ class SeamIntegrationGate(unittest.TestCase):
                     self.assertFalse(attempt['eligible'])
                     self.assertEqual(attempt['quarantine'],'UNKNOWN_DEFERRED')
                     self.assertEqual(attempt['evidence']['source_availability'],'UNKNOWN')
+                    e=attempt['evidence']
+                    self.assertEqual(e['full_universe_denominator'],e['eligible_selected']+e['ineligible'])
+                    self.assertEqual(e['eligible_selected'],e['unscanned']+e['screened_rejected']+e['unknown']+e['nominated'])
+                    self.assertLessEqual(e['failed_attempts'],e['unknown'])
             (dest/'.staging-crashed').write_bytes(b'partial')
             key2,again=run_v2(FIXTURES/'manifest.json',expected,self.roots,dest)
             self.assertEqual(key2,key);self.assertEqual(again,summary)
@@ -302,3 +308,7 @@ class SeamIntegrationGate(unittest.TestCase):
         self.assertEqual(evidence['scanner_envelope_sha256'],hashlib.sha256(raw).hexdigest())
         self.assertNotEqual(raw,canonical(self.batch['attempts'][0]['envelope']))
         self.assertFalse(result['attempts'][0]['eligible'])
+
+    def test_census_unit_must_be_explicit(self):
+        self.batch['count_unit']='UNVERIFIED_UNIQUE_ASSETS'
+        self.fail_scanner('CENSUS_UNIT_MISMATCH')

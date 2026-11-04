@@ -26,7 +26,10 @@ The Work controller only launches these bounded local Python contract workers.
 
 Reviewed Core C1–C4 delivery #180/6605833811, Factory F1–F4 #77/6605990801,
 Scanner handoff #134/6605929072 and follow-up #134/6605764375. Scanner handoff
-is a request for independent review, **not P0 acceptance**. New coordination
+is a request for independent review, **not P0 acceptance**. New pre-handoff
+independent Audit #134/6623767670 explicitly confirms **CHANGES_REQUIRED / REAL
+CONNECTOR NOT_CONNECTED** at these Scanner/Discoverer pins; this Work delta
+does not repair or close their P0 findings. New coordination
 #134/6623593991 leaves Claude as sole Scanner/Discoverer writer and requires
 continued quarantine. No inaccessible conversation is claimed reviewed.
 
@@ -137,8 +140,15 @@ worker timeout30s and one worker at a time. No unlimited spool or new ledger.
 
 Expected census: two symbols; **8 Factory pairs / 16 arm slots**: NO_SIGNAL4,
 REJECTED4, UNKNOWN2, UNSCANNED2, NOMINATED2, NULL2, UNRESOLVED0. All16 returns NULL.
-Scanner full sidecar universe8: nominated1, rejected1, unknown1, failed1,
-ineligible2, unscanned2. Four original attempts reach Discoverer and all four
+Scanner sidecar census contains **8 SYMBOL_PROFILE_ATTEMPT_SLOT units**,
+not eight unique assets: nominated1, rejected1, unknown1, failed1, ineligible2,
+unscanned2. Each cohort has three distinct symbols, hence six cohort-symbol
+members across the two separate cohorts. The native proposed Discoverer counters
+map eligible_selected = total slots - ineligible, including unscanned; FAILED
+is a subset of native UNKNOWN, with failed_attempts also retained separately.
+Both partition equations are independently checked; original disjoint statuses
+are retained without double counting. These units are explicit TEST_ONLY mapping
+context and are not an authentic verified market universe. Four original attempts reach Discoverer and all four
 become **UNKNOWN_DEFERRED**, evidence UNKNOWN_UNVERIFIED / availability UNKNOWN;
 **eligible0 / candidates0**. Omitted universe members remain in the denominator.
 
@@ -159,14 +169,14 @@ G0, holdout, paper/live, private scoring, source acquisition or trading.
 
 ## Final local consolidated evidence (public TEST_ONLY)
 
-50/50 focused boundary tests PASS at the final pinned input boundary. Identical
+51/51 focused boundary tests PASS at the final pinned input boundary. Identical
 input replay produced identical canonical bytes. GitHub CI at the published Work
 HEAD is reported separately in the PR/#205 handoff; this local result alone is
 not a GitHub CI claim.
 
-- Manifest raw SHA256: `0ba60cb42f0d48b78a6a797d0b600f3717b9bb2a55795b94df1b0160504a85da`
-- Summary raw/canonical SHA256: `59b71751a208874386f0bd6f08beb3600b4413fe6b59a8e4ad0192a90bdb41f2`
-- Gate receipt SHA256: `6cc687d578967c23a374d0b1eb8b29d34edc1ca9321f3e87d30cb927ac84da3b`
+- Manifest raw SHA256: `e14e7c9285507863bcee8856ff65ee1c0ea3736a278c654bd2af18ab439bda84`
+- Summary raw/canonical SHA256: `9812f1ecc60c04a9965c02b0f406ad7a1729a7e5c71e529e414207fefa464f4b`
+- Gate receipt SHA256: `0b882749253fa42d59c292800bc50b841faab4b6e6c5a482c5708a70ef9762ec`
 
 | Synthetic original-byte source | Raw SHA256 | Historical manifest integrity SHA256 |
 |---|---|---|

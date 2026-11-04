@@ -143,6 +143,7 @@ def scanner_boundary(cohort, batch, core, roots, scanner_commit):
     require(batch['schema'] == 'aql.work.scanner-sidecar.v2' and batch['test_only'] is True,
             'SCANNER_SIDECAR_VERSION')
     require(batch['independent_witness'] is None, 'FORGED_INDEPENDENT_WITNESS')
+    require(batch['count_unit'] == 'SYMBOL_PROFILE_ATTEMPT_SLOT', 'CENSUS_UNIT_MISMATCH')
     require(batch['source_raw_sha256'] == cohort['objects']['source']['sha256'] and
             batch['source_manifest_sha256'] == core['registration']['manifest_integrity_sha256'],
             'SCANNER_SOURCE_PARENT')
@@ -211,12 +212,18 @@ def scanner_boundary(cohort, batch, core, roots, scanner_commit):
                'source_dataset_id': cohort['spec']['dataset_id'], 'source_dataset_version': cohort['spec']['version'],
                'source_raw_sha256': batch['source_raw_sha256'], 'source_manifest_sha256': batch['source_manifest_sha256'],
                'universe_snapshot_sha256': digest(universe), 'full_universe_denominator': len(universe),
-               'eligible_selected': len(expected), 'ineligible': counts['INELIGIBLE'], 'unscanned': counts['UNSCANNED'],
-               'screened_rejected': counts['REJECTED'], 'unknown': counts['UNKNOWN'],
+               'eligible_selected': len(universe) - counts['INELIGIBLE'],
+               'ineligible': counts['INELIGIBLE'], 'unscanned': counts['UNSCANNED'],
+               'screened_rejected': counts['REJECTED'], 'unknown': counts['UNKNOWN'] + counts['FAILED'],
                'nominated': counts['NOMINATED'], 'failed_attempts': counts['FAILED'],
-               'omission_reason_codes': ['TEST_ONLY_SIDECAR_NOT_NATIVE_CENSUS', 'INDEPENDENT_WITNESS_NOT_CONNECTED'],
+               'omission_reason_codes': ['TEST_ONLY_SIDECAR_NOT_NATIVE_CENSUS', 'INDEPENDENT_WITNESS_NOT_CONNECTED',
+                                         'COUNT_UNIT_SYMBOL_PROFILE_ATTEMPT_SLOT', 'FAILED_IS_SUBSET_OF_UNKNOWN'],
                'independent_verifier_receipt_sha256': '0' * 64,
                'envelope_hex': envelope_raw.hex(), 'receipt_hex': receipt_raw.hex()}
+        require(raw['full_universe_denominator'] == raw['eligible_selected'] + raw['ineligible']
+                and raw['eligible_selected'] == raw['unscanned'] + raw['screened_rejected'] +
+                raw['unknown'] + raw['nominated'] and raw['failed_attempts'] <= raw['unknown'],
+                'DISCOVERER_CENSUS_PARTITION')
         outcome = worker('discoverer', raw, roots)
         evidence = outcome['evidence']
         require(outcome['eligible'] is False and outcome['quarantine'] == 'UNKNOWN_DEFERRED' and
@@ -226,7 +233,9 @@ def scanner_boundary(cohort, batch, core, roots, scanner_commit):
                 'DISCOVERER_BYTE_PARENT')
         admitted.append({'attempt_id': a['attempt_id'], 'original_state': member['state'], **outcome})
     return {'schema': 'aql.work.scanner-discoverer-boundary-result.v2',
-            'original_universe': universe, 'census': batch['census'], 'attempts': admitted,
+            'count_unit': batch['count_unit'], 'original_universe': universe,
+            'unique_symbols': len({u['symbol'] for u in universe}),
+            'census': batch['census'], 'attempts': admitted,
             'eligible_count': 0, 'candidate_count': 0, 'witness': 'NOT_CONNECTED',
             'authentic_route': 'NOT_CONNECTED_SCANNER_P0_UNRESOLVED'}
 
@@ -269,6 +278,8 @@ def run_v2(manifest_path, expected_sha, roots, output):
                'factory_status_counts': dict(sorted(counts.items())),
                'scanner_census': {k:sum(c['scanner_discoverer']['census'][k] for c in cohorts)
                                  for k in ('NOMINATED','REJECTED','UNKNOWN','FAILED','INELIGIBLE','UNSCANNED')},
+               'scanner_census_unit': 'SYMBOL_PROFILE_ATTEMPT_SLOT',
+               'cohort_symbol_members': sum(c['scanner_discoverer']['unique_symbols'] for c in cohorts),
                'discoverer_attempts': sum(len(c['scanner_discoverer']['attempts']) for c in cohorts),
                'discoverer_eligible': 0, 'candidates_generated': 0,
                'authentic_paths': 'NOT_CONNECTED', 'scanner_quarantine': 'P0_UNRESOLVED_UNKNOWN_DEFERRED',
