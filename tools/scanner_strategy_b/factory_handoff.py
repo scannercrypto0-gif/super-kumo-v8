@@ -103,6 +103,14 @@ def prepare_factory_handoff(native_run_receipt, source_route_receipt, ack_check_
             "cutoff_ms": n["cutoff_ms"],
         })
     require(len(attempts) > 0, "FACTORY_HANDOFF_NO_NOMINATIONS")
+    require(scan.get("source_status") == "SYNTHETIC_TEST_ONLY_NATIVE_15M"
+            or all(n["status"] not in ("SELECTED", "REJECTED")
+                   for rows in census_by_strategy.values() for n in rows),
+            "FACTORY_HANDOFF_NON_PIT_SELECTION")
+    require(all(n["source_raw_sha256"] == attempts[0]["source_raw_sha256"]
+                and n["source_manifest_sha256"] == attempts[0]["source_manifest_sha256"]
+                and n["cutoff_ms"] == attempts[0]["cutoff_ms"]
+                for n in attempts), "FACTORY_HANDOFF_CROSS_SOURCE_CUTOFF")
     totals = []
     for identity, rows in sorted(census_by_strategy.items()):
         state_counts = Counter(n["status"] for n in rows)
