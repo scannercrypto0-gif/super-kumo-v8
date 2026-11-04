@@ -198,6 +198,11 @@ def consume_core_warehouse_query(core_admission, price_query,
                   or (w["status"] == "OFFLINE_LOCAL_STAGE_ONLY"
                       and vw.get("vault") == "NOT_CONNECTED_CORE_STAGE_ONLY")),
              "CORE_253_RAW_VAULT_STATE")
+        need((w["test_only"] is True and
+              w["source_evidence_class"] == "SYNTHETIC_TEST")
+             or (w["test_only"] is False and
+                 w["source_evidence_class"] == "RETROSPECTIVE_NON_PIT"),
+             "CORE_253_TEST_ORIGINAL_EVIDENCE_CLASS")
         need(w.get("dataset_id") == q.get("dataset_id") == source_id
              and w.get("version") == q.get("version") == source_version
              and w.get("source_zip_sha256") == q.get("source_bytes_sha256") ==
@@ -225,6 +230,9 @@ def consume_core_warehouse_query(core_admission, price_query,
              and w.get("coverage") == core_admission["coverage"]
              and w.get("bar_count") == core_admission["available_bar_count"],
              "CORE_253_SCOPE_AND_COVERAGE")
+        need(q.get("start_ms") == w["start_ms"]
+             and q.get("end_exclusive_ms") == w["end_exclusive_ms"],
+             "CORE_253_FULL_SOURCE_QUERY_REQUIRED")
         need(type(q.get("start_ms")) is int
              and type(q.get("end_exclusive_ms")) is int
              and w["start_ms"] <= q["start_ms"] < q["end_exclusive_ms"] <=
@@ -282,6 +290,9 @@ def consume_core_warehouse_query(core_admission, price_query,
             need(all(t in seen_q for t in original_bars
                      if q["start_ms"] <= t < q["end_exclusive_ms"]),
                  "CORE_253_FULL_RANGE_EQUIVALENCE")
+        need(q.get("coverage") == coverage
+             and q.get("available_bar_count") == available,
+             "CORE_253_OVERALL_COVERAGE_CONSISTENCY")
         warehouse_receipt_sha = w["receipt_sha256"]
         warehouse_query_sha = q["query_sha256"]
         warehouse_original_vault = vw["vault"]
