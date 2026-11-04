@@ -28,6 +28,9 @@ No fake Scanner nomination is constructed to unlock independent generation.
 
 Main was independently refreshed at `dbc191df72f4b4d1ebb7d490926dcad4325dac12`.
 Before edits, #227/#230/#228/#226/#229 Draft/open/unmerged heads were refreshed.
+Later Core read-only handoff #231/6624213033 and owner B continuation
+#205/6624304668 were read; they confirm the same strategy/DNA/source mapping and
+no verified approved Paper registry/consumer. No inaccessible chat is claimed reviewed.
 The immutable dependency manifest records code-file SHA256s. No Draft is assumed
 to be merged into main; pinned workers use `python -I`, no ambient PYTHONPATH.
 
@@ -35,7 +38,7 @@ to be merged into main; pinned workers use `python -I`, no ambient PYTHONPATH.
 |---|---|---|---|
 | Main strategy contract | `dbc191df72f4b4d1ebb7d490926dcad4325dac12` | `StrategyDefinition.from_dict`, existing AST/registry validation, `candidate_grid`, `AttemptRecorder` | CONNECTED_VERIFIED research contracts only |
 | Main policy/DNA | same main | `StrategyDNAV2`, `ScannerProfile`, `_read`, `_test_predicate`, `_channel`, reference digests | CONNECTED_VERIFIED TEST_ONLY policy arithmetic |
-| Main indicator registry | same main | `IndicatorRegistryV2` and existing SMA/EMA/RSI/ATR `_compute_values` math kernels | CONNECTED_VERIFIED TEST_ONLY; no authenticated/PIT compute claim |
+| Main indicator registry | same main | `IndicatorRegistryV2` and existing V1 `_compute_values` and V2 `_values` math kernels | CONNECTED_VERIFIED TEST_ONLY; no authenticated/PIT compute claim |
 | Scanner #227 | `b9c9ff8602e79c534402f44bce83c56ec2fa6bb9` | Existing typed `AdmittedBar` / `admit_bars` after strict whole-window Work admission | TEST_ONLY validation; upstream P0 not closed |
 | Discoverer #230 | `f2006c0e431690ccea8b0532095bf4f2a2dc88ba` | Existing seven-family registry, stateless template/axes builders; no copied rules/families | CONNECTED_VERIFIED independent TEST_ONLY template generation |
 | Factory #229 | `6177da84ce67b3dc81ef759521c6b52ffa2132b3` | `build_research_report` / existing `build_lab` descriptive test fixture | CONNECTED_VERIFIED TEST_ONLY; authentic strategy evaluation NOT_CONNECTED |
@@ -72,8 +75,8 @@ calculation by source SHA/symbol/timeframe/indicator/parameters across strategie
 The fixture computes six feature arrays, not twelve (two symbols × three shared
 indicators). No INTRADAY/SWING score is treated as a strategy's decision; the
 research_profile_score is NULL and the strategy-specific screening rank is named
-separately. Unsupported kernels are CONTRACT_NOT_CONNECTED; no indicators are
-reimplemented. TEST_ONLY calls use existing pure kernels after strict byte and
+separately. All ten registered V1/V2 indicator kernels and their actual scalar/vector output
+fields are adapted; unknown registry IDs are refused. No indicators are reimplemented. TEST_ONLY calls use existing pure kernels after strict byte and
 whole-window admission. They never create CONFIRMED bars or bypass CustodyAccessor
 to claim authenticated indicator evidence. Real unverified sources are UNKNOWN
 and perform zero feature calculations.

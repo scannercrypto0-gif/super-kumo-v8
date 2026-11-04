@@ -1,6 +1,6 @@
 # Final consolidated local evidence — TEST_ONLY
 
-The executable multi-strategy/source/decision/research gate passed **54/54** tests.
+The executable multi-strategy/source/decision/research gate passed **55/55** tests.
 A routine initial negative-test mismatch was corrected so wrong-strategy routing
 reports WRONG_STRATEGY_ROUTE before checking the foreign definition digest; input
 was refused in either case. The final gate includes restart after target receipt
@@ -10,7 +10,7 @@ but before router acknowledgment. No upstream broad suite or private run occurre
 |---|---|
 | Whole-package payload bytes | `c9275337e3a5793a3cb0b2b23ad2d3a2594569fdd8389c076ee33ea7fd5505a5` |
 | Stored payload+hash wrapper object | `ca9e9d9dd27701db92fcb440f0f4bf0005d20e36700966d2b06a6e292205fb59` |
-| Gate receipt payload | `73ed1eb44a7a31ee5942645581aec9205c3baa091189af21ffee4285fbfe9fbb` |
+| Gate receipt payload | `0961e53f61125474cff5619e9c1fa197ffe53e3956386d8d1b4e676c1730d56a` |
 | Frozen TEST_ONLY input manifest | `2e83b28a22552aeb9f50a7c4c7da4b4f9efa89cdf5f633cc12a843d4347bc265` |
 
 Result and wrapper hashes differ by design: one identifies the canonical payload,
@@ -40,3 +40,7 @@ authority, absent consumer, restart and target-before-ACK replay; independent
 research without Scanner, optional quarantine, invalid/duplicate/budget accounting,
 frozen plan, invalid candidate reparse, Factory failure isolation and dependency
 hash drift. Every real-data/Paper/live path remains NOT_CONNECTED/NOT_ACTIVATED.
+
+The final gate also exercises all six existing V2 vector kernels with their actual
+output field names, alongside the shared V1 fixture math. No calculation is
+reimplemented; TEST_ONLY kernel arithmetic is not a confirmed/PIT compute receipt.

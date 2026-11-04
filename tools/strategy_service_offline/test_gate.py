@@ -328,3 +328,31 @@ class PackageGate(unittest.TestCase):
         # New router journal represents a crash before the source acknowledgment.
         recovered=route(n,s,RunJournal(self.root/'router',self.deps),test_sink=sink)
         self.assertEqual(original.payload,recovered.payload);self.assertEqual(len(calls),1)
+
+    def test_all_six_existing_vector_kernel_fields(self):
+        from research_wp_r0.indicator_library_v2 import SPECS
+        configs={'MACD_v2':{'fast':2,'slow':4,'signal':2},'BBANDS_v2':{'period':3,'deviations':2},
+                 'ADX_v2':{'period':3},'STOCH_v2':{'period':3,'smooth':2},
+                 'ROC_v2':{'period':3},'OBV_v2':{}}
+        original=self.specs
+        for indicator,params,fields in SPECS:
+            with self.subTest(indicator=indicator):
+                source=original[0].data;d=deepcopy(source['dna']['dna'])
+                ref=next(r for r in d['indicators'] if r['name']=='strength')
+                ref.update(indicator_id=indicator,version='2',parameters=configs[indicator],
+                           constraints={k:{'type':'number' if k=='deviations' else 'int','min':1,'max':20}
+                                        for k in configs[indicator]})
+                def change(obj):
+                    if isinstance(obj,dict):
+                        if obj.get('reference')=='strength':obj['field']=fields[0]
+                        for v in obj.values():change(v)
+                    elif isinstance(obj,list):
+                        for v in obj:change(v)
+                change(d)
+                policy=StrategyScreeningSpec.from_existing(source['definition'],{'dna':d,'digest':digest(d)},
+                    timeframe='5m',market='fixture',max_source_age_ms=300000)
+                self.specs=[policy]
+                rows=[r for r in self.rows() if r['symbol'] in ('AAA','BBB')]
+                self.assertTrue(all(r['status'] in ('SELECTED','REJECTED') for r in rows))
+                for r in rows:self.assertEqual(set(r['feature_evidence']['strength']['values']),set(fields))
+        self.specs=original

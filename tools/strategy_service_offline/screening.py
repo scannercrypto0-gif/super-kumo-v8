@@ -6,12 +6,12 @@ import math
 from types import SimpleNamespace
 from research_wp_r0.strategy_definition import StrategyDefinition, identifier, integer, number
 from research_wp_r0.strategy_dna_v2 import StrategyDNAV2, _read, _test_predicate, _channel, reference_digest
-from research_wp_r0.indicator_library_v2 import IndicatorRegistryV2
+from research_wp_r0.indicator_library_v2 import IndicatorRegistryV2, SPECS
 from .common import Frozen, canonical, decode, digest, raw_sha, require, BoundaryError
 
 TF = {'5m':300000,'30m':1800000,'1h':3600000,'4h':14400000,'1d':86400000}
 STATES = ('SELECTED','REJECTED','UNKNOWN','UNSCANNED','INELIGIBLE','FAILED')
-KERNELS = {'SMA_v1','EMA_v1','RSI_v1','ATR_v1'}
+KERNELS = {'SMA_v1','EMA_v1','RSI_v1','ATR_v1'} | {s[0] for s in SPECS}
 
 
 class StrategyScreeningSpec(Frozen):
@@ -174,20 +174,27 @@ def scan(specs, raw, manifest, universe, *, cutoff_ms, symbol_budget, deps):
                         if key not in cache:
                             ind=IndicatorRegistryV2().get(ref['indicator_id'],**ref['parameters'])
                             bars=valid[symbol]
-                            values=ind._compute_values([b['close'] for b in bars],
-                                                       [SimpleNamespace(**b) for b in bars])
-                            value=values[-1] if len(bars)>ind.min_warmup_bars else None
-                            if value is not None:number(value)
-                            cache[key]=value;compute_calls+=1
-                        value=cache[key]
+                            typed=[SimpleNamespace(**b) for b in bars]
+                            if hasattr(ind,'_compute_values'):
+                                values=ind._compute_values([b['close'] for b in bars],typed)
+                                value=values[-1] if len(bars)>ind.min_warmup_bars else None
+                                mapped={'value':value}
+                            else:
+                                vectors=ind._values(typed)
+                                values=vectors[-1][1] if vectors and vectors[-1][0]==len(bars)-1 else None
+                                mapped=dict(zip(ind.output_fields,values)) if values is not None else {f:None for f in ind.output_fields}
+                            for value in mapped.values():
+                                if value is not None:number(value)
+                            cache[key]=mapped;compute_calls+=1
+                        mapped=cache[key]
                         features[name]={'indicator_digest':reference_digest(ref),'source_kind':'SYNTHETIC',
                             'source_id':manifest['source_id'],
                             'source_generation_id':manifest['generation_id'],
                             'original_source_sha256':manifest['raw_sha256'],
-                            'quality':'VALID' if value is not None else 'MISSING','is_final':True,
+                            'quality':'VALID' if all(v is not None for v in mapped.values()) else 'MISSING','is_final':True,
                             'as_of_ms':valid[symbol][-1]['close_ms'],
                             'observed_at_ms':valid[symbol][-1]['available_ms'],
-                            'available_at_ms':valid[symbol][-1]['available_ms'],'values':{'value':value}}
+                            'available_at_ms':valid[symbol][-1]['available_ms'],'values':mapped}
                     def read(item):
                         return _read(features,item,refs[item['reference']],dna['provenance'],cutoff_ms)
                     reads=[read(rule) for rule in dna['scanner_profile']['filters']]
