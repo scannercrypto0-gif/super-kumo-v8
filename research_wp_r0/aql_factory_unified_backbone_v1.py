@@ -95,6 +95,27 @@ def consume_core_warehouse_query(core_admission, price_query,
          core_admission["manifest_record_sha256"]
          and chronology_assessment.get("price_query_sha256") ==
          price_query["price_query_sha256"], "CHRONOLOGY_PARENT")
+    need(core_admission.get("status") in (
+             "TEST_ONLY_INTEGRITY_VERIFIED",
+             "ORIGINAL_PIN_MATCHED_PROVENANCE_PENDING")
+         and core_admission.get("source_kind") == "BINANCE_KLINES_ZIP"
+         and core_admission.get("confirmed_pit") == "NOT_ATTESTED"
+         and core_admission.get("authenticated_source") == "NOT_ATTESTED"
+         and price_query.get("factory_scientific_input") ==
+             "BLOCKED_PENDING_INDEPENDENT_EVIDENCE"
+         and chronology_assessment.get("status") == "EVIDENCE_INCOMPLETE"
+         and chronology_assessment.get("independent_venue_issuance") ==
+             "NOT_ATTESTED"
+         and chronology_assessment.get("holdout") == "UNTOUCHED",
+         "ORIGINAL_SOURCE_AUTHORITY_OR_HOLDOUT")
+    parent = core_admission.get("correction_parent_source_sha256")
+    correction_reason = core_admission.get("correction_reason")
+    if core_admission.get("version", 0) > 1:
+        need(sha(parent) and type(correction_reason) is str
+             and bool(correction_reason.strip()), "CORRECTION_HISTORY")
+    else:
+        need(parent is None and correction_reason is None,
+             "CORRECTION_VERSION_1")
     need(price_query.get("status") == "OK"
          and price_query.get("scientific_pit") == "NOT_ATTESTED"
          and price_query.get("source_availability") == "RETROSPECTIVE_NON_PIT"
@@ -146,6 +167,8 @@ def consume_core_warehouse_query(core_admission, price_query,
         "native_csv_member_sha256": core_admission.get("native_csv_member_sha256"),
         "original_checksum_file_sha256":
             core_admission.get("native_checksum_file_sha256"),
+        "correction_parent_source_sha256": parent,
+        "correction_reason": correction_reason,
         "core_admission_sha256": core_admission["manifest_record_sha256"],
         "core_price_query_sha256": price_query["price_query_sha256"],
         "chronology_assessment_sha256":
@@ -239,6 +262,8 @@ def build_lab_experiment_ledger(source, comparison, trial_ledger,
              source["manifest_integrity_sha256"]
              and inner.get("trial_budget") == 53
              and inner.get("scientific_result") == "INSUFFICIENT_EVIDENCE"
+             and inner.get("source_original_bytes_verified") is False
+             and inner.get("historical_pit_verified") is False
              and inner.get("trading_authority") == "NONE",
              "FACTORY_RULE_ATTEMPT_PIN")
         need(type(inner.get("decisions")) is list
@@ -258,9 +283,16 @@ def build_lab_experiment_ledger(source, comparison, trial_ledger,
                  (x.get("status") != "MODEL_ONLY") for x in outcomes),
              "FACTORY_NULL_CENSOR")
         records[aid] = r["artifact_sha256"]
+    need(comparison.get("unique_families") ==
+         len({t["family_id"] for t in trial_ledger}),
+         "SELECTION_FAMILY_DENOMINATOR")
     if source["coverage"] != "COMPLETE":
         need(not records, "PARTIAL_SOURCE_CANNOT_MODEL")
     statuses = Counter(t["state"] for t in trial_ledger)
+    need(all(r["factory_report"]["trial_state_counts"] ==
+             {s: statuses[s] for s in sorted(TRIAL_STATES)}
+             for r in factory_port_reports),
+         "ATTEMPT_STATES_DRIFT")
     ledger = [
         {
             "attempt_id": t["attempt_id"],
@@ -280,6 +312,7 @@ def build_lab_experiment_ledger(source, comparison, trial_ledger,
         "source_class": source["original_history_status"],
         "warehouse_link": source["raw_warehouse_query"],
         "trial_denominator": 53,
+        "trial_ledger_sha256": _digest(trial_ledger),
         "trial_states": {s: statuses[s] for s in sorted(TRIAL_STATES)},
         "reported_attempts": len(records),
         "not_evaluated_attempts": 53 - len(records),
