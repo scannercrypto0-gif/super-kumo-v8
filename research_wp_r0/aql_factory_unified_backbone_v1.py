@@ -17,6 +17,7 @@ from research_wp_r0.aql_factory_authentic_research_admission import (
     _digest, _hash, _check_seal,
 )
 from research_wp_r0.strategy_definition import canonical as research_canonical, digest as research_digest
+from datetime import datetime, timezone
 from src.aql.observation.contracts import PaperIntent
 from src.aql.observation.positions import PositionEvent, PositionLedger, PositionContractError
 
@@ -68,7 +69,8 @@ def frozen_work_receipt(obj):
 
 
 def consume_core_warehouse_query(core_admission, price_query,
-                                 chronology_assessment, warehouse_receipt=None):
+                                 chronology_assessment, warehouse_receipt=None,
+                                 warehouse_query=None):
     """Consume existing Core read-only OHLCV; do not invent #253 RAW receipt.
 
     A warehouse receipt must come from the future Core-owned #253 contract.
@@ -78,7 +80,8 @@ def consume_core_warehouse_query(core_admission, price_query,
     checked(core_admission, "manifest_record_sha256")
     checked(price_query, "price_query_sha256")
     checked(chronology_assessment, "assessment_sha256")
-    need(warehouse_receipt is None, "UNRECOGNIZED_CORE_253_WAREHOUSE_PROOF")
+    need((warehouse_receipt is None) == (warehouse_query is None),
+         "CORE_253_WAREHOUSE_QUERY_PAIR")
     need(core_admission.get("schema") == "aql.core.historical-original-admission.v1"
          and price_query.get("schema") ==
              "aql.core.historical-price-custody-query.v1"
@@ -157,6 +160,137 @@ def consume_core_warehouse_query(core_admission, price_query,
     need(len(set(missing)) == len(missing)
          and not set(missing).intersection(seen)
          and all(type(t) is int for t in missing), "MISSING_GRID_INTEGRITY")
+    source_id = core_admission["dataset_id"]
+    source_version = core_admission["version"]
+    cutoff_ms = core_admission["decision_cutoff_ms"]
+    warehouse_status = "NOT_CONNECTED_CORE_253_PENDING"
+    warehouse_query_sha = None
+    warehouse_receipt_sha = None
+    warehouse_original_vault = "NOT_CONNECTED"
+    if warehouse_receipt is not None:
+        # Core #253 uses the existing Core SHA/JSON domain. A caller-provided
+        # seal proves consistency, not external source authenticity.
+        checked(warehouse_receipt, "receipt_sha256")
+        checked(warehouse_query, "query_sha256")
+        w, q = warehouse_receipt, warehouse_query
+        need(w.get("schema") == "aql.core.local-history-warehouse.v1"
+             and q.get("schema") == "aql.core.local-history-query.v1",
+             "CORE_253_SCHEMAS")
+        need(w.get("status") in ("OFFLINE_LOCAL_STAGE_ONLY",
+                                "OFFLINE_LOCAL_WAREHOUSE_COMMITTED")
+             and type(w.get("test_only")) is bool
+             and w.get("source_evidence_class") in ("SYNTHETIC_TEST",
+                                                    "RETROSPECTIVE_NON_PIT")
+             and w.get("availability") == "RETROSPECTIVE_NON_PIT"
+             and w.get("historical_known_at") == "NOT_ATTESTED"
+             and w.get("universe") == "NOT_ATTESTED"
+             and w.get("scientific_result") == "INSUFFICIENT_EVIDENCE"
+             and w.get("execution") == "DISABLED"
+             and q.get("source_availability") == "RETROSPECTIVE_NON_PIT"
+             and q.get("historical_pit") == "NOT_ATTESTED"
+             and q.get("universe") == "NOT_ATTESTED",
+             "CORE_253_AUTHORITY")
+        vw = w.get("vault")
+        need(type(vw) is dict and sha(vw.get("sha256"))
+             and vw["sha256"] == w.get("source_zip_sha256")
+             and ((w["status"] == "OFFLINE_LOCAL_WAREHOUSE_COMMITTED"
+                   and vw.get("vault") == "EXISTING_PINNED_RAW_VAULT")
+                  or (w["status"] == "OFFLINE_LOCAL_STAGE_ONLY"
+                      and vw.get("vault") == "NOT_CONNECTED_CORE_STAGE_ONLY")),
+             "CORE_253_RAW_VAULT_STATE")
+        need(w.get("dataset_id") == q.get("dataset_id") == source_id
+             and w.get("version") == q.get("version") == source_version
+             and w.get("source_zip_sha256") == q.get("source_bytes_sha256") ==
+                 core_admission["source_bytes_sha256"]
+             and w.get("manifest_integrity_sha256") ==
+                 q.get("manifest_integrity_sha256") ==
+                 core_admission["manifest_integrity_sha256"]
+             and w.get("csv_member_sha256") ==
+                 core_admission.get("native_csv_member_sha256")
+             and w.get("checksum_file_sha256") ==
+                 core_admission.get("native_checksum_file_sha256")
+             and w.get("packet_sha256") == core_admission.get("packet_sha256")
+             and w.get("custody_receipt_sha256") ==
+                 core_admission.get("custody_receipt_sha256")
+             and w.get("decision_cutoff_ms") ==
+                 q.get("decision_cutoff_ms") == cutoff_ms,
+             "CORE_253_ANCESTRY_SOURCE_CUTOFF")
+        need(type(w.get("symbol")) is str and bool(w["symbol"])
+             and w.get("market") == "SPOT"
+             and w.get("exchange") == "BINANCE"
+             and type(w.get("interval")) is str
+             and type(w.get("start_ms")) is int
+             and type(w.get("end_exclusive_ms")) is int
+             and 0 <= w["start_ms"] < w["end_exclusive_ms"] <= cutoff_ms
+             and w.get("coverage") == core_admission["coverage"]
+             and w.get("bar_count") == core_admission["available_bar_count"],
+             "CORE_253_SCOPE_AND_COVERAGE")
+        need(type(q.get("start_ms")) is int
+             and type(q.get("end_exclusive_ms")) is int
+             and w["start_ms"] <= q["start_ms"] < q["end_exclusive_ms"] <=
+                 w["end_exclusive_ms"]
+             and q["coverage"] in ("COMPLETE", "PARTIAL", "UNKNOWN")
+             and type(q.get("required_bar_count")) is int
+             and 0 <= q["required_bar_count"] <= 4096
+             and type(q.get("available_bar_count")) is int
+             and type(q.get("missing_bar_opens")) is list
+             and type(q.get("bars")) is list
+             and len(q["bars"]) == q["available_bar_count"]
+             and q["available_bar_count"] + len(q["missing_bar_opens"]) ==
+                 q["required_bar_count"],
+             "CORE_253_RANGE_CENSUS")
+        need((q["coverage"] == "COMPLETE") ==
+             (len(q["missing_bar_opens"]) == 0)
+             and (q["coverage"] == "UNKNOWN") ==
+             (q["available_bar_count"] == 0),
+             "CORE_253_COVERAGE_STATUS")
+        if q["start_ms"] == w["start_ms"] and q["end_exclusive_ms"] == w["end_exclusive_ms"]:
+            need(q["coverage"] == coverage and
+                 q["missing_bar_opens"] == missing and
+                 q["available_bar_count"] == available and
+                 q["required_bar_count"] == required,
+                 "CORE_253_WHOLE_RANGE_COMPARISON")
+        original_bars = {row["bar_open_ms"]: row for row in rows}
+        seen_q = set()
+        prior_q = -1
+        for row in q["bars"]:
+            t = row.get("bar_open_ms")
+            need(type(t) is int and q["start_ms"] <= t < q["end_exclusive_ms"]
+                 and t > prior_q and t not in seen_q
+                 and type(row.get("bar_close_ms")) is int
+                 and sha(row.get("bar_checksum"))
+                 and type(row.get("observation_lower_bound_ms")) is int
+                 and row["observation_lower_bound_ms"] <= cutoff_ms
+                 and row.get("historical_known_at_ms") is None,
+                 "CORE_253_BAR_PROVENANCE")
+            prior_q = t
+            seen_q.add(t)
+            source_row = original_bars.get(t)
+            need(source_row is not None
+                 and source_row.get("checksum") == row["bar_checksum"]
+                 and source_row.get("bar_close_ms") == row["bar_close_ms"]
+                 and all(source_row.get(k) == row.get(k)
+                         for k in ("open", "high", "low", "close", "volume"))
+                 and source_row.get("observation_lower_bound_ms") ==
+                     row["observation_lower_bound_ms"],
+                 "CORE_253_BAR_MISMATCH")
+        need(len(set(q["missing_bar_opens"])) == len(q["missing_bar_opens"])
+             and all(type(t) is int and q["start_ms"] <= t < q["end_exclusive_ms"]
+                     and t not in seen_q for t in q["missing_bar_opens"]),
+             "CORE_253_MISSING_IDENTITY")
+        need(set(original_bars) & set(range(q["start_ms"],q["end_exclusive_ms"], 
+                 (q["end_exclusive_ms"]-q["start_ms"]) // q["required_bar_count"]
+                 if q["required_bar_count"] else 1)) ==
+             seen_q if q["coverage"]=="COMPLETE" else True,
+             "CORE_253_FULL_RANGE_EQUIVALENCE")
+        warehouse_receipt_sha = w["receipt_sha256"]
+        warehouse_query_sha = q["query_sha256"]
+        warehouse_original_vault = vw["vault"]
+        warehouse_status = (
+            "CONNECTED_PINNED_CORE_253_RAW_WAREHOUSE"
+            if w["status"] == "OFFLINE_LOCAL_WAREHOUSE_COMMITTED"
+            else "CONNECTED_CORE_253_STAGE_ONLY_RAW_VAULT_MISSING"
+        )
     output = {
         "schema": SOURCE_SCHEMA,
         "dataset_id": core_admission["dataset_id"],
@@ -181,10 +315,14 @@ def consume_core_warehouse_query(core_admission, price_query,
         "core_query_consumer": (
             "CONNECTED_READ_ONLY_CORE_CUSTODY"
             if coverage == "COMPLETE" else "FAIL_CLOSED_INCOMPLETE_CORE_CUSTODY"),
-        "raw_warehouse_query": "NOT_CONNECTED_CORE_253_PENDING",
+        "raw_warehouse_query": warehouse_status,
+        "core_253_warehouse_receipt_sha256": warehouse_receipt_sha,
+        "core_253_warehouse_query_sha256": warehouse_query_sha,
+        "core_253_raw_vault": warehouse_original_vault,
         "scanner_secretary_real_distribution": "NOT_CONNECTED_CORE_253_PENDING",
         "source_eligible_for_modeling":
-            coverage == "COMPLETE",
+            coverage == "COMPLETE" and (warehouse_query is None or
+                warehouse_query["coverage"] == "COMPLETE"),
         "source_eligible_for_historical_pit": False,
         "independent_opportunity_denominator": None,
         "holdout": "SEALED_UNOPENED", "trading_authority": "NONE",
