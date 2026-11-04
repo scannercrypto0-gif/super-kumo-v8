@@ -1,0 +1,41 @@
+# Factory #254 — Unified Backbone / Lab + Offline Paper Model V1
+
+## Scope, ownership and concrete APIs
+
+Owner provisional **B** under [Issue #254](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/254), execution only on this new Factory-owned Draft branch stacked on untouched Factory #241 (itself #229 → #222). Real Core warehouse/Scanner/Secretary implementation belongs to Core #253, which did not yet have a documented code delivery at branch creation. This Factory package **does not** change Core, RAW Vault #211, Scanner #227, Discoverer #230, Work #228/#235/#242, or old Factory #246/#250 modules; no duplicative 106-report evaluation.
+
+Module `research_wp_r0/aql_factory_unified_backbone_v1.py` exposes **four** bounded read-only operations:
+- `consume_core_warehouse_query(core_admission, price_query, chronology_assessment, warehouse_receipt=None)` → `aql.factory.unified-custody-source.v1`. Consumes actual existing Core #245 original-admission / source-locked OHLCV query and Core #249 chronology/universe assessment **by canonical receipt**. Enforces same ZIP source SHA, manifest integrity, dataset, version, cutoff, Core parent hashes; COMPLETE/PARTIAL/UNKNOWN, missing bar identity and cutoff as-of are fail-closed. Any unrecognized Core #253 warehouse receipt is **rejected**, not guessed or accepted via a generic `verified=true`. Until Core #253 publishes a concrete contract, `raw_warehouse_query=NOT_CONNECTED_CORE_253_PENDING`. COMPLETE Core custody query is connected **only** as a retrospective Core read-only query, *not* as a continuously fed RAW warehouse.
+- `build_lab_experiment_ledger(source, comparison, trial_ledger, factory_port_reports)` → `aql.factory.unified-lab-ledger.v1`. Reads existing Factory #246 source-pinned modeled rule receipts + #250 descriptive comparison report, validates all 53 frozen attempt IDs/family/digests, exact source/manifest/plan provenance, opportunity/arm UNKNOWN and null-safe return state, links individual reports to immutable attempt IDs. Missing reports are `NOT_EVALUATED`, never dropped. This **indexes preexisting evaluations** and doesn't compute another strategy model or repeat accepted arithmetic; independent source/opportunity completeness not invented.
+- `build_offline_paper_model_trace(nomination, decision_receipt, secretary_receipt, position_events=())` → `aql.factory.offline-paper-model.v1`. Consumes exact sealed Work #235 `Frozen.receipt()` strategy-addressed Scanner nomination and Work strategy-owned TEST_ONLY decision; checks full SELECTED/REJECTED/UNKNOWN/UNSCANNED/INELIGIBLE/FAILED symbol denominator, source/config/feature/delivery policy, synthetic Secretary dispatch/ACK, then calls existing **main** `PaperIntent`, `PositionEvent` and `PositionLedger` contract classes to reconstruct a **pure synthetic paper-model** position/decision/event log. Real Secretary Core #253 ACKs are **not** faked: required `mode=TEST_ONLY`, `real_secretary_ack=null`; no broker, exchange order, funds, independent real fill or paper activation exists.
+- `build_unified_offline_e2e(source, lab, paper=None)` → `aql.factory.unified-offline-e2e.v1` one SHA-anchored research+paper boundary receipt. It expressly refuses to equate a TEST_ONLY Scanner JSON source SHA with authentic native ZIP source SHA. A same-string synthetic source pin does not prove provenance. The genuine pinned-original RAW → Scanner/Secretary → Factory/Lab → offline paper path remains **NOT_CONNECTED** until Core #253 actual source/warehouse and delivery evidence join the graph.
+
+All results are content-addressed, deterministic JSON. Factory side is a set of pure adapter functions; Work #228 existing ReceiptStore remains the artifact durability owner. The new module **does not implement a competing journal database, recovery scheduler, source fetcher, paper execution engine, fill model, event bus or monitoring service**. In-memory replay of main PositionLedger is not an independently durable or production-approved store.
+
+## Source integrity and hard fail-closed semantics
+
+Inputs must have exact existing Core `aql.core.historical-original-admission.v1` (`manifest_record_sha256`), `aql.core.historical-price-custody-query.v1` (`price_query_sha256`), and Core #249 `aql.core.chronology-universe-assessment.v1` (`assessment_sha256`) parent hashes. Dataset/version/source bytes SHA/manifest SHA/cutoff/coverage and missing opens agree exactly. All historical `known_at` remain NULL; no theoretically earliest close+1 is presented as source availability or actual 2024 received-at. `scientific_pit=NOT_ATTESTED`, market universe and independently enumerable opportunities remain NULL.
+
+Factory lab requires existing `aql.factory.opportunity-comparison-report.v1` and `aql.factory.core-price-rule-port.v1` and embedded `aql.factory.historical-rule-report.v1`, all SHA verified. Exactly 53 trials are retained; a report may cover only its own pinned attempt. `MODEL_ONLY` outcomes may have modeled numeric return, but every `UNKNOWN_*` outcome must have null return. No BASE/SHADOW efficacy output, no re-run 106 retrospective reports, no holdout, OOS or multiple-testing PASS.
+
+Synthetic Paper path requires `aql.strategy-nomination.v1` plus `aql.paper-strategy-decision-receipt.v1` or disconnected `aql.paper-strategy-handoff.v1`, wrapped in actual Work canonical `{payload,sha256}` structure. Secretary's new **Factory synthetic** handoff `aql.factory.secretary-offline-delivery.v1` is separately content hashed; it is **not** a Core Secretary office receipt. Strategy identity includes strategy_id, version, config_digest, attempt_id, nomination SHA, policy/delivery hash and cutoff. Only strategy-owned ACCEPT may create an optional **modeled** position series from source `TEST_ONLY_PAPER_MODEL`, with main PositionLedger's open/quote/close immutable lifecycle checks. Work's PaperIntent remains proposed/declined contract, never an executable order.
+
+## Test and practical run
+
+```bash
+python -m unittest discover -s tests -p test_aql_factory_unified_backbone_v1.py -v
+```
+
+The focused CI matrix runs Python 3.10, 3.11, 3.12, 3.13. This test imports **existing real** Factory #246 original price-rule port and Factory #250 comparison evaluation and the existing main PositionLedger/PaperIntent classes; Core and Scanner/Secretary envelope fixtures are explicitly marked synthetic schema-shaped cross-owner compatibility, not actual authentic combined runtime. Deterministic replay, cutoff/version/coverage, drift/tamper, full census, missing/duplicate trials, cross-source identity, idempotent vs conflicting position events, future receipt, synthetic Secretary ACK and authority negatives are covered.
+
+## Current integration state / external blocker
+
+| Segment | Current bounded claim |
+|---|---|
+| Native ZIP / Core warehouse consumer | Existing #245 Core custody price response **consumed and checked**. Core #253 warehouse ingestion / RAW source registration **NOT_CONNECTED** |
+| Existing candidate → Factory → Lab | Factory #246/250 receipt DAG integrated on TEST_ONLY examples. Prior Work #247 106 original evaluations are read-only and unchanged |
+| Scanner strategy nomination → Secretary → paper model | Work #235/Scanner-shaped sealed TEST_ONLY contracts and existing main position state machine exercised. Real Scanner→Secretary Core #253 delivery NOT_CONNECTED |
+| Authentic original-to-offline-paper E2E | **NOT_CONNECTED**: Core #253 needs actual RAW warehouse + strategy-addressed delivery provenance and shared cutoff/source mapping |
+| Science | Separate Core #249, Factory #250 and Audit #252 accepted engineering only. 2024 PIT/source publication, independent market opportunities, genuine historical BASE/SHADOW, OOS, alpha all **INSUFFICIENT_EVIDENCE** |
+
+**Next one coherent gate:** Core #253 supplies its exact immutable warehouse query/ingest/Secretary evidence contract and bounded real-source smoke. Factory then binds it to this adapter using a new SHA-checked witness (not invented beforehand) and executes one joint source→RAW→Core→Scanner/Secretary→Factory/Lab→offline paper trace; Audit reviews just that new gate. No PR merge, G0, holdout access, paid actions, paper/live activation or trading.
