@@ -85,6 +85,16 @@ jobs:
           set -euo pipefail
           test "$(git -C _pinned_scanner227 rev-parse HEAD)" = "b9c9ff8602e79c534402f44bce83c56ec2fa6bb9"
           cp -a _pinned_scanner227/tools/scanner_engine_offline tools/
+      - name: Stage frozen Work #235 code-only dependency
+        uses: actions/checkout@v4
+        with:
+          ref: 288998b5d83466f75a08775dcf5806768b458141
+          path: _pinned_strategy235
+          persist-credentials: false
+      - name: Resolve frozen Work #235 screening import
+        run: |
+          set -euo pipefail
+          cp -a _pinned_strategy235/tools/strategy_service_offline tools/
       - name: Check SHA-pinned ownership and code-only provenance
         run: |
           python - <<'PY'
