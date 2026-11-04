@@ -356,6 +356,18 @@ def build_offline_paper_model_trace(nomination, decision_receipt,
          and d.get("trading_authority") == "NONE"
          and d.get("paper_execution") == "NOT_ACTIVATED",
          "DECISION_SOURCE_OR_AUTHORITY")
+    policy_id = (d.get("decision_policy_id")
+                 if d["schema"] == "aql.paper-strategy-decision-receipt.v1"
+                 else "NOT_CONNECTED")
+    need(type(policy_id) is str and bool(policy_id)
+         and d.get("delivery_id") == research_digest({
+             "nomination": nomination["sha256"],
+             "strategy": n["config_digest"],
+             "consumer_policy": policy_id,
+             "contract": "aql.paper-strategy-handoff.v1",
+         })
+         and secretary_receipt.get("delivery_id") == d.get("delivery_id"),
+         "SECRETARY_ROUTE_DECISION_COMMIT")
     need(d.get("decision") == "WAIT" or n["status"] == "SELECTED",
          "UNSELECTED_STRATEGY_DECISION")
     if d["schema"] == "aql.paper-strategy-decision-receipt.v1":
