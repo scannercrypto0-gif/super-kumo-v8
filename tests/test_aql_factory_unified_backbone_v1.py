@@ -450,6 +450,27 @@ class UnifiedBackboneTests(unittest.TestCase):
             self.assertEqual(source["bar_count_available"],N)
             self.assertEqual(source,consume_core_warehouse_query(
                 admission,prices,assessment,warehouse,query))
+            # The genuine original mode has a different Core classification
+            # from the synthetic fixture mode. Shape-only mock in this CI:
+            # NOT an authenticated original source or genuine E2E.
+            original_contract_mock=copy.deepcopy(warehouse)
+            original_contract_mock["test_only"]=False
+            original_contract_mock["source_evidence_class"]="RETROSPECTIVE_NOT_PIT"
+            original_contract_mock["receipt_sha256"]=_digest({
+                k:v for k,v in original_contract_mock.items()
+                if k!="receipt_sha256"})
+            original_contract_result=consume_core_warehouse_query(
+                admission,prices,assessment,original_contract_mock,query)
+            self.assertEqual(original_contract_result["historical_pit"],
+                             "NOT_ATTESTED") if "historical_pit" in original_contract_result else self.assertFalse(
+                                 original_contract_result["source_eligible_for_historical_pit"])
+            original_contract_mock["test_only"]=True
+            original_contract_mock["receipt_sha256"]=_digest({
+                k:v for k,v in original_contract_mock.items()
+                if k!="receipt_sha256"})
+            with self.assertRaises(UnifiedBackboneError):
+                consume_core_warehouse_query(
+                    admission,prices,assessment,original_contract_mock,query)
             self.assertEqual(raw_vault.read(warehouse["source_zip_sha256"]),raw)
             self.assertEqual(warehouse,admit_local_original(
                 warehouse_root,raw,checks,pin,scope,
