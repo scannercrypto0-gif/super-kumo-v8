@@ -43,7 +43,7 @@ jobs:
       - name: Checkout pinned Core #253 code (unmerged read-only)
         uses: actions/checkout@v4
         with:
-          ref: 5d7c869d97ad99219a5ef27f9c841c70f0fcd505
+          ref: fef7e0df23e4b49f834239ee020d52265e1697f4
           path: _core253
           persist-credentials: false
       - name: Checkout exact pinned RAW Vault #211 (read-only)
