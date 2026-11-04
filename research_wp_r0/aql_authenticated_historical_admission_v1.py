@@ -11,7 +11,7 @@ import re
 
 from research_wp_r0.aql_archive_custody_bridge_v1 import (
     BridgeError, OfflineBridgeStager, digest, export_archive_query,
-    export_vault_csv, raw_sha, verify_packet,
+    export_vault_csv, export_binance_native_zip, raw_sha, verify_packet,
 )
 from research_wp_r0.aql_core_research_query_seam_v1 import (
     REQUEST_SCHEMA, query_custody,
@@ -20,6 +20,8 @@ from research_wp_r0.historical_library import HistoricalLibrary
 
 ADMISSION_SCHEMA = "aql.core.historical-original-admission.v1"
 PIN_SCHEMA = "aql.core.external-original-byte-pin.v1"
+_ZIP_FIELDS = frozenset(("archive_name", "csv_member_name",
+                         "csv_member_sha256", "checksum_file_sha256"))
 _PIN_FIELDS = frozenset((
     "schema", "source_kind", "original_object_id", "original_sha256",
     "provenance_reference", "captured_at_ms", "claimed_available_at_ms",
@@ -48,9 +50,11 @@ def _ms(value):
 
 
 def _validate_pin(pin, spec, cutoff):
-    _require(type(pin) is dict and set(pin) == _PIN_FIELDS, "INVALID_PIN_FIELDS")
+    _require(type(pin) is dict and set(pin) ==
+             (_PIN_FIELDS | _ZIP_FIELDS if pin.get("source_kind") == "BINANCE_KLINES_ZIP"
+              else _PIN_FIELDS), "INVALID_PIN_FIELDS")
     _require(pin["schema"] == PIN_SCHEMA, "INVALID_PIN_SCHEMA")
-    _require(pin["source_kind"] in ("SEALED_ARCHIVE_QUERY", "RAW_VAULT_CSV"),
+    _require(pin["source_kind"] in ("SEALED_ARCHIVE_QUERY", "RAW_VAULT_CSV", "BINANCE_KLINES_ZIP"),
              "UNSUPPORTED_ORIGINAL_SOURCE")
     _require(type(pin["original_object_id"]) is str
              and _IDENTIFIER.fullmatch(pin["original_object_id"]) is not None
@@ -80,6 +84,14 @@ def _validate_pin(pin, spec, cutoff):
         _require(_sha(pin["expected_inventory_sha256"])
                  and pin["vault_object_metadata"] is None,
                  "ARCHIVE_INVENTORY_PIN_REQUIRED")
+    elif pin["source_kind"] == "BINANCE_KLINES_ZIP":
+        _require(pin["expected_inventory_sha256"] is None
+                 and pin["vault_object_metadata"] is None
+                 and all(_sha(pin[k]) for k in
+                         ("csv_member_sha256", "checksum_file_sha256"))
+                 and type(pin["archive_name"]) is str
+                 and type(pin["csv_member_name"]) is str,
+                 "NATIVE_ZIP_EXTERNAL_PINS_REQUIRED")
     else:
         _require(pin["expected_inventory_sha256"] is None
                  and type(pin["vault_object_metadata"]) is dict,
@@ -110,6 +122,7 @@ def source_not_available(dataset_id=None):
 def admit_original_bytes(
     source_bytes, pin, spec, *, stager: OfflineBridgeStager,
     library: HistoricalLibrary, decision_cutoff_ms: int,
+    checksum_file_bytes: bytes | None = None,
 ):
     """Stage one bounded original source object and return sealed custody proof.
 
@@ -137,6 +150,18 @@ def admit_original_bytes(
             source_bytes,
             expected_source_sha256=pin["original_sha256"],
             expected_inventory_hash=pin["expected_inventory_sha256"],
+            spec=spec,
+        )
+    elif pin["source_kind"] == "BINANCE_KLINES_ZIP":
+        _require(type(checksum_file_bytes) is bytes,
+                 "NATIVE_ZIP_CHECKSUM_FILE_REQUIRED")
+        packet = export_binance_native_zip(
+            source_bytes, expected_zip_sha256=pin["original_sha256"],
+            archive_name=pin["archive_name"],
+            member_name=pin["csv_member_name"],
+            member_sha256=pin["csv_member_sha256"],
+            checksum_file_bytes=checksum_file_bytes,
+            checksum_file_sha256=pin["checksum_file_sha256"],
             spec=spec,
         )
     else:
@@ -199,6 +224,12 @@ def admit_original_bytes(
         "original_object_id": pin["original_object_id"],
         "original_pin_claim_sha256": digest(pin),
         "source_bytes_sha256": pin["original_sha256"],
+        "native_csv_member_sha256": (pin["csv_member_sha256"]
+                                     if pin["source_kind"] == "BINANCE_KLINES_ZIP"
+                                     else None),
+        "native_checksum_file_sha256": (pin["checksum_file_sha256"]
+                                         if pin["source_kind"] == "BINANCE_KLINES_ZIP"
+                                         else None),
         "packet_sha256": key,
         "custody_receipt_sha256": receipt["receipt_sha256"],
         "manifest_integrity_sha256": receipt["manifest_integrity_sha256"],
