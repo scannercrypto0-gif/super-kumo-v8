@@ -187,7 +187,7 @@ class CrossLayerSameSourceSyntheticGate(unittest.TestCase):
         self.assertEqual(report["receipt_sha256"],
                          core_digest({k: v for k, v in report.items()
                                       if k != "receipt_sha256"}))
-        Path(".atlas_bundle_b_ci_receipts.json").write_text(
+        Path("atlas_bundle_b_ci_receipts.json").write_text(
             json.dumps(report, sort_keys=True, indent=2) + chr(10),
             encoding="utf8")
         print("ATLAS_B_RECEIPT_SHA256=" + report["receipt_sha256"])
