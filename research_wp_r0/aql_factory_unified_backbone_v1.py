@@ -16,6 +16,7 @@ import re
 from research_wp_r0.aql_factory_authentic_research_admission import (
     _digest, _hash, _check_seal,
 )
+from research_wp_r0.strategy_definition import canonical as research_canonical, digest as research_digest
 from src.aql.observation.contracts import PaperIntent
 from src.aql.observation.positions import PositionEvent, PositionLedger, PositionContractError
 
@@ -59,9 +60,7 @@ def frozen_work_receipt(obj):
          and type(obj["payload"]) is dict and sha(obj["sha256"]),
          "WORK_RECEIPT_SHAPE")
     try:
-        digest = sha256(json.dumps(obj["payload"], sort_keys=True,
-                                   separators=(",", ":"), ensure_ascii=False,
-                                   allow_nan=False).encode("utf-8")).hexdigest()
+        digest = sha256(research_canonical(obj["payload"])).hexdigest()
     except (ValueError, TypeError, OverflowError) as exc:
         raise UnifiedBackboneError("FACTORY_254_WORK_JSON") from exc
     need(digest == obj["sha256"], "WORK_RECEIPT_DIGEST")
@@ -319,7 +318,7 @@ def build_offline_paper_model_trace(nomination, decision_receipt,
          and type(n.get("reason_codes")) is list
          and sha(n.get("source_raw_sha256"))
          and sha(n.get("feature_snapshot_sha256"))
-         and _digest(n.get("feature_evidence")) == n["feature_snapshot_sha256"],
+         and research_digest(n.get("feature_evidence")) == n["feature_snapshot_sha256"],
          "SCANNER_EVIDENCE_OR_CLOCK")
     census = n.get("strategy_census")
     need(type(census) is dict and
@@ -328,7 +327,7 @@ def build_offline_paper_model_trace(nomination, decision_receipt,
          and sum(census.values()) == n.get("denominator")
          and census[n["status"].lower()] >= 1,
          "SCANNER_FULL_DENOMINATOR")
-    need(n.get("attempt_id") == _digest({
+    need(n.get("attempt_id") == research_digest({
         "run": n.get("run_id"), "strategy": n.get("config_digest"),
         "symbol": n.get("symbol")}), "SCANNER_ATTEMPT_ID")
     need(secretary_receipt.get("schema") ==
