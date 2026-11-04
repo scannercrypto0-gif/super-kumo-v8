@@ -704,6 +704,7 @@ def consume_core_secretary_route(warehouse_receipt, scanner_route,
          and sha(ack.get("acknowledgement_sha256")),
          "SECRETARY_ACK_RECEIPT")
     need(type(event_trace) is list and 2 <= len(event_trace) <= 256
+         and all(type(v) is dict for v in event_trace)
          and event_trace[0].get("state") == "PENDING"
          and event_trace[-1].get("state") == "ACKED",
          "SECRETARY_TRACE_SHAPE")
