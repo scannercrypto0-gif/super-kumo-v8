@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import unittest
 import json
+from pathlib import Path
+from research_wp_r0.aql_archive_custody_bridge_v1 import digest as core_digest
 from datetime import datetime, timezone
 from research_wp_r0.aql_factory_unified_backbone_v1 import freeze
 from research_wp_r0.aql_factory_core_query_bridge_v1 import run_isolated_bundle_b
@@ -135,6 +137,60 @@ class CrossLayerSameSourceSyntheticGate(unittest.TestCase):
         self.assertEqual(again, ack)
         self.assertEqual(product["batch"]["trading_authority"], "NONE")
         self.assertEqual(product["batch"]["orders_created"], 0)
+        report = {
+            "schema": "aql.integration.bundle-b-software-evidence.v1",
+            "source_class": "IN_MEMORY_SYNTHETIC_TEST_ONLY",
+            "new_authentic_month": "SOURCE_UNAVAILABLE",
+            "core_245_native_price_query_sha256": native["price_query_sha256"],
+            "core_253_query_local_sha256": local["query_sha256"],
+            "core_253_raw_warehouse_receipt_sha256": warehouse["receipt_sha256"],
+            "source_zip_sha256": warehouse["source_zip_sha256"],
+            "manifest_integrity_sha256": warehouse["manifest_integrity_sha256"],
+            "core_dual_query_identity_sha256": core_map["identity_map_sha256"],
+            "core_strategy_evaluation_sha256": calc["evaluation_sha256"],
+            "factory_source_receipt_sha256": source["artifact_sha256"],
+            "factory_bridge_sha256": product["bridge"]["artifact_sha256"],
+            "factory_projected_source_sha256":
+                product["adapted_source"]["artifact_sha256"],
+            "factory_lab_sha256": product["lab"]["artifact_sha256"],
+            "factory_paper_sha256": product["paper"]["artifact_sha256"],
+            "factory_batch_sha256": product["batch"]["artifact_sha256"],
+            "strategy_id": calc["strategy_id"],
+            "strategy_version": calc["strategy_version"],
+            "strategy_digest": calc["strategy_digest"],
+            "strategy_attempt_denominator": calc["attempt_denominator"],
+            "strategy_decision_slots": calc["decision_slots"],
+            "strategy_decision_counts": calc["decision_counts"],
+            "secretary_source_only_strategy_id": route.data["work235_strategy_id"],
+            "secretary_source_only_strategy_config":
+                route.data["work235_config_digest"],
+            "strategy_identity_with_secretary": "NOT_CLAIMED_SOURCE_ONLY",
+            "scanner_nomination_sha256": native_nomination["digest"],
+            "scanner_operational_status": "UNKNOWN",
+            "secretary_route_sha256": route.sha256,
+            "secretary_queue_message_id": queue["message_id"],
+            "secretary_queue_payload_sha256": queue["payload_sha256"],
+            "secretary_ack_sha256": ack["receipt_sha256"],
+            "secretary_factory_consumer_sha256":
+                confirmed.data["factory_consumer_receipt_sha256"],
+            "secretary_ack_state": confirmed.data["state"],
+            "paper_decision": product["paper"]["decision"],
+            "paper_route": product["paper"]["work235_actual_route"],
+            "orders": product["paper"]["orders_created"],
+            "positions": product["paper"]["paper_positions"],
+            "fills": product["paper"]["actual_fills"],
+            "historical_pit": "NOT_ATTESTED",
+            "holdout": "SEALED_UNOPENED",
+            "trading_authority": "NONE",
+        }
+        report["receipt_sha256"] = core_digest(report)
+        self.assertEqual(report["receipt_sha256"],
+                         core_digest({k: v for k, v in report.items()
+                                      if k != "receipt_sha256"}))
+        Path(".atlas_bundle_b_ci_receipts.json").write_text(
+            json.dumps(report, sort_keys=True, indent=2) + "\\n",
+            encoding="utf8")
+        print("ATLAS_B_RECEIPT_SHA256=" + report["receipt_sha256"])
 
 
 def load_tests(loader, standard_tests, pattern):
