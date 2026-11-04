@@ -42,6 +42,42 @@ New `consume_core_secretary_route(warehouse,scanner_route,queue_receipt,ack_rece
 
 The consolidated `.github/workflows/aql-factory-unified-backbone.yml` checks out Core #253 exact SHA `5d7c869d97ad99219a5ef27f9c841c70f0fcd505` in a read-only secondary directory, plus Work #235 and Work #228 frozen SHA. The cross-owner test invokes **actual existing Core functions** `admit_local_original` (native 12-column test ZIP), `query_local`, pre-existing Core #245 `admit_original_bytes`/`query_price_custody`, Core #249 `assess_chronology_universe`, Core #253 `enqueue_nomination/poll_nomination/acknowledge_nomination/route_trace`, and Factory source+Secretary consumers. It validates identical repeated receipts and negatives for resealed source SHA, version, missing bars, future availability, ACK, trace, strategy and source domain. **Real pinned Core code, synthetic original-format source bytes**: this is an engineering-compatible offline E2E, not the authentic 2024 original-data run. Work #228 store and Work #235 route are also executed on their *own* TEST_ONLY synthetic fixtures in the same CI job, without false identification across source domains.
 
+## Owner option A — retained private original-source transfer intake (2026-11-04)
+
+[Owner approval #254/6628519182](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/254#issuecomment-6628519182) allows *only* an owner-authorized private transfer of the **already-retained** Feb/Aug 2024 BTCUSDT Spot 15m ZIP+CHECKSUM to a common Core/Factory runner. This does NOT authorize a new download, public GitHub upload, GitHub Actions private-byte artifact, paper/live activation, or a new Work dispatch. Audit #248 independently verified the earlier private evidence artifact in its own context; that does not establish byte access in this Factory/CI context.
+
+**Actual access check (2026-11-04):** no original source ZIP/CHECKSUM backing file is mounted into this Factory runner. Current conversation attachments: none. The accessible Library has unrelated source metadata and receipts, not the requested original monthly ZIP; connected Drive exact archive/package search: no matches. The available Work #247 session originally held the private source bundle, which is not automatically shared with this new runner. Therefore no actual original-source run or authentic end-to-end receipt is claimed from the public CI.
+
+### Prepared private source-only executable (new Factory-owned path)
+
+`research_wp_r0/aql_factory_authorized_original_run_v1.py` provides:
+- **Immutable preflight** for precisely the two Work #247/Audit #248 published ZIP, original CSV member and original CHECKSUM-file SHA256s, ZIP CRC, exact member/filename and checksum-line integrity. The two expected source counts are Feb 2,784 and Aug 2,976. The public callable `verify_original(raw,checksum,month)` **cannot** accept arbitrary fixture pins. No partial ZIP truncation or replacing a missing original with a synthetic file.
+- **Exact code checkout** `Core #253 5d7c869d97ad99219a5ef27f9c841c70f0fcd505` and `RAW Vault #211 7d97b09c0c6ee2650a61d523acb8d8c771a99c46` checked with `git rev-parse HEAD`, not a mutable branch. Only already-retained authorized bytes are passed to existing `admit_local_original(...,vault=RawVault(...))`, immutable Vault readback and recovery scan, Core `query_local`, native Core admission/price and Core #249 chronology, then existing Factory `consume_core_warehouse_query`. Outputs **only** sanitized content-addressed hashes and statuses, no private prices/source or private file paths; owner-private receipt created with mode 0600, exclusive create-only and not under git checkout.
+- Core #253 `IDENTITY` allows `[A-Za-z0-9_.:]` but not hyphens. Published Work #247 development `dataset_id` contains hyphens. Factory runner records an **explicit** alias per cohort (`BINANCE_SPOT_BTCUSDT_15M_2024_02_DEV_v1` or `...2024_08_DEV_v1`) and the original Work #247 ID, **joined only by the immutable pinned source ZIP hash**. The alias must NOT be used to pretend old Work #247 original receipt objects or the 106 accepted Factory reports have identical dataset IDs, nor as a pretext to recalculate them. Full old Lab receipt joining needs a separately attested ID mapping in the same-source strategy evidence.
+- The private runner intentionally returns **`authentic_source_to_paper_e2e=NOT_COMPLETE`**, `scanner_secretary=NOT_CONNECTED_SOURCE_LOCKED_SCANNER_EVIDENCE`, `independent_work_policy=NOT_CONNECTED_SOURCE_MATCH_MISSING`. It never auto-generates a Scanner V1 NOMINATED signal, Secretary ACK, Work #235 decision, synthetic fills, or fake full E2E. Historical issuer/correction/known-at and all-market opportunities remain unproven.
+
+Usage **only inside an owner-authorized private offline environment**, after the existing exact monthly source ZIP and adjacent CHECKSUM have been made available through an approved private channel and both frozen repository checkouts are present. The cutoff is an *observed 2026 retrospective* time in UTC milliseconds, never an assertion the files were published at the 2024 bar close:
+
+```sh
+export AQL_AUTHORIZED_ORIGINAL_CORE_FACTORY_RUNNER=OWNER_APPROVED_PRIVATE_ONLY
+python -m research_wp_r0.aql_factory_authorized_original_run_v1 \
+  --month 2024-02 \
+  --original-zip /authorized/private/BTCUSDT-15m-2024-02.zip \
+  --checksum-file /authorized/private/BTCUSDT-15m-2024-02.zip.CHECKSUM \
+  --core-checkout /authorized/pinned/core253 \
+  --raw-checkout /authorized/pinned/raw211 \
+  --core-root /authorized/private/core-local-warehouse \
+  --raw-root /authorized/private/immutable-raw-vault \
+  --cutoff-ms "$APPROVED_RETROSPECTIVE_OBSERVATION_CUTOFF_MS" \
+  --receipt-out /authorized/private/receipts/factory254-feb-source.json
+```
+
+For August repeat only after the February original source + receipt are independently verified, with separate Core/RAW roots as required by the bounded original-source identity. Do not put private files anywhere inside the repository or GitHub Actions. These commands are **prepared local instructions, not executed original-source runs**.
+
+**One consolidated public CI** in `.github/workflows/aql-factory-unified-backbone.yml` uses pinned actual Core #253 + actual RAW #211 + Work #228/#235 on *new synthetic TEST_ONLY data only*, validates RAW_COMMITTED and restart/replay/gaps/version/Secretary ACK, plus the private-runner fail-closed SHA checks against independent synthetic fixtures; the fixtures cannot pass genuine `verify_original`. This is preparation, not original data transfer.
+
+**Remaining owner's actual handoff dependency:** provide the already-retained original ZIP+CHECKSUM from the previous private Work session to **this same authorized Core/Factory runner** through an existing private artifact transfer/attachment capability. Do not upload them to GitHub or regenerate from the web. Once truly accessible, run the above one bounded source→RAW→Core→Factory smoke; genuine source-locked Scanner V1 and independent Work #235 strategy policy must also exist **on that exact source** before claiming genuine source→Secretary→Paper/Lab E2E. Audit receives one read-only engineering delta/owner-private receipt; Audit #248 source checks need not be repeated.
+
 ## Current integration state / external blocker
 
 | Segment | Current bounded claim |
