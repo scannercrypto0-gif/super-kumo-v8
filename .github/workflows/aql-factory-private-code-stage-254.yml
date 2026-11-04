@@ -1,0 +1,78 @@
+name: Factory 254 private-runner code checkout export (CODE ONLY)
+on:
+  push:
+    branches:
+      - factory/private-code-stage-254-20261104
+    paths:
+      - '.github/workflows/aql-factory-private-code-stage-254.yml'
+permissions:
+  contents: read
+jobs:
+  exact-code-export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 59772a8a90be997ec6c4447d4f90a22d299938ef
+          path: _factory255
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: fef7e0df23e4b49f834239ee020d52265e1697f4
+          path: _core226
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46
+          path: _raw211
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: b9c9ff8602e79c534402f44bce83c56ec2fa6bb9
+          path: _scanner227
+          persist-credentials: false
+      - name: Independently verify checkout commits and package executable code
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C _factory255 rev-parse HEAD)" = "59772a8a90be997ec6c4447d4f90a22d299938ef"
+          test "$(git -C _core226 rev-parse HEAD)" = "fef7e0df23e4b49f834239ee020d52265e1697f4"
+          test "$(git -C _raw211 rev-parse HEAD)" = "7d97b09c0c6ee2650a61d523acb8d8c771a99c46"
+          test "$(git -C _scanner227 rev-parse HEAD)" = "b9c9ff8602e79c534402f44bce83c56ec2fa6bb9"
+          for d in _factory255 _core226 _raw211 _scanner227; do
+            git -C "$d" diff --exit-code
+            git -C "$d" diff --cached --exit-code
+            test -f "$d/.git/HEAD"
+            if grep -q 'x-access-token\|ghs_\|github_pat_' "$d/.git/config"; then
+              echo "Credentials detected in checkout config, refusing export" >&2
+              exit 3
+            fi
+          done
+          python - <<'PY'
+          import json, subprocess
+          pins={
+              "_factory255":"59772a8a90be997ec6c4447d4f90a22d299938ef",
+              "_core226":"fef7e0df23e4b49f834239ee020d52265e1697f4",
+              "_raw211":"7d97b09c0c6ee2650a61d523acb8d8c771a99c46",
+              "_scanner227":"b9c9ff8602e79c534402f44bce83c56ec2fa6bb9",
+          }
+          manifest={"schema":"aql.factory.code-stage-254.v1","private_original_bytes_in_artifact":False,
+                    "checkouts":{k:{"commit_sha256":v,"tree_sha1":subprocess.check_output(
+                       ["git","-C",k,"rev-parse","HEAD^{tree}"],text=True).strip()} for k,v in pins.items()}}
+          with open("CODE_PIN_MANIFEST.json","w",encoding="utf8") as f:
+              json.dump(manifest,f,sort_keys=True,separators=(",",":"))
+          PY
+          tar -czf "$RUNNER_TEMP/aql-code-stage-254.tar.gz" \
+            --exclude='*/.git/config' --exclude='*/.git/logs' \
+            --exclude='*/.git/hooks' --exclude='*/.git/objects/info/alternates' \
+            CODE_PIN_MANIFEST.json _factory255 _core226 _raw211 _scanner227
+          sha256sum "$RUNNER_TEMP/aql-code-stage-254.tar.gz"
+          du -h "$RUNNER_TEMP/aql-code-stage-254.tar.gz"
+      - name: Export only public repository code for owner-private co-location
+        uses: actions/upload-artifact@v4
+        with:
+          name: aql-factory254-exact-code-only
+          path: ${{ runner.temp }}/aql-code-stage-254.tar.gz
+          retention-days: 1
+          if-no-files-found: error
