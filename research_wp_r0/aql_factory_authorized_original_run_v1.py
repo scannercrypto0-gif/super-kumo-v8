@@ -32,12 +32,8 @@ PINS={
             "3fe8d6caf60fa6e7b7bc22e482fc04710aaedbd281dc725fba8a36e913e33118",
             2976,"BINANCE-SPOT-BTCUSDT-15M-2024-08-DEV-v1"),
 }
-# Core #253 Bridge IDENTITY disallows hyphens. Explicit versioned alias,
-# never a silent rewrite of Work #247 dataset IDs or its 106 receipts.
-CORE_DATASET_ALIASES={
- "2024-02":"BINANCE_SPOT_BTCUSDT_15M_2024_02_DEV_v1",
- "2024-08":"BINANCE_SPOT_BTCUSDT_15M_2024_08_DEV_v1",
-}
+# Core IDENTITY [A-Za-z0-9_.:-] allows hyphens: retain the EXACT
+# Work #247 dataset_id, never silently introduce a second source identity.
 class OriginalAccessError(ValueError): pass
 
 def need(ok,why):
@@ -95,7 +91,7 @@ def month_spec(month,cutoff,pin):
     need(type(cutoff) is int and cutoff>=
          int(datetime(2026,11,1,tzinfo=timezone.utc).timestamp()*1000),
          "OBSERVATION_CUTOFF_NOT_RETROSPECTIVE")
-    return dict(dataset_id=CORE_DATASET_ALIASES[month],version=1,symbol="BTCUSDT",
+    return dict(dataset_id=pin["dataset_id"],version=1,symbol="BTCUSDT",
                 interval="15m",exchange="BINANCE",market="SPOT",
                 source_label="WORK247_OWNER_AUTHORIZED_RETROSPECTIVE",
                 start_ms=start,end_exclusive_ms=end,as_of_ms=cutoff,
@@ -175,7 +171,7 @@ def run_source_only(raw,checksum,month,cutoff,core_checkout,raw_checkout,
         "cohort":month,"source_archive_sha256":p["source_sha256"],
         "published_work247_dataset_id":p["dataset_id"],
         "actual_core253_dataset_id":spec["dataset_id"],
-        "source_dataset_alias":"EXPLICIT_ALIAS_SAME_ORIGINAL_ZIP_SHA_ONLY",
+        "source_dataset_identity":"EXACT_WORK247_ID_PRESERVED",
         "prior_work_106_reports_reused":False,
         "source_member_sha256":p["member_sha256"],
         "checksum_file_sha256":p["checksum_sha256"],
