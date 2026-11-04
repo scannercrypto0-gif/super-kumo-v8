@@ -7,13 +7,13 @@ import unittest
 
 from tools.strategy_service_offline.run import FIXTURES
 from tools.strategy_service_offline.common import Frozen
-from .test_integration import Native15mGate
+from . import test_integration
 from .portfolio import scan_strategy_groups
 
 
 class PortfolioGate(unittest.TestCase):
     def setUp(self):
-        fixture = Native15mGate(methodName="test_all_strategy_symbol_pairs_and_safety")
+        fixture = test_integration.Native15mGate(methodName="test_all_strategy_symbol_pairs_and_safety")
         fixture.setUp()
         self.synthetic = fixture
         specs = json.loads((FIXTURES/"strategies.json").read_text())
