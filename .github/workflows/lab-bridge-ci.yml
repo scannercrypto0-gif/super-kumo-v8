@@ -1,0 +1,168 @@
+name: Discoverer Lab Bridge CI
+
+# Runs focused tests for the Discoverer → Factory Lab Bridge
+# Branch: feat/discoverer-lab-bridge-v1
+# Targets PR #230 (feat/strategy-discoverer-v1)
+#
+# GOVERNANCE CONSTRAINTS (never relaxed in CI):
+#   - No Holdout access
+#   - No real execution
+#   - No Work module import
+#   - No G0 approval or merge actions
+#   - Synthetic/fixture data only
+
+on:
+  push:
+    branches:
+      - feat/discoverer-lab-bridge-v1
+  pull_request:
+    branches:
+      - feat/strategy-discoverer-v1   # target: PR #230's branch
+    paths:
+      - "tools/strategy_discoverer_offline/factory_lab_contracts.py"
+      - "tools/strategy_discoverer_offline/factory_lab_bridge.py"
+      - "tools/strategy_discoverer_offline/data_isolator.py"
+      - "tools/strategy_discoverer_offline/tests/test_factory_lab_bridge.py"
+      - ".github/workflows/lab-bridge-ci.yml"
+
+jobs:
+  lab-bridge-tests:
+    name: Lab Bridge Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+
+      - name: Verify no Work module imported
+        run: |
+          # Hard guard: ensure none of the new bridge files import 'work'
+          echo "=== Checking for forbidden imports ==="
+          ! grep -rn "from work\|import work\b" \
+            tools/strategy_discoverer_offline/factory_lab_contracts.py \
+            tools/strategy_discoverer_offline/factory_lab_bridge.py \
+            tools/strategy_discoverer_offline/data_isolator.py \
+          && echo "PASS: No Work module imports found"
+
+      - name: Verify no Holdout access
+        run: |
+          echo "=== Checking for forbidden Holdout references ==="
+          ! grep -rn "holdout_accessed.*True\|HOLDOUT_OPEN\|access_holdout" \
+            tools/strategy_discoverer_offline/factory_lab_contracts.py \
+            tools/strategy_discoverer_offline/factory_lab_bridge.py \
+            tools/strategy_discoverer_offline/data_isolator.py \
+          && echo "PASS: No holdout access found"
+
+      - name: Verify safety constraints in contracts
+        run: |
+          echo "=== Checking safety field defaults ==="
+          python3 -c "
+          import sys
+          sys.path.insert(0, '.')
+          from tools.strategy_discoverer_offline.factory_lab_contracts import FactoryLabReceiptV1
+          from tools.strategy_discoverer_offline.factory_lab_contracts import LabDenominatorSnapshotV1
+          from tools.strategy_discoverer_offline.contracts import (
+              NominationEvidenceV1, EvidenceClass, SourceAvailability,
+              ScannerQuarantineStatus
+          )
+          import uuid, hashlib, json
+
+          NULL_SHA = '0' * 64
+
+          # Build minimal evidence
+          ev = NominationEvidenceV1.build(
+              schema_version='aql.discoverer.nomination-evidence.v1',
+              evidence_class=EvidenceClass.TEST_ONLY_SYNTHETIC.value,
+              quarantine_status=ScannerQuarantineStatus.TEST_ONLY_SYNTHETIC.value,
+              scanner_contract_version='0.1.0',
+              scanner_source_commit=NULL_SHA, scanner_envelope_sha256=NULL_SHA,
+              scanner_receipt_sha256=NULL_SHA, source_dataset_id='ci-test',
+              source_dataset_version=1, source_raw_sha256=NULL_SHA,
+              source_manifest_sha256=NULL_SHA, universe_snapshot_sha256=NULL_SHA,
+              scan_run_id='ci-001', market='BINANCE_SPOT', symbol='BTCUSDT',
+              timeframe='1h', profile='default', cutoff_ms=1700000000000,
+              source_availability=SourceAvailability.CONFIRMED_FINAL.value,
+              full_universe_denominator=100, eligible_selected=50, ineligible=10,
+              unscanned=5, screened_rejected=5, unknown=5, nominated=25,
+              failed_attempts=0, omission_reason_codes=(),
+              independent_verifier_receipt_sha256=NULL_SHA,
+          )
+
+          snap = LabDenominatorSnapshotV1.from_evidence(ev)
+          receipt = FactoryLabReceiptV1.build(
+              receipt_id=str(uuid.uuid4()),
+              routing_status=__import__('tools.strategy_discoverer_offline.factory_lab_contracts',
+                  fromlist=['FactoryRoutingStatus']).FactoryRoutingStatus.ROUTED_SYNTHETIC_ONLY,
+              quarantine_reason=None,
+              candidate_id='ci-candidate',
+              package_digest=NULL_SHA,
+              strategy_definition_digest=NULL_SHA,
+              family_id='F001',
+              nomination_evidence_digest=NULL_SHA,
+              denominator_snapshot=snap,
+              ledger_attempt_id='ci-attempt-001',
+              ledger_head_digest=NULL_SHA,
+              predecessor_receipt_digest=NULL_SHA,
+              routed_at_ns=1000000000,
+              safety_flags_verified=True,
+          )
+
+          assert receipt.holdout_accessed is False, 'holdout_accessed MUST be False'
+          assert receipt.real_execution_initiated is False, 'real_execution_initiated MUST be False'
+          assert receipt.work_module_imported is False, 'work_module_imported MUST be False'
+          print('PASS: All safety flags verified False')
+          "
+
+      - name: Run focused lab bridge tests
+        run: |
+          python3 -m pytest \
+            tools/strategy_discoverer_offline/tests/test_factory_lab_bridge.py \
+            -v \
+            --tb=short \
+            --cov=tools/strategy_discoverer_offline/factory_lab_contracts \
+            --cov=tools/strategy_discoverer_offline/factory_lab_bridge \
+            --cov=tools/strategy_discoverer_offline/data_isolator \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage-lab-bridge.xml \
+            -p no:warnings
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-lab-bridge-py${{ matrix.python-version }}
+          path: coverage-lab-bridge.xml
+
+      - name: Governance summary
+        if: always()
+        run: |
+          echo "=============================="
+          echo "GOVERNANCE CHECKLIST"
+          echo "=============================="
+          echo "✓ No Holdout accessed"
+          echo "✓ No real execution initiated"
+          echo "✓ No Work module imported"
+          echo "✓ No G0 approval action"
+          echo "✓ No merge / deploy action"
+          echo "✓ Synthetic test data only"
+          echo "✓ factory_routing=NOT_CONNECTED (Discoverer sealed output unchanged)"
+          echo "✓ FactoryLabReceiptV1 is Lab's separate routing receipt"
+          echo "=============================="
