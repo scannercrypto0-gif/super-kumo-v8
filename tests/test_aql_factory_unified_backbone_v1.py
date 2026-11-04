@@ -2,6 +2,9 @@
 TEST_ONLY/native Core objects are explicitly schema-shaped synthetic fixtures.
 """
 import copy
+import os
+import sys
+from pathlib import Path
 import unittest
 
 from research_wp_r0.aql_factory_authentic_research_admission import _digest, seal
@@ -355,6 +358,76 @@ class UnifiedBackboneTests(unittest.TestCase):
                     events[0]["source"]="BROKER_REAL_ORDER"
                 with self.assertRaises(UnifiedBackboneError):
                     build_offline_paper_model_trace(n,d,s,events)
+
+    def test_actual_work235_strategy_route_to_main_paper_ledger(self):
+        # A secondary checkout is pinned at the exact existing Work #235
+        # SHA; the test imports its genuine route and StrategyScreeningSpec
+        # without editing that Work-owned code or its accepted test suite.
+        root=os.environ.get("AQL_WORK235_PATH")
+        if not root:
+            self.skipTest("isolated Work #235 checkout not provided")
+        root=Path(root).resolve()
+        self.assertTrue((root/"tools/strategy_service_offline/routing.py").is_file())
+        sys.path.insert(0,str(root))
+        try:
+            from tools.strategy_service_offline.common import Frozen
+            from tools.strategy_service_offline.screening import StrategyScreeningSpec
+            from tools.strategy_service_offline.routing import route, TestOnlyStrategySink
+            import json
+            data=json.loads((root/"tools/strategy_service_offline/fixtures/strategies.json").read_text())
+            class TestOnlyJournal:
+                def __init__(self):self.data={}
+                def get(self,kind,key):return self.data.get((kind,key))
+                def put(self,kind,key,obj):
+                    old=self.data.get((kind,key))
+                    if old is not None and old!=obj:
+                        raise ValueError("CONFLICTING_TEST_ONLY_REPLAY")
+                    self.data[(kind,key)]=obj
+                    return obj
+            reports=[]
+            for i,raw in enumerate(data):
+                spec=StrategyScreeningSpec.restore_spec(raw)
+                n,_,_=paper_inputs()
+                row=n["payload"]
+                row.update(strategy_id=spec.data["strategy_id"],
+                           strategy_version=spec.data["strategy_version"],
+                           config_digest=spec.data["config_digest"],
+                           strategy_definition_digest=spec.data["definition"]["digest"])
+                row["attempt_id"]=research_digest({
+                    "run":row["run_id"],"strategy":row["config_digest"],
+                    "symbol":row["symbol"]})
+                nomination=Frozen.build(row).receipt()
+                journal=TestOnlyJournal()
+                sink=TestOnlyStrategySink(spec,journal,lambda _: "ACCEPT",
+                                          decision_policy_id="fixture_policy_%d" % i)
+                receipt=route(nomination,spec,journal,test_sink=sink).receipt()
+                self.assertEqual(
+                    receipt,route(nomination,spec,journal,test_sink=sink).receipt())
+                sec=freeze({
+                    "schema":"aql.factory.secretary-offline-delivery.v1",
+                    "mode":"TEST_ONLY","delivery_state":"ACK_TEST_ONLY_ONLY",
+                    "delivery_id":receipt["payload"]["delivery_id"],
+                    "nomination_sha256":nomination["sha256"],
+                    "attempt_id":row["attempt_id"],
+                    "strategy_id":row["strategy_id"],
+                    "strategy_version":row["strategy_version"],
+                    "config_digest":row["config_digest"],
+                    "source_raw_sha256":row["source_raw_sha256"],
+                    "cutoff_ms":row["cutoff_ms"],
+                    "delivered_ms":row["cutoff_ms"]+1000,
+                    "real_secretary_ack":None,"trading_authority":"NONE",
+                })
+                out=build_offline_paper_model_trace(
+                    nomination,receipt,sec,simulated_events(sec["delivered_ms"]))
+                self.assertEqual(out["strategy_id"],spec.data["strategy_id"])
+                self.assertEqual(out["orders_created"],0)
+                self.assertEqual(out["modeled_positions"][0]["status"],"closed")
+                reports.append(out)
+            self.assertEqual(len(reports),2)
+            self.assertEqual(len({x["config_digest"] for x in reports}),2)
+            self.assertEqual(len({x["artifact_sha256"] for x in reports}),2)
+        finally:
+            sys.path.remove(str(root))
 
     def test_real_original_and_synthetic_scan_never_join_implicitly(self):
         a,p,c,source,comparison,trials,port=lab_inputs()
