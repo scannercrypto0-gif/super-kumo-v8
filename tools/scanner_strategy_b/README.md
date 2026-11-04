@@ -115,3 +115,46 @@ claim that Work #235 can route native 15m operationally.
 The focused CI gate also exercises mixed 5m/15m synthetic portfolios,
 independent census/replay, duplicate group refusal, wrong timeframe and
 cross-source unknown. The whole batch remains no-network and TEST_ONLY.
+
+## Factory B ONE new-delta combined gate — Scanner handoff V1
+
+Scanner owner: `tools/scanner_strategy_b/factory_handoff.py::prepare_factory_handoff`.
+Input: a SHA-sealed Scanner `aql.scanner.strategy-native15m-test-only.v1`
+run receipt; a separately sealed Core/Secretary `aql.scanner-b.core-secretary-source-route.v1`
+receipt obtained using `prepare_source_only_route`; the independently
+verified `aql.scanner-b.secretary-ack-check.v1` receipt from
+`verify_offline_consumer_ack`; and **three independently pinned exact SHA
+arguments** for source ZIP, Core245 native price query, and Core253 local query.
+
+Result: immutable `aql.scanner-b.factory-handoff.v1` containing the test-only
+per-strategy total denominator and census, every strategy ID/version/config,
+every symbol/status/attempt/nomination SHA, the synthetic source SHA/manifest,
+separate exact Core historical source ZIP/native245/local253 SHA parents and
+Secretary ACK verification status. Every nested receipt is independently
+SHA-verified before it becomes eligible for the combined harness. The
+synthetic screening source and historical source-only route are **separate
+lanes**. Historical PIT stays NOT_ATTESTED and operational Scanner UNKNOWN;
+no synthetic SELECTED state is carried into the historical source route or
+Factory's Lab/Paper authority.
+
+Factory executor calls the existing Core Secretary `acknowledge_nomination`
+only for a **real explicit test consumer acknowledgement**, then Scanner's
+read-only `verify_offline_consumer_ack` validates the persisted Core outbox
+payload, signed event trace and existing Factory source consumer. Missing or
+quarantined ACK produces WAIT and no false success. Scanner's
+`prepare_factory_handoff` does not call `acknowledge_nomination` itself.
+Synthetic tests may provide a deterministic fake consumer SHA, but the result
+must remain labelled synthetic, source-only, offline and NOT PAPER ACTIVATED.
+
+For reproducible focused tests (CI composes exact pinned Draft owner modules
+in an ephemeral checkout, never changes the owner's PR):
+
+```sh
+python -m unittest -v tools.scanner_strategy_b.test_integration tools.scanner_strategy_b.test_portfolio
+```
+
+The included CI deliberately does not run accepted original Feb/Aug cohorts,
+106 historical reports, private data, operational Work235 Paper or an authentic
+new-original source. The **new-source E2E status remains SOURCE_UNAVAILABLE**
+until a new independently authenticated 15m cohort is delivered by Core, and
+Factory's integrated software gate remains separately owned/assessed.
