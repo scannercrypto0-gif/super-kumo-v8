@@ -6,6 +6,7 @@ Delivery is explicit caller-side handoff with acknowledged content hash.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from research_wp_r0.aql_archive_custody_bridge_v1 import digest
@@ -29,7 +30,18 @@ def _check_sha(value, code):
 
 def _payload(nomination, strategy_id, strategy_version, warehouse_receipt, lane):
     require(type(nomination) is dict and
-            nomination.get("publishable") is False and
+            nomination.get("schema_version") == "AQL-SCANNER-V1"
+            and type(nomination.get("digest")) is str
+            and SHA.fullmatch(nomination["digest"]) is not None,
+            "SCANNER_V1_SCHEMA_AND_DIGEST_REQUIRED")
+    scanner_body={k:v for k,v in nomination.items() if k!="digest"}
+    scanner_hash=hashlib.sha256(json.dumps(
+        scanner_body,sort_keys=True,separators=(",",":"),
+        ensure_ascii=False,default=str,
+    ).encode("utf-8")).hexdigest()
+    require(scanner_hash == nomination["digest"],
+            "SCANNER_ENVELOPE_DIGEST_MISMATCH")
+    require(nomination.get("publishable") is False and
             nomination.get("delivery_authorized") is False and
             nomination.get("availability_class") in (
                 "RETROSPECTIVE_NON_PIT", "UNKNOWN") and
