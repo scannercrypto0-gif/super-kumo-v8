@@ -573,6 +573,106 @@ class UnifiedBackboneTests(unittest.TestCase):
             # remains separate and has NOT acquired authority from the ACK.
             self.assertEqual(warehouse["status"],"OFFLINE_LOCAL_WAREHOUSE_COMMITTED")
 
+    def test_actual_core253_authorized_intake_unknown_wait_factory_ack(self):
+        # Public CI: actual immutable Core/RAW/Scanner code on SYNTHETIC
+        # source-format ZIP. This is NOT the private Feb/Aug original bytes.
+        core_root=os.environ.get("AQL_CORE253_PATH")
+        raw_root=os.environ.get("AQL_RAW211_PATH")
+        scanner_root=os.environ.get("AQL_SCANNER227_PATH")
+        if not all((core_root,raw_root,scanner_root)):
+            self.skipTest("pinned owner source-intake checkouts unavailable")
+        import io, zipfile, hashlib, json
+        from datetime import datetime,timezone
+        import research_wp_r0
+        import tools
+        research_wp_r0.__path__.insert(
+            0,str(Path(core_root).resolve()/"research_wp_r0"))
+        tools.__path__.insert(0,str(Path(raw_root).resolve()/"tools"))
+        tools.__path__.insert(0,str(Path(scanner_root).resolve()/"tools"))
+        from tools.raw_vault_offline.vault import RawVault
+        from research_wp_r0.aql_core_authorized_source_transfer_v1 import (
+            run_authorized_original_intake)
+        from research_wp_r0.aql_core_secretary_routing_v1 import (
+            enqueue_nomination,acknowledge_nomination,route_trace)
+        start=1706745600000
+        width=900000
+        member=(f"{start},100,102,99,101,5,{start+width-1},505,10,2,202,0\\n").encode()
+        out=io.BytesIO()
+        with zipfile.ZipFile(out,"w",zipfile.ZIP_DEFLATED) as z:
+            z.writestr("BTCUSDT-15m-2024-02.csv",member)
+        raw=out.getvalue()
+        zh=hashlib.sha256(raw).hexdigest()
+        checks=(zh+"  BTCUSDT-15m-2024-02.zip\\n").encode()
+        month_id="BINANCE-SPOT-BTCUSDT-15M-2024-02-DEV-v1"
+        witness={
+            "dataset_id":month_id,"version":1,
+            "symbol":"BTCUSDT","interval":"15m",
+            "exchange":"BINANCE","market":"SPOT",
+            "archive_name":"BTCUSDT-15m-2024-02.zip",
+            "csv_member_name":"BTCUSDT-15m-2024-02.csv",
+            "archive_sha256":zh,
+            "checksum_sha256":hashlib.sha256(checks).hexdigest(),
+            "csv_member_sha256":hashlib.sha256(member).hexdigest(),
+            "archive_bytes":len(raw),"checksum_bytes":len(checks),
+            "start_ms":start,"end_exclusive_ms":start+width,
+            "observed_bars":1,
+            "capture_observed_at_ms":start+width+10000,
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)/"core"
+            vault=RawVault(Path(tmp)/"raw")
+            result,warehouse,prices,queued=run_authorized_original_intake(
+                root,raw,checks,witness,vault=vault,
+                cutoff_ms=start+width+1000,
+                strategy_id="RESEARCH_WAIT_ONLY",strategy_version="v1",
+                message_id="FACTORY254_OWNER_A_SYNTHETIC_TEST",test_only=True,
+            )
+            self.assertEqual(result["warehouse_status"],
+                             "OFFLINE_LOCAL_WAREHOUSE_COMMITTED")
+            self.assertEqual(result["scanner_stage"],"UNKNOWN")
+            self.assertEqual(result["secretary_status"],
+                             "PENDING_FACTORY_CONSUMER_ACK")
+            self.assertEqual(result["factory_lab_paper"],
+                             "NOT_CONNECTED_UNTIL_OWNER_FACTORY_RUN")
+            self.assertEqual(vault.read(zh),raw)
+            self.assertEqual(prices["available_bar_count"],1)
+            self.assertEqual(queued["envelope"]["source_zip_sha256"],zh)
+            self.assertEqual(queued["envelope"]["strategy_id"],
+                             "RESEARCH_WAIT_ONLY")
+            queue=enqueue_nomination(
+                root,queued["envelope"]["scanner_nomination"],
+                strategy_id="RESEARCH_WAIT_ONLY",
+                strategy_version="v1",warehouse_receipt=warehouse,
+                lane="SLOW",idempotency_key=queued["message_id"])
+            self.assertEqual(queue["payload_sha256"],
+                             result["secretary_payload_sha256"])
+            acknowledgement=_digest({
+                "schema":"aql.factory.source-locked-consumer-ack.v1",
+                "source_sha256":zh,"payload_sha256":queue["payload_sha256"],
+                "message_id":queued["message_id"],
+                "authority":"OFFLINE_TEST_ONLY_CONSUMER",
+            })
+            ack=acknowledge_nomination(
+                root,message_id=queued["message_id"],
+                payload_sha256=queue["payload_sha256"],
+                acknowledgement_sha256=acknowledgement)
+            traced=consume_core_secretary_route(
+                warehouse,queued["envelope"],queue,ack,
+                route_trace(root,queued["message_id"]))
+            self.assertEqual(traced["scanner_strategy_decision"],
+                             "NOT_PERFORMED")
+            self.assertEqual(traced["paper_orders"],0)
+            self.assertEqual(traced["source_zip_sha256"],zh)
+            self.assertEqual(traced["dataset_id"],month_id)
+            self.assertEqual(traced["delivery"],
+                             "CORE_253_OFFLINE_OUTBOX_ACKED_CALLER_EVIDENCE")
+            altered=copy.deepcopy(queue)
+            altered["payload_sha256"]="f"*64
+            with self.assertRaises(UnifiedBackboneError):
+                consume_core_secretary_route(warehouse,queued["envelope"],
+                                            altered,ack,route_trace(
+                                                root,queued["message_id"]))
+
     def test_actual_work228_receipt_store_replay_and_tamper(self):
         # Reuse the existing Work #228 create-only ReceiptStore, not a second
         # Factory journal/persistence implementation.
