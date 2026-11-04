@@ -180,7 +180,7 @@ def consume_core_warehouse_query(core_admission, price_query,
                                 "OFFLINE_LOCAL_WAREHOUSE_COMMITTED")
              and type(w.get("test_only")) is bool
              and w.get("source_evidence_class") in ("SYNTHETIC_TEST",
-                                                    "RETROSPECTIVE_NON_PIT")
+                                                    "RETROSPECTIVE_NOT_PIT")
              and w.get("availability") == "RETROSPECTIVE_NON_PIT"
              and w.get("historical_known_at") == "NOT_ATTESTED"
              and w.get("universe") == "NOT_ATTESTED"
@@ -201,7 +201,7 @@ def consume_core_warehouse_query(core_admission, price_query,
         need((w["test_only"] is True and
               w["source_evidence_class"] == "SYNTHETIC_TEST")
              or (w["test_only"] is False and
-                 w["source_evidence_class"] == "RETROSPECTIVE_NON_PIT"),
+                 w["source_evidence_class"] == "RETROSPECTIVE_NOT_PIT"),
              "CORE_253_TEST_ORIGINAL_EVIDENCE_CLASS")
         need(w.get("dataset_id") == q.get("dataset_id") == source_id
              and w.get("version") == q.get("version") == source_version
