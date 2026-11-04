@@ -4,6 +4,7 @@ Synthetic originals only, all checked against real existing Core ZIP/Bridge
 APIs; no private Work retained bytes and no scientific or trading authority.
 """
 from copy import deepcopy
+from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -59,19 +60,22 @@ class CoreBackboneGate(unittest.TestCase):
         )
 
     def nomination(self,receipt,*,candidate="BTCUSDT:TEST:1",stage="NOMINATED"):
+        cutoff=datetime.fromtimestamp(self.cutoff/1000,timezone.utc).isoformat()
         result={
             "schema_version":"AQL-SCANNER-V1",
             "scanner_id":"SCANNER_TEST_ONLY",
             "candidate_id":candidate,
             "profile_id":"STRATEGY_TEST_PROFILE",
             "market":"BINANCE:SPOT:USDT",
-            "cutoff_at":"TEST_ONLY_DATE",
+            "cutoff_at":cutoff,
             "availability_class":"RETROSPECTIVE_NON_PIT",
             "stage":stage,
             "source_manifest":{
                 "dataset_id":receipt["dataset_id"],
                 "dataset_sha":receipt["source_zip_sha256"],
                 "schema_version":"AQL-SCANNER-V1",
+                "cutoff_at":cutoff,
+                "created_at":cutoff,
             },
             "feature_snapshot":{},
             "reasons":["TEST_ONLY_NOT_APPROVED"],
@@ -162,7 +166,7 @@ class CoreBackboneGate(unittest.TestCase):
             idempotency_key="E1",
         ))
         enqueue_nomination(
-            self.root,self.nomination(receipt,candidate="SLOW:TEST"),
+            self.root,self.nomination(receipt,candidate="BTCUSDT:SLOW:TEST"),
             strategy_id="STRAT_TEST",strategy_version="v1",
             warehouse_receipt=receipt,lane="SLOW",idempotency_key="E2",
         )
@@ -188,7 +192,7 @@ class CoreBackboneGate(unittest.TestCase):
                            strategy_version="v1",warehouse_receipt=receipt,
                            lane="FAST",idempotency_key="E1")
         with self.assertRaisesRegex(BackboneError,"IDEMPOTENCY_CONFLICT"):
-            enqueue_nomination(self.root,self.nomination(receipt,candidate="ELSE"),
+            enqueue_nomination(self.root,self.nomination(receipt,candidate="BTCUSDT:ELSE"),
                 strategy_id="STRAT",strategy_version="v1",warehouse_receipt=receipt,
                 lane="FAST",idempotency_key="E1")
         fake=deepcopy(original);fake["delivery_authorized"]=True
