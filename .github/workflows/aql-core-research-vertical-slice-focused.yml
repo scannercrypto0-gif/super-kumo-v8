@@ -20,6 +20,7 @@ on:
       - 'tests/test_aql_native_binance_zip_v1.py'
       - 'tests/test_aql_core_chronology_universe_evidence_v1.py'
       - 'tests/test_aql_core_backbone_local_v1.py'
+      - 'tests/test_aql_core_raw_vault_pin_v1.py'
       - 'tests/test_aql_archive_custody_bridge_v1.py'
       - '.github/workflows/aql-core-research-vertical-slice-focused.yml'
   pull_request:
@@ -39,6 +40,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout pinned existing RAW Vault #211 (read-only)
+        uses: actions/checkout@v4
+        with:
+          ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46
+          path: _pinned_raw_211
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -51,3 +58,4 @@ jobs:
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_native_binance_zip_v1.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_core_chronology_universe_evidence_v1.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_core_backbone_local_v1.py' -v
+          PYTHONPATH=.:_pinned_raw_211 python -m unittest discover -s tests -p 'test_aql_core_raw_vault_pin_v1.py' -v
