@@ -112,6 +112,17 @@ def _validate_population(packet):
 
 
 def _validate_bars(packet):
+    window = packet.get("research_window")
+    _require(type(window) is dict and set(window) == {
+        "train_end_exclusive_ms", "embargo_ms",
+        "holdout_start_ms", "holdout_end_exclusive_ms",
+    }, "DEVELOPMENT_WINDOW")
+    _require(all(type(v) is int and v >= 0 for v in window.values())
+             and window["embargo_ms"] >= 259_200_000
+             and window["train_end_exclusive_ms"] + window["embargo_ms"]
+             <= window["holdout_start_ms"]
+             < window["holdout_end_exclusive_ms"],
+             "SEALED_HOLDOUT_EMBARGO")
     width = packet.get("width_ms")
     bars = packet.get("bars")
     _require(type(width) is int and width in (60_000, 900_000, 3_600_000),
@@ -150,6 +161,12 @@ def _validate_bars(packet):
             _require(type(known) is int
                      and bar["close_ms"] < known <= start + width,
                      "FUTURE_OR_INVALID_AVAILABILITY")
+    _require(bars[-1]["close_ms"] < window["train_end_exclusive_ms"],
+             "SEALED_HOLDOUT_BAR_ACCESS")
+    for opp in packet["opportunities"]:
+        _require(first <= opp["bar_open_ms"] <= bars[-1]["open_ms"]
+                 and (opp["bar_open_ms"] - first) % width == 0,
+                 "OPPORTUNITY_OUTSIDE_PRICE_GRID")
     return bars, retrospective
 
 
@@ -321,10 +338,12 @@ def evaluate_historical_rules(packet):
             # The decision bar is fully observed at next-open execution. If
             # any stop/target was touched since entry, intrabar fill sequencing
             # cannot be reconstructed from OHLCV.
-            touches = any((bars[j]["low"] <= stop or bars[j]["high"] >= target)
-                          if direction == "LONG"
-                          else (bars[j]["high"] >= stop or bars[j]["low"] <= target)
-                          for j in range(entry, i+1))
+            # Earlier held bars were already checked; the first touch
+            # halts the path, so only the newly closed bar is relevant.
+            current = bars[i]
+            touches = ((current["low"] <= stop or current["high"] >= target)
+                       if direction == "LONG" else
+                       (current["high"] >= stop or current["low"] <= target))
             if touches:
                 unknown += 1
                 modeled.append({
