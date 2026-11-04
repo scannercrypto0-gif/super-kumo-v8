@@ -14,12 +14,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 5169b8486c369f5891d322ce8f4dfe6c08a2f337
+          ref: 9abdd81811f90df118695aac8a4e0b9ede4421e7
           path: _factory255
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          ref: fef7e0df23e4b49f834239ee020d52265e1697f4
+          ref: d5cd3764c21d4461143e3d89e64e331236fb295d
           path: _core226
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -36,8 +36,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C _factory255 rev-parse HEAD)" = "5169b8486c369f5891d322ce8f4dfe6c08a2f337"
-          test "$(git -C _core226 rev-parse HEAD)" = "fef7e0df23e4b49f834239ee020d52265e1697f4"
+          test "$(git -C _factory255 rev-parse HEAD)" = "9abdd81811f90df118695aac8a4e0b9ede4421e7"
+          test "$(git -C _core226 rev-parse HEAD)" = "d5cd3764c21d4461143e3d89e64e331236fb295d"
           test "$(git -C _raw211 rev-parse HEAD)" = "7d97b09c0c6ee2650a61d523acb8d8c771a99c46"
           test "$(git -C _scanner227 rev-parse HEAD)" = "b9c9ff8602e79c534402f44bce83c56ec2fa6bb9"
           for d in _factory255 _core226 _raw211 _scanner227; do
@@ -52,8 +52,8 @@ jobs:
           python - <<'PY'
           import json, subprocess
           pins={
-              "_factory255":"5169b8486c369f5891d322ce8f4dfe6c08a2f337",
-              "_core226":"fef7e0df23e4b49f834239ee020d52265e1697f4",
+              "_factory255":"9abdd81811f90df118695aac8a4e0b9ede4421e7",
+              "_core226":"d5cd3764c21d4461143e3d89e64e331236fb295d",
               "_raw211":"7d97b09c0c6ee2650a61d523acb8d8c771a99c46",
               "_scanner227":"b9c9ff8602e79c534402f44bce83c56ec2fa6bb9",
           }
