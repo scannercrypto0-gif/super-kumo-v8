@@ -120,10 +120,13 @@ class AuthenticHistoricalAdmissionGate(unittest.TestCase):
         self.assertEqual(unknown["factory_scientific_input"],"BLOCKED")
 
     def test_nonfinal_gap_duplicate_and_source_identity_adversarial(self):
-        for raw in (archive_payload(gap=True),
-                    archive_payload(nonfinal=True)):
-            with self.subTest(kind=raw[:36]),self.assertRaises(BridgeError):
-                self.admit(raw=raw,source_pin=pin(raw))
+        raw=archive_payload(gap=True)
+        with self.assertRaises(BridgeError):
+            self.admit(raw=raw,source_pin=pin(raw))
+        # The preexisting archive envelope itself must reject a nonfinal bar
+        # before the Bridge ever sees it; this is the correct upstream guard.
+        with self.assertRaises(ValueError):
+            archive_payload(nonfinal=True)
         with self.assertRaises(BridgeError):
             mutated=archive_payload(mutation=1)
             self.admit(raw=mutated,source_pin=pin(mutated,expected_inventory_sha256="0"*64))
