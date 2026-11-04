@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 59772a8a90be997ec6c4447d4f90a22d299938ef
+          ref: 5169b8486c369f5891d322ce8f4dfe6c08a2f337
           path: _factory255
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C _factory255 rev-parse HEAD)" = "59772a8a90be997ec6c4447d4f90a22d299938ef"
+          test "$(git -C _factory255 rev-parse HEAD)" = "5169b8486c369f5891d322ce8f4dfe6c08a2f337"
           test "$(git -C _core226 rev-parse HEAD)" = "fef7e0df23e4b49f834239ee020d52265e1697f4"
           test "$(git -C _raw211 rev-parse HEAD)" = "7d97b09c0c6ee2650a61d523acb8d8c771a99c46"
           test "$(git -C _scanner227 rev-parse HEAD)" = "b9c9ff8602e79c534402f44bce83c56ec2fa6bb9"
@@ -52,7 +52,7 @@ jobs:
           python - <<'PY'
           import json, subprocess
           pins={
-              "_factory255":"59772a8a90be997ec6c4447d4f90a22d299938ef",
+              "_factory255":"5169b8486c369f5891d322ce8f4dfe6c08a2f337",
               "_core226":"fef7e0df23e4b49f834239ee020d52265e1697f4",
               "_raw211":"7d97b09c0c6ee2650a61d523acb8d8c771a99c46",
               "_scanner227":"b9c9ff8602e79c534402f44bce83c56ec2fa6bb9",
