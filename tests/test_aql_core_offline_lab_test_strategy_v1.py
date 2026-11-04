@@ -74,13 +74,13 @@ class CoreLabCalculation(unittest.TestCase):
                 START+i*WIDTH,close,close+1,close-1,close,5,
                 START+(i+1)*WIDTH-1,500,10,2,200,0,
             ))))
-        csv=("\\n".join(lines)+"\\n").encode()
+        csv=("\n".join(lines)+"\n").encode()
         sink=BytesIO()
         with ZipFile(sink,"w",compression=ZIP_DEFLATED) as z:
             z.writestr("BTCUSDT-15m-2024-02.csv",csv)
         raw=sink.getvalue()
         sha=lambda b:hashlib.sha256(b).hexdigest()
-        cs=(sha(raw)+"  BTCUSDT-15m-2024-02.zip\\n").encode()
+        cs=(sha(raw)+"  BTCUSDT-15m-2024-02.zip\n").encode()
         w={**self.w,"archive_sha256":sha(raw),"csv_member_sha256":sha(csv),
            "checksum_sha256":sha(cs),"archive_bytes":len(raw),
            "checksum_bytes":len(cs),"observed_bars":count,
