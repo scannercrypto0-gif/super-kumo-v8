@@ -619,7 +619,156 @@ def build_offline_paper_model_trace(nomination, decision_receipt,
     return freeze(output)
 
 
-def build_unified_offline_e2e(source, lab, paper=None):
+def consume_core_secretary_route(warehouse_receipt, scanner_route,
+                                 queue_receipt, ack_receipt,
+                                 event_trace):
+    """Read-only consumer of Core #253's actual append-only Secretary outbox.
+
+    ACK is caller-provided research handoff evidence, NOT independent transport,
+    strategy acceptance, Paper approval, a fill or a broker/order receipt.
+    """
+    w = checked(warehouse_receipt, "receipt_sha256")
+    e = checked(scanner_route, "payload_sha256")
+    ack = checked(ack_receipt, "receipt_sha256")
+    need(w.get("schema") == "aql.core.local-history-warehouse.v1"
+         and w.get("status") in ("OFFLINE_LOCAL_STAGE_ONLY",
+                                "OFFLINE_LOCAL_WAREHOUSE_COMMITTED")
+         and w.get("execution") == "DISABLED"
+         and w.get("availability") == "RETROSPECTIVE_NON_PIT"
+         and w.get("scientific_result") == "INSUFFICIENT_EVIDENCE"
+         and type(w.get("vault")) is dict
+         and w["vault"].get("sha256") == w.get("source_zip_sha256"),
+         "SECRETARY_WAREHOUSE_AUTHORITY")
+    need(e.get("schema") == "aql.core.scanner-secretary-offline-route.v1"
+         and e.get("warehouse_receipt_sha256") == w["receipt_sha256"]
+         and e.get("source_zip_sha256") == w["source_zip_sha256"]
+         and e.get("source_manifest_sha256") == w["manifest_integrity_sha256"]
+         and e.get("raw_vault") == w["vault"].get("vault")
+         and e.get("historical_pit") == "NOT_ATTESTED"
+         and e.get("secretary_trading_authority") == "NONE"
+         and e.get("scanner_strategy_decision") == "NOT_PERFORMED"
+         and e.get("strategy_authority") ==
+             "OFFLINE_RESEARCH_ONLY_NOT_APPROVED_PAPER"
+         and e.get("lane") in ("FAST", "SLOW")
+         and type(e.get("strategy_id")) is str and bool(e["strategy_id"])
+         and type(e.get("strategy_version")) is str
+         and bool(e["strategy_version"]),
+         "SECRETARY_ENVELOPE_PARENTS")
+    n = e.get("scanner_nomination")
+    need(type(n) is dict and n.get("schema_version") == "AQL-SCANNER-V1"
+         and sha(n.get("digest"))
+         and type(n.get("source_manifest")) is dict
+         and n["source_manifest"].get("dataset_id") == w.get("dataset_id")
+         and n["source_manifest"].get("dataset_sha") == w["source_zip_sha256"]
+         and n["source_manifest"].get("schema_version") == "AQL-SCANNER-V1"
+         and n["source_manifest"].get("cutoff_at") == n.get("cutoff_at")
+         and n.get("availability_class") in ("RETROSPECTIVE_NON_PIT",
+                                              "UNKNOWN")
+         and n.get("publishable") is False
+         and n.get("delivery_authorized") is False
+         and n.get("market", "").startswith(
+             w.get("exchange", "") + ":" + w.get("market", "") + ":")
+         and type(n.get("candidate_id")) is str
+         and n["candidate_id"].split(":", 1)[0] == w.get("symbol"),
+         "SECRETARY_SCANNER_SOURCE")
+    scan_body = {k: v for k, v in n.items() if k != "digest"}
+    need(sha256(json.dumps(scan_body, sort_keys=True,
+                           separators=(",", ":"), ensure_ascii=False,
+                           default=str).encode("utf-8")).hexdigest() ==
+         n["digest"], "SECRETARY_SCANNER_NATIVE_SEAL")
+    try:
+        scan_time = datetime.fromisoformat(n["cutoff_at"].replace(
+            "Z", "+00:00"))
+        need(scan_time.tzinfo is not None
+             and scan_time.utcoffset() is not None, "SECRETARY_UTC_CLOCK")
+        scan_ms = int(scan_time.astimezone(timezone.utc).timestamp() * 1000)
+    except (ValueError, TypeError, OverflowError, AttributeError) as exc:
+        raise UnifiedBackboneError("FACTORY_254_SECRETARY_TIME") from exc
+    need(0 <= scan_ms <= w["decision_cutoff_ms"],
+         "SECRETARY_CUTOFF_LOOKAHEAD")
+    need(type(queue_receipt) is dict
+         and queue_receipt.get("schema") ==
+             "aql.core.secretary-offline-queue.v1"
+         and queue_receipt.get("payload_sha256") == e["payload_sha256"]
+         and queue_receipt.get("lane") == e["lane"]
+         and queue_receipt.get("delivery") == "OFFLINE_ONLY_NO_NETWORK"
+         and queue_receipt.get("trading_authority") == "NONE",
+         "SECRETARY_QUEUE_RECEIPT")
+    msg = queue_receipt.get("message_id")
+    need(type(msg) is str and bool(msg)
+         and ack.get("schema") == "aql.core.secretary-offline-ack.v1"
+         and ack.get("message_id") == msg
+         and ack.get("payload_sha256") == e["payload_sha256"]
+         and ack.get("state") == "ACKED"
+         and ack.get("authority") == "OFFLINE_RESEARCH_ONLY"
+         and sha(ack.get("acknowledgement_sha256")),
+         "SECRETARY_ACK_RECEIPT")
+    need(type(event_trace) is list and 2 <= len(event_trace) <= 256
+         and event_trace[0].get("state") == "PENDING"
+         and event_trace[-1].get("state") == "ACKED",
+         "SECRETARY_TRACE_SHAPE")
+    last = None
+    attempts = 0
+    for i, ev in enumerate(event_trace):
+        need(type(ev) is dict and ev.get("schema") ==
+             "aql.core.secretary-event.v1"
+             and ev.get("message_id") == msg
+             and ev.get("payload_sha256") == e["payload_sha256"]
+             and ev.get("previous_event_sha256") == last
+             and type(ev.get("attempt_count")) is int
+             and 0 <= ev["attempt_count"] <= 10
+             and ev["attempt_count"] >= attempts,
+             "SECRETARY_TRACE_IDENTITY")
+        if i == 0:
+            need(ev["state"] == "PENDING"
+                 and ev["attempt_count"] == 0
+                 and ev.get("reason") is None,
+                 "SECRETARY_FIRST_EVENT")
+        elif ev.get("state") == "RETRY":
+            need(ev["attempt_count"] == attempts + 1
+                 and type(ev.get("reason")) is str
+                 and bool(ev["reason"]), "SECRETARY_RETRY")
+        elif ev.get("state") == "ACKED":
+            need(i == len(event_trace) - 1
+                 and ev["attempt_count"] == attempts
+                 and ev.get("reason") == ack["acknowledgement_sha256"],
+                 "SECRETARY_ACK_TRACE")
+        else:
+            need(False, "SECRETARY_ILLEGAL_STATE")
+        attempts = ev["attempt_count"]
+        last = _digest(ev)
+    output = {
+        "schema": "aql.factory.core-secretary-route-consumption.v1",
+        "core_warehouse_receipt_sha256": w["receipt_sha256"],
+        "core_route_payload_sha256": e["payload_sha256"],
+        "core_queue_message_id": msg,
+        "core_ack_receipt_sha256": ack["receipt_sha256"],
+        "core_acknowledgement_sha256": ack["acknowledgement_sha256"],
+        "core_last_event_sha256": last,
+        "core_trace_length": len(event_trace),
+        "source_zip_sha256": w["source_zip_sha256"],
+        "source_manifest_sha256": w["manifest_integrity_sha256"],
+        "dataset_id": w["dataset_id"],
+        "source_version": w["version"],
+        "decision_cutoff_ms": w["decision_cutoff_ms"],
+        "scanner_cutoff_ms": scan_ms,
+        "strategy_id": e["strategy_id"],
+        "strategy_version": e["strategy_version"],
+        "candidate_id": n["candidate_id"],
+        "lane": e["lane"],
+        "delivery": "CORE_253_OFFLINE_OUTBOX_ACKED_CALLER_EVIDENCE",
+        "scanner_strategy_decision": "NOT_PERFORMED",
+        "paper_strategy_consumer": "NOT_CONNECTED",
+        "paper_orders": 0,
+        "paper_fills": None,
+        "scientific_result": "INSUFFICIENT_EVIDENCE",
+        "historical_pit": "NOT_ATTESTED",
+        "trading_authority": "NONE",
+    }
+    return freeze(output)
+
+
+def build_unified_offline_e2e(source, lab, paper=None, core_secretary=None):
     """Cross-stage summary that refuses to pretend original→Scanner is wired."""
     checked(source, "artifact_sha256")
     checked(lab, "artifact_sha256")
@@ -643,6 +792,20 @@ def build_unified_offline_e2e(source, lab, paper=None):
                       if paper["source_raw_sha256"] ==
                       source["source_bytes_sha256"]
                       else "NOT_CONNECTED_DIFFERENT_SOURCE_DOMAINS")
+    if core_secretary is not None:
+        checked(core_secretary, "artifact_sha256")
+        need(core_secretary.get("schema") ==
+             "aql.factory.core-secretary-route-consumption.v1"
+             and core_secretary.get("source_zip_sha256") ==
+             source["source_bytes_sha256"]
+             and core_secretary.get("source_manifest_sha256") ==
+             source["manifest_integrity_sha256"]
+             and core_secretary.get("core_warehouse_receipt_sha256") ==
+             source.get("core_253_warehouse_receipt_sha256")
+             and core_secretary.get("source_version") == source["version"]
+             and core_secretary.get("decision_cutoff_ms") == source["cutoff_ms"]
+             and core_secretary.get("trading_authority") == "NONE",
+             "CORE_253_E2E_PARENT_MISMATCH")
     return freeze({
         "schema": E2E_SCHEMA,
         "source_receipt_sha256": source["artifact_sha256"],
@@ -652,6 +815,12 @@ def build_unified_offline_e2e(source, lab, paper=None):
         "core_custody_consumer": source["core_query_consumer"],
         "raw_warehouse_link": source["raw_warehouse_query"],
         "factory_lab_link": "CONNECTED_READ_ONLY_RECEIPTS",
+        "core_secretary_receipt_sha256": (
+            None if core_secretary is None else
+            core_secretary["artifact_sha256"]),
+        "core_secretary_verified_link": (
+            "NOT_CONNECTED" if core_secretary is None else
+            "CORE_253_OFFLINE_OUTBOX_ACKED_NO_STRATEGY_DECISION"),
         "scanner_secretary_link": paper_link,
         "actual_original_to_raw_warehouse_to_scanner":
             "NOT_CONNECTED_CORE_253_PENDING",
