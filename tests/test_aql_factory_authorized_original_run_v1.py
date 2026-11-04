@@ -5,7 +5,7 @@ from hashlib import sha256
 from io import BytesIO
 from zipfile import ZipFile,ZIP_DEFLATED
 from research_wp_r0.aql_factory_authorized_original_run_v1 import (
- OriginalAccessError,PINS,CORE_DATASET_ALIASES,preflight,
+ OriginalAccessError,PINS,preflight,
  verify_original,month_spec,run_source_only)
 
 def fixture():
@@ -46,12 +46,11 @@ class OwnerOriginalGate(unittest.TestCase):
         with self.assertRaises(OriginalAccessError):
             verify_original(raw,checks,"2024-03")
 
-    def test_core_dataset_alias_is_explicit_and_pit_never_claimed(self):
+    def test_exact_work247_dataset_identity_and_pit_never_claimed(self):
         cutoff=int(datetime(2026,11,4,tzinfo=timezone.utc).timestamp()*1000)
         for month in PINS:
             spec=month_spec(month,cutoff,{"dataset_id":PINS[month][4]})
-            self.assertEqual(spec["dataset_id"],CORE_DATASET_ALIASES[month])
-            self.assertNotEqual(spec["dataset_id"],PINS[month][4])
+            self.assertEqual(spec["dataset_id"],PINS[month][4])
             self.assertFalse(spec["test_only"])
             self.assertEqual(spec["interval"],"15m")
             self.assertIsNone(spec["correction_reason"])
