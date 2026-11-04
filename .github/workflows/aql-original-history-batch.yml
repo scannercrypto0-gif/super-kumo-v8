@@ -1,0 +1,58 @@
+name: Work original-source rule projection batch
+on:
+  pull_request:
+    paths:
+      - 'tools/original_history_batch/**'
+      - '.github/workflows/aql-original-history-batch.yml'
+permissions:
+  contents: read
+jobs:
+  consolidated:
+    # #251 runs only its new evidence-contract gate; accepted research is frozen.
+    if: "${{ !contains(github.event.pull_request.title, '[WORK #251]') }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/checkout@v4
+        with:
+          ref: '607e88d69e9450ae66fd5090317c5c296ade8457'
+          path: '.batch-pins/work'
+      - uses: actions/checkout@v4
+        with:
+          ref: 'c6797654942ac6c81184fdc63637c9871721ecc2'
+          path: '.batch-pins/core'
+      - uses: actions/checkout@v4
+        with:
+          ref: 'f3632f54ddeba631cafa1182ff8059b958163361'
+          path: '.batch-pins/factory'
+      - uses: actions/checkout@v4
+        with:
+          ref: 'f2006c0e431690ccea8b0532095bf4f2a2dc88ba'
+          path: '.batch-pins/discoverer'
+      - name: ONE consolidated TEST_ONLY custody Discoverer Factory gate
+        run: |
+          python -m tools.original_history_batch.gate \
+            --checkout main=. \
+            --checkout work=.batch-pins/work \
+            --checkout core=.batch-pins/core \
+            --checkout factory=.batch-pins/factory \
+            --checkout discoverer=.batch-pins/discoverer \
+            --output batch-gate-evidence
+      - uses: actions/upload-artifact@v4
+        with:
+          name: original-history-batch-TEST-ONLY-${{ github.event.pull_request.head.sha }}-py${{ matrix.python }}
+          path: |
+            batch-gate-evidence/
+            tools/original_history_batch/fixtures/
+          retention-days: 7
+          if-no-files-found: error
