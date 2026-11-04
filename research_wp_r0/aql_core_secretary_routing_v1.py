@@ -237,11 +237,11 @@ def acknowledge_nomination(root, *, message_id:str, payload_sha256:str,
         ).fetchone()
         require(row is not None and row[0]==payload_sha256,
                 "ACK_SOURCE_MISMATCH")
+        _trace(con,message_id)
         require(row[1]!="QUARANTINED","ACK_QUARANTINED")
         if row[1]=="ACKED":
             require(row[2]==acknowledgement_sha256,"ACK_REWRITE_DENIED")
         else:
-            _trace(con,message_id)
             con.execute(
                 "UPDATE distribution_outbox SET state='ACKED',ack_sha=?,"
                 "last_error=NULL WHERE message_id=?",
