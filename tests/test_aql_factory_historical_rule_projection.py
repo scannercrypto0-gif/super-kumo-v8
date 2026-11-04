@@ -195,6 +195,59 @@ class TestHistoricalRuleProjection(unittest.TestCase):
                 with self.assertRaises((ResearchAdmissionError, ValueError)):
                     evaluate_historical_rules(seal(p))
 
+
+    def test_all_ten_existing_indicator_kernels_are_supported(self):
+        # Covers each family F001-F007 plus existing SMA/RSI/ATR kernels.
+        # No Discoverer source copied and no branch import required.
+        specs = [
+            ("SMA_v1", "1", {"period": 5}, "value"),
+            ("EMA_v1", "1", {"period": 5, "smoothing": 2.0}, "value"),
+            ("RSI_v1", "1", {"period": 5}, "value"),
+            ("ATR_v1", "1", {"period": 5}, "value"),
+            ("MACD_v2", "2", {"fast": 3, "slow": 6, "signal": 3}, "histogram"),
+            ("BBANDS_v2", "2", {"period": 5, "deviations": 2.0}, "upper"),
+            ("ADX_v2", "2", {"period": 5}, "adx"),
+            ("STOCH_v2", "2", {"period": 5, "smooth": 3}, "k"),
+            ("ROC_v2", "2", {"period": 5}, "roc"),
+            ("OBV_v2", "2", {}, "obv"),
+        ]
+        for indicator_id, version, params, field in specs:
+            with self.subTest(indicator_id=indicator_id):
+                p = fixture()
+                spec = p["strategy"]["definition"]
+                spec["strategy_id"] = "test-" + indicator_id.lower()
+                spec["indicators"] = [{
+                    "name": "signal", "indicator_id": indicator_id,
+                    "version": version, "parameters": params,
+                    "constraints": {
+                        k: ({"type": "number", "min": .1, "max": 100.0}
+                            if k in ("smoothing", "deviations")
+                            else {"type": "int", "min": 1, "max": 1000})
+                        for k in params
+                    },
+                }]
+                ref = {"op": "indicator", "name": "signal",
+                       "field": field, "lag": 0}
+                spec["entry"] = {
+                    "op": "gt", "left": ref,
+                    "right": {"op": "constant", "value": -1000000},
+                }
+                spec["exit"] = {
+                    "op": "gt",
+                    "left": {"op": "constant", "value": -1000000},
+                    "right": ref,
+                }
+                p["strategy"] = StrategyDefinition(
+                    spec, registry=IndicatorRegistryV2()).to_dict()
+                p["trials"][0]["candidate_digest"] = p["strategy"]["digest"]
+                out = evaluate_historical_rules(seal(p))
+                self.assertGreater(
+                    out["decision_counts"].get("ENTRY_TRIGGERED", 0), 0)
+                self.assertGreater(
+                    out["decision_counts"].get("EXIT_TRIGGERED", 0), 0)
+                self.assertEqual(out["scientific_result"],
+                                 "INSUFFICIENT_EVIDENCE")
+
     def test_tampered_bar_or_packet_rejected(self):
         p = fixture()
         p["bars"][8]["close"] = 9999
