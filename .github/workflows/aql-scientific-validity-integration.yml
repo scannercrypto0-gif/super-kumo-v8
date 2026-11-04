@@ -1,0 +1,56 @@
+name: Work scientific validity evidence integration
+on:
+  pull_request:
+    paths:
+      - 'tools/scientific_validity_integration/**'
+      - '.github/workflows/aql-scientific-validity-integration.yml'
+permissions:
+  contents: read
+jobs:
+  consolidated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/checkout@v4
+        with:
+          ref: '607e88d69e9450ae66fd5090317c5c296ade8457'
+          path: '.batch-pins/work'
+      - uses: actions/checkout@v4
+        with:
+          ref: '7a2631325e70e70e5df25abc5f507cab53f4399e'
+          path: '.batch-pins/core'
+      - uses: actions/checkout@v4
+        with:
+          ref: 'bf48e77193e69f4e857e0a461b0895ab26af31a8'
+          path: '.batch-pins/factory'
+      - uses: actions/checkout@v4
+        with:
+          ref: 'f2006c0e431690ccea8b0532095bf4f2a2dc88ba'
+          path: '.batch-pins/discoverer'
+      - name: ONE consolidated new-contract TEST_ONLY evidence gate
+        run: |
+          python -m tools.scientific_validity_integration.gate \
+            --checkout main=. \
+            --checkout work=.batch-pins/work \
+            --checkout core=.batch-pins/core \
+            --checkout factory=.batch-pins/factory \
+            --checkout discoverer=.batch-pins/discoverer \
+            --output validity-gate-evidence
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scientific-validity-TEST-ONLY-${{ github.event.pull_request.head.sha }}-py${{ matrix.python }}
+          path: |
+            validity-gate-evidence/
+            tools/scientific_validity_integration/fixtures/
+          retention-days: 7
+          if-no-files-found: error
