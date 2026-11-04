@@ -81,7 +81,7 @@ def _connect(root):
       );
       CREATE INDEX IF NOT EXISTS idx_bars_time ON price_bars(dataset_id,open_ms,generation);
       CREATE TABLE IF NOT EXISTS distribution_outbox (
-       message_id TEXT PRIMARY KEY, payload_hash TEXT NOT NULL,
+       message_id TEXT NOT NULL UNIQUE, payload_hash TEXT NOT NULL,
        lane TEXT NOT NULL, state TEXT NOT NULL, attempt_count INTEGER NOT NULL,
        delivery_json TEXT NOT NULL,
        ack_sha TEXT, priority INTEGER NOT NULL,
@@ -204,7 +204,7 @@ def admit_local_original(
             require(parent is not None and parent[0]==spec["parent_source_sha256"],
                     "GENERATION_CORRECTION_PARENT_MISMATCH")
         con.execute(
-            "INSERT OR IGNORE INTO generations VALUES(?,?,?,?,?,?,?,?,?)",
+            "INSERT OR IGNORE INTO generations VALUES(?,?,?,?,?,?,?,?,?,?)",
             (spec["dataset_id"],spec["version"],a["source_bytes_sha256"],
              a["manifest_integrity_sha256"],a["packet_sha256"],
              a["custody_receipt_sha256"],spec["parent_source_sha256"],
