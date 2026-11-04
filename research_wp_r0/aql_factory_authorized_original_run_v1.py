@@ -32,6 +32,12 @@ PINS={
             "3fe8d6caf60fa6e7b7bc22e482fc04710aaedbd281dc725fba8a36e913e33118",
             2976,"BINANCE-SPOT-BTCUSDT-15M-2024-08-DEV-v1"),
 }
+# Core #253 Bridge IDENTITY disallows hyphens. Explicit versioned alias,
+# never a silent rewrite of Work #247 dataset IDs or its 106 receipts.
+CORE_DATASET_ALIASES={
+ "2024-02":"BINANCE_SPOT_BTCUSDT_15M_2024_02_DEV_v1",
+ "2024-08":"BINANCE_SPOT_BTCUSDT_15M_2024_08_DEV_v1",
+}
 class OriginalAccessError(ValueError): pass
 
 def need(ok,why):
@@ -89,9 +95,9 @@ def month_spec(month,cutoff,pin):
     need(type(cutoff) is int and cutoff>=
          int(datetime(2026,11,1,tzinfo=timezone.utc).timestamp()*1000),
          "OBSERVATION_CUTOFF_NOT_RETROSPECTIVE")
-    return dict(dataset_id=pin["dataset_id"],version=1,symbol="BTCUSDT",
+    return dict(dataset_id=CORE_DATASET_ALIASES[month],version=1,symbol="BTCUSDT",
                 interval="15m",exchange="BINANCE",market="SPOT",
-                source_label="owner-authorized-existing-work247-original",
+                source_label="WORK247_OWNER_AUTHORIZED_RETROSPECTIVE",
                 start_ms=start,end_exclusive_ms=end,as_of_ms=cutoff,
                 parent_source_sha256=None,correction_reason=None,
                 test_only=False)
@@ -121,7 +127,7 @@ def run_source_only(raw,checksum,month,cutoff,core_checkout,raw_checkout,
          and vault_root not in core_root.parents,"RAW_STORE_MUST_BE_SEPARATE")
     pin=dict(schema="aql.core.external-original-byte-pin.v1",
              source_kind="BINANCE_KLINES_ZIP",
-             original_object_id=f"BTCUSDT-15m-{month}",
+             original_object_id=f"BTCUSDT_15m_{month.replace(chr(45),chr(95))}",
              original_sha256=p["source_sha256"],
              provenance_reference="WORK247_AUDIT248_EXISTING_RETAINED_BYTES",
              captured_at_ms=None,claimed_available_at_ms=None,
@@ -137,7 +143,7 @@ def run_source_only(raw,checksum,month,cutoff,core_checkout,raw_checkout,
          and raw_vault.read(p["source_sha256"])==raw
          and raw_vault.recovery_scan()["status"]=="CLEAN",
          "RAW_COMMIT_READBACK")
-    query=query_local(core_root,p["dataset_id"],1,spec["start_ms"],
+    query=query_local(core_root,spec["dataset_id"],1,spec["start_ms"],
                       spec["end_exclusive_ms"],cutoff,
                       required_source_sha256=p["source_sha256"])
     need(query["coverage"]=="COMPLETE"
@@ -147,7 +153,7 @@ def run_source_only(raw,checksum,month,cutoff,core_checkout,raw_checkout,
                stager=OfflineBridgeStager(core_root/"factory254-verify"),
                library=lib,decision_cutoff_ms=cutoff,checksum_file_bytes=checksum)
     price=query_price_custody(lib,dict(schema=REQUEST_SCHEMA,
-             dataset_id=p["dataset_id"],version=1,
+             dataset_id=spec["dataset_id"],version=1,
              start_ms=spec["start_ms"],end_exclusive_ms=spec["end_exclusive_ms"],
              decision_cutoff_ms=cutoff,require_complete=False,
              confirmed_only=False),
@@ -161,6 +167,10 @@ def run_source_only(raw,checksum,month,cutoff,core_checkout,raw_checkout,
     return freeze({
         "schema":"aql.factory.authentic-original-source-only-smoke.v1",
         "cohort":month,"source_archive_sha256":p["source_sha256"],
+        "published_work247_dataset_id":p["dataset_id"],
+        "actual_core253_dataset_id":spec["dataset_id"],
+        "source_dataset_alias":"EXPLICIT_ALIAS_SAME_ORIGINAL_ZIP_SHA_ONLY",
+        "prior_work_106_reports_reused":False,
         "source_member_sha256":p["member_sha256"],
         "checksum_file_sha256":p["checksum_sha256"],
         "source_receipt_sha256":source["artifact_sha256"],
