@@ -95,3 +95,23 @@ verdict and original known-at/PIT/holdout limitations.
 Scanner's separate TEST_ONLY lane; it is **not** actual Work #235 operational
 15m integration, independent original opportunity-universe verification, or
 Paper approval.
+
+## Mixed-timeframe portfolio entry point
+
+`portfolio.scan_strategy_groups` runs independent per-timeframe and per-market
+groups with exact distinct source bytes/universe/cutoff/strategy config. For
+pre-existing 5m/30m/1h/4h/1d groups it invokes **Work #235's own scan**
+and existing Worker→Scanner #227 bar-admission adapter without editing their
+code. Explicit 15m groups invoke this branch's synthetic TEST_ONLY native
+adapter. It returns immutable per-group receipts and a total attempts
+denominator; a source/group/strategy/timeframe collision fails closed.
+
+This supports **different screening preferences and declared timeframes** in
+the same research portfolio without relabelling candles, cross-strategy
+caches, or silently dropping whole groups. Its grouped-output schema is
+Scanner-owned, not a change to the existing Work contract. It does not
+claim that Work #235 can route native 15m operationally.
+
+The focused CI gate also exercises mixed 5m/15m synthetic portfolios,
+independent census/replay, duplicate group refusal, wrong timeframe and
+cross-source unknown. The whole batch remains no-network and TEST_ONLY.
