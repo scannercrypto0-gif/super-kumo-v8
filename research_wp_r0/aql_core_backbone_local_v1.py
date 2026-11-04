@@ -88,6 +88,14 @@ def _connect(root):
        next_attempt_ms INTEGER NOT NULL, last_error TEXT,
        created_sequence INTEGER PRIMARY KEY AUTOINCREMENT
       );
+      CREATE TABLE IF NOT EXISTS distribution_events (
+       event_seq INTEGER PRIMARY KEY AUTOINCREMENT,
+       message_id TEXT NOT NULL, state TEXT NOT NULL,
+       payload_sha256 TEXT NOT NULL, prev_sha256 TEXT,
+       event_sha256 TEXT NOT NULL, event_json TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_distribution_event_trace
+       ON distribution_events(message_id,event_seq);
     """)
     c.execute("PRAGMA foreign_keys=ON")
     return c
