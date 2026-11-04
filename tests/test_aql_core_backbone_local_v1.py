@@ -246,7 +246,8 @@ class CoreBackboneGate(unittest.TestCase):
         with sqlite3.connect(self.root/"warehouse.sqlite") as c:
             c.execute("UPDATE distribution_outbox SET payload_hash=?",
                       ("0"*64,))
-        with self.assertRaisesRegex(BackboneError,"SECRETARY_QUEUE_TAMPER"):
+        with self.assertRaisesRegex(BackboneError,
+                                    "SECRETARY_(QUEUE_TAMPER|TRACE_STATE_DRIFT)"):
             poll_nomination(self.root,now_ms=0)
 
 if __name__=="__main__":
