@@ -587,8 +587,9 @@ class UnifiedBackboneTests(unittest.TestCase):
         import tools
         research_wp_r0.__path__.insert(
             0,str(Path(core_root).resolve()/"research_wp_r0"))
-        tools.__path__.insert(0,str(Path(raw_root).resolve()/"tools"))
-        tools.__path__.insert(0,str(Path(scanner_root).resolve()/"tools"))
+        tools.__path__ = [str(Path(raw_root).resolve()/"tools"),
+                          str(Path(scanner_root).resolve()/"tools"),
+                          *list(tools.__path__)]
         from tools.raw_vault_offline.vault import RawVault
         from research_wp_r0.aql_core_authorized_source_transfer_v1 import (
             run_authorized_original_intake)
