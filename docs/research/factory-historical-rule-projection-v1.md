@@ -29,6 +29,30 @@ python -m unittest discover -s tests -p 'test_aql_factory_*.py' -v
 ```
 A single consolidated Factory-focused GitHub Actions workflow runs Python 3.10–3.13. Tests include embargo/holdout temporal isolation, 53-trial conservation, exact/source/strategy/plan digests, malformed/duplicate/missing bars, wrong pricing, retrospective PIT refusal, unauthorized holdout, cost drift, future feature timestamp, conservative intrabar stop/target ambiguity, deterministic repeated receipts, and prefix future-mutation invariance.
 
+
+## Native Core #245 price-bearing port — exact Work #247 handoff
+
+Factory-owned read-only API (no import from Core's unmerged branch):
+
+```python
+from research_wp_r0.aql_factory_core_price_rule_port import from_core_original_price_query
+report = from_core_original_price_query(
+    core_original_admission_receipt,
+    core_historical_price_custody_query,
+    sealed_research_plan,
+)
+# report["factory_report"] contains the historical rule / cost projection,
+# not executable fills, approved scientific efficacy or a live PIT guarantee.
+```
+
+**Core input identities:** `core_original_admission_receipt.schema=aql.core.historical-original-admission.v1` with SHA `manifest_record_sha256`, `status=ORIGINAL_PIN_MATCHED_PROVENANCE_PENDING` (or explicitly TEST_ONLY), `source_kind=BINANCE_KLINES_ZIP`, source original ZIP SHA, CSV member SHA, retained original CHECKSUM content SHA, immutable custody receipt SHA, source version/correction parent, and nested read-only query. Core price response `schema=aql.core.historical-price-custody-query.v1` with SHA `price_query_sha256`, `status=OK`, `coverage=COMPLETE`, no missing opens, pinned source ZIP/manifest/version/dataset/cutoff, and `bars[]` carrying `bar_open_ms,bar_close_ms,open,high,low,close,volume,checksum,observation_lower_bound_ms,historical_known_at_ms=null,availability_kind=RETROSPECTIVE`. This port checks the Core custody query/bar checksum equivalence, coverage and source identities, and does NOT identify Core metadata checksum with Factory's different normalized JSON bar digest.
+
+**Work research plan:** sealed dictionary with `schema=aql.factory.historical-rule-work-plan.v1` and `artifact_sha256` over all other JSON keys. Required identity fields: `dataset_id,dataset_version,source_bytes_sha256,manifest_integrity_sha256,correction_parent_source_sha256,decision_cutoff_ms` exactly equal to Core receipt/query. Required experimental fields: `plan_digest,trial_budget=53,trials[],selected_attempt_id,strategy` (actual validated `StrategyDefinition.to_dict()`), `universe,opportunity_count,opportunities,research_window,width_ms,costs,holdout=SEALED_UNOPENED,execution_authority=NONE,market=SPOT,direction=LONG`. This adapter intentionally refuses PERP on the retained native Binance spot ZIP until independent venue-market provenance can bind perp market membership. A separate standalone synthetic API still exercises modeled perp assumptions, not this original-spot source.
+
+**Returned explicit pins:** admission SHA `core_admission_sha256`, original member SHA `core_native_csv_member_sha256`, companion CHECKSUM-file SHA `core_original_checksum_file_sha256`, Core price query SHA `core_price_query_sha256`, original Core bar checksum list commitment `core_bar_checksum_list_sha256`, Factory normalized rule report SHA in `factory_report.artifact_sha256`, and top-level report `artifact_sha256`. All remain **retrospective, not independently vendor-authenticated or historical PIT-attested**.
+
+The exact original ZIP bytes and source's native decimal precision stay inside Work's authorized environment; GitHub/Factory tests use only schema-shaped synthetic records. Invalid/missing Core source, partial range, mismatched hashes, unknown chronology promoted as PIT, forged BASE/SHADOW, invalid correction parent, missing trial, invalid research window or altered cost fails closed. Return `INSUFFICIENT_EVIDENCE` until an independent scientific evaluator with properly attested source/history and universe is approved. This is a **bounded adapter and model projection**, not a second backtesting platform.
+
 ## Hard blockers before actual scientific acceptance
 1. Core #245 must supply native original ZIP/CSV checksum/correction lineage and price-grid admission; Work environment may hold Feb/Aug 2024 originals but they are not automatically in Factory's environment.
 2. Source authenticity and historical availability are **different**. Native archive checksums cannot independently prove what was known at a historical decision time. No retrospective execution is promoted to live historical PIT.
