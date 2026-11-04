@@ -1,0 +1,26 @@
+name: Factory #254 unified backbone focused
+on:
+  push:
+    paths:
+      - 'research_wp_r0/aql_factory_unified_backbone_v1.py'
+      - 'tests/test_aql_factory_unified_backbone_v1.py'
+      - '.github/workflows/aql-factory-unified-backbone.yml'
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_factory_unified_backbone_v1.py'
+      - 'tests/test_aql_factory_unified_backbone_v1.py'
+      - '.github/workflows/aql-factory-unified-backbone.yml'
+jobs:
+  factory-unified-backbone:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10','3.11','3.12','3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run one bounded #254 end-to-end contract and negative matrix
+        run: python -m unittest discover -s tests -p 'test_aql_factory_unified_backbone_v1.py' -v
