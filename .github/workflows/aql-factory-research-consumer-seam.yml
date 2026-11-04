@@ -1,0 +1,23 @@
+name: Factory research consumer seam focused
+on:
+  push:
+    branches:
+      - factory/research-consumer-seam-v1-20261103
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_factory_research_consumer_seam.py'
+      - 'research_wp_r0/aql_factory_cross_owner_compatibility.py'
+      - 'tests/test_aql_factory_research_consumer_seam.py'
+      - 'tests/test_aql_factory_cross_owner_compatibility.py'
+      - 'docs/research/factory-research-consumer-seam-v1.md'
+      - '.github/workflows/aql-factory-research-consumer-seam.yml'
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: One consolidated Factory consumer compatibility gate
+        run: python -m unittest discover -s tests -p 'test_aql_factory_*.py' -v
