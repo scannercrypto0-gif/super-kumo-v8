@@ -38,6 +38,37 @@ jobs:
             cp -a _core_raw_dependency/tools/raw_vault_offline tools/
           fi
           echo "Pinned RAW code only, no original price bytes"
+      - name: Stage pinned Core #226 and Factory #255 code-only dependencies
+        uses: actions/checkout@v4
+        with:
+          ref: 1b165f85ab0dc21e14d9150764125d92a3b0b568
+          path: _pinned_core226
+          persist-credentials: false
+      - name: Stage pinned Factory #255 code-only dependencies
+        uses: actions/checkout@v4
+        with:
+          ref: e66ac39a6443853c60463f7bd5bfaf590bb125a6
+          path: _pinned_factory255
+          persist-credentials: false
+      - name: Merge missing code-only dependency modules without changing owner sources
+        run: |
+          set -euo pipefail
+          test "$(git -C _pinned_core226 rev-parse HEAD)" = "1b165f85ab0dc21e14d9150764125d92a3b0b568"
+          test "$(git -C _pinned_factory255 rev-parse HEAD)" = "e66ac39a6443853c60463f7bd5bfaf590bb125a6"
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          for name in ('_pinned_core226', '_pinned_factory255'):
+              for root in ('research_wp_r0', 'src', 'tools'):
+                  source=Path(name)/root
+                  if not source.is_dir(): continue
+                  for p in source.rglob('*.py'):
+                      target=Path(root)/p.relative_to(source)
+                      if not target.exists():
+                          target.parent.mkdir(parents=True,exist_ok=True)
+                          shutil.copyfile(p,target)
+          print("Only missing Python modules from exact owner commits staged")
+          PY
       - name: Check SHA-pinned ownership and code-only provenance
         run: |
           python - <<'PY'
