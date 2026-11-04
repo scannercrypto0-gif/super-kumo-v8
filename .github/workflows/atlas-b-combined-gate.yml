@@ -88,12 +88,13 @@ jobs:
       - name: Stage frozen Work #235 code-only dependency
         uses: actions/checkout@v4
         with:
-          ref: 288998b5d83466f75a08775dcf5806768b458141
+          ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8
           path: _pinned_strategy235
           persist-credentials: false
       - name: Resolve frozen Work #235 screening import
         run: |
           set -euo pipefail
+          test "$(git -C _pinned_strategy235 rev-parse HEAD)" = "6acbcc7fc243b132f58170df4c6469bbf7f4eff8"
           cp -a _pinned_strategy235/tools/strategy_service_offline tools/
       - name: Check SHA-pinned ownership and code-only provenance
         run: |
