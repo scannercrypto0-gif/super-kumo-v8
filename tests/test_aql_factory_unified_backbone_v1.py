@@ -589,6 +589,7 @@ class UnifiedBackboneTests(unittest.TestCase):
             0,str(Path(core_root).resolve()/"research_wp_r0"))
         tools.__path__ = [str(Path(raw_root).resolve()/"tools"),
                           str(Path(scanner_root).resolve()/"tools"),
+                          str(Path(os.environ.get("AQL_WORK235_PATH")).resolve()/"tools"),
                           *list(tools.__path__)]
         from tools.raw_vault_offline.vault import RawVault
         from research_wp_r0.aql_core_authorized_source_transfer_v1 import (
@@ -603,7 +604,7 @@ class UnifiedBackboneTests(unittest.TestCase):
             z.writestr("BTCUSDT-15m-2024-02.csv",member)
         raw=out.getvalue()
         zh=hashlib.sha256(raw).hexdigest()
-        checks=(zh+"  BTCUSDT-15m-2024-02.zip\\n").encode()
+        checks=(zh+"  BTCUSDT-15m-2024-02.zip\n").encode()
         month_id="BINANCE-SPOT-BTCUSDT-15M-2024-02-DEV-v1"
         witness={
             "dataset_id":month_id,"version":1,
