@@ -278,11 +278,10 @@ def consume_core_warehouse_query(core_admission, price_query,
              and all(type(t) is int and q["start_ms"] <= t < q["end_exclusive_ms"]
                      and t not in seen_q for t in q["missing_bar_opens"]),
              "CORE_253_MISSING_IDENTITY")
-        need(set(original_bars) & set(range(q["start_ms"],q["end_exclusive_ms"], 
-                 (q["end_exclusive_ms"]-q["start_ms"]) // q["required_bar_count"]
-                 if q["required_bar_count"] else 1)) ==
-             seen_q if q["coverage"]=="COMPLETE" else True,
-             "CORE_253_FULL_RANGE_EQUIVALENCE")
+        if q["coverage"] == "COMPLETE":
+            need(all(t in seen_q for t in original_bars
+                     if q["start_ms"] <= t < q["end_exclusive_ms"]),
+                 "CORE_253_FULL_RANGE_EQUIVALENCE")
         warehouse_receipt_sha = w["receipt_sha256"]
         warehouse_query_sha = q["query_sha256"]
         warehouse_original_vault = vw["vault"]
