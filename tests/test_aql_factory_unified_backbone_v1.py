@@ -20,6 +20,7 @@ from research_wp_r0.aql_factory_unified_backbone_v1 import (
     UnifiedBackboneError, freeze, consume_core_warehouse_query,
     build_lab_experiment_ledger, build_offline_paper_model_trace,
     build_unified_offline_e2e, frozen_work_receipt,
+    consume_core_secretary_route,
 )
 from research_wp_r0.strategy_definition import StrategyDefinition, digest as research_digest
 from research_wp_r0.indicator_library_v2 import IndicatorRegistryV2
@@ -360,6 +361,186 @@ class UnifiedBackboneTests(unittest.TestCase):
                     events[0]["source"]="BROKER_REAL_ORDER"
                 with self.assertRaises(UnifiedBackboneError):
                     build_offline_paper_model_trace(n,d,s,events)
+
+    def test_actual_core253_warehouse_and_secretary_pinned_offline_flow(self):
+        # Core #253 is checked out at exact unmerged SHA by this single CI.
+        # All source bytes here are *synthetic*, never Work-private originals.
+        root=os.environ.get("AQL_CORE253_PATH")
+        if not root:
+            self.skipTest("read-only pinned Core #253 checkout unavailable")
+        root=Path(root).resolve()
+        self.assertTrue((root/"research_wp_r0/aql_core_backbone_local_v1.py").is_file())
+        from datetime import datetime, timezone
+        from test_aql_archive_custody_bridge_v1 import START, WIDTH, N, spec
+        from test_aql_native_binance_zip_v1 import native_source
+        from research_wp_r0.aql_archive_custody_bridge_v1 import OfflineBridgeStager
+        from research_wp_r0.aql_authenticated_historical_admission_v1 import admit_original_bytes
+        from research_wp_r0.aql_native_price_custody_query_v1 import query_price_custody
+        from research_wp_r0.aql_core_chronology_universe_evidence_v1 import assess_chronology_universe
+        from research_wp_r0.aql_core_research_query_seam_v1 import REQUEST_SCHEMA
+        from research_wp_r0.historical_library import HistoricalLibrary
+        from research_wp_r0.aql_core_backbone_local_v1 import (
+            admit_local_original,query_local)
+        from research_wp_r0.aql_core_secretary_routing_v1 import (
+            enqueue_nomination,poll_nomination,acknowledge_nomination,route_trace)
+        import hashlib
+        import json
+        raw,csv_bytes,checks,pin=native_source()
+        scope=spec(source_label="native-monthly-zip")
+        cutoff=START+N*WIDTH+2000
+        with tempfile.TemporaryDirectory(prefix="factory254-core253-") as tmp:
+            warehouse_root=Path(tmp)/"warehouse"
+            warehouse=admit_local_original(
+                warehouse_root,raw,checks,pin,scope,
+                decision_cutoff_ms=cutoff)
+            query=query_local(
+                warehouse_root,scope["dataset_id"],scope["version"],
+                scope["start_ms"],scope["end_exclusive_ms"],cutoff,
+                required_source_sha256=warehouse["source_zip_sha256"],
+                require_complete=True)
+            # Reuse exact Core #245 admitted source envelopes; do not
+            # invent a source or reinterpret native ZIP as scanner JSON.
+            lib=HistoricalLibrary()
+            stager=OfflineBridgeStager(Path(tmp)/"other-core-stage")
+            admission=admit_original_bytes(
+                raw,pin,scope,stager=stager,library=lib,
+                decision_cutoff_ms=cutoff,checksum_file_bytes=checks)
+            prices=query_price_custody(
+                lib,{
+                    "schema":REQUEST_SCHEMA,"dataset_id":scope["dataset_id"],
+                    "version":scope["version"],
+                    "start_ms":scope["start_ms"],
+                    "end_exclusive_ms":scope["end_exclusive_ms"],
+                    "decision_cutoff_ms":cutoff,"require_complete":False,
+                    "confirmed_only":False,
+                },expected_source_sha256=admission["source_bytes_sha256"],
+                expected_manifest_integrity_sha256=admission["manifest_integrity_sha256"])
+            assessment=assess_chronology_universe(
+                admission,prices,chronology_evidence=None,universe_evidence=None)
+            source=consume_core_warehouse_query(
+                admission,prices,assessment,warehouse,query)
+            self.assertEqual(source["raw_warehouse_query"],
+                             "CONNECTED_CORE_253_STAGE_ONLY_RAW_VAULT_MISSING")
+            self.assertEqual(source["core_253_warehouse_receipt_sha256"],
+                             warehouse["receipt_sha256"])
+            self.assertFalse(source["source_eligible_for_historical_pit"])
+            self.assertEqual(source["bar_count_available"],N)
+            self.assertEqual(source,consume_core_warehouse_query(
+                admission,prices,assessment,warehouse,query))
+            # Exercise Core's *actual* persistent off-line queue/ACK APIs.
+            scan_cutoff=datetime.fromtimestamp(cutoff/1000,timezone.utc).isoformat()
+            native={
+                "schema_version":"AQL-SCANNER-V1",
+                "scanner_id":"FACTORY254_TEST_SCANNER",
+                "candidate_id":"BTCUSDT:TEST_ONLY:254",
+                "profile_id":"FACTORY254_TEST_PROFILE",
+                "market":"BINANCE:SPOT:USDT",
+                "cutoff_at":scan_cutoff,
+                "availability_class":"RETROSPECTIVE_NON_PIT",
+                "stage":"UNKNOWN",
+                "source_manifest":{
+                    "dataset_id":warehouse["dataset_id"],
+                    "dataset_sha":warehouse["source_zip_sha256"],
+                    "schema_version":"AQL-SCANNER-V1",
+                    "cutoff_at":scan_cutoff,
+                    "created_at":scan_cutoff,
+                },
+                "feature_snapshot":{},
+                "reasons":["TEST_ONLY_NO_AUTHENTIC_PIT"],
+                "coverage":{"historical_pit":"NOT_ATTESTED"},
+                "score":None,"score_status":"NOT_SCORED",
+                "publishable":False,"delivery_authorized":False,
+            }
+            native["digest"]=hashlib.sha256(json.dumps(
+                native,sort_keys=True,separators=(",",":"),
+                ensure_ascii=False).encode()).hexdigest()
+            mid="FACTORY254_TEST_EVENT"
+            queued=enqueue_nomination(
+                warehouse_root,native,strategy_id="RESEARCH_254",
+                strategy_version="v1",warehouse_receipt=warehouse,
+                lane="FAST",idempotency_key=mid)
+            self.assertEqual(queued,enqueue_nomination(
+                warehouse_root,native,strategy_id="RESEARCH_254",
+                strategy_version="v1",warehouse_receipt=warehouse,
+                lane="FAST",idempotency_key=mid))
+            item=poll_nomination(warehouse_root,now_ms=0,lane="FAST")
+            self.assertEqual(item["message_id"],mid)
+            delivered_hash=research_digest({
+                "test_only_consumer":"FACTORY_254",
+                "message_id":mid,
+                "source_sha256":warehouse["source_zip_sha256"]})
+            ack=acknowledge_nomination(
+                warehouse_root,message_id=mid,
+                payload_sha256=queued["payload_sha256"],
+                acknowledgement_sha256=delivered_hash)
+            trace=route_trace(warehouse_root,mid)
+            route_report=consume_core_secretary_route(
+                warehouse,item["envelope"],queued,ack,trace)
+            self.assertEqual(route_report["scanner_strategy_decision"],
+                             "NOT_PERFORMED")
+            self.assertEqual(route_report["paper_orders"],0)
+            self.assertEqual(route_report,consume_core_secretary_route(
+                warehouse,item["envelope"],queued,ack,trace))
+            self.assertIsNone(poll_nomination(warehouse_root,now_ms=10**15))
+            # New delta negative suite: source, version, query gap,
+            # corrected lineage, ACK and event chain; all resealed before
+            # adversarial reconsumption, no false trusted external witness.
+            for fault in ("warehouse","query_source","version","missing",
+                          "future","ack","trace","strategy","source_domain"):
+                with self.subTest(fault=fault):
+                    w,q,a,e=copy.deepcopy((warehouse,query,ack,item["envelope"]))
+                    t=copy.deepcopy(trace)
+                    if fault=="warehouse":
+                        w["source_zip_sha256"]="0"*64
+                        w["receipt_sha256"]=_digest({
+                            k:v for k,v in w.items() if k!="receipt_sha256"})
+                    elif fault=="query_source":
+                        q["source_bytes_sha256"]="f"*64
+                        q["query_sha256"]=_digest({
+                            k:v for k,v in q.items() if k!="query_sha256"})
+                    elif fault=="version":
+                        w["version"]=2
+                        w["receipt_sha256"]=_digest({
+                            k:v for k,v in w.items() if k!="receipt_sha256"})
+                    elif fault=="missing":
+                        q["missing_bar_opens"].append(q["bars"][0]["bar_open_ms"])
+                        q["query_sha256"]=_digest({
+                            k:v for k,v in q.items() if k!="query_sha256"})
+                    elif fault=="future":
+                        q["bars"][0]["observation_lower_bound_ms"]=cutoff+1
+                        q["query_sha256"]=_digest({
+                            k:v for k,v in q.items() if k!="query_sha256"})
+                    elif fault=="ack":
+                        a["acknowledgement_sha256"]="f"*64
+                        a["receipt_sha256"]=_digest({
+                            k:v for k,v in a.items() if k!="receipt_sha256"})
+                    elif fault=="trace":
+                        t[-1]["previous_event_sha256"]="f"*64
+                    elif fault=="strategy":
+                        e["strategy_id"]="OTHER_POLICY"
+                        e["payload_sha256"]=_digest({
+                            k:v for k,v in e.items() if k!="payload_sha256"})
+                    elif fault=="source_domain":
+                        e["source_zip_sha256"]="f"*64
+                        e["payload_sha256"]=_digest({
+                            k:v for k,v in e.items() if k!="payload_sha256"})
+                    with self.assertRaises(UnifiedBackboneError):
+                        if fault in ("warehouse","query_source","version",
+                                     "missing","future"):
+                            consume_core_warehouse_query(
+                                admission,prices,assessment,w,q)
+                        else:
+                            consume_core_secretary_route(
+                                warehouse,e,queued,a,t)
+            self.assertEqual(route_report["source_zip_sha256"],
+                             source["source_bytes_sha256"])
+            self.assertEqual(route_report["source_manifest_sha256"],
+                             source["manifest_integrity_sha256"])
+            self.assertEqual(route_report["trading_authority"],"NONE")
+            self.assertEqual(route_report["historical_pit"],"NOT_ATTESTED")
+            # The isolated Lab remains descriptive; no old 106-report repeat.
+            self.assertEqual(source["scanner_secretary_real_distribution"],
+                             "NOT_CONNECTED_CORE_253_PENDING")
 
     def test_actual_work228_receipt_store_replay_and_tamper(self):
         # Reuse the existing Work #228 create-only ReceiptStore, not a second
