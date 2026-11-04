@@ -85,6 +85,7 @@ def _connect(root):
        lane TEXT NOT NULL, state TEXT NOT NULL, attempt_count INTEGER NOT NULL,
        delivery_json TEXT NOT NULL,
        ack_sha TEXT, priority INTEGER NOT NULL,
+       next_attempt_ms INTEGER NOT NULL, last_error TEXT,
        created_sequence INTEGER PRIMARY KEY AUTOINCREMENT
       );
     """)
