@@ -248,6 +248,54 @@ class TestHistoricalRuleProjection(unittest.TestCase):
                 self.assertEqual(out["scientific_result"],
                                  "INSUFFICIENT_EVIDENCE")
 
+
+    def test_explicit_opportunity_and_base_shadow_denominator(self):
+        p = fixture()
+        p["opportunity_count"] = 1
+        p["opportunities"] = [{
+            "opportunity_id": "O1",
+            "bar_open_ms": p["bars"][8]["open_ms"],
+            "status": "NOMINATED",
+            "arms": [{"arm": "BASE", "status": "NOT_EVALUATED"},
+                     {"arm": "SHADOW", "status": "UNKNOWN"}],
+        }]
+        original = copy.deepcopy(p)
+        out = evaluate_historical_rules(seal(p))
+        self.assertEqual(p, original)
+        self.assertEqual(out["opportunity_count"], 1)
+        self.assertEqual(out["arm_slots"], 2)
+        self.assertFalse(out["universe_independently_attested"])
+        for case in ("missing-arm", "duplicate-arm", "promoted-status",
+                     "duplicate-opportunity"):
+            with self.subTest(case=case):
+                q = copy.deepcopy(p)
+                if case == "missing-arm":
+                    q["opportunities"][0]["arms"].pop()
+                elif case == "duplicate-arm":
+                    q["opportunities"][0]["arms"][1]["arm"] = "BASE"
+                elif case == "promoted-status":
+                    q["opportunities"][0]["arms"][0]["status"] = "PROFIT"
+                else:
+                    q["opportunities"].append(copy.deepcopy(q["opportunities"][0]))
+                    q["opportunity_count"] = 2
+                with self.assertRaises(ResearchAdmissionError):
+                    evaluate_historical_rules(seal(q))
+
+    def test_perpetual_short_funding_is_only_an_assumption(self):
+        p = fixture()
+        p["market"] = "PERP"
+        p["direction"] = "SHORT"
+        p["costs"]["funding_bps_per_bar"] = "1"
+        out = evaluate_historical_rules(seal(p))
+        first = out["modeled_outcomes"][0]
+        self.assertEqual(first["direction"], "SHORT")
+        self.assertEqual(first["market"], "PERP")
+        self.assertEqual(first["holding_bars"], 3)
+        self.assertEqual(first["total_cost_bps"], "23")
+        self.assertEqual(first["cost_class"],
+                         "ASSUMPTION_ONLY_NOT_EXECUTABLE_FILL")
+        self.assertEqual(out["scientific_result"], "INSUFFICIENT_EVIDENCE")
+
     def test_tampered_bar_or_packet_rejected(self):
         p = fixture()
         p["bars"][8]["close"] = 9999
