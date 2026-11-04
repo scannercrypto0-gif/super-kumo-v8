@@ -79,10 +79,26 @@ def compatibility_evidence(library: HistoricalLibrary, packet: dict,
              and request["decision_cutoff_ms"] >= 0,
              "REQUEST_SOURCE_OR_SCOPE")
     query = query_custody(library, request)
-    _require(query["schema"] == SCHEMA and query["status"] == "OK"
-             and query["evidence_class"] == "SYNTHETIC_TEST",
+    _require(query["schema"] == SCHEMA and query["status"] == "OK",
              "QUERY_FAIL_CLOSED")
     result = query["result"]
+    # Core custody_range classifies an empty response as RETROSPECTIVE_NOT_PIT:
+    # there are no observed source bars from which to infer SYNTHETIC_TEST.
+    # Only the independently verified packet+registration receipt establish
+    # the synthetic fixture identity. Never upgrade zero observations to PIT.
+    empty_unknown = (
+        result.get("status") == "UNKNOWN"
+        and result.get("available_bar_count") == 0
+        and result.get("availability_class") == "RETROSPECTIVE_NOT_PIT"
+        and query["evidence_class"] == "RETROSPECTIVE_NON_PIT"
+    )
+    populated_synthetic = (
+        result.get("status") in ("COMPLETE", "PARTIAL")
+        and result.get("available_bar_count", 0) > 0
+        and result.get("availability_class") == "SYNTHETIC_TEST"
+        and query["evidence_class"] == "SYNTHETIC_TEST"
+    )
+    _require(empty_unknown or populated_synthetic, "QUERY_EVIDENCE_CLASS")
     _require(result["schema"] == "aql.bridge.custody-range.v1"
              and result["dataset_id"] == spec["dataset_id"]
              and result["version"] == spec["version"]
@@ -90,7 +106,6 @@ def compatibility_evidence(library: HistoricalLibrary, packet: dict,
              and result["manifest_integrity_sha256"] ==
                  receipt["manifest_integrity_sha256"]
              and result["decision_cutoff_ms"] == request["decision_cutoff_ms"]
-             and result["availability_class"] == "SYNTHETIC_TEST"
              and result["source_confidence"] == "LOCAL_CHECKSUM_AND_PIN_ONLY",
              "QUERY_MANIFEST_OR_AVAILABILITY")
     expected = len(packet["bars"])
