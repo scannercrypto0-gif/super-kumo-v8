@@ -371,6 +371,10 @@ class UnifiedBackboneTests(unittest.TestCase):
         root=Path(root).resolve()
         self.assertTrue((root/"research_wp_r0/aql_core_backbone_local_v1.py").is_file())
         from datetime import datetime, timezone
+        # The pinned Core checkout holds the native ZIP fixture utilities.
+        # Add only that checkout to fixture imports; production modules are
+        # still owned by the separately checked-out Core SHA.
+        sys.path.insert(0, str(root/"tests"))
         from test_aql_archive_custody_bridge_v1 import START, WIDTH, N, spec
         from test_aql_native_binance_zip_v1 import native_source
         from research_wp_r0.aql_archive_custody_bridge_v1 import OfflineBridgeStager
