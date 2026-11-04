@@ -15,7 +15,7 @@ from research_wp_r0.aql_core_backbone_local_v1 import (
 )
 from research_wp_r0.aql_core_secretary_routing_v1 import (
     enqueue_nomination,poll_nomination,acknowledge_nomination,
-    retry_or_quarantine,
+    retry_or_quarantine,route_trace,
 )
 from test_aql_archive_custody_bridge_v1 import START, WIDTH, N, spec
 from test_aql_native_binance_zip_v1 import native_source
@@ -208,6 +208,35 @@ class CoreBackboneGate(unittest.TestCase):
         with self.assertRaisesRegex(BackboneError,"ACK_QUARANTINED"):
             acknowledge_nomination(self.root,message_id="R1",
                   payload_sha256=payload,acknowledgement_sha256="a"*64)
+
+    def test_trace_ledger_enqueued_retry_ack_and_crash_reopen(self):
+        a=self.admit()
+        p=enqueue_nomination(
+            self.root,self.nomination(a),strategy_id="S",
+            strategy_version="v1",warehouse_receipt=a,
+            lane="FAST",idempotency_key="AUDIT_TRACE",
+        )
+        self.assertEqual([x["state"] for x in
+                         route_trace(self.root,"AUDIT_TRACE")],["PENDING"])
+        retry_or_quarantine(self.root,message_id="AUDIT_TRACE",
+               payload_sha256=p["payload_sha256"],reason="TEMP",
+               now_ms=100,max_attempts=3)
+        self.assertEqual([x["state"] for x in
+                         route_trace(self.root,"AUDIT_TRACE")],
+                         ["PENDING","RETRY"])
+        acknowledge_nomination(self.root,message_id="AUDIT_TRACE",
+               payload_sha256=p["payload_sha256"],
+               acknowledgement_sha256="a"*64)
+        self.assertEqual([x["state"] for x in
+                         route_trace(self.root,"AUDIT_TRACE")],
+                         ["PENDING","RETRY","ACKED"])
+        self.assertIsNone(poll_nomination(self.root,now_ms=100000))
+        with sqlite3.connect(self.root/"warehouse.sqlite") as c:
+            c.execute("UPDATE distribution_events SET event_sha256=? "
+                      "WHERE message_id=? AND state='RETRY'",
+                      ("0"*64,"AUDIT_TRACE"))
+        with self.assertRaisesRegex(BackboneError,"SECRETARY_TRACE_TAMPER"):
+            route_trace(self.root,"AUDIT_TRACE")
 
     def test_queue_payload_tamper_fails_closed(self):
         receipt=self.admit()
