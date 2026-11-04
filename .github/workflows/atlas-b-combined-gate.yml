@@ -1,0 +1,43 @@
+name: ATLAS Bundle B cross-PR isolated software contract gate
+on:
+  push:
+    branches:
+      - integration/atlas-b-combined-gate-20261104
+    paths:
+      - '.github/workflows/atlas-b-combined-gate.yml'
+      - 'tests/test_aql_bundle_b_combined_gate_v1.py'
+      - 'research_wp_r0/aql_core_dual_query_identity_map_v1.py'
+      - 'research_wp_r0/aql_factory_core_query_bridge_v1.py'
+      - 'tools/scanner_strategy_b/**'
+permissions:
+  contents: read
+jobs:
+  combined-software-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check SHA-pinned ownership and code-only provenance
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path("docs/research/atlas-b-combined-pin-manifest-v1.json").read_text())
+          assert m["execution_mode"]=="SYNTHETIC_SOFTWARE_ONLY"
+          assert m["operational_paper"]=="NOT_CONNECTED_15M_UNSUPPORTED"
+          assert m["authentic_new_source_e2e"]=="SOURCE_UNAVAILABLE"
+          assert len(m["owners"])==3
+          print("SOURCE_UNAVAILABLE for genuine new monthly source; software gate proceeds")
+          PY
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: One combined cross-PR software-contract test batch
+        run: |
+          PYTHONPATH="$PWD:$PWD/tests" python -m unittest -v tests/test_aql_bundle_b_combined_gate_v1.py
