@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections import Counter
 from decimal import Decimal
+from types import SimpleNamespace
 import math
 
 from research_wp_r0.aql_factory_authentic_research_admission import (
@@ -161,17 +162,18 @@ def _vectors(definition, bars):
     """
     registry = IndicatorRegistryV2()
     values = {}
+    source_bars = [SimpleNamespace(**bar) for bar in bars]
     for ref in definition.spec["indicators"]:
         indicator = registry.get(ref["indicator_id"], **ref["parameters"])
         outputs = {}
         if hasattr(indicator, "_values"):
-            for index, vals in indicator._values(bars):
+            for index, vals in indicator._values(source_bars):
                 _require(type(index) is int and index >= 0 and index < len(bars)
                          and len(vals) == len(indicator.output_fields),
                          "INDICATOR_VECTOR_SHAPE")
                 outputs[index] = dict(zip(indicator.output_fields, vals))
         else:
-            raw = indicator._compute_values([b["close"] for b in bars], bars)
+            raw = indicator._compute_values([b["close"] for b in bars], source_bars)
             _require(len(raw) == len(bars), "INDICATOR_LENGTH")
             for index in range(indicator.min_warmup_bars, len(bars)):
                 if raw[index] is not None:
