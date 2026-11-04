@@ -9,7 +9,7 @@ permissions:
 jobs:
   consolidated:
     # #251 runs only its new evidence-contract gate; accepted research is frozen.
-    if: ${{ !contains(github.event.pull_request.title, '[WORK #251]') }}
+    if: "${{ !contains(github.event.pull_request.title, '[WORK #251]') }}"
     runs-on: ubuntu-latest
     timeout-minutes: 8
     strategy:
