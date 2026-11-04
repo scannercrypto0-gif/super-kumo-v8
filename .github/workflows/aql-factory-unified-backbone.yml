@@ -3,6 +3,8 @@ on:
   push:
     paths:
       - 'research_wp_r0/aql_factory_unified_backbone_v1.py'
+      - 'research_wp_r0/aql_factory_same_source_lab_paper_v1.py'
+      - 'tests/test_aql_factory_same_source_lab_paper_v1.py'
       - 'tests/test_aql_factory_unified_backbone_v1.py'
       - 'research_wp_r0/aql_factory_authorized_original_run_v1.py'
       - 'tests/test_aql_factory_authorized_original_run_v1.py'
@@ -11,6 +13,8 @@ on:
   pull_request:
     paths:
       - 'research_wp_r0/aql_factory_unified_backbone_v1.py'
+      - 'research_wp_r0/aql_factory_same_source_lab_paper_v1.py'
+      - 'tests/test_aql_factory_same_source_lab_paper_v1.py'
       - 'tests/test_aql_factory_unified_backbone_v1.py'
       - 'research_wp_r0/aql_factory_authorized_original_run_v1.py'
       - 'tests/test_aql_factory_authorized_original_run_v1.py'
@@ -68,3 +72,4 @@ jobs:
         run: |
           python -m unittest discover -s tests -p 'test_aql_factory_unified_backbone_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_factory_authorized_original_run_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_factory_same_source_lab_paper_v1.py' -v
