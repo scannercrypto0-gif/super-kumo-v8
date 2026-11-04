@@ -189,6 +189,7 @@ class UnifiedBackboneTests(unittest.TestCase):
         ports=[]
         for i in range(53):
             owned=copy.deepcopy(plan)
+            owned.pop("artifact_sha256", None)
             owned["strategy"]=definitions[i]
             owned["selected_attempt_id"]="attempt-%02d" % i
             ports.append(from_core_original_price_query(a,p,seal(owned)))
