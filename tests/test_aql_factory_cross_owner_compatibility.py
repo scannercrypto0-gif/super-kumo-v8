@@ -175,7 +175,8 @@ class TestCrossOwnerCompatibility(unittest.TestCase):
                 # still cannot bypass the independent Factory join/checks.
                 if label not in ("discovery-fake-digest", "package-nested-tamper"):
                     repin_evidence(args[5])
-                    args[6]["nomination_evidence_digest"] = args[5]["nomination_digest"]
+                    if label != "package-nomination-link":
+                        args[6]["nomination_evidence_digest"] = args[5]["nomination_digest"]
                     repin_package(args[6])
                 if label.startswith("factory-"):
                     env = args[1]
