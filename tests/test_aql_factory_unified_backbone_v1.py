@@ -369,6 +369,13 @@ class UnifiedBackboneTests(unittest.TestCase):
         if not root:
             self.skipTest("read-only pinned Core #253 checkout unavailable")
         root=Path(root).resolve()
+        raw211_root=os.environ.get("AQL_RAW211_PATH")
+        if not raw211_root:
+            self.skipTest("pinned RAW Vault #211 checkout is not supplied")
+        raw211_root=Path(raw211_root).resolve()
+        self.assertTrue((raw211_root/"tools/raw_vault_offline/vault.py").is_file())
+        sys.path.insert(0,str(raw211_root))
+        from tools.raw_vault_offline.vault import RawVault
         self.assertTrue((root/"research_wp_r0/aql_core_backbone_local_v1.py").is_file())
         from datetime import datetime, timezone
         # The pinned Core checkout holds the native ZIP fixture utilities.
@@ -396,9 +403,17 @@ class UnifiedBackboneTests(unittest.TestCase):
         cutoff=START+N*WIDTH+2000
         with tempfile.TemporaryDirectory(prefix="factory254-core253-") as tmp:
             warehouse_root=Path(tmp)/"warehouse"
+            raw_vault=RawVault(Path(tmp)/"raw-original-vault")
             warehouse=admit_local_original(
                 warehouse_root,raw,checks,pin,scope,
-                decision_cutoff_ms=cutoff)
+                decision_cutoff_ms=cutoff,vault=raw_vault)
+            self.assertEqual(warehouse["status"],
+                             "OFFLINE_LOCAL_WAREHOUSE_COMMITTED")
+            self.assertEqual(warehouse["vault"]["vault"],
+                             "EXISTING_PINNED_RAW_VAULT")
+            self.assertEqual(raw_vault.read(warehouse["source_zip_sha256"]),raw)
+            self.assertEqual(raw_vault.recovery_scan()["status"],"CLEAN")
+            self.assertEqual(len(raw_vault.manifest_entries()),1)
             query=query_local(
                 warehouse_root,scope["dataset_id"],scope["version"],
                 scope["start_ms"],scope["end_exclusive_ms"],cutoff,
@@ -426,13 +441,20 @@ class UnifiedBackboneTests(unittest.TestCase):
             source=consume_core_warehouse_query(
                 admission,prices,assessment,warehouse,query)
             self.assertEqual(source["raw_warehouse_query"],
-                             "CONNECTED_CORE_253_STAGE_ONLY_RAW_VAULT_MISSING")
+                             "CONNECTED_PINNED_CORE_253_RAW_WAREHOUSE")
+            self.assertEqual(source["core_253_raw_vault"],
+                             "EXISTING_PINNED_RAW_VAULT")
             self.assertEqual(source["core_253_warehouse_receipt_sha256"],
                              warehouse["receipt_sha256"])
             self.assertFalse(source["source_eligible_for_historical_pit"])
             self.assertEqual(source["bar_count_available"],N)
             self.assertEqual(source,consume_core_warehouse_query(
                 admission,prices,assessment,warehouse,query))
+            self.assertEqual(raw_vault.read(warehouse["source_zip_sha256"]),raw)
+            self.assertEqual(warehouse,admit_local_original(
+                warehouse_root,raw,checks,pin,scope,
+                decision_cutoff_ms=cutoff,vault=raw_vault))
+            self.assertEqual(len(raw_vault.manifest_entries()),1)
             # Exercise Core's *actual* persistent off-line queue/ACK APIs.
             scan_cutoff=datetime.fromtimestamp(cutoff/1000,timezone.utc).isoformat()
             native={
@@ -547,6 +569,9 @@ class UnifiedBackboneTests(unittest.TestCase):
             # The isolated Lab remains descriptive; no old 106-report repeat.
             self.assertEqual(source["scanner_secretary_real_distribution"],
                              "NOT_CONNECTED_CORE_253_PENDING")
+            # RAW commit is actually tested here; Scanner-to-Work Paper
+            # remains separate and has NOT acquired authority from the ACK.
+            self.assertEqual(warehouse["status"],"OFFLINE_LOCAL_WAREHOUSE_COMMITTED")
 
     def test_actual_work228_receipt_store_replay_and_tamper(self):
         # Reuse the existing Work #228 create-only ReceiptStore, not a second
