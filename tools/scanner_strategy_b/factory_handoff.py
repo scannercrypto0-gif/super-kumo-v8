@@ -69,7 +69,9 @@ def prepare_factory_handoff(native_run_receipt, source_route_receipt, ack_check_
     names = set()
     attempts = []
     census_by_strategy = {}
-    for receipt in scan.get("nominations", []):
+    require(type(scan.get("nominations")) is list,
+            "FACTORY_HANDOFF_NOMINATIONS_MISSING")
+    for receipt in scan["nominations"]:
         item = Frozen.restore(receipt)
         n = item.data
         identity = (n.get("strategy_id"), n.get("strategy_version"),
