@@ -1,0 +1,65 @@
+name: Scanner B focused native15m and Core Secretary contract
+on:
+  pull_request:
+    paths:
+      - 'tools/scanner_strategy_b/**'
+      - '.github/workflows/scanner-b-native15m.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  focused-offline-scanner-b:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: project
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: b9c9ff8602e79c534402f44bce83c56ec2fa6bb9
+          path: upstream/scanner227
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8
+          path: upstream/strategy235
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 1b165f85ab0dc21e14d9150764125d92a3b0b568
+          path: upstream/core226
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: e66ac39a6443853c60463f7bd5bfaf590bb125a6
+          path: upstream/factory255
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Compose pinned upstream runtime in disposable CI checkout only
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -a upstream/scanner227/tools/scanner_engine_offline project/tools/
+          cp -a upstream/strategy235/tools/strategy_service_offline project/tools/
+          cp upstream/core226/research_wp_r0/aql_*.py project/research_wp_r0/
+          cp upstream/factory255/research_wp_r0/aql_factory_unified_backbone_v1.py project/research_wp_r0/
+          cp upstream/factory255/research_wp_r0/aql_factory_authentic_research_admission.py project/research_wp_r0/
+      - name: ONE focused tests and negatives - TEST_ONLY no original bytes
+        working-directory: project
+        run: |
+          python -m unittest -v tools.scanner_strategy_b.test_integration
+      - name: Check for trading API and cross-owner edits
+        working-directory: project
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -REn 'create_order\(|submit_order\(|send_order\(|enable_auto_merge|merge_pull_request' tools/scanner_strategy_b/
+          git diff --exit-code HEAD -- tools/scanner_strategy_b/
