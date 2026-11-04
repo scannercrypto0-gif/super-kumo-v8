@@ -461,9 +461,8 @@ class UnifiedBackboneTests(unittest.TestCase):
                 if k!="receipt_sha256"})
             original_contract_result=consume_core_warehouse_query(
                 admission,prices,assessment,original_contract_mock,query)
-            self.assertEqual(original_contract_result["historical_pit"],
-                             "NOT_ATTESTED") if "historical_pit" in original_contract_result else self.assertFalse(
-                                 original_contract_result["source_eligible_for_historical_pit"])
+            self.assertFalse(
+                original_contract_result["source_eligible_for_historical_pit"])
             original_contract_mock["test_only"]=True
             original_contract_mock["receipt_sha256"]=_digest({
                 k:v for k,v in original_contract_mock.items()
