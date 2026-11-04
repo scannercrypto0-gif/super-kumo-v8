@@ -2,6 +2,8 @@
 TEST_ONLY/native Core objects are explicitly schema-shaped synthetic fixtures.
 """
 import copy
+import importlib.util
+import tempfile
 import os
 import sys
 from pathlib import Path
@@ -358,6 +360,32 @@ class UnifiedBackboneTests(unittest.TestCase):
                     events[0]["source"]="BROKER_REAL_ORDER"
                 with self.assertRaises(UnifiedBackboneError):
                     build_offline_paper_model_trace(n,d,s,events)
+
+    def test_actual_work228_receipt_store_replay_and_tamper(self):
+        # Reuse the existing Work #228 create-only ReceiptStore, not a second
+        # Factory journal/persistence implementation.
+        source_root=os.environ.get("AQL_WORK228_PATH")
+        if not source_root:
+            self.skipTest("pinned Work #228 receipt store checkout not provided")
+        src=Path(source_root).resolve()/"tools/research_integration_harness/harness.py"
+        self.assertTrue(src.is_file())
+        spec=importlib.util.spec_from_file_location(
+            "_pinned_work228_receipt_store_factory254",src)
+        module=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        a,p,c,source,comparison,trials,port=lab_inputs()
+        lab=build_lab_experiment_ledger(source,comparison,trials,[port])
+        with tempfile.TemporaryDirectory(prefix="factory254-receipts-") as temp:
+            root=Path(temp)/"objects"
+            store=module.ReceiptStore(root)
+            first=store.put(lab)
+            self.assertEqual(first,store.put(copy.deepcopy(lab)))
+            self.assertEqual(module.strict_json((root/(first+".json")).read_bytes()),lab)
+            restart=module.ReceiptStore(root)
+            self.assertEqual(restart.put(lab),first)
+            (root/(first+".json")).write_bytes(b'{"tamper":"yes"}')
+            with self.assertRaises(module.BoundaryError):
+                restart.put(lab)
 
     def test_actual_work235_strategy_route_to_main_paper_ledger(self):
         # A secondary checkout is pinned at the exact existing Work #235
