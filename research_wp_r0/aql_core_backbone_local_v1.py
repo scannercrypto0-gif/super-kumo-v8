@@ -292,6 +292,12 @@ def admit_local_original(
         "schema":WAREHOUSE_SCHEMA,"status":("OFFLINE_LOCAL_WAREHOUSE_COMMITTED" if vault is not None
                   else "OFFLINE_LOCAL_STAGE_ONLY"),
         "dataset_id":spec["dataset_id"],"version":spec["version"],
+        "symbol":spec["symbol"],"market":spec["market"],
+        "exchange":spec["exchange"],"interval":spec["interval"],
+        "start_ms":spec["start_ms"],"end_exclusive_ms":spec["end_exclusive_ms"],
+        "decision_cutoff_ms":decision_cutoff_ms,
+        "test_only":spec["test_only"],
+        "source_evidence_class":a["underlying_availability_class"],
         "source_zip_sha256":a["source_bytes_sha256"],
         "csv_member_sha256":a["native_csv_member_sha256"],
         "checksum_file_sha256":a["native_checksum_file_sha256"],
