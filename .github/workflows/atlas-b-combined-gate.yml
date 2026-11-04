@@ -120,7 +120,7 @@ jobs:
           import json
           from pathlib import Path
           from research_wp_r0.aql_archive_custody_bridge_v1 import digest
-          x=json.loads(Path(".atlas_bundle_b_ci_receipts.json").read_text())
+          x=json.loads(Path("atlas_bundle_b_ci_receipts.json").read_text())
           assert x["receipt_sha256"]==digest({k:v for k,v in x.items() if k!="receipt_sha256"})
           assert x["source_class"]=="IN_MEMORY_SYNTHETIC_TEST_ONLY"
           assert x["new_authentic_month"]=="SOURCE_UNAVAILABLE"
@@ -137,6 +137,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: atlas-b-synthetic-parent-receipts-py${{ matrix.python-version }}
-          path: .atlas_bundle_b_ci_receipts.json
+          path: atlas_bundle_b_ci_receipts.json
           retention-days: 7
           if-no-files-found: error
