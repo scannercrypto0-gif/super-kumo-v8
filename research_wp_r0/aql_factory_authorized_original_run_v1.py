@@ -204,9 +204,9 @@ def main(argv=None):
              "OWNER_APPROVED_PRIVATE_ONLY","RUNNER_AUTHORIZATION_MISSING")
         month=args["month"]
         need(month in PINS,"MONTH_UNKNOWN")
-        zp=Path(args["original-zip"]).resolve(strict=True)
-        cs=Path(args["checksum-file"]).resolve(strict=True)
-        out=Path(args["receipt-out"]).resolve()
+        zp=Path(args["original_zip"]).resolve(strict=True)
+        cs=Path(args["checksum_file"]).resolve(strict=True)
+        out=Path(args["receipt_out"]).resolve()
         need(zp.name==f"BTCUSDT-15m-{month}.zip"
              and cs.name==zp.name+".CHECKSUM"
              and zp.is_file() and cs.is_file()
@@ -219,9 +219,9 @@ def main(argv=None):
         need(not out.is_relative_to(Path.cwd().resolve()),
              "NO_OUTPUT_INSIDE_REPO")
         result=run_source_only(
-            zp.read_bytes(),cs.read_bytes(),month,args["cutoff-ms"],
-            args["core-checkout"],args["raw-checkout"],
-            args["core-root"],args["raw-root"])
+            zp.read_bytes(),cs.read_bytes(),month,args["cutoff_ms"],
+            args["core_checkout"],args["raw_checkout"],
+            args["core_root"],args["raw_root"])
         need(out.parent.is_dir() and not out.exists(),"RECEIPT_CREATE_ONLY")
         with os.fdopen(os.open(str(out),os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600),
                        "w",encoding="utf-8") as f:
