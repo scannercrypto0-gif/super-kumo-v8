@@ -14,6 +14,7 @@ from research_wp_r0.aql_core_backbone_local_v1 import _connect, require, Backbon
 SCHEMA = "aql.core.scanner-secretary-offline-route.v1"
 ACK_SCHEMA = "aql.core.secretary-offline-ack.v1"
 IDENTITY = re.compile(r"^[A-Za-z0-9_.:-]{1,160}$")
+SCANNER_CANDIDATE = re.compile(r"^[A-Za-z0-9_.:+-]{1,200}$")
 SHA = re.compile(r"^[0-9a-f]{64}$")
 LANES = ("FAST", "SLOW")
 
@@ -36,8 +37,11 @@ def _payload(nomination, strategy_id, strategy_version, warehouse_receipt, lane)
                 "DISCOVERED", "SCREENED", "QUALIFIED", "NOMINATED",
                 "REJECTED", "EXPIRED", "UNKNOWN"),
             "SCANNER_OFFLINE_AUTHORITY")
-    for field in ("scanner_id", "candidate_id", "profile_id"):
+    for field in ("scanner_id", "profile_id"):
         _check_identity(nomination.get(field), "SCANNER_IDENTITY_REQUIRED")
+    require(type(nomination.get("candidate_id")) is str and
+            SCANNER_CANDIDATE.fullmatch(nomination["candidate_id"]) is not None,
+            "SCANNER_CANDIDATE_ID_REQUIRED")
     require(type(nomination.get("source_manifest")) is dict
             and type(nomination.get("coverage")) is dict
             and type(nomination.get("reasons")) is list
