@@ -40,9 +40,16 @@ jobs:
           ref: 5d7c869d97ad99219a5ef27f9c841c70f0fcd505
           path: _core253
           persist-credentials: false
+      - name: Checkout exact pinned RAW Vault #211 (read-only)
+        uses: actions/checkout@v4
+        with:
+          ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46
+          path: _raw211
+          persist-credentials: false
       - name: Run one bounded #254 cross-owner E2E contract and negative matrix
         env:
           AQL_CORE253_PATH: ${{ github.workspace }}/_core253
+          AQL_RAW211_PATH: ${{ github.workspace }}/_raw211
           AQL_WORK235_PATH: ${{ github.workspace }}/_work235
           AQL_WORK228_PATH: ${{ github.workspace }}/_work228
         run: python -m unittest discover -s tests -p 'test_aql_factory_unified_backbone_v1.py' -v
