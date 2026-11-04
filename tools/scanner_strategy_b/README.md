@@ -1,0 +1,97 @@
+# ATLAS Scanner Bundle B — distinct native 15m TEST_ONLY compatibility
+
+**Status:** New Scanner-owned integration source, Draft only. No merge, G0,
+broker, operational Paper, holdout, scientific PIT, or private original bytes.
+
+## Upstream exact code pins (read-only)
+
+| Owner | Draft | Exact frozen code SHA for this branch |
+| --- | --- | --- |
+| Scanner Engine V1 | #227 | `b9c9ff8602e79c534402f44bce83c56ec2fa6bb9` |
+| Work strategy service | #235 | `6acbcc7fc243b132f58170df4c6469bbf7f4eff8` |
+| Core warehouse / Secretary | #226, Issue #253 | `1b165f85ab0dc21e14d9150764125d92a3b0b568` |
+| Factory research source consumer | #255, Issue #254 | `e66ac39a6443853c60463f7bd5bfaf590bb125a6` |
+| Discoverer | #230 | Only interface review, never required in Scanner→Secretary→Paper |
+
+All four referenced PR branches remain **independent and unmerged**. The
+workflow checks out exact commits and overlays runtime modules into an
+**ephemeral CI checkout**, not GitHub source branches. No dependency is copied
+or modified by this Scanner PR.
+
+## Authority and important distinction
+
+`native15m.native_15m_policy` requires a valid existing Work #235
+strategy/version/DNA/config. It declares `timeframe=15m` **explicitly as
+a new TEST_ONLY policy with a new config_digest**, retaining the Work policy
+SHA and original timeframe field. It never changes or resamples source bars.
+
+`native15m.scan_native15m` accepts only sealed source bytes of
+`aql.strategy-service.synthetic-bars.v1`, `evidence_class=TEST_ONLY`
+and an exact native 900,000 ms bar grid. It computes reference indicators
+using the **existing** `IndicatorRegistryV2` and decisions via the
+**existing** `StrategyDNAV2` rule functions. Every strategy and every
+universe symbol gets a SHA-sealed row and explicit status:
+SELECTED/REJECTED/UNKNOWN/UNSCANNED/INELIGIBLE (plus defined FAILED
+denominator field), even when source/feature data are missing.
+
+No part of the historical operational Scanner #227 UNKNOWN gets upgraded.
+With original-retrospective source and missing original-time historical PIT
+information, **all eligible historical screening remains UNKNOWN**.
+A synthetic SELECTED means only a rule passed a test fixture; it is not a
+genuine trading nomination. `safe_wait_for_paper` returns **WAIT even for
+synthetic SELECTED**. Work #235 operational native 15m remains
+`NOT_CONNECTED_15M_UNSUPPORTED`, which this Scanner-only code does not
+misrepresent as closed.
+
+`core_secretary.prepare_source_only_route` validates the original Core
+#245 native `price_query_sha256` and Core #253 `query_local.query_sha256`
+through Core's own independently sealed dual-query map. These are separate
+SHA domains and are never equated, overwritten, or aliased. It accepts
+**only** sealed native Scanner V1 UNKNOWN source envelopes, validates source
+SHA/version/cutoff/symbol, and asks Core to enqueue one offline SLOW or FAST
+source-only message. The Work strategy/version/config are pinned into the
+new Scanner route receipt and deterministic Core idempotency key; Core still
+owns its immutable route schema/outbox.
+
+`verify_offline_consumer_ack` checks Core event history. Missing or
+quarantined ACK yields WAIT; supplied Core ACK requires an actual persisted
+ACKED event chain and Factory's read-only contract verifier. It never
+creates ACK, never impersonates Secretary or Factory, and never makes
+`strategy_decision=SELECTED` or `paper_execution=ACTIVE` from a source ACK.
+
+## Focused regression / replay scope
+
+`python -m unittest -v tools.scanner_strategy_b.test_integration` after
+pinned upstream runtime composition, as in workflow. Checks include:
+
+- Two opposite strategy preferences, independent per-symbol 15m census
+  (including incomplete, budget-excluded and universe-ineligible symbols).
+- Exact native timeframe, SHA mismatch, duplicate and out-of-order bar,
+  incomplete window, future or unknown availability, wrong source/TF,
+  missing finality, malformed OHLCV, policy/config mismatch.
+- Historical non-PIT never SELECTED and zero activation even from synthetic
+  SELECTED.
+- Core #245/#253 independent SHA domains, source/manifest/version/coverage
+  mismatch, native Scanner UNKNOWN-only envelope.
+- Core Secretary deterministic PENDING replay, absence-of-ACK WAIT,
+  legitimate explicit synthetic caller ACK followed by verification,
+  idempotent duplicate ACK, quarantined nomination unable to ACK.
+- No existing Feb/Aug source bytes, no 106-result historical rerun,
+  no original private evidence re-evaluation.
+
+## Consolidated E2E boundary
+
+This branch participates in **one future NEW-source combined E2E** alongside
+Core and Factory, once an authenticated NEW original native-15m cohort and
+a permitted shared runner are available. Core still owns real ZIP verification,
+custody/query and Secretary; Factory owns Lab and isolated Paper policy.
+The new source-only route cannot establish a same-source strategy rule
+decision for retrospective original data. Final independent Audit #256
+new-delta gate should evaluate this focused Scanner change together with
+Core/Factory deltas only, preserving the prior ACCEPT_IN_SCOPE evidence
+verdict and original known-at/PIT/holdout limitations.
+
+**No platform/scientific claim:** This is native15m adapter compatibility in
+Scanner's separate TEST_ONLY lane; it is **not** actual Work #235 operational
+15m integration, independent original opportunity-universe verification, or
+Paper approval.
