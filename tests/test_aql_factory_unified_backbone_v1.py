@@ -188,6 +188,39 @@ class UnifiedBackboneTests(unittest.TestCase):
         with self.assertRaises(UnifiedBackboneError):
             consume_core_warehouse_query(a,p,assessment)
 
+    def test_core_correction_and_holdout_claims_fail_closed(self):
+        a,p,assessment,*_=lab_inputs()
+        for case in ("parent-version-1","missing-version-2-parent",
+                     "false-holdout","false-source","false-science"):
+            with self.subTest(case=case):
+                aa,pp,cc=copy.deepcopy((a,p,assessment))
+                if case=="parent-version-1":
+                    aa["correction_parent_source_sha256"]="e"*64
+                    repin_admission(aa)
+                    cc["admission_sha256"]=aa["manifest_record_sha256"]
+                elif case=="missing-version-2-parent":
+                    aa["version"]=2
+                    pp["version"]=2
+                    repin_admission(aa)
+                    repin_price(pp)
+                    cc.update(version=2,
+                              admission_sha256=aa["manifest_record_sha256"],
+                              price_query_sha256=pp["price_query_sha256"])
+                elif case=="false-holdout":
+                    cc["holdout"]="OPENED"
+                elif case=="false-source":
+                    aa["authenticated_source"]="ATTESTED"
+                    repin_admission(aa)
+                    cc["admission_sha256"]=aa["manifest_record_sha256"]
+                elif case=="false-science":
+                    pp["factory_scientific_input"]="ACCEPTED"
+                    repin_price(pp)
+                    cc["price_query_sha256"]=pp["price_query_sha256"]
+                cc["assessment_sha256"]=_digest({
+                    k:v for k,v in cc.items() if k!="assessment_sha256"})
+                with self.assertRaises(UnifiedBackboneError):
+                    consume_core_warehouse_query(aa,pp,cc)
+
     def test_lab_trial_missing_duplicate_and_cross_source(self):
         a,p,assessment,source,comparison,trials,port=lab_inputs()
         for action in ("missing","duplicate","source","candidate","duplicate-report"):
