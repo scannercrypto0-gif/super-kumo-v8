@@ -55,7 +55,7 @@ jobs:
       - name: ONE focused tests and negatives - TEST_ONLY no original bytes
         working-directory: project
         run: |
-          python -m unittest -v tools.scanner_strategy_b.test_integration
+          python -m unittest -v tools.scanner_strategy_b.test_integration tools.scanner_strategy_b.test_portfolio
       - name: Check for trading API and cross-owner edits
         working-directory: project
         shell: bash
