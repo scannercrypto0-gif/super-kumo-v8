@@ -109,7 +109,7 @@ def run_source_only(raw,checksum,month,cutoff,core_checkout,raw_checkout,
     import research_wp_r0
     research_wp_r0.__path__.insert(0,str(core/"research_wp_r0"))
     import tools
-    tools.__path__.insert(0,str(vault/"tools"))
+    tools.__path__ = [str(vault/"tools"), *list(tools.__path__)]
     from tools.raw_vault_offline.vault import RawVault
     from research_wp_r0.aql_core_backbone_local_v1 import admit_local_original,query_local
     from research_wp_r0.aql_authenticated_historical_admission_v1 import admit_original_bytes
