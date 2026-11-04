@@ -1,5 +1,8 @@
 """Core #253 actual source-backed TEST_ONLY ROC rule calculation; no original private bytes."""
 from copy import deepcopy
+from io import BytesIO
+from zipfile import ZipFile,ZIP_DEFLATED
+import hashlib
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -61,6 +64,40 @@ class CoreLabCalculation(unittest.TestCase):
             calculate_one_original_test_strategy(
                 self.root,wrong,start_ms=START,
                 end_exclusive_ms=START+N*WIDTH,cutoff_ms=self.cutoff)
+
+    def test_24_bar_existing_roc_kernel_entry_exit(self):
+        count=24
+        lines=[]
+        for i in range(count):
+            close=100+3*i if i<12 else 136-4*(i-12)
+            lines.append(",".join(map(str,(
+                START+i*WIDTH,close,close+1,close-1,close,5,
+                START+(i+1)*WIDTH-1,500,10,2,200,0,
+            ))))
+        csv=("\\n".join(lines)+"\\n").encode()
+        sink=BytesIO()
+        with ZipFile(sink,"w",compression=ZIP_DEFLATED) as z:
+            z.writestr("BTCUSDT-15m-2024-02.csv",csv)
+        raw=sink.getvalue()
+        sha=lambda b:hashlib.sha256(b).hexdigest()
+        cs=(sha(raw)+"  BTCUSDT-15m-2024-02.zip\\n").encode()
+        w={**self.w,"archive_sha256":sha(raw),"csv_member_sha256":sha(csv),
+           "checksum_sha256":sha(cs),"archive_bytes":len(raw),
+           "checksum_bytes":len(cs),"observed_bars":count,
+           "end_exclusive_ms":START+count*WIDTH}
+        cutoff=START+count*WIDTH+10000
+        with TemporaryDirectory() as td:
+            root=Path(td)/"core"
+            _,warehouse,_,_=run_authorized_original_intake(
+                root,raw,cs,w,vault=RawVault(Path(td)/"vault"),
+                cutoff_ms=cutoff,test_only=True)
+            result=calculate_one_original_test_strategy(
+                root,warehouse,start_ms=START,
+                end_exclusive_ms=START+count*WIDTH,cutoff_ms=cutoff)
+            self.assertEqual(result["decision_slots"],23)
+            self.assertEqual(result["decision_counts"]["UNKNOWN"],5)
+            self.assertGreater(result["decision_counts"]["ENTRY_TRIGGERED"],0)
+            self.assertGreater(result["decision_counts"]["EXIT_TRIGGERED"],0)
 
     def test_reject_wrong_strategy_digest(self):
         wrong=deepcopy(default_test_strategy())
