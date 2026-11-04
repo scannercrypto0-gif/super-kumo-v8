@@ -1,5 +1,9 @@
 """Private original intake: synthetic fixtures never match actual Work #247 pins."""
 import unittest
+import tempfile
+import pathlib
+import json
+from unittest.mock import patch
 from datetime import datetime,timezone
 from hashlib import sha256
 from io import BytesIO
@@ -56,6 +60,33 @@ class OwnerOriginalGate(unittest.TestCase):
             self.assertIsNone(spec["correction_reason"])
         with self.assertRaises(OriginalAccessError):
             month_spec("2024-02",1706745600000,{"dataset_id":PINS["2024-02"][4]})
+
+    def test_private_cli_real_argument_names_are_parsed(self):
+        # Pure CLI plumbing test. Stubbed synthetic receipt: never claims
+        # original access or actual Core/RAW execution.
+        from research_wp_r0 import aql_factory_authorized_original_run_v1 as m
+        with tempfile.TemporaryDirectory(prefix="aql254-cli-") as tmp:
+            root=pathlib.Path(tmp)
+            original=root/"BTCUSDT-15m-2024-02.zip"
+            checks=root/"BTCUSDT-15m-2024-02.zip.CHECKSUM"
+            target=root/"CLI_TEST_ONLY.json"
+            original.write_bytes(b"fake-not-original")
+            checks.write_bytes(b"fake-checksum")
+            args=["--month","2024-02","--original-zip",str(original),
+                  "--checksum-file",str(checks),"--core-checkout",str(root),
+                  "--raw-checkout",str(root),"--core-root",str(root/"core"),
+                  "--raw-root",str(root/"raw"),"--receipt-out",str(target),
+                  "--cutoff-ms","1793775600000"]
+            with patch.dict("os.environ",{
+                   "AQL_AUTHORIZED_ORIGINAL_CORE_FACTORY_RUNNER":
+                       "OWNER_APPROVED_PRIVATE_ONLY"}), patch.object(
+                   m,"run_source_only",return_value={
+                       "schema":"SYNTHETIC_STUB_ONLY",
+                       "orders_created":0}) as fake:
+                self.assertEqual(m.main(args),0)
+                self.assertEqual(fake.call_count,1)
+            self.assertEqual(json.loads(target.read_text())["schema"],
+                             "SYNTHETIC_STUB_ONLY")
 
     def test_no_synthetic_substitution_in_private_runner(self):
         raw,checks,_=fixture()
