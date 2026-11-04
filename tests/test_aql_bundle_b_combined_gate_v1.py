@@ -19,6 +19,7 @@ from research_wp_r0.aql_core_dual_query_identity_map_v1 import bind_dual_query_i
 from research_wp_r0.aql_core_secretary_routing_v1 import acknowledge_nomination, route_trace
 from tools.scanner_engine_offline.contracts import canonical_bytes, sha256_hex
 from tools.scanner_strategy_b.core_secretary import prepare_source_only_route, verify_offline_consumer_ack
+from tools.scanner_strategy_b.factory_handoff import prepare_factory_handoff
 from tools.strategy_service_offline.run import FIXTURES
 
 from test_aql_core_dual_query_identity_map_v1 import DualQueryIdentity
@@ -137,6 +138,28 @@ class CrossLayerSameSourceSyntheticGate(unittest.TestCase):
         self.assertEqual(again, ack)
         self.assertEqual(product["batch"]["trading_authority"], "NONE")
         self.assertEqual(product["batch"]["orders_created"], 0)
+        scanner_case = Native15mGate("test_all_strategy_symbol_pairs_and_safety")
+        scanner_case.setUp()
+        scanner_run = scanner_case.run_scan()
+        handoff = prepare_factory_handoff(
+            scanner_run.receipt(), route.receipt(), confirmed.receipt(),
+            expected_source_zip_sha256=warehouse["source_zip_sha256"],
+            expected_core245_sha256=native["price_query_sha256"],
+            expected_core253_sha256=local["query_sha256"])
+        self.assertEqual(handoff.data["synthetic_attempt_denominator"], 10)
+        self.assertEqual(len(handoff.data["synthetic_native15m_strategy_census"]), 2)
+        self.assertEqual(handoff.data["secretary_source_only_state"], "ACKED_SOURCE_ONLY")
+        self.assertEqual(handoff.data["strategy_to_original_source"],
+                         "NOT_CONNECTED_NO_PIT_PROMOTION")
+        self.assertFalse(handoff.data["source_only_is_strategy_selection"])
+        self.assertEqual(handoff.data["orders_created"], 0)
+        self.assertEqual(
+            handoff.payload,
+            prepare_factory_handoff(
+                scanner_run.receipt(), route.receipt(), confirmed.receipt(),
+                expected_source_zip_sha256=warehouse["source_zip_sha256"],
+                expected_core245_sha256=native["price_query_sha256"],
+                expected_core253_sha256=local["query_sha256"]).payload)
         report = {
             "schema": "aql.integration.bundle-b-software-evidence.v1",
             "source_class": "IN_MEMORY_SYNTHETIC_TEST_ONLY",
@@ -166,6 +189,13 @@ class CrossLayerSameSourceSyntheticGate(unittest.TestCase):
                 route.data["work235_config_digest"],
             "strategy_identity_with_secretary": "NOT_CLAIMED_SOURCE_ONLY",
             "scanner_nomination_sha256": native_nomination["digest"],
+            "scanner_native15m_synthetic_run_sha256": scanner_run.sha256,
+            "scanner_to_factory_handoff_sha256": handoff.sha256,
+            "scanner_strategy_symbol_attempt_denominator":
+                handoff.data["synthetic_attempt_denominator"],
+            "scanner_synthetic_strategy_census":
+                handoff.data["synthetic_native15m_strategy_census"],
+            "scanner_source_is_strategy_selected": False,
             "scanner_operational_status": "UNKNOWN",
             "secretary_route_sha256": route.sha256,
             "secretary_queue_message_id": queue["message_id"],
