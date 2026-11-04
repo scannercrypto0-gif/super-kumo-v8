@@ -6,10 +6,12 @@ on:
     paths:
       - 'research_wp_r0/aql_core_research_query_seam_v1.py'
       - 'research_wp_r0/aql_core_factory_work_compat_v1.py'
+      - 'research_wp_r0/aql_authenticated_historical_admission_v1.py'
       - 'research_wp_r0/aql_archive_custody_bridge_v1.py'
       - 'research_wp_r0/historical_library.py'
       - 'tests/test_aql_core_research_query_seam_v1.py'
       - 'tests/test_aql_core_factory_work_compat_v1.py'
+      - 'tests/test_aql_authenticated_historical_admission_v1.py'
       - 'tests/test_aql_archive_custody_bridge_v1.py'
       - '.github/workflows/aql-core-research-vertical-slice-focused.yml'
   pull_request:
@@ -37,3 +39,4 @@ jobs:
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_core_research_query_seam_v1.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_archive_custody_bridge_v1.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_core_factory_work_compat_v1.py' -v
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_authenticated_historical_admission_v1.py' -v
