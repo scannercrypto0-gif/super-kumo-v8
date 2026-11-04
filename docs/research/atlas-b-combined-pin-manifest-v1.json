@@ -4,18 +4,21 @@
   "authentic_new_source_e2e": "SOURCE_UNAVAILABLE",
   "operational_paper": "NOT_CONNECTED_15M_UNSUPPORTED",
   "owners": {
-    "core226": "1b165f85ab0dc21e14d9150764125d92a3b0b568",
+    "core226": "5cde010bac4a087bbed9fbf0791c56fb2e41aa2b",
     "factory255": "e66ac39a6443853c60463f7bd5bfaf590bb125a6",
-    "scanner257": "4250c513a7c323dc149f6b9297f83f61f90ee61b"
+    "scanner257": "30c37ae56851488b882998c7fa0085ec51dbfc92"
   },
   "read_only": {
     "scanner227": "b9c9ff8602e79c534402f44bce83c56ec2fa6bb9",
-    "strategy235": "FROZEN_READ_ONLY_INHERITED_FROM_SCANNER257"
+    "strategy235": "6acbcc7fc243b132f58170df4c6469bbf7f4eff8",
+    "raw211": "7d97b09c0c6ee2650a61d523acb8d8c771a99c46"
   },
   "branch": "integration/atlas-b-combined-gate-20261104",
   "source_privacy": "NO_ORIGINAL_ZIP_CSV_OHLCV",
   "holdout": "SEALED",
   "trading_authority": "NONE",
   "audited_original_feb_aug": "NOT_RERUN",
-  "old_106_reports": "NOT_RERUN"
+  "old_106_reports": "NOT_RERUN",
+  "authentic_new_source_dependency": "Verified independent new BTCUSDT Spot15m monthly original ZIP + publisher CHECKSUM available to isolated authorized private runner",
+  "discoverer_dependency": "NON_BLOCKING"
 }
