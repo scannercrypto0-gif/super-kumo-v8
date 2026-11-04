@@ -49,8 +49,8 @@ def _payload(nomination, strategy_id, strategy_version, warehouse_receipt, lane)
     require(type(warehouse_receipt) is dict
             and warehouse_receipt.get("schema") ==
                 "aql.core.local-history-warehouse.v1"
-            and warehouse_receipt.get("status") ==
-                "OFFLINE_LOCAL_WAREHOUSE_COMMITTED"
+            and warehouse_receipt.get("status") in (
+                "OFFLINE_LOCAL_WAREHOUSE_COMMITTED","OFFLINE_LOCAL_STAGE_ONLY")
             and warehouse_receipt.get("availability") ==
                 "RETROSPECTIVE_NON_PIT"
             and warehouse_receipt.get("execution") == "DISABLED"
@@ -73,6 +73,7 @@ def _payload(nomination, strategy_id, strategy_version, warehouse_receipt, lane)
         "strategy_authority":"OFFLINE_RESEARCH_ONLY_NOT_APPROVED_PAPER",
         "scanner_nomination":nomination,
         "warehouse_receipt_sha256":warehouse_receipt["receipt_sha256"],
+        "raw_vault":warehouse_receipt["vault"]["vault"],
         "source_zip_sha256":warehouse_receipt["source_zip_sha256"],
         "source_manifest_sha256":warehouse_receipt["manifest_integrity_sha256"],
         "historical_pit":"NOT_ATTESTED",
