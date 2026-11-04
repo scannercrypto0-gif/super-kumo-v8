@@ -89,7 +89,7 @@ def run_authorized_original_intake(
     root, original_zip_bytes:bytes, original_checksum_bytes:bytes,
     retained_source_witness:dict, *, vault, cutoff_ms:int,
     strategy_id:str="HISTORICAL_UNAPPROVED", strategy_version:str="v1",
-    message_id:str="HISTORICAL_UNKNOWN",
+    message_id:str="HISTORICAL_UNKNOWN", test_only:bool=False,
 ):
     """Real-original bytes→Vault RAW COMMITTED→Core query→native Scanner UNKNOWN→Secretary PENDING.
 
@@ -97,6 +97,7 @@ def run_authorized_original_intake(
     Source witness must be retained *prior* to this call by an authorized
     controller. This module NEVER upgrades 2024 historical known-at.
     """
+    require(type(test_only) is bool,"AUTHORIZED_TEST_SCOPE_REQUIRED")
     _shape(retained_source_witness)
     w=retained_source_witness
     require(type(original_zip_bytes) is bytes
@@ -122,11 +123,12 @@ def run_authorized_original_intake(
         "schema":PIN_SCHEMA,"source_kind":"BINANCE_KLINES_ZIP",
         "original_object_id":w["dataset_id"],
         "original_sha256":w["archive_sha256"],
-        "provenance_reference":"RETAINED_WORK247_OWNER_TRANSFER",
+        "provenance_reference":("TEST_ONLY_IN_MEMORY" if test_only
+                                 else "RETAINED_WORK247_OWNER_TRANSFER"),
         "captured_at_ms":None,"claimed_available_at_ms":None,
         "expected_inventory_sha256":None,"vault_object_metadata":None,
         "universe_manifest_sha256":None,"universe_member_count":None,
-        "test_only":False,"archive_name":w["archive_name"],
+        "test_only":test_only,"archive_name":w["archive_name"],
         "csv_member_name":w["csv_member_name"],
         "csv_member_sha256":w["csv_member_sha256"],
         "checksum_file_sha256":w["checksum_sha256"],
@@ -139,7 +141,7 @@ def run_authorized_original_intake(
         "end_exclusive_ms":w["end_exclusive_ms"],
         "as_of_ms":cutoff_ms,
         "parent_source_sha256":None,"correction_reason":None,
-        "test_only":False,
+        "test_only":test_only,
     }
     original=admit_local_original(
         root,original_zip_bytes,original_checksum_bytes,pin,spec,
@@ -203,7 +205,11 @@ def run_authorized_original_intake(
     events=route_trace(root,message_id)
     require(events[-1]["state"]=="PENDING","SECRETARY_FALSE_DELIVERY_ACK")
     body={
-        "schema":SCHEMA,"status":"AUTHORIZED_ORIGINAL_CORE_AND_SECRETARY_PENDING",
+        "schema":SCHEMA,
+        "status":("TEST_ONLY_CORE_AND_SECRETARY_PENDING" if test_only
+                  else "AUTHORIZED_ORIGINAL_CORE_AND_SECRETARY_PENDING"),
+        "source_classification":("TEST_ONLY_FIXTURE" if test_only
+                  else "RETAINED_SOURCE_SHA_MATCHED_VENDOR_NOT_ATTESTED"),
         "dataset_id":w["dataset_id"],
         "source_zip_sha256":w["archive_sha256"],
         "native_csv_member_sha256":w["csv_member_sha256"],
