@@ -84,6 +84,69 @@ def _payload(nomination, strategy_id, strategy_version, warehouse_receipt, lane)
     return {**body, "payload_sha256":digest(body)}
 
 
+def _append_event(con, message_id, state, payload_sha256,
+                  *, attempt_count, reason=None):
+    """Append a content-addressed event inside the SAME outbox transaction."""
+    last=con.execute(
+        "SELECT event_sha256 FROM distribution_events WHERE message_id=? "
+        "ORDER BY event_seq DESC LIMIT 1",(message_id,),
+    ).fetchone()
+    body={
+        "schema":"aql.core.secretary-event.v1",
+        "message_id":message_id,"state":state,
+        "payload_sha256":payload_sha256,
+        "attempt_count":attempt_count,"reason":reason,
+        "previous_event_sha256":last[0] if last else None,
+    }
+    event_sha=digest(body)
+    con.execute(
+        "INSERT INTO distribution_events "
+        "(message_id,state,payload_sha256,prev_sha256,event_sha256,event_json) "
+        "VALUES(?,?,?,?,?,?)",
+        (message_id,state,payload_sha256,body["previous_event_sha256"],
+         event_sha,json.dumps(body,sort_keys=True,separators=(",",":"))),
+    )
+    return event_sha
+
+
+def _trace(con, message_id):
+    rows=con.execute(
+        "SELECT state,payload_sha256,prev_sha256,event_sha256,event_json "
+        "FROM distribution_events WHERE message_id=? ORDER BY event_seq",
+        (message_id,),
+    ).fetchall()
+    require(len(rows)>0 and len(rows)<=256, "SECRETARY_TRACE_MISSING_OR_TOO_LARGE")
+    prior=None
+    for state,payload_sha,prev,event_sha,jsontext in rows:
+        body=json.loads(jsontext)
+        require(body["message_id"]==message_id and
+                body["state"]==state and
+                body["payload_sha256"]==payload_sha and
+                body["previous_event_sha256"]==prior and
+                prev==prior and digest(body)==event_sha,
+                "SECRETARY_TRACE_TAMPER")
+        prior=event_sha
+    tail=con.execute(
+        "SELECT state,payload_hash,attempt_count FROM distribution_outbox "
+        "WHERE message_id=?",(message_id,),
+    ).fetchone()
+    require(tail is not None and tail[0]==rows[-1][0] and
+            tail[1]==rows[-1][1] and
+            tail[2]==json.loads(rows[-1][4])["attempt_count"],
+            "SECRETARY_TRACE_STATE_DRIFT")
+    return [json.loads(row[4]) for row in rows]
+
+
+def route_trace(root, message_id:str):
+    """Safe, read-only verification of a single durable Secretary event chain."""
+    _check_identity(message_id,"TRACE_MESSAGE_ID")
+    con=_connect(root)
+    try:
+        return _trace(con,message_id)
+    finally:
+        con.close()
+
+
 def enqueue_nomination(
     root, scanner_nomination:dict, *, strategy_id:str, strategy_version:str,
     warehouse_receipt:dict, lane:str, idempotency_key:str,
@@ -111,6 +174,10 @@ def enqueue_nomination(
                  0,json.dumps(envelope,sort_keys=True,separators=(",",":")),
                  None,0 if lane=="FAST" else 1,0,None),
             )
+            _append_event(con,idempotency_key,"PENDING",envelope["payload_sha256"],
+                          attempt_count=0)
+        else:
+            _trace(con,idempotency_key)
         con.commit()
     except Exception:
         con.rollback()
@@ -143,6 +210,7 @@ def poll_nomination(root, *, now_ms:int, lane:str|None=None):
         if found is None:
             return None
         mid,sha,payload,attempts,selected,state=found
+        _trace(con,mid)
         body=json.loads(payload)
         require(body["payload_sha256"] == sha
                 and digest({k:v for k,v in body.items()
@@ -173,11 +241,18 @@ def acknowledge_nomination(root, *, message_id:str, payload_sha256:str,
         if row[1]=="ACKED":
             require(row[2]==acknowledgement_sha256,"ACK_REWRITE_DENIED")
         else:
+            _trace(con,message_id)
             con.execute(
                 "UPDATE distribution_outbox SET state='ACKED',ack_sha=?,"
                 "last_error=NULL WHERE message_id=?",
                 (acknowledgement_sha256,message_id),
             )
+            attempts=con.execute(
+                "SELECT attempt_count FROM distribution_outbox "
+                "WHERE message_id=?",(message_id,),
+            ).fetchone()[0]
+            _append_event(con,message_id,"ACKED",payload_sha256,
+                          attempt_count=attempts,reason=acknowledgement_sha256)
         con.commit()
     except Exception:
         con.rollback()
@@ -213,6 +288,7 @@ def retry_or_quarantine(root, *, message_id:str, payload_sha256:str,
                 "RETRY_SOURCE_MISMATCH")
         require(row[1] in ("PENDING","RETRY"),
                 "RETRY_TERMINAL")
+        _trace(con,message_id)
         attempts=row[2]+1
         state="QUARANTINED" if attempts>=max_attempts else "RETRY"
         next_ms=now_ms+(min(3600,2**(attempts-1))*1000)
@@ -221,6 +297,8 @@ def retry_or_quarantine(root, *, message_id:str, payload_sha256:str,
             "next_attempt_ms=?,last_error=? WHERE message_id=?",
             (state,attempts,next_ms,reason,message_id),
         )
+        _append_event(con,message_id,state,payload_sha256,
+                      attempt_count=attempts,reason=reason)
         con.commit()
     except Exception:
         con.rollback()
