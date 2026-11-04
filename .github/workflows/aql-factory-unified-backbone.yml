@@ -52,10 +52,17 @@ jobs:
           ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46
           path: _raw211
           persist-credentials: false
+      - name: Checkout exact pinned Scanner #227 native contract
+        uses: actions/checkout@v4
+        with:
+          ref: b9c9ff8602e79c534402f44bce83c56ec2fa6bb9
+          path: _scanner227
+          persist-credentials: false
       - name: Run one bounded #254 cross-owner E2E contract and negative matrix
         env:
           AQL_CORE253_PATH: ${{ github.workspace }}/_core253
           AQL_RAW211_PATH: ${{ github.workspace }}/_raw211
+          AQL_SCANNER227_PATH: ${{ github.workspace }}/_scanner227
           AQL_WORK235_PATH: ${{ github.workspace }}/_work235
           AQL_WORK228_PATH: ${{ github.workspace }}/_work228
         run: |
