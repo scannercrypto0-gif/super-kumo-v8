@@ -71,9 +71,9 @@ class CoreBackboneGate(unittest.TestCase):
 
     def test_original_zip_to_durable_index_to_source_locked_price(self):
         a=self.admit()
-        self.assertEqual(a["status"],"OFFLINE_LOCAL_WAREHOUSE_COMMITTED")
+        self.assertEqual(a["status"],"OFFLINE_LOCAL_STAGE_ONLY")
         self.assertEqual(a["bar_count"],N)
-        self.assertEqual(a["vault"]["vault"],"NOT_CONNECTED")
+        self.assertEqual(a["vault"]["vault"],"NOT_CONNECTED_CORE_STAGE_ONLY")
         self.assertEqual(a["availability"],"RETROSPECTIVE_NON_PIT")
         self.assertEqual(self.admit(),a)
         q=self.query(a)
