@@ -4,14 +4,18 @@ on:
   push:
     paths:
       - 'research_wp_r0/aql_factory_historical_rule_projection.py'
+      - 'research_wp_r0/aql_factory_core_price_rule_port.py'
       - 'research_wp_r0/aql_factory_authentic_research_admission.py'
       - 'tests/test_aql_factory_historical_rule_projection.py'
+      - 'tests/test_aql_factory_core_price_rule_port.py'
       - '.github/workflows/aql-factory-historical-rule-projection.yml'
   pull_request:
     paths:
       - 'research_wp_r0/aql_factory_historical_rule_projection.py'
+      - 'research_wp_r0/aql_factory_core_price_rule_port.py'
       - 'research_wp_r0/aql_factory_authentic_research_admission.py'
       - 'tests/test_aql_factory_historical_rule_projection.py'
+      - 'tests/test_aql_factory_core_price_rule_port.py'
       - '.github/workflows/aql-factory-historical-rule-projection.yml'
 
 jobs:
