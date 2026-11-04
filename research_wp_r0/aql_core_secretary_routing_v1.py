@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from datetime import datetime,timezone
 from research_wp_r0.aql_archive_custody_bridge_v1 import digest
 from research_wp_r0.aql_core_backbone_local_v1 import _connect, require, BackboneError
 
@@ -62,6 +63,17 @@ def _payload(nomination, strategy_id, strategy_version, warehouse_receipt, lane)
     source_manifest = nomination["source_manifest"]
     _check_identity(source_manifest.get("dataset_id"), "SCANNER_DATASET_REQUIRED")
     _check_sha(source_manifest.get("dataset_sha"), "SCANNER_SOURCE_SHA_REQUIRED")
+    require(source_manifest.get("schema_version")=="AQL-SCANNER-V1" and
+            type(source_manifest.get("cutoff_at")) is str and
+            source_manifest["cutoff_at"]==nomination.get("cutoff_at"),
+            "SCANNER_MANIFEST_CUTOFF_DRIFT")
+    try:
+        clock=datetime.fromisoformat(nomination["cutoff_at"].replace("Z","+00:00"))
+        require(clock.tzinfo is not None and clock.utcoffset() is not None,
+                "SCANNER_CLOCK_NOT_UTC")
+        clock_ms=int(clock.astimezone(timezone.utc).timestamp()*1000)
+    except (ValueError,TypeError,OverflowError,AttributeError) as exc:
+        raise BackboneError("SCANNER_CLOCK_INVALID") from exc
     require(type(warehouse_receipt) is dict
             and warehouse_receipt.get("schema") ==
                 "aql.core.local-history-warehouse.v1"
@@ -77,7 +89,13 @@ def _payload(nomination, strategy_id, strategy_version, warehouse_receipt, lane)
             "WAREHOUSE_RECEIPT_REQUIRED")
     require(source_manifest["dataset_id"] == warehouse_receipt["dataset_id"]
             and source_manifest["dataset_sha"] ==
-                warehouse_receipt["source_zip_sha256"],
+                warehouse_receipt["source_zip_sha256"]
+            and clock_ms <= warehouse_receipt["decision_cutoff_ms"]
+            and nomination["candidate_id"].split(":",1)[0] ==
+                warehouse_receipt["symbol"]
+            and nomination["market"].startswith(
+                warehouse_receipt["exchange"]+":"+
+                warehouse_receipt["market"]+":"),
             "SCANNER_SOURCE_PARENTS_DRIFT")
     _check_identity(strategy_id, "STRATEGY_ID_REQUIRED")
     _check_identity(strategy_version, "STRATEGY_VERSION_REQUIRED")
