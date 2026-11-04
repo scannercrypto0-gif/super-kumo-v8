@@ -20,3 +20,23 @@ Private owner Library inventory visible in this Core session contains `ATLAS_WOR
 For native 15m: maximum 31×24×4=2,976 bars/month. The existing two original ZIPs in owner-private Work247 bundle are small enough to fit the existing Core 8MB packet cap. Budget **up to 8MB original ZIP plus 8MB staging and under ~10MB derived/SQLite metadata per month** as a conservative planning envelope (not a guarantee), approximately **up to 26MB local disk/month** plus backups/manifest overhead; SHA/ZIP validation and ~3k bar inserts/query are bounded CPU. A new monthly ZIP and CHECKSUM require **one source transfer/download each**, network bytes unknown until the actual source is selected, no paid resource approved. Validate actual file sizes and available free disk before transfer; if above source cap, stop for owner-reviewed chunk contract. No automatic bulk months, 1m conversion, new symbols or timeframes.
 
 **Smallest real dependency:** one independently pinned, authorized *new* BTCUSDT Spot 15m monthly original ZIP plus matching original CHECKSUM (or owner approval for a bounded new source retrieval after license/network/cost review). This lane is nonblocking for the primary existing Feb/Aug E2E.
+
+## Executable bounded source acquisition preflight (2026-11-04)
+
+New Core-owned module `research_wp_r0/aql_core_bounded_monthly_source_preflight_v1.py`, with 6 negative/determinism tests, **does not duplicate #211 Vault or #226 warehouse**. It provides `month_window`, `source_urls`, `verify_native_month` and an **explicit opt-in** `stage_one_month`. Only new native BTCUSDT Binance Spot 15m months of 2024; February/August are hard-refused. Source is publisher's native monthly ZIP and matching `.CHECKSUM`, never daily 1m resampling. Limits 8MB ZIP, 512B checksum, 16MB decompressed CSV, exact expected 2,688–2,976 12-column native bars, 15m UTC grid, no gaps/duplicates, strict SHA. Creates source bytes only in a **caller-owned private local directory**, create-only, and returns an immutable SHA256 metadata receipt. It never asserts original 2024 issuer signature or historical PIT, never executes Vault admission, never writes raw bytes to GitHub/Actions.
+
+Private runner preflight (no network, safe to run anywhere):
+
+```bash
+python -m research_wp_r0.aql_core_bounded_monthly_source_preflight_v1 --month 2024-03 --private-dir /private/aql/historical
+```
+
+This prints **READY_FOR_SOURCE** with the precise publisher URLs and 8MB cap, without network. To authorize one **actual** bounded transfer in a separate permitted private network runner, an operator must explicitly run:
+
+```bash
+python -m research_wp_r0.aql_core_bounded_monthly_source_preflight_v1 --month 2024-03 --private-dir /private/aql/historical --allow-network
+```
+
+This second command is documented but **has not been executed in this session**: this environment's DNS cannot resolve `data.binance.vision` and no additional owner-retained native monthly ZIP/CHECKSUM is visible. It is not a Work dispatch, automated bulk fetch, or authorization to copy source to CI. Expected network <=8,000,000 ZIP bytes +512 checksum bytes, not including protocol overhead; expected private disk up to ~26MB/month for ZIP, staging and derived SQLite planning envelope. Before running, verify actual free disk and rights/terms. Successful preflight must be followed by actual Core `admit_local_original` with #211 RawVault, `query_local` and immutable replay/coverage receipt in **same private runner**; the preflight receipt alone does NOT prove ingest.
+
+**Latest status: READY_FOR_SOURCE, ONE NEW MONTH NOT INGESTED.** Primary Feb/Aug original E2E has since been reported complete by Factory #254/6631294940; independent Audit #256 evidence-access gate remains separate.
