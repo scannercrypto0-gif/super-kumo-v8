@@ -75,7 +75,11 @@ class CoreToFactoryWorkCompatibility(unittest.TestCase):
         self.assertEqual(part["coverage"], "PARTIAL")
         self.assertEqual(part["available_bar_count"], 1)
         self.assertEqual(len(part["missing_bar_opens"]), N-1)
-        unknown = self.evidence(request(cutoff=START))
+        # A query at/before the first available bar may be rejected outright.
+        # That is fail-closed, not a fabricated successful UNKNOWN observation.
+        with self.assertRaisesRegex(ValueError, "QUERY_FAIL_CLOSED"):
+            self.evidence(request(cutoff=START))
+        unknown = self.evidence(request(cutoff=START+WIDTH))
         self.assertEqual(unknown["coverage"], "UNKNOWN")
         self.assertEqual(unknown["available_bar_count"], 0)
         self.assertEqual(len(unknown["missing_bar_opens"]), N)
