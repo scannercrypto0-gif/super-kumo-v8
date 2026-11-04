@@ -26,13 +26,13 @@ jobs:
       - name: Stage exact Core RAW code-only dependency without changing owner branch
         uses: actions/checkout@v4
         with:
-          ref: 1b165f85ab0dc21e14d9150764125d92a3b0b568
+          ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46
           path: _core_raw_dependency
           persist-credentials: false
       - name: Resolve pinned Core RAW dependency
         run: |
           set -euo pipefail
-          test "$(git -C _core_raw_dependency rev-parse HEAD)" = "1b165f85ab0dc21e14d9150764125d92a3b0b568"
+          test "$(git -C _core_raw_dependency rev-parse HEAD)" = "7d97b09c0c6ee2650a61d523acb8d8c771a99c46"
           test -d _core_raw_dependency/tools/raw_vault_offline
           if [ ! -d tools/raw_vault_offline ]; then
             cp -a _core_raw_dependency/tools/raw_vault_offline tools/
