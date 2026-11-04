@@ -4,6 +4,8 @@ Synthetic originals only, all checked against real existing Core ZIP/Bridge
 APIs; no private Work retained bytes and no scientific or trading authority.
 """
 from copy import deepcopy
+import hashlib
+import json
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
@@ -19,6 +21,14 @@ from research_wp_r0.aql_core_secretary_routing_v1 import (
 )
 from test_aql_archive_custody_bridge_v1 import START, WIDTH, N, spec
 from test_aql_native_binance_zip_v1 import native_source
+
+def scanner_seal(body):
+    value={k:v for k,v in body.items() if k!="digest"}
+    return hashlib.sha256(json.dumps(
+        value,sort_keys=True,separators=(",",":"),ensure_ascii=False,
+        default=str,
+    ).encode()).hexdigest()
+
 
 class CoreBackboneGate(unittest.TestCase):
     def setUp(self):
@@ -49,7 +59,8 @@ class CoreBackboneGate(unittest.TestCase):
         )
 
     def nomination(self,receipt,*,candidate="BTCUSDT:TEST:1",stage="NOMINATED"):
-        return {
+        result={
+            "schema_version":"AQL-SCANNER-V1",
             "scanner_id":"SCANNER_TEST_ONLY",
             "candidate_id":candidate,
             "profile_id":"STRATEGY_TEST_PROFILE",
@@ -68,6 +79,8 @@ class CoreBackboneGate(unittest.TestCase):
             "score":None,"score_status":"NOT_SCORED",
             "publishable":False,"delivery_authorized":False,
         }
+        result["digest"]=scanner_seal(result)
+        return result
 
     def test_original_zip_to_durable_index_to_source_locked_price(self):
         a=self.admit()
@@ -179,6 +192,7 @@ class CoreBackboneGate(unittest.TestCase):
                 strategy_id="STRAT",strategy_version="v1",warehouse_receipt=receipt,
                 lane="FAST",idempotency_key="E1")
         fake=deepcopy(original);fake["delivery_authorized"]=True
+        fake["digest"]=scanner_seal(fake)
         with self.assertRaisesRegex(BackboneError,"SCANNER_OFFLINE_AUTHORITY"):
             enqueue_nomination(self.root,fake,strategy_id="STRAT",
                     strategy_version="v1",warehouse_receipt=receipt,lane="SLOW",
@@ -188,6 +202,16 @@ class CoreBackboneGate(unittest.TestCase):
             enqueue_nomination(self.root,original,strategy_id="STRAT",
                  strategy_version="v1",warehouse_receipt=forged,lane="SLOW",
                  idempotency_key="E4")
+
+    def test_scanner_sealed_envelope_tamper_rejected(self):
+        receipt=self.admit()
+        n=self.nomination(receipt)
+        n["candidate_id"]="RESEALED_INVALID_CANDIDATE"
+        with self.assertRaisesRegex(BackboneError,
+                                     "SCANNER_ENVELOPE_DIGEST_MISMATCH"):
+            enqueue_nomination(self.root,n,strategy_id="STRAT_TEST",
+                     strategy_version="v1",warehouse_receipt=receipt,
+                     lane="SLOW",idempotency_key="REJECT_TAMPER")
 
     def test_retry_backoff_terminal_quarantine_no_premature_ack(self):
         a=self.admit()
