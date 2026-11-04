@@ -1,0 +1,56 @@
+name: Work strategy-aware scanner and independent research
+on:
+  pull_request:
+    paths:
+      - 'tools/strategy_service_offline/**'
+      - '.github/workflows/aql-strategy-service-offline.yml'
+permissions:
+  contents: read
+jobs:
+  consolidated-test-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/checkout@v4
+        with:
+          ref: '607e88d69e9450ae66fd5090317c5c296ade8457'
+          path: '.strategy-pins/work'
+      - uses: actions/checkout@v4
+        with:
+          ref: 'b9c9ff8602e79c534402f44bce83c56ec2fa6bb9'
+          path: '.strategy-pins/scanner'
+      - uses: actions/checkout@v4
+        with:
+          ref: 'f2006c0e431690ccea8b0532095bf4f2a2dc88ba'
+          path: '.strategy-pins/discoverer'
+      - uses: actions/checkout@v4
+        with:
+          ref: '6177da84ce67b3dc81ef759521c6b52ffa2132b3'
+          path: '.strategy-pins/factory'
+      - name: ONE consolidated multi-strategy TEST_ONLY gate
+        run: |
+          python -m tools.strategy_service_offline.gate \
+            --checkout main=. \
+            --checkout work=.strategy-pins/work \
+            --checkout scanner=.strategy-pins/scanner \
+            --checkout discoverer=.strategy-pins/discoverer \
+            --checkout factory=.strategy-pins/factory \
+            --output strategy-evidence
+      - uses: actions/upload-artifact@v4
+        with:
+          name: strategy-service-TEST-ONLY-${{ github.event.pull_request.head.sha }}-py${{ matrix.python }}
+          path: |
+            strategy-evidence/
+            tools/strategy_service_offline/fixtures/
+          retention-days: 7
+          if-no-files-found: error
