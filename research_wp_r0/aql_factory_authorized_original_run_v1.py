@@ -20,7 +20,7 @@ from research_wp_r0.aql_factory_unified_backbone_v1 import (
     consume_core_warehouse_query,freeze,
 )
 
-CORE_SHA="5d7c869d97ad99219a5ef27f9c841c70f0fcd505"
+CORE_SHA="fef7e0df23e4b49f834239ee020d52265e1697f4"
 RAW_SHA="7d97b09c0c6ee2650a61d523acb8d8c771a99c46"
 PINS={
  "2024-02":("55066890cd3a76c97c05e94213311b17a4146d697f6abe8762b3edae8495b20e",
