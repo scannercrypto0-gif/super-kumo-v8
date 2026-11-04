@@ -125,6 +125,12 @@ def run_source_only(raw,checksum,month,cutoff,core_checkout,raw_checkout,
     core_root=Path(core_root).resolve();vault_root=Path(vault_root).resolve()
     need(core_root!=vault_root and core_root not in vault_root.parents
          and vault_root not in core_root.parents,"RAW_STORE_MUST_BE_SEPARATE")
+    factory_checkout=Path(__file__).resolve().parents[1]
+    for private_store in (core_root,vault_root):
+        need(not any(private_store==checkout or
+                     private_store.is_relative_to(checkout)
+                     for checkout in (factory_checkout,core,vault)),
+             "PRIVATE_RAW_OR_WAREHOUSE_IN_GIT_CHECKOUT")
     pin=dict(schema="aql.core.external-original-byte-pin.v1",
              source_kind="BINANCE_KLINES_ZIP",
              original_object_id=f"BTCUSDT_15m_{month.replace(chr(45),chr(95))}",
@@ -210,6 +216,10 @@ def main(argv=None):
              and zp.is_file() and cs.is_file()
              and zp.stat().st_size<=8_000_000
              and cs.stat().st_size<=4096,"PRIVATE_INPUT_MISSING")
+        factory_checkout=Path(__file__).resolve().parents[1]
+        need(not any(path==factory_checkout or path.is_relative_to(factory_checkout)
+                     for path in (zp,cs,out)),
+             "PRIVATE_INPUT_OR_OUTPUT_IN_FACTORY_GIT_CHECKOUT")
         need(not out.is_relative_to(Path.cwd().resolve()),
              "NO_OUTPUT_INSIDE_REPO")
         result=run_source_only(
