@@ -278,6 +278,40 @@ class CoreSecretaryGate(unittest.TestCase):
         self.assertEqual(ack, second_ack)
         self.assertEqual(len(route_trace(self.root, queue["message_id"])), 2)
 
+    def test_ack_after_restart_readonly_payload_and_tamper_rejected(self):
+        first = self.prepare()
+        queue = first.data["queue"]
+        ack = acknowledge_nomination(
+            self.root, message_id=queue["message_id"],
+            payload_sha256=queue["payload_sha256"],
+            acknowledgement_sha256="d"*64)
+        # A fresh call after the original PENDING item was ACKed cannot poll it:
+        replay = self.prepare()
+        self.assertIsNone(replay.data["secretary_payload"])
+        result = verify_offline_consumer_ack(
+            self.root, replay.receipt(), self.warehouse, ack)
+        self.assertEqual(result.data["state"], "ACKED_SOURCE_ONLY")
+        self.assertEqual(result.data["trading_authority"], "NONE")
+        # A resealed mutation of the durable delivery body must never pass.
+        from research_wp_r0.aql_core_backbone_local_v1 import _connect
+        con = _connect(self.root)
+        try:
+            raw = con.execute(
+                "SELECT delivery_json FROM distribution_outbox WHERE message_id=?",
+                (queue["message_id"],)).fetchone()[0]
+            value = json.loads(raw)
+            value["strategy_id"] = "forged"
+            con.execute(
+                "UPDATE distribution_outbox SET delivery_json=? WHERE message_id=?",
+                (json.dumps(value,sort_keys=True,separators=(",",":")),
+                 queue["message_id"]))
+            con.commit()
+        finally:
+            con.close()
+        with self.assertRaisesRegex(ValueError, "SECRETARY_OUTBOX_PAYLOAD_TAMPER"):
+            verify_offline_consumer_ack(
+                self.root, replay.receipt(), self.warehouse, ack)
+
     def test_native_scanner_unknown_not_promoted(self):
         bad = deepcopy(self.nomination)
         bad["stage"] = "NOMINATED"
