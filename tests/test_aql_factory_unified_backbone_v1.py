@@ -398,7 +398,7 @@ class UnifiedBackboneTests(unittest.TestCase):
                     "symbol":row["symbol"]})
                 nomination=Frozen.build(row).receipt()
                 journal=TestOnlyJournal()
-                sink=TestOnlyStrategySink(spec,journal,lambda _: "ACCEPT",
+                sink=TestOnlyStrategySink(spec,TestOnlyJournal(),lambda _: "ACCEPT",
                                           decision_policy_id="fixture_policy_%d" % i)
                 receipt=route(nomination,spec,journal,test_sink=sink).receipt()
                 self.assertEqual(
