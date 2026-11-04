@@ -281,6 +281,16 @@ def _build_packet(raw, spec, meta):
         bars, origin = _archive_records(raw,spec,meta)
     elif meta.get("kind") == "RAW_VAULT_OBJECT":
         bars, origin = _vault_records(raw,spec,meta)
+    elif meta.get("kind") == "NATIVE_BINANCE_KLINES_ZIP":
+        from research_wp_r0.aql_native_binance_zip_v1 import (
+            NativeZipError, parse_binance_zip,
+        )
+        try:
+            bars, origin = parse_binance_zip(
+                raw, spec, meta, make_bar=_bar_record,
+            )
+        except NativeZipError as exc:
+            raise BridgeError(str(exc)) from exc
     else:
         raise BridgeError("UNSUPPORTED_SOURCE_ADAPTER")
     expected = (spec["end_exclusive_ms"]-spec["start_ms"])//width
