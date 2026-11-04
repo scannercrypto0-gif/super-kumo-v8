@@ -336,6 +336,41 @@ def export_archive_query(raw, *, expected_source_sha256, expected_inventory_hash
                                    "inventory_hash":expected_inventory_hash})
 
 
+def export_binance_native_zip(raw, *, expected_zip_sha256,
+                              archive_name, member_name, member_sha256,
+                              checksum_file_bytes, checksum_file_sha256,
+                              spec):
+    """Native Binance 12-column source; retain full ZIP, CSV and CHECKSUM pins.
+
+    The caller supplies the original ZIP and original CHECKSUM file bytes.
+    A checksum retained with the same source is local integrity evidence only.
+    """
+    require(type(raw) is bytes and type(checksum_file_bytes) is bytes
+            and 0 < len(checksum_file_bytes) <= 512
+            and type(expected_zip_sha256) is str
+            and bool(HEX.fullmatch(expected_zip_sha256))
+            and raw_sha(raw) == expected_zip_sha256,
+            "NATIVE_ZIP_ORIGINAL_SHA_MISMATCH")
+    require(type(checksum_file_sha256) is str
+            and bool(HEX.fullmatch(checksum_file_sha256))
+            and raw_sha(checksum_file_bytes) == checksum_file_sha256,
+            "NATIVE_ZIP_CHECKSUM_FILE_SHA_MISMATCH")
+    try:
+        checksum_text = checksum_file_bytes.decode("ascii")
+    except UnicodeError as exc:
+        raise BridgeError("NATIVE_ZIP_CHECKSUM_ENCODING") from exc
+    meta = {
+        "kind":"NATIVE_BINANCE_KLINES_ZIP",
+        "archive_name":archive_name,
+        "archive_sha256":expected_zip_sha256,
+        "member_name":member_name,
+        "member_sha256":member_sha256,
+        "checksum_file_sha256":checksum_file_sha256,
+        "checksum_text":checksum_text,
+    }
+    return _build_packet(raw, spec, meta)
+
+
 def export_existing_archive_backup(root, *, expected_inventory_hash,
                                    spec, max_rows=MAX_BARS):
     """Uses the EXISTING fully verified sealed-backup read-only adapter."""
