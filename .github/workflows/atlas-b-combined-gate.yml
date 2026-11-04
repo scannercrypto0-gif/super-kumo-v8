@@ -74,6 +74,17 @@ jobs:
           set -euo pipefail
           cp _pinned_core226/tests/test_aql_core_authorized_source_transfer_v1.py tests/
           echo "Only helper fixture imported by cross-PR Core tests"
+      - name: Stage frozen Scanner #227 code-only dependency
+        uses: actions/checkout@v4
+        with:
+          ref: b9c9ff8602e79c534402f44bce83c56ec2fa6bb9
+          path: _pinned_scanner227
+          persist-credentials: false
+      - name: Stage frozen Scanner #227 read-only port
+        run: |
+          set -euo pipefail
+          test "$(git -C _pinned_scanner227 rev-parse HEAD)" = "b9c9ff8602e79c534402f44bce83c56ec2fa6bb9"
+          cp -a _pinned_scanner227/tools/scanner_engine_offline tools/
       - name: Check SHA-pinned ownership and code-only provenance
         run: |
           python - <<'PY'
