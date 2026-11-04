@@ -1,0 +1,21 @@
+{
+  "schema": "aql.integration.bundle-b-pins.v1",
+  "execution_mode": "SYNTHETIC_SOFTWARE_ONLY",
+  "authentic_new_source_e2e": "SOURCE_UNAVAILABLE",
+  "operational_paper": "NOT_CONNECTED_15M_UNSUPPORTED",
+  "owners": {
+    "core226": "1b165f85ab0dc21e14d9150764125d92a3b0b568",
+    "factory255": "e66ac39a6443853c60463f7bd5bfaf590bb125a6",
+    "scanner257": "4250c513a7c323dc149f6b9297f83f61f90ee61b"
+  },
+  "read_only": {
+    "scanner227": "b9c9ff8602e79c534402f44bce83c56ec2fa6bb9",
+    "strategy235": "FROZEN_READ_ONLY_INHERITED_FROM_SCANNER257"
+  },
+  "branch": "integration/atlas-b-combined-gate-20261104",
+  "source_privacy": "NO_ORIGINAL_ZIP_CSV_OHLCV",
+  "holdout": "SEALED",
+  "trading_authority": "NONE",
+  "audited_original_feb_aug": "NOT_RERUN",
+  "old_106_reports": "NOT_RERUN"
+}
