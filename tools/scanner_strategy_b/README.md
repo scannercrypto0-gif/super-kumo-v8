@@ -61,7 +61,7 @@ creates ACK, never impersonates Secretary or Factory, and never makes
 
 ## Focused regression / replay scope
 
-`python -m unittest -v tools.scanner_strategy_b.test_integration` after
+`python -m unittest -v tools.scanner_strategy_b.test_integration tools.scanner_strategy_b.test_portfolio` after
 pinned upstream runtime composition, as in workflow. Checks include:
 
 - Two opposite strategy preferences, independent per-symbol 15m census
