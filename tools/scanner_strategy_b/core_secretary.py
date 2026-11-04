@@ -8,11 +8,13 @@ owns its independent source-consumer ACK verification.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
 
 from research_wp_r0.aql_core_dual_query_identity_map_v1 import bind_dual_query_identities
 from research_wp_r0.aql_core_secretary_routing_v1 import (
     enqueue_nomination, poll_nomination, route_trace,
 )
+from research_wp_r0.aql_core_backbone_local_v1 import _connect
 from research_wp_r0.aql_factory_unified_backbone_v1 import consume_core_secretary_route
 from tools.scanner_engine_offline.contracts import canonical_bytes, sha256_hex
 from tools.strategy_service_offline.common import Frozen, digest, require
@@ -126,6 +128,46 @@ def prepare_source_only_route(root, nomination, work235_spec_receipt,
     })
 
 
+def _verified_outbox_payload(root, queue):
+    """Read existing persisted Core payload, including after an ACK/restart.
+
+    Core owns the SQLite outbox and trace. This read-only lookup validates
+    the immutable payload hash and exact queue identity; it does not dequeue,
+    acknowledge, retry or modify any state.
+    """
+    connection = _connect(root)
+    try:
+        row = connection.execute(
+            "SELECT payload_hash,delivery_json,state,lane FROM distribution_outbox "
+            "WHERE message_id=?", (queue["message_id"],)
+        ).fetchone()
+    finally:
+        connection.close()
+    require(row is not None
+            and row[0] == queue["payload_sha256"]
+            and row[3] == queue["lane"]
+            and row[2] in ("PENDING", "RETRY", "ACKED", "QUARANTINED"),
+            "SECRETARY_OUTBOX_IDENTITY_DRIFT")
+    try:
+        payload = json.loads(row[1], object_pairs_hook=_no_duplicate_keys)
+    except (ValueError, TypeError, KeyError) as exc:
+        raise ValueError("SECRETARY_OUTBOX_PAYLOAD_DECODE") from exc
+    require(type(payload) is dict and
+            payload.get("payload_sha256") == queue["payload_sha256"]
+            and digest({key: value for key, value in payload.items()
+                        if key != "payload_sha256"}) == row[0],
+            "SECRETARY_OUTBOX_PAYLOAD_TAMPER")
+    return payload
+
+
+def _no_duplicate_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        require(key not in result, "SECRETARY_DUPLICATE_JSON_KEY")
+        result[key] = value
+    return result
+
+
 def verify_offline_consumer_ack(root, pending_receipt, warehouse_receipt, ack_receipt=None):
     """Read-only verification; never ACK by itself, never promote to Paper.
 
@@ -152,12 +194,12 @@ def verify_offline_consumer_ack(root, pending_receipt, warehouse_receipt, ack_re
             "paper_execution": "NOT_ACTIVATED", "trading_authority": "NONE",
         })
     require(trace[-1]["state"] == "ACKED", "SECRETARY_ACK_NOT_COMMITTED")
-    route = bound["secretary_payload"]
-    # Durable replay can return a null poll view for an already-ACKED message.
-    # A caller must provide the exact immutable Core payload; never reconstruct
-    # or forge it from unsealed user arguments.
-    require(type(route) is dict and route.get("payload_sha256") == queue["payload_sha256"],
-            "SECRETARY_PAYLOAD_NOT_ATTESTED")
+    # Revalidate the immutable persisted Core payload instead of trusting an
+    # earlier poll snapshot, including after a Core outbox ACK and restart.
+    route = _verified_outbox_payload(root, queue)
+    if bound["secretary_payload"] is not None:
+        require(bound["secretary_payload"] == route,
+                "SECRETARY_POLLED_PAYLOAD_DRIFT")
     consumer = consume_core_secretary_route(warehouse_receipt, route, queue,
                                              ack_receipt, trace)
     return Frozen.build({
