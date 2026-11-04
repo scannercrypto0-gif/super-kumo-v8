@@ -18,6 +18,7 @@ from tools.strategy_service_offline.common import canonical, Frozen, raw_sha
 from tools.strategy_service_offline.run import FIXTURES
 from .native15m import native_15m_policy, scan_native15m, safe_wait_for_paper
 from .core_secretary import prepare_source_only_route, verify_offline_consumer_ack
+from .factory_handoff import prepare_factory_handoff
 
 
 def seal(obj, key):
@@ -311,6 +312,59 @@ class CoreSecretaryGate(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "SECRETARY_OUTBOX_PAYLOAD_TAMPER"):
             verify_offline_consumer_ack(
                 self.root, replay.receipt(), self.warehouse, ack)
+
+    def test_factory_handoff_sealed_census_wait_and_source_ack(self):
+        native = Native15mGate(methodName="test_all_strategy_symbol_pairs_and_safety")
+        native.setUp()
+        scan = native.run_scan().receipt()
+        pending = self.prepare()
+        args = dict(
+            expected_source_zip_sha256=self.warehouse["source_zip_sha256"],
+            expected_core245_sha256=self.native["price_query_sha256"],
+            expected_core253_sha256=self.local["query_sha256"],
+        )
+        wait = verify_offline_consumer_ack(self.root, pending.receipt(), self.warehouse)
+        handoff = prepare_factory_handoff(scan, pending.receipt(), wait.receipt(), **args)
+        self.assertEqual(handoff.data["synthetic_attempt_denominator"], 10)
+        self.assertEqual(len(handoff.data["synthetic_native15m_strategy_census"]), 2)
+        self.assertEqual(handoff.data["secretary_source_only_state"], "WAIT")
+        self.assertFalse(handoff.data["source_only_is_strategy_selection"])
+        self.assertEqual(handoff.data["trading_authority"], "NONE")
+        self.assertEqual(handoff.payload,
+                         prepare_factory_handoff(scan, pending.receipt(), wait.receipt(), **args).payload)
+        queue = pending.data["queue"]
+        ack = acknowledge_nomination(
+            self.root, message_id=queue["message_id"],
+            payload_sha256=queue["payload_sha256"],
+            acknowledgement_sha256="d"*64)
+        checked = verify_offline_consumer_ack(
+            self.root, pending.receipt(), self.warehouse, ack)
+        approved = prepare_factory_handoff(scan, pending.receipt(), checked.receipt(), **args).data
+        self.assertEqual(approved["secretary_source_only_state"], "ACKED_SOURCE_ONLY")
+        self.assertEqual(approved["secretary_source_only_ack_sha256"], ack["receipt_sha256"])
+        self.assertEqual(approved["strategy_to_original_source"], "NOT_CONNECTED_NO_PIT_PROMOTION")
+        self.assertEqual(approved["orders_created"], 0)
+
+    def test_factory_handoff_mismatched_parent_rejected(self):
+        native = Native15mGate(methodName="test_all_strategy_symbol_pairs_and_safety")
+        native.setUp()
+        scan = native.run_scan().receipt()
+        pending = self.prepare()
+        wait = verify_offline_consumer_ack(self.root, pending.receipt(), self.warehouse)
+        kwargs = dict(
+            expected_source_zip_sha256=self.warehouse["source_zip_sha256"],
+            expected_core245_sha256=self.native["price_query_sha256"],
+            expected_core253_sha256=self.local["query_sha256"],
+        )
+        kwargs["expected_core253_sha256"] = "f"*64
+        with self.assertRaisesRegex(ValueError, "FACTORY_HANDOFF_SOURCE_QUERY_DOMAIN"):
+            prepare_factory_handoff(scan, pending.receipt(), wait.receipt(), **kwargs)
+        forged = deepcopy(scan)
+        forged["payload"]["nominations"][0]["payload"]["status"] = "SELECTED"
+        forged = Frozen.build(forged["payload"]).receipt()
+        kwargs["expected_core253_sha256"] = self.local["query_sha256"]
+        with self.assertRaisesRegex(ValueError, "FROZEN_DIGEST_DRIFT"):
+            prepare_factory_handoff(forged, pending.receipt(), wait.receipt(), **kwargs)
 
     def test_native_scanner_unknown_not_promoted(self):
         bad = deepcopy(self.nomination)
