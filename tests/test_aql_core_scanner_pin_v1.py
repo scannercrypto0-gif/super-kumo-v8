@@ -49,7 +49,7 @@ class ActualScannerPinnedContract(unittest.TestCase):
             )
             universe=make_synthetic_universe(["BTCUSDT"],cutoff)
             result=scanner.scan(universe,{"BTCUSDT":{}},cutoff_at=cutoff)
-            self.assertEqual(result.census["attempted"],1)
+            self.assertEqual(result.census["expected_receipt_count"],1)
             self.assertEqual(len(result.envelopes),1)
             n=result.envelopes[0].as_dict()
             self.assertIn(n["stage"],("SCREENED","UNKNOWN","QUALIFIED"))
