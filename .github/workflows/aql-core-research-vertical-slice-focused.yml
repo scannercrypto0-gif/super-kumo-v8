@@ -15,6 +15,7 @@ on:
       - 'research_wp_r0/aql_core_authorized_source_transfer_v1.py'
       - 'research_wp_r0/aql_core_offline_lab_test_strategy_v1.py'
       - 'research_wp_r0/aql_core_bounded_monthly_source_preflight_v1.py'
+      - 'research_wp_r0/aql_core_dual_query_identity_map_v1.py'
       - 'research_wp_r0/aql_archive_custody_bridge_v1.py'
       - 'research_wp_r0/historical_library.py'
       - 'tests/test_aql_core_research_query_seam_v1.py'
@@ -28,6 +29,7 @@ on:
       - 'tests/test_aql_core_authorized_source_transfer_v1.py'
       - 'tests/test_aql_core_offline_lab_test_strategy_v1.py'
       - 'tests/test_aql_core_bounded_monthly_source_preflight_v1.py'
+      - 'tests/test_aql_core_dual_query_identity_map_v1.py'
       - 'tests/test_aql_archive_custody_bridge_v1.py'
       - '.github/workflows/aql-core-research-vertical-slice-focused.yml'
   pull_request:
@@ -76,3 +78,4 @@ jobs:
           PYTHONPATH=.:_pinned_raw_211:_pinned_scanner_227 python -m unittest discover -s tests -p 'test_aql_core_authorized_source_transfer_v1.py' -v
           PYTHONPATH=.:_pinned_raw_211:_pinned_scanner_227 python -m unittest discover -s tests -p 'test_aql_core_offline_lab_test_strategy_v1.py' -v
           PYTHONPATH=.:_pinned_raw_211:_pinned_scanner_227 python -m unittest discover -s tests -p 'test_aql_core_bounded_monthly_source_preflight_v1.py' -v
+          PYTHONPATH=.:_pinned_raw_211:_pinned_scanner_227 python -m unittest discover -s tests -p 'test_aql_core_dual_query_identity_map_v1.py' -v
