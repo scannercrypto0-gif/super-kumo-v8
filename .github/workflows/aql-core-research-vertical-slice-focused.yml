@@ -1,0 +1,81 @@
+name: AQL Core Research Vertical Slice C4 (TEST ONLY)
+on:
+  push:
+    branches:
+      - aql/historical-archive-custody-bridge-offline-20261103
+    paths:
+      - 'research_wp_r0/aql_core_research_query_seam_v1.py'
+      - 'research_wp_r0/aql_core_factory_work_compat_v1.py'
+      - 'research_wp_r0/aql_authenticated_historical_admission_v1.py'
+      - 'research_wp_r0/aql_native_binance_zip_v1.py'
+      - 'research_wp_r0/aql_native_price_custody_query_v1.py'
+      - 'research_wp_r0/aql_core_chronology_universe_evidence_v1.py'
+      - 'research_wp_r0/aql_core_backbone_local_v1.py'
+      - 'research_wp_r0/aql_core_secretary_routing_v1.py'
+      - 'research_wp_r0/aql_core_authorized_source_transfer_v1.py'
+      - 'research_wp_r0/aql_core_offline_lab_test_strategy_v1.py'
+      - 'research_wp_r0/aql_core_bounded_monthly_source_preflight_v1.py'
+      - 'research_wp_r0/aql_core_dual_query_identity_map_v1.py'
+      - 'research_wp_r0/aql_archive_custody_bridge_v1.py'
+      - 'research_wp_r0/historical_library.py'
+      - 'tests/test_aql_core_research_query_seam_v1.py'
+      - 'tests/test_aql_core_factory_work_compat_v1.py'
+      - 'tests/test_aql_authenticated_historical_admission_v1.py'
+      - 'tests/test_aql_native_binance_zip_v1.py'
+      - 'tests/test_aql_core_chronology_universe_evidence_v1.py'
+      - 'tests/test_aql_core_backbone_local_v1.py'
+      - 'tests/test_aql_core_raw_vault_pin_v1.py'
+      - 'tests/test_aql_core_scanner_pin_v1.py'
+      - 'tests/test_aql_core_authorized_source_transfer_v1.py'
+      - 'tests/test_aql_core_offline_lab_test_strategy_v1.py'
+      - 'tests/test_aql_core_bounded_monthly_source_preflight_v1.py'
+      - 'tests/test_aql_core_dual_query_identity_map_v1.py'
+      - 'tests/test_aql_archive_custody_bridge_v1.py'
+      - '.github/workflows/aql-core-research-vertical-slice-focused.yml'
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_core_research_query_seam_v1.py'
+      - 'research_wp_r0/aql_archive_custody_bridge_v1.py'
+      - 'research_wp_r0/historical_library.py'
+      - 'tests/test_aql_core_research_query_seam_v1.py'
+      - 'tests/test_aql_archive_custody_bridge_v1.py'
+      - '.github/workflows/aql-core-research-vertical-slice-focused.yml'
+  workflow_dispatch:
+jobs:
+  offline-contract-and-bridge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout pinned existing RAW Vault #211 (read-only)
+        uses: actions/checkout@v4
+        with:
+          ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46
+          path: _pinned_raw_211
+          persist-credentials: false
+      - name: Checkout pinned offline Scanner #227 (read-only)
+        uses: actions/checkout@v4
+        with:
+          ref: b9c9ff8602e79c534402f44bce83c56ec2fa6bb9
+          path: _pinned_scanner_227
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: C3 focused seam negatives + existing G6 integration baseline
+        run: |
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_core_research_query_seam_v1.py' -v
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_archive_custody_bridge_v1.py' -v
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_core_factory_work_compat_v1.py' -v
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_authenticated_historical_admission_v1.py' -v
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_native_binance_zip_v1.py' -v
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_core_chronology_universe_evidence_v1.py' -v
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_core_backbone_local_v1.py' -v
+          PYTHONPATH=.:_pinned_raw_211 python -m unittest discover -s tests -p 'test_aql_core_raw_vault_pin_v1.py' -v
+          PYTHONPATH=.:_pinned_raw_211:_pinned_scanner_227 python -m unittest discover -s tests -p 'test_aql_core_scanner_pin_v1.py' -v
+          PYTHONPATH=.:_pinned_raw_211:_pinned_scanner_227 python -m unittest discover -s tests -p 'test_aql_core_authorized_source_transfer_v1.py' -v
+          PYTHONPATH=.:_pinned_raw_211:_pinned_scanner_227 python -m unittest discover -s tests -p 'test_aql_core_offline_lab_test_strategy_v1.py' -v
+          PYTHONPATH=.:_pinned_raw_211:_pinned_scanner_227 python -m unittest discover -s tests -p 'test_aql_core_bounded_monthly_source_preflight_v1.py' -v
+          PYTHONPATH=.:_pinned_raw_211:_pinned_scanner_227 python -m unittest discover -s tests -p 'test_aql_core_dual_query_identity_map_v1.py' -v

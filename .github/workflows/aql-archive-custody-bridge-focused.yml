@@ -1,0 +1,46 @@
+name: AQL Bridge Offline Focused
+on:
+  push:
+    branches: [aql/historical-archive-custody-bridge-offline-20261103]
+    paths:
+      - research_wp_r0/aql_archive_custody_bridge_v1.py
+      - tests/test_aql_archive_custody_bridge_v1.py
+      - .github/workflows/aql-archive-custody-bridge-focused.yml
+  pull_request:
+    paths:
+      - research_wp_r0/aql_archive_custody_bridge_v1.py
+      - tests/test_aql_archive_custody_bridge_v1.py
+      - .github/workflows/aql-archive-custody-bridge-focused.yml
+permissions:
+  contents: read
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: |
+          git rev-parse HEAD
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_archive_custody_bridge_v1.py' -v
+      - name: Produce deterministic TEST_ONLY source-packet-receipt hashes
+        run: |
+          PYTHONPATH=.:tests python - <<'PY'
+          from tempfile import TemporaryDirectory
+          from test_aql_archive_custody_bridge_v1 import exported, N
+          from research_wp_r0.historical_library import HistoricalLibrary
+          from research_wp_r0.aql_archive_custody_bridge_v1 import (
+              OfflineBridgeStager, raw_sha,
+          )
+          p, raw = exported()
+          with TemporaryDirectory() as temp:
+              stager = OfflineBridgeStager(temp)
+              key = stager.stage(p, raw)
+              stager.advance(key, batch_size=N)
+              receipt = stager.commit(key, HistoricalLibrary())
+          print("AQL_BRIDGE_G6_TEST_ONLY_SOURCE_SHA256=" + raw_sha(raw))
+          print("AQL_BRIDGE_G6_TEST_ONLY_PACKET_SHA256=" + key)
+          print("AQL_BRIDGE_G6_TEST_ONLY_RECEIPT_SHA256=" + receipt["receipt_sha256"])
+          print("AQL_BRIDGE_G6_NOT_INTEGRATED_NOT_AUDIT_ACCEPTED")
+          PY
