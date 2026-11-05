@@ -49,10 +49,10 @@ def decide_source_bound_strategy(
             and d.get("secretary_state")=="NOT_ENQUEUED"
             and d.get("trading_authority")=="NONE",
             "F3_STRATEGY_CENSUS_NOT_AUTHORIZED_FOR_RESEARCH")
-    matches=[Frozen.restore(x).data for x in d["attempts"]
-             if Frozen.restore(x).data["month"]==month
-             and Frozen.restore(x).data["strategy_id"]==strategy_id
-             and Frozen.restore(x).data["strategy_version"]==strategy_version]
+    records=[Frozen.restore(x).data for x in d["attempts"]]
+    matches=[x for x in records if x["month"]==month
+             and x["strategy_id"]==strategy_id
+             and x["strategy_version"]==strategy_version]
     require(len(matches)==1,"F3_STRATEGY_IDENTITY_OR_MONTH_NOT_IN_CENSUS")
     trial=matches[0]
     require(trial["status"]=="PENDING_RESEARCH_EVALUATION"
@@ -63,6 +63,8 @@ def decide_source_bound_strategy(
             "F3_RETAINED_OR_MISSING_SOURCE_NOT_SELECTABLE")
     require(type(core_f2_report) is dict
             and core_f2_report.get("report_sha256")==d["core_f2_report_sha256"]
+            and core_digest({k:v for k,v in core_f2_report.items()
+                             if k!="report_sha256"})==core_f2_report["report_sha256"]
             and core_f2_report.get("historical_pit")=="NOT_ATTESTED"
             and core_f2_report.get("strategy_policy_approval")=="NOT_ATTESTED_BY_CORE",
             "F3_SOURCE_F2_PARENT_DRIFT")
@@ -145,9 +147,9 @@ def decide_source_bound_strategy(
                              if k!="signal_digest"})==
                 observed_close_signal["signal_digest"],
             "F3_EXTERNAL_EVALUATOR_SIGNAL_SCOPE_OR_SEAL")
-    # The signed policy + source report prove intake only. Without an
-    # independently trusted evaluator execution record and actual strategy
-    # signal, even a PROPOSED signal is not proof of SELECTED.
+    # Do not confuse a caller-created sealed evaluator observation with an
+    # independently trusted evaluator trace: these three states are input
+    # assertions, never a StrategyApproval or research selection.
     return Frozen.build({
         "schema":SCHEMA,
         "source_bound_census_sha256":c.sha256,
