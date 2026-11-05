@@ -1,0 +1,29 @@
+name: ATLAS Factory F Resumable Historical Batch Blocker
+on:
+  push:
+    branches:
+      - factory/package-e-historical-research-results-20261105
+    paths:
+      - 'research_wp_r0/aql_factory_f_batch_ledger_v1.py'
+      - 'tests/test_aql_factory_f_batch_ledger_v1.py'
+      - '.github/workflows/atlas-factory-f-batch-ledger.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  factory-f-batch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11','3.12','3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Factory F exact-denominator durable blocked batch tests
+        run: |
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_factory_f_batch_ledger_v1.py' -v
