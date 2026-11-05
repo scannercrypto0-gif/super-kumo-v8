@@ -17,7 +17,7 @@ from tools.strategy_discoverer_offline.historical_f4_intake import (
 
 def case():
     e0,p0,ledger,attempt,head,receipt,log_head=setup_case()
-    evidence_dict=e0._fields_for_digest()
+    evidence_dict={**e0._fields_for_digest(), "omission_reason_codes": e0.omission_reason_codes}
     evidence_dict.update(
         evidence_class="RETROSPECTIVE_NON_PIT_VERIFIED",
         source_dataset_id="historical-cohort-2024",
@@ -85,7 +85,7 @@ def test_synthetic_evidence_is_forbidden():
 
 def test_unknown_evidence_quarantined():
     evidence,package,cohort=case()
-    d=evidence._fields_for_digest()
+    d={**evidence._fields_for_digest(), "omission_reason_codes": evidence.omission_reason_codes}
     d["evidence_class"]="UNKNOWN_UNVERIFIED"
     bad=NominationEvidenceV1.build(**d)
     fields=package_fields(package)
@@ -99,7 +99,7 @@ def test_unknown_evidence_quarantined():
 
 def test_wrong_cutoff_rejected():
     evidence,package,cohort=case()
-    d=evidence._fields_for_digest()
+    d={**evidence._fields_for_digest(), "omission_reason_codes": evidence.omission_reason_codes}
     d["cutoff_ms"]+=900000
     bad=NominationEvidenceV1.build(**d)
     fields=package_fields(package)
