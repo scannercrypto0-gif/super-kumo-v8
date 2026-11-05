@@ -138,7 +138,8 @@ def run_factory_d_same_source_lab_paper(
           and spec.get("market") == "fixture"
           and spec.get("strategy_id") == gate["strategy_id"]
           and spec.get("strategy_version") == gate["strategy_version"]
-          and spec.get("config_digest") == gate["config_digest"]
+          and spec.get("config_digest") == gate.get("scanner_c_work235_config_digest")
+          and spec.get("dna", {}).get("digest") == gate.get("scanner_c_dna_digest")
           and spec.get("definition", {}).get("digest")
               == gate["strategy_definition_digest"],
           "FROZEN_STRATEGY_DEFINITION_PARENT")
@@ -294,6 +295,9 @@ def run_factory_d_same_source_lab_paper(
         "post_hoc_one_bar_observations": observed,
         "observed_one_bar_denominator": len(observed),
         "work235_spec_sha256": strategy_spec.sha256,
+        "work235_config_digest": spec["config_digest"],
+        "native15m_config_digest": gate["config_digest"],
+        "native15m_policy_sha256": gate["native15m_policy_sha256"],
         "frozen_v1_definition_sha256": definition.digest,
         "rule_evaluation": "ACTUAL_FACTORY_INDICATOR_PREFIX_ONLY",
         "rule_decisions": rule_decisions,
