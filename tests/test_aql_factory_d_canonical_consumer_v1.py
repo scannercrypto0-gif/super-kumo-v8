@@ -157,6 +157,12 @@ class FactoryDActualLabPaper(unittest.TestCase):
                          a["paper"]["paper_sha256"])
         self.assertEqual(a["batch"]["trading_authority"], "NONE")
         self.assertEqual(a["batch"]["historical_pit"], "NOT_ATTESTED")
+        # Auditable exact-HEAD CI proof: preserve complete sealed artifacts,
+        # not only booleans, in each Python job log.
+        import json
+        print("ATLAS_FACTORY_D_EVIDENCE_JSON=" + json.dumps(
+            {"lab": a["lab"], "paper": a["paper"], "batch": a["batch"]},
+            sort_keys=True, separators=(",", ":"), ensure_ascii=True))
 
     def test_no_core_durable_consumer_ack_no_lab_or_paper(self):
         with self.assertRaises((ValueError, LabHandoffError)):
