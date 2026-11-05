@@ -139,7 +139,9 @@ def prepare_f4_intake(*, package, evidence, ledger_checkpoint_path,
                       ledger_checkpoint_sha256, ledger_attempt_id,
                       ledger_reference, cohort: F4RetrospectiveEvidence,
                       source_independently_authenticated=False,
-                      research_policy_independently_approved=False):
+                      research_policy_independently_approved=False,
+                      external_witnesses=None, independent_trust_roots=None,
+                      trusted_now_ms=None, independently_pinned_f2_report_sha256=None):
     """Construct candidate history envelope; never self-certify source/policy.
 
     Flags indicate external verifications to be attested *again* by Factory.
@@ -198,13 +200,38 @@ def prepare_f4_intake(*, package, evidence, ledger_checkpoint_path,
                   strategy_approval_status="NOT_APPROVED_FOR_TRADING",
                   factory_consumer_status="NOT_CONNECTED",
                   holdout_accessed=False,trading_authority="NONE")
-    return F4ResearchIntake(**fields,intake_digest=_digest(fields))
+    waiting = F4ResearchIntake(**fields,intake_digest=_digest(fields))
+    if external_witnesses is not None:
+        # Three distinct real Ed25519 authority roles, verified against an
+        # OUTSIDE trust registry and clock, never self-reported boolean flags.
+        from tools.strategy_discoverer_offline.historical_f4_positive import prepare_signed_f4
+        return prepare_signed_f4(
+            waiting=waiting, package=package, nomination=evidence, cohort=cohort,
+            db_path=ledger_checkpoint_path, checkpoint_sha=ledger_checkpoint_sha256,
+            attempt_id=ledger_attempt_id, ledger_reference=ledger_reference,
+            report_sha=independently_pinned_f2_report_sha256,
+            witnesses=external_witnesses, external_roots=independent_trust_roots,
+            trusted_now_ms=trusted_now_ms,
+        )
+    return waiting
 
 
 def verify_f4_intake(*, intake: F4ResearchIntake, package, evidence, cohort,
                      durable_ledger_path=None, independently_confirm_source=False,
-                     independently_confirm_policy=False):
-    """Receiver-side verification of F4 envelope. Never trust sealed flags alone."""
+                     independently_confirm_policy=False,
+                     independent_trust_roots=None, trusted_now_ms=None,
+                     independently_pinned_f2_report_sha256=None):
+    """Receiver-side verification; positive v2 rechecks external signatures."""
+    from tools.strategy_discoverer_offline.historical_f4_positive import (
+        F4ReadyIntakeV2, verify_signed_f4,
+    )
+    if isinstance(intake, F4ReadyIntakeV2):
+        return verify_signed_f4(
+            intake=intake, package=package, nomination=evidence, cohort=cohort,
+            db_path=durable_ledger_path, external_roots=independent_trust_roots,
+            trusted_now_ms=trusted_now_ms,
+            pinned_f2_report_sha256=independently_pinned_f2_report_sha256,
+        )
     if not isinstance(intake, F4ResearchIntake) or not isinstance(cohort, F4RetrospectiveEvidence):
         raise F4ContractError("F4 verifier input type")
     F4ResearchIntake(**intake.to_dict())
