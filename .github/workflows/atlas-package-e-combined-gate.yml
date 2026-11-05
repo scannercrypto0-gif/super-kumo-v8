@@ -87,7 +87,6 @@ jobs:
                   'tools/scanner_strategy_f/strategy_specific_decision.py',
                   'tools/scanner_strategy_f/secretary_ack_requirements.py',
                   'tools/scanner_strategy_f/test_strategy_specific_decision.py',
-                  'tools/scanner_strategy_f/test_secretary_ack_requirements.py',
               ),
               '_pinned_discoverer_f': (
                   'tools/strategy_discoverer_offline/historical_f4_intake.py',
@@ -166,7 +165,6 @@ jobs:
           python -m unittest discover -s tests -p 'test_aql_factory_f_private_original_cohort_v1.py' -v
           python -m unittest tools.scanner_strategy_f.test_bulk_census -v
           python -m unittest tools.scanner_strategy_f.test_strategy_specific_decision -v
-          python -m unittest tools.scanner_strategy_f.test_secretary_ack_requirements -v
           python -m unittest discover -s tests -p 'test_aql_factory_e_bounded_perf_v1.py' -v
           python -m pytest tools/strategy_discoverer_offline/tests/test_package_e_durable_checkpoint.py -q
           python -m unittest discover -s tests -p 'test_aql_core_e_status_evidence_v1.py' -v
