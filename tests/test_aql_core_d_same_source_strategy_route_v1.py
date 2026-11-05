@@ -40,6 +40,7 @@ from research_wp_r0.historical_library import HistoricalLibrary
 from research_wp_r0.aql_core_c_strategy_secretary_route_v1 import strategy_route_snapshot
 from research_wp_r0.aql_core_d_same_source_strategy_route_v1 import (
     verify_same_source_research,connect_canonical_test_only_strategy,
+    read_factory_canonical_strategy_offer,
 )
 
 START = 1706745600000
@@ -252,6 +253,25 @@ class CoreDSameSource(unittest.TestCase):
         self.assertEqual(route["state"],"PENDING_CONSUMER")
         self.assertFalse(route["route_ready_for_isolated_lab"])
         self.assertEqual(route["trading_authority"],"NONE")
+        offer=read_factory_canonical_strategy_offer(
+            self.root,same_source_inputs=self.args,
+            canonical_bridge_receipt=b,now_ms=self.now)
+        self.assertEqual(
+            offer["status"],"READY_FOR_EXPLICIT_FACTORY_RESEARCH_CONSUMER_ONLY")
+        self.assertEqual(
+            offer["scanner_c_approval_sha256"],self.approval.sha256)
+        self.assertNotEqual(offer["source_only_ack_sha256"],
+                            offer["scanner_c_approval_sha256"])
+        self.assertIsNone(offer["factory_consumer_ack_sha256"])
+        self.assertFalse(offer["lab_invoked"])
+        self.assertFalse(offer["paper_invoked"])
+        self.assertEqual(offer,read_factory_canonical_strategy_offer(
+            self.root,same_source_inputs=self.args,
+            canonical_bridge_receipt=b,now_ms=self.now))
+        with self.assertRaises(BackboneError):
+            read_factory_canonical_strategy_offer(
+                self.root,same_source_inputs=self.args,
+                canonical_bridge_receipt=b,now_ms=self.now+60000)
 
     def test_wrong_scanner_raw_even_when_sealed_sha_is_not_source(self):
         mutated=deepcopy(self.scanner_source)
