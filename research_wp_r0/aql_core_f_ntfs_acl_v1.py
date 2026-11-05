@@ -39,7 +39,7 @@ def validate_acl_entries(entries, current_user_sid):
         sid, ace_type, flags, mask = entry
         # Type 0 = ACCESS_ALLOWED_ACE. Any denies, object ACE, callback ACE
         # or unrecognized DACL semantics must be audited, not guessed.
-        if ace_type != 0 or flags & ~0x13 or mask < 0 or mask > 0xFFFFFFFF:
+        if ace_type != 0 or flags & ~0x1F or mask < 0 or mask > 0xFFFFFFFF:
             raise ValueError("WINDOWS_ACL_UNRECOGNIZED")
         if sid not in allowed_sids:
             raise ValueError("WINDOWS_ACL_UNSAFE_PRINCIPAL")
