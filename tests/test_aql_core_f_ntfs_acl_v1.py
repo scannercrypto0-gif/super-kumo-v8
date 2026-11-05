@@ -108,13 +108,15 @@ class TestWindowsAclPolicy(unittest.TestCase):
             )
             script = (
                 "$ErrorActionPreference='Stop'; "
-                "$acl=Get-Acl -LiteralPath $args[0]; "
-                "$acl.SetSecurityDescriptorSddlForm($args[1]); "
-                "Set-Acl -LiteralPath $args[0] -AclObject $acl"
+                "$acl=Get-Acl -LiteralPath $env:AQL_TEST_DIR; "
+                "$acl.SetSecurityDescriptorSddlForm($env:AQL_TEST_SDDL); "
+                "Set-Acl -LiteralPath $env:AQL_TEST_DIR -AclObject $acl"
             )
             setup = subprocess.run(
                 ["powershell.exe", "-NoProfile", "-NonInteractive",
-                 "-Command", script, str(base), sddl],
+                 "-Command", script],
+                env={**os.environ, "AQL_TEST_DIR": str(base),
+                     "AQL_TEST_SDDL": sddl},
                 capture_output=True, text=True, errors="replace",
             )
             if setup.returncode:
