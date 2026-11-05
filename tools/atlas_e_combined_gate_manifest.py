@@ -22,6 +22,9 @@ PINS = {
  "discoverer_base":"f2006c0e431690ccea8b0532095bf4f2a2dc88ba",
  "work235":"6acbcc7fc243b132f58170df4c6469bbf7f4eff8",
  "raw211":"7d97b09c0c6ee2650a61d523acb8d8c771a99c46",
+ "core_f":"74602f248b19b142d05aecfef19a560ceaf9ce13",
+ "scanner_f":"8dcf20021c859eed139c199b31c9d346e6a0be74",
+ "discoverer_f":"58959b22de9bc96f03b03dfc565815282fd1a939",
 }
 # PASS is restricted to demonstrated bounded engineering subgate.
 # PARTIAL / BLOCKED are NOT successful Package E completion.
@@ -72,7 +75,11 @@ def main():
       "orders_created":0, "actual_fills":None,
       "holdout":"SEALED_UNOPENED",
       "final_package_e":"CLOSED_ENGINEERING_WITH_EXTERNAL_HISTORICAL_BLOCKERS",
-      "package_f":"F4_BATCH_BLOCKED_PENDING_F0_F1_F2_F3",
+      "package_f":"F4_RUNBOOK_READY_F1_F2_SOURCE_AND_F3_APPROVAL_BLOCKED",
+      "package_f_policy":"OWNER_PROVISIONAL_CONDITIONAL_A_DORMANT",
+      "package_f_f0_manifest":"READY_F1_ORIGINAL_SOURCE_NOT_ADMITTED",
+      "package_f_scanner_f3":"DRAFT_NOT_APPROVED_FOR_HISTORICAL_EXECUTION",
+      "package_f_discoverer_f4":"WAIT_NOT_CONNECTED_OPTIONAL",
       "package_f_actual_original_source_backtest":"NOT_EXECUTED",
       "audit_verdict":"PENDING_FINAL_INDEPENDENT_DELTA_REVIEW",
     }
