@@ -12,7 +12,7 @@ import platform
 from pathlib import Path
 
 PINS = {
- "factory_e":"ccc563f8a838d3ed07c0cf6725aca5ead9b9209e",
+ "factory_e":"4212151a1be7f526a672b8a9ee49eb3b2c552f87",
  "factory_d":"a695e262da6787f752a13820f02dd00eef8ef1cd",
  "core_e":"3c23ba606c94a2d9e7a95d2dce122adbc7d9e88e",
  "core_d":"a86a590a5e2c32c18e03522f52896dbcf50c60ff",
