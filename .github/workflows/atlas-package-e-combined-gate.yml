@@ -76,6 +76,8 @@ jobs:
                        'aql_factory_e_durable_discoverer_consumer_v1.py'):
               copyfile(Path('_pinned_factory_e')/'research_wp_r0'/name,
                        Path('research_wp_r0')/name)
+          copyfile(Path('_pinned_factory_e')/'tools/atlas_factory_e_bounded_perf.py',
+                   Path('tools/atlas_factory_e_bounded_perf.py'))
           for name in ('test_aql_factory_e_research_results_store_v1.py',
                        'test_aql_factory_e_discoverer_consumer_v1.py',
                        'test_aql_factory_e_historical_source_boundary_v1.py',
