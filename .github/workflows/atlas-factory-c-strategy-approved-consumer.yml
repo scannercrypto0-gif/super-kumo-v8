@@ -1,0 +1,34 @@
+name: ATLAS Factory C isolated strategy-approved research consumer
+on:
+  push:
+    branches:
+      - factory/package-c-strategy-approved-consumer-20261105
+    paths:
+      - 'research_wp_r0/aql_factory_strategy_approved_consumer_c_v1.py'
+      - 'tests/test_aql_factory_strategy_approved_consumer_c_v1.py'
+      - '.github/workflows/atlas-factory-c-strategy-approved-consumer.yml'
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_factory_strategy_approved_consumer_c_v1.py'
+      - 'tests/test_aql_factory_strategy_approved_consumer_c_v1.py'
+      - '.github/workflows/atlas-factory-c-strategy-approved-consumer.yml'
+permissions:
+  contents: read
+jobs:
+  factory-c-consumer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Factory C consumer only — synthetic isolated contract negatives/replay
+        run: |
+          PYTHONPATH="$PWD:$PWD/tests" python -m unittest -v tests/test_aql_factory_strategy_approved_consumer_c_v1.py
