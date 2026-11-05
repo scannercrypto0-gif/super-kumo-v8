@@ -69,6 +69,23 @@ class HistoricalBoundaryTests(unittest.TestCase):
             self.assertEqual(receipt["status"], BLOCKED)
             self.assertTrue(verify_preflight_receipt(receipt))
 
+    def test_malformed_verified_receipt_never_raises(self):
+        with tempfile.TemporaryDirectory() as root:
+            p = Path(root) / "original.zip"
+            p.write_bytes(b"synthetic fixture bytes only")
+            sha = hashlib.sha256(p.read_bytes()).hexdigest()
+            original = preflight_historical_source(
+                zip_path=p, publisher_checksum_sha256=sha,
+                dataset_id="TEST-NOT-PUBLISHER", source_kind="ORIGINAL_PUBLISHER")
+            for bad in (None, 3, [], {}, True):
+                attempt = dict(original)
+                attempt["publisher_checksum_sha256"] = bad
+                self.assertFalse(verify_preflight_receipt(attempt))
+            for bad in (None, 7, False):
+                attempt = dict(original)
+                attempt["source_sha256"] = bad
+                self.assertFalse(verify_preflight_receipt(attempt))
+
 
 if __name__ == "__main__":
     unittest.main()
