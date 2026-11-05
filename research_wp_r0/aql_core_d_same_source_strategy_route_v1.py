@@ -225,6 +225,17 @@ def verify_same_source_research(
                 "symbol":warehouse_receipt["symbol"],"eligible":True,
                 "membership_available_ms":scanner_manifest["cutoff_ms"]}],
             "CORE_D_SCANNER_UNIVERSE_DRIFT")
+    # A signed Scanner run alone is not proof it consumed these raw bytes.
+    # Replay the actual pinned Scanner B native15m kernel with the precise
+    # owner policy, identical byte payload and complete one-symbol universe.
+    from tools.scanner_strategy_b.native15m import scan_native15m
+    expected_scan=scan_native15m(
+        [native15m_policy_receipt],[work235_spec_receipt],
+        scanner_raw_bytes,scanner_manifest,scanner_universe,
+        cutoff_ms=warehouse_receipt["decision_cutoff_ms"],symbol_budget=1)
+    require(expected_scan.sha256==scanner_run.sha256
+            and expected_scan.data==scanner_run.data,
+            "CORE_D_SCANNER_ACTUAL_EXECUTION_REPLAY_DRIFT")
     require(raw_request["source_raw_sha256"]==_hash(scanner_raw_bytes)
             and raw_request["source_manifest_sha256"]==digest(scanner_manifest)
             and raw_request["universe_sha256"]==digest(scanner_universe)
