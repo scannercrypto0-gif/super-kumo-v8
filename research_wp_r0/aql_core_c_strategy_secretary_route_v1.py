@@ -16,6 +16,7 @@ from research_wp_r0.aql_core_secretary_routing_v1 import _trace as _source_trace
 
 REQUEST_SCHEMA = "aql.core.c.strategy-route-request.v1"
 APPROVAL_SCHEMA = "aql.scanner.c.strategy-approval.v1"
+POLICY_SCHEMA = "aql.scanner.native15m-policy.v1"
 RECEIPT_SCHEMA = "aql.core.c.strategy-secretary-route.v1"
 EVENT_SCHEMA = "aql.core.c.strategy-route-event.v1"
 SOURCE_ACK_SCHEMA = "aql.core.secretary-offline-ack.v1"
@@ -48,6 +49,7 @@ def _create(con):
         route_id TEXT PRIMARY KEY, request_sha TEXT NOT NULL,
         request_json TEXT NOT NULL, approval_sha TEXT,
         source_ack_json TEXT NOT NULL, consumer_ack_json TEXT,
+        policy_sha TEXT NOT NULL, policy_json TEXT NOT NULL,
         approval_json TEXT, source_ack_sha TEXT NOT NULL,
         state TEXT NOT NULL, attempts INTEGER NOT NULL,
         consumer_ack_sha TEXT, next_attempt_ms INTEGER NOT NULL
@@ -77,12 +79,13 @@ def _trace(con, route_id):
                digest(event)==sha,"TRACE_TAMPER")
         previous=sha
     current=con.execute("SELECT state,request_sha,approval_sha,"
-                        "source_ack_sha,consumer_ack_sha,attempts "
+                        "source_ack_sha,consumer_ack_sha,attempts,policy_sha "
                         "FROM c_strategy_routes WHERE route_id=?",
                         (route_id,)).fetchone()
     _check(current is not None and current[0]==rows[-1][0],"TRACE_STATE_DRIFT")
     tail=json.loads(rows[-1][1])
     _check(tail["request_sha256"]==current[1]
+           and tail["policy_receipt_sha256"]==current[6]
            and tail["approval_sha256"]==current[2]
            and tail["source_ack_sha256"]==current[3]
            and tail["consumer_ack_sha256"]==current[4]
@@ -90,18 +93,61 @@ def _trace(con, route_id):
     return [json.loads(x[1]) for x in rows]
 
 
-def _event(con, route_id, state, *, request_sha, approval_sha,
+def _event(con, route_id, state, *, request_sha, policy_sha, approval_sha,
            source_ack_sha, consumer_ack_sha, attempts, reason):
     prev=con.execute("SELECT event_sha FROM c_strategy_events WHERE route_id=? "
                      "ORDER BY event_seq DESC LIMIT 1",(route_id,)).fetchone()
     body={"schema":EVENT_SCHEMA,"route_id":route_id,"state":state,
-          "request_sha256":request_sha,"approval_sha256":approval_sha,
+          "request_sha256":request_sha,"policy_receipt_sha256":policy_sha,
+          "approval_sha256":approval_sha,
           "source_ack_sha256":source_ack_sha,
           "consumer_ack_sha256":consumer_ack_sha,"attempts":attempts,
           "reason":reason,"previous_sha256":prev[0] if prev else None}
     con.execute("INSERT INTO c_strategy_events(route_id,state,event_json,event_sha) "
                 "VALUES(?,?,?,?)",(route_id,state,json.dumps(body,sort_keys=True,
                 separators=(",",":")),digest(body)))
+
+
+def _verify_policy(policy_receipt,request):
+    """Read-only verification of the existing Scanner B native15m TEST_ONLY policy.
+
+    This is a SHA-sealed identity/contract, not a grant of production or
+    trading authority. Scanner owns validating the policy against frozen
+    Work235 / StrategyDefinition; Core cannot infer that from a source ACK.
+    """
+    _check(type(policy_receipt) is dict
+           and type(policy_receipt.get("payload")) is dict
+           and type(policy_receipt.get("sha256")) is str
+           and HEX.fullmatch(policy_receipt["sha256"]) is not None,
+           "POLICY_RECEIPT_REQUIRED")
+    policy=policy_receipt["payload"]
+    _check(digest(policy)==policy_receipt["sha256"],
+           "POLICY_SEAL_TAMPER")
+    _check(policy.get("schema")==POLICY_SCHEMA
+           and policy.get("timeframe")=="15m"
+           and policy.get("override_is_explicit") is True
+           and policy.get("evidence_class")=="TEST_ONLY"
+           and policy.get("operational_work235_15m")==
+               "NOT_CONNECTED_15M_UNSUPPORTED"
+           and policy.get("approved_paper_registry")=="NOT_CONNECTED"
+           and policy.get("trading_authority")=="NONE",
+           "POLICY_NOT_TEST_ONLY")
+    config=policy.get("config_digest")
+    _check(type(config) is str and HEX.fullmatch(config) is not None
+           and digest({k:v for k,v in policy.items() if k!="config_digest"})==config,
+           "POLICY_CONFIG_DIGEST_DRIFT")
+    definition=policy.get("definition")
+    _check(type(definition) is dict
+           and type(definition.get("digest")) is str
+           and HEX.fullmatch(definition["digest"]) is not None,
+           "POLICY_DEFINITION_REQUIRED")
+    _check(request.get("policy_receipt_sha256")==policy_receipt["sha256"]
+           and request.get("config_digest")==config
+           and request.get("strategy_definition_digest")==definition["digest"]
+           and request.get("strategy_id")==policy.get("strategy_id")
+           and request.get("strategy_version")==policy.get("strategy_version"),
+           "POLICY_REQUEST_IDENTITY_DRIFT")
+    return policy
 
 
 def _verify_source_ack(con, request, source_ack, nomination=None):
@@ -175,7 +221,8 @@ def _verify_request(request, identity_map, warehouse, nomination, source_ack,
                  "source_zip_sha256","manifest_integrity_sha256",
                  "core_245_price_query_sha256","core_253_query_local_sha256",
                  "warehouse_receipt_sha256","identity_map_sha256",
-                 "scanner_nomination_sha256","source_ack_sha256"):
+                 "scanner_nomination_sha256","source_ack_sha256",
+                 "policy_receipt_sha256"):
         _check(type(request.get(name)) is str and
                HEX.fullmatch(request[name]) is not None,
                "REQUEST_SHA_FIELDS")
@@ -238,7 +285,8 @@ def _verify_request(request, identity_map, warehouse, nomination, source_ack,
 
 
 def make_strategy_route_request(*, identity_map, warehouse, nomination,
-                                source_ack, strategy_id, strategy_version,
+                                source_ack, strategy_policy_receipt,
+                                strategy_id, strategy_version,
                                 config_digest, strategy_definition_digest,
                                 expires_at_ms):
     body={
@@ -262,10 +310,13 @@ def make_strategy_route_request(*, identity_map, warehouse, nomination,
        "operational_scanner_status":"UNKNOWN",
        "scanner_nomination_sha256":nomination["digest"],
        "source_ack_sha256":source_ack["receipt_sha256"],
+       "policy_receipt_sha256":strategy_policy_receipt["sha256"],
        "source_ack_is_approval":False,
        "paper_authority":"NONE","trading_authority":"NONE",
     }
-    return {**body,"request_sha256":digest(body)}
+    request={**body,"request_sha256":digest(body)}
+    _verify_policy(strategy_policy_receipt,request)
+    return request
 
 
 def _approval(approval, request, *, now_ms):
@@ -299,6 +350,8 @@ def _approval(approval, request, *, now_ms):
            and approval.get("source_ack_sha256")==
                 request["source_ack_sha256"]
            and approval.get("request_sha256")==request["request_sha256"]
+           and approval.get("policy_receipt_sha256")==
+                request["policy_receipt_sha256"]
            and approval.get("cutoff_ms")==request["cutoff_ms"],
            "APPROVAL_IDENTITY_OR_PARENT_DRIFT")
     _check(type(approval.get("issued_at_ms")) is int
@@ -313,7 +366,7 @@ def _approval(approval, request, *, now_ms):
 def _verify_stored(con, route_id):
     row=con.execute("SELECT request_sha,request_json,approval_sha,approval_json,"
                     "source_ack_sha,state,attempts,consumer_ack_sha,next_attempt_ms,"
-                    "source_ack_json,consumer_ack_json "
+                    "source_ack_json,consumer_ack_json,policy_sha,policy_json "
                     "FROM c_strategy_routes WHERE route_id=?",(route_id,)).fetchone()
     _check(row is not None,"ROUTE_NOT_FOUND")
     request=json.loads(row[1])
@@ -327,6 +380,9 @@ def _verify_stored(con, route_id):
         _check(approval["approval_sha256"]==row[2]
                and approval["request_sha256"]==row[0],
                "STORED_APPROVAL_PARENT")
+    policy=json.loads(row[12])
+    _check(row[11]==policy["sha256"],"STORED_POLICY_PARENT_DRIFT")
+    _verify_policy(policy,request)
     source_ack=json.loads(row[9])
     _verify_source_ack(con,request,source_ack)
     if row[10] is not None:
@@ -344,7 +400,7 @@ def _verify_stored(con, route_id):
 
 
 def enqueue_strategy_route(root, request, identity_map, warehouse,
-                           nomination, source_ack, *,
+                           nomination, source_ack, strategy_policy_receipt, *,
                            approval=None, now_ms, route_id):
     """Create-once strategy route, or replay same immutable decision.
 
@@ -355,6 +411,7 @@ def enqueue_strategy_route(root, request, identity_map, warehouse,
     _check(type(route_id) is str and IDENT.fullmatch(route_id) is not None,
            "ROUTE_ID")
     _verify_request(request,identity_map,warehouse,nomination,source_ack,now_ms=now_ms)
+    _verify_policy(strategy_policy_receipt,request)
     source_con=_connect(root)
     try:
         _verify_source_ack(source_con,request,source_ack,nomination)
@@ -378,14 +435,17 @@ def enqueue_strategy_route(root, request, identity_map, warehouse,
             con.execute("INSERT INTO c_strategy_routes("
                 "route_id,request_sha,request_json,approval_sha,approval_json,"
                 "source_ack_sha,state,attempts,consumer_ack_sha,next_attempt_ms,"
-                "source_ack_json,consumer_ack_json)"
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                "source_ack_json,consumer_ack_json,policy_sha,policy_json)"
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (route_id,request["request_sha256"],json.dumps(request,sort_keys=True),
                  valid["approval_sha256"] if valid else None,
                  json.dumps(valid,sort_keys=True) if valid else None,
                  source_ack["receipt_sha256"],state,0,None,0,
-                 json.dumps(source_ack,sort_keys=True),None))
+                 json.dumps(source_ack,sort_keys=True),None,
+                 strategy_policy_receipt["sha256"],
+                 json.dumps(strategy_policy_receipt,sort_keys=True)))
             _event(con,route_id,state,request_sha=request["request_sha256"],
+                   policy_sha=strategy_policy_receipt["sha256"],
                    approval_sha=valid["approval_sha256"] if valid else None,
                    source_ack_sha=source_ack["receipt_sha256"],
                    consumer_ack_sha=None,attempts=0,reason="CREATED")
@@ -466,6 +526,7 @@ def _transition(root, route_id, *, now_ms, action, approval=None,
                      json.dumps(consumer_ack,sort_keys=True)
                         if state=="ACKED_CONSUMER" else None,route_id))
         _event(con,route_id,state,request_sha=request["request_sha256"],
+               policy_sha=request["policy_receipt_sha256"],
                approval_sha=app["approval_sha256"] if app else None,
                source_ack_sha=row[4],consumer_ack_sha=ack,
                attempts=attempts,reason=reason)
@@ -495,6 +556,7 @@ def _verify_consumer_ack(ack, request, approval, now_ms):
            and ack.get("cutoff_ms")==request["cutoff_ms"]
            and ack.get("route_id") is not None
            and ack.get("source_ack_sha256")==request["source_ack_sha256"]
+           and ack.get("policy_receipt_sha256")==request["policy_receipt_sha256"]
            and ack.get("scanner_nomination_sha256")==
                 request["scanner_nomination_sha256"]
            and ack.get("manifest_integrity_sha256")==
@@ -545,6 +607,7 @@ def strategy_route_snapshot(root,route_id,*,now_ms):
            "schema":RECEIPT_SCHEMA,"route_id":route_id,
            "request_sha256":request["request_sha256"],
            "source_ack_sha256":row[4],
+           "policy_receipt_sha256":request["policy_receipt_sha256"],
            "approval_sha256":row[2],
            "consumer_ack_sha256":row[7],
            "state":state,"event_tail_sha256":digest(trace[-1]),
