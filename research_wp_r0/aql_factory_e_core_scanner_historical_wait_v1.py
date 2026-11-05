@@ -12,11 +12,15 @@ from research_wp_r0.aql_core_e_status_evidence_v1 import verify_core_e_status
 from tools.scanner_strategy_e.historical_research_policy import (
     validate_historical_policy_proposal,
 )
+from tools.scanner_strategy_e.historical_policy_approval_request import (
+    verify_historical_policy_approval_request,
+)
 from tools.strategy_service_offline.common import Frozen
 
 def record_historical_core_scanner_wait(*, store_path, experiment_id,
                                         core_preflight, core_status,
-                                        scanner_policy_proposal, frozen_work_specs,
+                                        scanner_policy_proposal, approval_request,
+                                        frozen_work_specs,
                                         code_sha256, environment_sha256):
     if not verify_core_e_status(core_status, core_preflight):
         raise ResultsStoreError("FACTORY_E_CORE_E_STATUS_UNTRUSTED")
@@ -25,7 +29,16 @@ def record_historical_core_scanner_wait(*, store_path, experiment_id,
             scanner_policy_proposal,frozen_work_specs).data
     except (ValueError, KeyError, TypeError, AttributeError) as exc:
         raise ResultsStoreError("FACTORY_E_HISTORICAL_POLICY_INVALID") from exc
-    if (core_status["status"] != "SOURCE_BLOCKED"
+    try:
+        approval = verify_historical_policy_approval_request(
+            approval_request,scanner_policy_proposal,frozen_work_specs).data
+    except (ValueError,KeyError,TypeError,AttributeError) as exc:
+        raise ResultsStoreError("FACTORY_E_RESEARCH_POLICY_REQUEST_INVALID") from exc
+    if (approval.get("policy_approval_status") != "PENDING_INDEPENDENT_OWNER"
+        or approval.get("source_authentication_receipt_sha256") is not None
+        or approval.get("independent_policy_approval_receipt_sha256") is not None
+        or approval.get("core_secretary_historical_route") != "NOT_AUTHORIZED"
+        or core_status["status"] != "SOURCE_BLOCKED"
         or core_status["source_sha256"] is not None
         or core_status["warehouse_receipt_sha256"] is not None
         or core_status["core_245_native_price_query_sha256"] is not None
@@ -64,6 +77,7 @@ def record_historical_core_scanner_wait(*, store_path, experiment_id,
         experiment_sha256=record["sha256"],
         core_e_status_sha256=core_status["receipt_sha256"],
         scanner_policy_proposal_sha256=scanner_policy_proposal["sha256"],
+        scanner_approval_request_sha256=approval_request["sha256"],
         strategy_count=len(policy["strategies"]),
         symbol_count=len(policy["target_symbols"]),
         attempt_count=len(attempts),
