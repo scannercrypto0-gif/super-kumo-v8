@@ -1,0 +1,25 @@
+name: Discoverer Package E Membership Gate
+on:
+  push:
+    branches:
+      - feat/discoverer-package-e-membership-intake-20261105
+  pull_request:
+    paths:
+      - 'tools/strategy_discoverer_offline/**'
+      - '.github/workflows/discoverer-package-e.yml'
+jobs:
+  discoverer-e:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install test dependencies
+        run: python -m pip install pytest
+      - name: Focused Package E tests
+        run: python -m pytest tools/strategy_discoverer_offline/tests/test_package_e_durable_checkpoint.py -q
