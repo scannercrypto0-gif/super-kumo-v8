@@ -195,6 +195,15 @@ def validate_input(packet,witness,witness_sha):
                 entries_by_month[trial["month"]]["source_sha256"],
              "ATTEMPT_SOURCE_IDENTITY")
         expected.add(trial["attempt_id"])
+    # A real F2 admission contains 10 authenticated months, but a positive
+    # research execution cannot silently omit the other eligible candidates.
+    # Preserve the exact 2 frozen scanner strategy × 10 admitted-month
+    # denominator. February/August remain in the earlier WAIT 12-month census.
+    need(len(packet["attempts"])==20
+         and all(sum(row["month"]==m for row in packet["attempts"])==2
+                 for m in packet["admitted_months"])
+         and len({row["candidate_id"] for row in packet["attempts"]})==2,
+         "TEN_MONTH_FULL_STRATEGY_CENSUS")
     need(sum(x["state"]=="SELECTED" for x in packet["attempts"])==1,
          "EXACTLY_ONE_SOURCE_BOUND_SELECTED_TRIAL")
     need(all(_sha(packet[name]) for name in ("strategy_definition_sha256",
