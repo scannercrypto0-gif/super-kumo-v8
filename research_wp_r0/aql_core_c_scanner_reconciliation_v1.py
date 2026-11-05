@@ -148,7 +148,8 @@ def reconcile_scanner_c_candidate(
     block(True,"SCANNER_SYNTHETIC_RAW_TO_CORE_ZIP_NOT_ATTESTED")
     body={
         "schema":SCHEMA,"decision":"WAIT",
-        "reason":"WAIT_SOURCE_PROVENANCE_NOT_CONNECTED",
+        "reason":"SOURCE_LINEAGE_NOT_CONNECTED",
+        "owner_facing_wait_status":"WAIT_SOURCE_PROVENANCE_NOT_CONNECTED",
         "blocking_conditions":sorted(set(reasons)),
         "scanner_c_route_sha256":scan_route.sha256,
         "scanner_c_approval_sha256":approval.sha256,
