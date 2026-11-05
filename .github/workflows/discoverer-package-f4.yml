@@ -1,0 +1,26 @@
+name: ATLAS Discoverer F4 Historical Research Seam
+on:
+  push:
+    branches:
+      - feat/discoverer-package-f4-original-cohort-contract-20261105
+  pull_request:
+    paths:
+      - 'tools/strategy_discoverer_offline/historical_f4_intake.py'
+      - 'tools/strategy_discoverer_offline/tests/test_package_f4_historical_intake.py'
+      - '.github/workflows/discoverer-package-f4.yml'
+jobs:
+  discoverer-f4:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11','3.12','3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install test tools
+        run: python -m pip install pytest pytest-timeout
+      - name: Focused F4 seam tests only
+        run: python -m pytest tools/strategy_discoverer_offline/tests/test_package_f4_historical_intake.py -q
