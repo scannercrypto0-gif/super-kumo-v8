@@ -121,7 +121,7 @@ class CoreDCanonicalSecretary(unittest.TestCase):
         self.assertEqual(strategy_d_snapshot(self.root,"CORE-D-STRATEGY",
             now_ms=self.exp+1)["state"],"EXPIRED")
 
-    def test_consumer_wrong_approval_parent_is_denied(self):
+    def test_persisted_consumer_ack_resealed_tamper_rejected_on_restart(self):\n        from research_wp_r0.aql_core_backbone_local_v1 import _connect\n        import json\n        self.enqueue()\n        ack=self.make_ack()\n        ack_scanner_d_strategy_consumer(\n            self.root,"CORE-D-STRATEGY",ack,now_ms=self.now+2)\n        con=_connect(self.root)\n        try:\n            changed=deepcopy(ack)\n            changed["paper_authority"]="GRANTED"\n            changed["consumer_ack_sha256"]=digest(\n                {k:v for k,v in changed.items() if k!="consumer_ack_sha256"})\n            con.execute("UPDATE d_canonical_strategy_routes SET consumer_ack_json=?,"\n                        "consumer_ack_sha=? WHERE route_id=?",\n                        (json.dumps(changed,sort_keys=True),changed["consumer_ack_sha256"],\n                         "CORE-D-STRATEGY"))\n            con.commit()\n        finally:con.close()\n        with self.assertRaises(ValueError):\n            strategy_d_snapshot(self.root,"CORE-D-STRATEGY",now_ms=self.now+3)\n\n    def test_consumer_wrong_approval_parent_is_denied(self):
         self.enqueue()
         ack=self.make_ack()
         ack["scanner_c_approval_sha256"]="0"*64
