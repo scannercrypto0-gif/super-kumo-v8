@@ -72,6 +72,147 @@ def _source_ack_present(root, warehouse, source_ack):
         con.close()
 
 
+
+def project_test_only_scanner_native15m(
+    vault, *, synthetic_zip_bytes, native_price_query, core_local_query,
+    identity_map, warehouse_receipt,
+):
+    """Produce the exact read-only Scanner B/C native15m input from Core query.
+
+    This is a deterministic byte projection of TEST_ONLY, already-pinned
+    Core 15m source bars. It uses the *existing* Core index and #211 vault.
+    No new warehouse, publisher-source acquisition, resampling or PIT claim.
+    """
+    from tools.strategy_service_offline.common import canonical
+    require(type(synthetic_zip_bytes) is bytes
+            and 0<len(synthetic_zip_bytes)<=MAX_BYTES,
+            "CORE_D_PROJECTION_SOURCE_BYTES_REQUIRED")
+    _sealed(warehouse_receipt,"receipt_sha256")
+    require(warehouse_receipt.get("test_only") is True
+            and warehouse_receipt.get("status")==
+                "OFFLINE_LOCAL_WAREHOUSE_COMMITTED"
+            and warehouse_receipt.get("symbol")=="AAA"
+            and warehouse_receipt.get("interval")=="15m"
+            and warehouse_receipt.get("availability")=="RETROSPECTIVE_NON_PIT"
+            and warehouse_receipt.get("historical_known_at")=="NOT_ATTESTED",
+            "CORE_D_PROJECTION_SYNTHETIC_SCOPE")
+    zip_sha=_hash(synthetic_zip_bytes)
+    require(zip_sha==warehouse_receipt["source_zip_sha256"]
+            and vault.read(zip_sha)==synthetic_zip_bytes,
+            "CORE_D_PROJECTION_VAULT_READBACK")
+    mapping=bind_dual_query_identities(
+        native_price_query,core_local_query,warehouse_receipt)
+    require(mapping["identity_map_sha256"]==
+            identity_map.get("identity_map_sha256"),
+            "CORE_D_PROJECTION_QUERY_PARENT_DRIFT")
+    try:
+        with ZipFile(io.BytesIO(synthetic_zip_bytes)) as source:
+            members=source.namelist()
+            require(len(members)==1 and
+                    members[0].startswith("AAA-15m-") and
+                    members[0].endswith(".csv"),
+                    "CORE_D_PROJECTION_TEST_MEMBER")
+            original_csv=source.read(members[0])
+            require(source.testzip() is None,
+                    "CORE_D_PROJECTION_ZIP_CRC")
+    except (BadZipFile, OSError, RuntimeError) as exc:
+        raise ValueError("CORE_D_PROJECTION_TEST_ZIP_FORMAT") from exc
+    require(_hash(original_csv)==warehouse_receipt["csv_member_sha256"],
+            "CORE_D_PROJECTION_MEMBER_SHA")
+    bars=core_local_query.get("bars")
+    require(type(bars) is list and 0<len(bars)<=MAX_BARS
+            and len(bars)==len(original_csv.splitlines())
+            and len(bars)==warehouse_receipt["bar_count"],
+            "CORE_D_PROJECTION_CENSUS")
+    output=[]
+    def number(value):
+        require(type(value) in (int,float) and math.isfinite(value),
+                "CORE_D_PROJECTION_FINITE_NUMBER")
+        return int(value) if float(value).is_integer() else value
+    for line,bar in zip(original_csv.splitlines(),bars):
+        parts=line.split(b",")
+        require(len(parts)==12 and parts[0].isdigit() and parts[6].isdigit(),
+                "CORE_D_PROJECTION_NATIVE_CSV")
+        opened=int(parts[0]); closed=int(parts[6])
+        try:
+            vals=tuple(float(parts[j]) for j in (1,2,3,4,5))
+        except (ValueError,TypeError,OverflowError) as exc:
+            raise ValueError("CORE_D_PROJECTION_BAD_CSV_PRICE") from exc
+        require(all(math.isfinite(v) for v in vals)
+                and opened==bar["bar_open_ms"]
+                and closed==bar["bar_close_ms"]
+                and closed==opened+WIDTH-1
+                and tuple(bar[k] for k in ("open","high","low","close","volume"))==vals
+                and bar["historical_known_at_ms"] is None,
+                "CORE_D_PROJECTION_NATIVE_CORE_BAR_MISMATCH")
+        output.append({
+            "symbol":"AAA","timeframe":"15m","source_id":"generator",
+            "open_ms":opened,"close_ms":closed,
+            "available_ms":closed+1,"finalized":True,
+            "open":number(vals[0]),"high":number(vals[1]),
+            "low":number(vals[2]),"close":number(vals[3]),
+            "volume":number(vals[4]),
+        })
+    raw=canonical({
+        "schema":"aql.strategy-service.synthetic-bars.v1",
+        "source_id":"generator","generation_id":"fixture_v1",
+        "rows":output,
+    })
+    start=bars[0]["bar_open_ms"]
+    end=bars[-1]["bar_close_ms"]+1
+    cutoff=warehouse_receipt["decision_cutoff_ms"]
+    require(all(output[i]["open_ms"]==start+i*WIDTH
+                for i in range(len(output)))
+            and end<=cutoff,
+            "CORE_D_PROJECTION_GAP_OR_FUTURE")
+    manifest={
+        "schema":"aql.strategy-service.source.v1",
+        "timeframe":"15m","market":"fixture",
+        "source_id":"generator","generation_id":"fixture_v1",
+        "start_ms":start,"end_exclusive_ms":end,
+        "cutoff_ms":cutoff,"evidence_class":"TEST_ONLY",
+        "external_verifier":"NOT_CONNECTED",
+        "raw_sha256":_hash(raw),
+    }
+    universe={
+        "schema":"aql.strategy-service.universe.v1",
+        "count_unit":"SYMBOL","cutoff_ms":cutoff,
+        "evidence_class":"TEST_ONLY",
+        "source_raw_sha256":_hash(raw),
+        "members":[{"symbol":"AAA","eligible":True,
+                    "membership_available_ms":cutoff}],
+    }
+    body={
+        "schema":"aql.core.d.read-only-scanner-native15m-projection.v1",
+        "status":"READY_FOR_SCANNER_TEST_ONLY",
+        "source_zip_sha256":zip_sha,
+        "csv_member_sha256":_hash(original_csv),
+        "raw_vault_readback":"MATCHED_TEST_ONLY",
+        "warehouse_receipt_sha256":warehouse_receipt["receipt_sha256"],
+        "core_245_native_price_query_sha256":
+            native_price_query["price_query_sha256"],
+        "core_253_local_query_sha256":core_local_query["query_sha256"],
+        "dual_query_map_sha256":identity_map["identity_map_sha256"],
+        "scanner_raw_sha256":_hash(raw),
+        "scanner_manifest_sha256":digest(manifest),
+        "scanner_universe_sha256":digest(universe),
+        "start_ms":start,"end_exclusive_ms":end,
+        "cutoff_ms":cutoff,"bar_count":len(output),
+        "source_id":"generator","generation_id":"fixture_v1",
+        "symbol":"AAA","timeframe":"15m",
+        "synthetic_available_at_not_historical_known_at":True,
+        "historical_known_at_ms":None,"historical_pit":"NOT_ATTESTED",
+        "original_publisher_attestation":"NONE",
+        "operational_paper_authority":"NONE","trading_authority":"NONE",
+    }
+    return {
+        "scanner_raw_bytes":raw,"scanner_manifest":manifest,
+        "scanner_universe":universe,
+        "projection_receipt":{
+            **body,"projection_sha256":digest(body),
+        },
+    }
+
 def verify_same_source_research(
     root, vault, *, synthetic_zip_bytes, local_test_checksum_bytes,
     scanner_raw_bytes, scanner_manifest, scanner_universe,
