@@ -7,8 +7,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Mapping
 
@@ -94,11 +92,15 @@ def verify_preflight_receipt(receipt: Mapping) -> bool:
         return False
     if receipt.get("status") not in (BLOCKED, VERIFIED):
         return False
-    if receipt.get("status") == VERIFIED and (
-        receipt.get("source_kind") != "ORIGINAL_PUBLISHER"
-        or receipt.get("source_sha256") != receipt.get("publisher_checksum_sha256", "").lower()
-    ):
-        return False
+    if receipt.get("status") == VERIFIED:
+        checksum = receipt.get("publisher_checksum_sha256")
+        source = receipt.get("source_sha256")
+        if (receipt.get("source_kind") != "ORIGINAL_PUBLISHER"
+                or not isinstance(checksum, str)
+                or len(checksum) != 64
+                or not isinstance(source, str)
+                or source != checksum.lower()):
+            return False
     payload = dict(receipt)
     sha = payload.pop("receipt_sha256", None)
     return isinstance(sha, str) and _seal(payload)["receipt_sha256"] == sha
