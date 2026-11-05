@@ -1,0 +1,95 @@
+name: Scanner D Core-source native15m research gate
+on:
+  pull_request:
+    paths:
+      - 'tools/scanner_strategy_d/**'
+      - '.github/workflows/scanner-d-core-same-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scanner-d-focused:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11','3.12','3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: project
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: 40ad0b4cf3b4b75b8ba55f524e79af3928b0673f
+          path: upstream/core261
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8
+          path: upstream/work235
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: 30c37ae56851488b882998c7fa0085ec51dbfc92
+          path: upstream/scanner257
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46
+          path: upstream/raw211
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: b9c9ff8602e79c534402f44bce83c56ec2fa6bb9
+          path: upstream/scanner227
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: a86a590a5e2c32c18e03522f52896dbcf50c60ff
+          path: upstream/core264
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Stage precise pinned owner code and TEST_ONLY fixture imports
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -a upstream/work235/tools/strategy_service_offline project/tools/
+          cp -a upstream/scanner257/tools/scanner_strategy_b project/tools/
+          cp -a upstream/scanner227/tools/scanner_engine_offline project/tools/
+          cp -a upstream/raw211/tools/raw_vault_offline project/tools/
+          for file in upstream/core261/research_wp_r0/aql_*.py; do
+            cp "$file" project/research_wp_r0/
+          done
+          for file in upstream/core264/research_wp_r0/aql_core_d_*.py; do
+            cp "$file" project/research_wp_r0/
+          done
+          cp upstream/core261/tests/test_aql_core_dual_query_identity_map_v1.py project/tests/
+          cp upstream/core261/tests/test_aql_core_authorized_source_transfer_v1.py project/tests/
+      - name: One NEW Scanner D source replay/negative gate
+        shell: bash
+        working-directory: project
+        run: |
+          PYTHONPATH=.:tests python -m unittest -v tools.scanner_strategy_d.test_same_source tools.scanner_strategy_d.test_permitted_cohort
+      - name: Assert no actuation surface
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          src=Path('project/tools/scanner_strategy_d/core_query_adapter.py').read_text()
+          assert 'query_local(' in src
+          assert 'bind_dual_query_identities(' in src
+          assert '"trading_authority": "NONE"' in src
+          assert 'acknowledge_strategy_consumer(' not in src
+          assert 'enqueue_strategy_route(' not in src
+          PY
