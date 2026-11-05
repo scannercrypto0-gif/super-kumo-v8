@@ -37,8 +37,8 @@ def _sealed(item, key):
 
 def consume_canonical_scanner_core_wait(
     *, scanner_route_receipt, scanner_approval_receipt,
-    reconciliation_receipt, core_strategy_route_receipt=None,
-    source_only_ack_receipt=None,
+    reconciliation_receipt, warehouse_receipt,
+    core_strategy_route_receipt=None, source_only_ack_receipt=None,
 ):
     """Signed read-only cross-owner reconciliation, no promotion or execution.
 
@@ -76,7 +76,18 @@ def consume_canonical_scanner_core_wait(
             and r.get("historical_known_at_ms") is None,
             "SCANNER_IDENTITY_POLICY_BOUNDARY")
     _sealed(reconciliation_receipt,"reconciliation_sha256")
+    _sealed(warehouse_receipt,"receipt_sha256")
     c = reconciliation_receipt
+    require(warehouse_receipt.get("schema") == "aql.core.local-history-warehouse.v1"
+            and warehouse_receipt.get("status") == "OFFLINE_LOCAL_WAREHOUSE_COMMITTED"
+            and warehouse_receipt.get("receipt_sha256") == c.get("core_warehouse_receipt_sha256")
+            and warehouse_receipt.get("decision_cutoff_ms") == c.get("core_cutoff_ms")
+            and warehouse_receipt.get("source_zip_sha256") == c.get("core_source_zip_sha256")
+            and warehouse_receipt.get("manifest_integrity_sha256") ==
+                c.get("core_manifest_integrity_sha256")
+            and warehouse_receipt.get("availability") == "RETROSPECTIVE_NON_PIT"
+            and warehouse_receipt.get("historical_known_at") == "NOT_ATTESTED",
+            "WAREHOUSE_PROVENANCE_AND_CORE_CUTOFF")
     require(c.get("schema") == RECONCILIATION_SCHEMA
             and c.get("decision") == "WAIT"
             and c.get("reason") == "SOURCE_LINEAGE_NOT_CONNECTED"
