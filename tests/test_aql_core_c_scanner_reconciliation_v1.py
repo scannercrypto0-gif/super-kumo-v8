@@ -60,6 +60,11 @@ class CoreCActualScannerContract(unittest.TestCase):
         receipt=self.runit()
         self.assertEqual(receipt,self.runit())
         self.assertEqual(receipt["decision"],"WAIT")
+        self.assertEqual(receipt["reason"],"WAIT_SOURCE_PROVENANCE_NOT_CONNECTED")
+        self.assertEqual(receipt["scanner_envelope_seal_key"],"sha256")
+        self.assertEqual(receipt["core_source_ack_seal_key"],"receipt_sha256")
+        self.assertTrue(receipt["factory_provisional_artifact_sha256_is_not_scanner_sha256"])
+        self.assertIsNone(receipt["strategy_consumer_ack_sha256"])
         self.assertEqual(receipt["strategy_secretary_status"],"NOT_ENQUEUED")
         self.assertEqual(receipt["scanner_c_approval_sha256"],self.approval["sha256"])
         self.assertEqual(receipt["scanner_c_route_sha256"],self.route["sha256"])
@@ -102,6 +107,7 @@ class CoreCActualScannerContract(unittest.TestCase):
         self.assertIn("SCANNER_DECLARED_CORE_ZIP_PARENT_DRIFT",
                       got["blocking_conditions"])
         self.assertEqual(got["decision"],"WAIT")
+        self.assertEqual(got["reason"],"WAIT_SOURCE_PROVENANCE_NOT_CONNECTED")
 
     def test_broken_core_source_only_ack_is_rejected(self):
         fake=deepcopy(self.core.source_ack)
