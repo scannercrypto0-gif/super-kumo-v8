@@ -60,8 +60,8 @@ jobs:
           cp -a upstream/work235/tools/strategy_service_offline project/tools/
           cp -a upstream/scanner257/tools/scanner_strategy_b project/tools/
           cp -a upstream/scanner227/tools/scanner_engine_offline project/tools/
-          for module in aql_archive_custody_bridge_v1.py aql_core_backbone_local_v1.py aql_core_dual_query_identity_map_v1.py aql_core_secretary_routing_v1.py aql_native_price_custody_query_v1.py; do
-            cp "upstream/core226/research_wp_r0/$module" "project/research_wp_r0/$module"
+          for module in upstream/core226/research_wp_r0/aql_*.py; do
+            cp "$module" "project/research_wp_r0/"
           done
           cp upstream/factory255/research_wp_r0/aql_factory_unified_backbone_v1.py project/research_wp_r0/
       - name: ONE C focused contract/negative/replay test suite
