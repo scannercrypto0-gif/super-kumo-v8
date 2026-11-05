@@ -23,6 +23,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/checkout@v4
+        with: {ref: ccc563f8a838d3ed07c0cf6725aca5ead9b9209e, path: _pinned_factory_e, persist-credentials: false}
+      - uses: actions/checkout@v4
         with: {ref: a86a590a5e2c32c18e03522f52896dbcf50c60ff, path: _pinned_core_d, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: 3c23ba606c94a2d9e7a95d2dce122adbc7d9e88e, path: _pinned_core_e, persist-credentials: false}
@@ -65,6 +67,17 @@ jobs:
                       if not target.exists():
                           target.parent.mkdir(parents=True,exist_ok=True)
                           copyfile(item,target)
+          # Exact Factory E owner HEAD is the source for its own modules/tests;
+          # integration branch never changes the Factory owner branch.
+          for name in ('aql_factory_e_research_results_store_v1.py',
+                       'aql_factory_e_discoverer_consumer_v1.py',
+                       'aql_factory_e_historical_source_boundary_v1.py'):
+              copyfile(Path('_pinned_factory_e')/'research_wp_r0'/name,
+                       Path('research_wp_r0')/name)
+          for name in ('test_aql_factory_e_research_results_store_v1.py',
+                       'test_aql_factory_e_discoverer_consumer_v1.py',
+                       'test_aql_factory_e_historical_source_boundary_v1.py'):
+              copyfile(Path('_pinned_factory_e')/'tests'/name,Path('tests')/name)
           copytree(Path('_pinned_work235')/'tools/strategy_service_offline/fixtures',
                    Path('tools/strategy_service_offline/fixtures'),dirs_exist_ok=True)
           for name in ('test_aql_core_d_same_source_v1.py',
@@ -87,6 +100,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_aql_factory_e_research_results_store_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_factory_e_discoverer_consumer_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_core_e_historical_boundary_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_factory_e_historical_source_boundary_v1.py' -v
           python -m unittest tools.scanner_strategy_e.test_historical_core_screening -v
           python -m pytest tools/strategy_discoverer_offline/tests/test_package_e_membership.py -q
           python tools/atlas_e_combined_gate_manifest.py
