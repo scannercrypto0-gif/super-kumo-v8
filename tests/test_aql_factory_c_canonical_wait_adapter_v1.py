@@ -29,6 +29,7 @@ class FactoryCCanonicalWait(unittest.TestCase):
             scanner_approval_receipt=self.case.approval if approval is None else approval,
             reconciliation_receipt=(self.case.runit() if reconciliation is None
                                     else reconciliation),
+            warehouse_receipt=self.case.core.warehouse,
             source_only_ack_receipt=(self.case.core.source_ack if source_ack is None
                                      else source_ack),
         )
