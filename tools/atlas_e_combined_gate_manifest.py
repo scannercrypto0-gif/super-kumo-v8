@@ -12,7 +12,7 @@ import platform
 from pathlib import Path
 
 PINS = {
- "factory_e":"c44e9066e8258056e50afe204451e28ce7eb6499",
+ "factory_e":"aa361ff3117b07f38600695e3dbabe619a929458",
  "factory_d":"a695e262da6787f752a13820f02dd00eef8ef1cd",
  "core_e":"3af5b66d2b381b853a6b5be32c38b3d3d02e1ea7",
  "core_d":"a86a590a5e2c32c18e03522f52896dbcf50c60ff",
@@ -22,8 +22,8 @@ PINS = {
  "discoverer_base":"f2006c0e431690ccea8b0532095bf4f2a2dc88ba",
  "work235":"6acbcc7fc243b132f58170df4c6469bbf7f4eff8",
  "raw211":"7d97b09c0c6ee2650a61d523acb8d8c771a99c46",
- "core_f":"759507ea97548ae56e228b034dfb37a1d94f186f",
- "scanner_f":"dc227c8f320334053fdc14f116ab633bf3f39475",
+ "core_f":"1ce3b697af3f8c49c7cead397dc4193c2a9456b1",
+ "scanner_f":"a35e9a4e8a144f63c286e5c6da363c97ec4780e2",
  "discoverer_f":"58959b22de9bc96f03b03dfc565815282fd1a939",
 }
 # PASS is restricted to demonstrated bounded engineering subgate.
