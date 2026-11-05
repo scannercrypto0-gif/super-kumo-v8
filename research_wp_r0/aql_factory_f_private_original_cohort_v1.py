@@ -121,8 +121,7 @@ def validate_input(packet,witness,witness_sha):
          and packet["core_f2_report_sha256"]==report["report_sha256"],
          "CORE_F2_REPORT")
     need(report["manifest_sha256"]==packet["source_manifest_sha256"]
-         and report["f2_new_admitted_count"]==len(report["entries"])
-         and 0<len(report["entries"])<=10
+         and report["f2_new_admitted_count"]==len(report["entries"])==10
          and report["f2_previous_retained_inventory_only_count"]==2
          and report["factory_consumer_ack"] is None
          and report["secretary_historical_strategy_route"]=="NOT_AUTHORIZED"
@@ -156,9 +155,16 @@ def validate_input(packet,witness,witness_sha):
                   entry["core_253_local_query_sha256"]
              and type(entry["bars"]) is int and entry["bars"]>0,
              "CORE_F2_ENTRY_UNVERIFIED")
+        from calendar import monthrange
+        yy,mm=map(int,m.split("-"))
+        need(entry["bars"]==monthrange(yy,mm)[1]*96,
+             "CORE_F2_MONTH_BAR_CENSUS")
         entries_by_month[m]=entry
         months.append(m)
+    expected_new_months=[f"2024-{i:02d}" for i in range(1,13)
+                         if i not in (2,8)]
     need(type(packet["admitted_months"]) is list
+         and packet["admitted_months"]==expected_new_months
          and packet["admitted_months"]==sorted(months)
          and packet["admitted_months"]
          and report["authorization_document_sha256"] is not None
