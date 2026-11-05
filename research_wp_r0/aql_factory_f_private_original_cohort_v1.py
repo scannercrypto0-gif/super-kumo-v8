@@ -238,10 +238,11 @@ def validate_input(packet,witness,witness_sha):
          "REAL_LAB_PACKET_PARENT_DRIFT")
     need(type(trial.get("bars")) is list
          and 2<=len(trial["bars"])<=MAX_BARS
-         and all(bar.get("known_at_ms") is None
+         and all(type(bar) is dict and bar.get("known_at_ms") is None
                  for bar in trial["bars"]),
          "NO_SYNTHETIC_KNOWN_AT")
-    need(all(x["bar_sha256"]==digest({k:v for k,v in x.items()
+    need(all(type(x.get("bar_sha256")) is str and
+             x["bar_sha256"]==digest({k:v for k,v in x.items()
                                     if k!="bar_sha256"})
              for x in trial["bars"]),
          "BAR_SHA")
