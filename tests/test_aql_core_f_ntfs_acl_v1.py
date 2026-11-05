@@ -97,26 +97,33 @@ class TestWindowsAclPolicy(unittest.TestCase):
         self.assertTrue(current_sid.startswith("S-1-"))
         with tempfile.TemporaryDirectory() as d:
             base = Path(d)
-            # Use icacls on this disposable test directory only. Set-Acl can
-            # require SeSecurityPrivilege on ordinary Windows PowerShell hosts.
-            # Remove inherited grants and install only trusted explicit SIDs.
-            # No owner's historical files or parent ACLs are modified.
-            setup_commands = [
-                ["icacls", str(base), "/inheritance:r"],
-                ["icacls", str(base), "/grant:r",
-                 f"*{current_sid}:(OI)(CI)F",
-                 f"*{SYSTEM}:(OI)(CI)F",
-                 f"*{ADMINS}:(OI)(CI)F"],
-            ]
-            for command in setup_commands:
-                setup = subprocess.run(command, capture_output=True,
-                                       text=True, errors="replace")
-                if setup.returncode:
-                    self.fail(
-                        "Windows test-local ACL setup failed "
-                        f"(exit={setup.returncode}); "
-                        f"stdout={setup.stdout[-3000:]!r}; "
-                        f"stderr={setup.stderr[-3000:]!r}")
+            # CI temp folders can contain additional *explicit* grants from
+            # the runner image. /inheritance:r plus /grant:r only replaces
+            # named SIDs; it does NOT remove unrelated explicit ACEs.
+            # Replace the DACL on this disposable test folder only, retaining
+            # its actual owner. Never weaken the production ACL validator.
+            sddl = (
+                f"D:P(A;OICI;FA;;;{current_sid})"
+                "(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)"
+            )
+            script = (
+                "$ErrorActionPreference='Stop'; "
+                "$acl=Get-Acl -LiteralPath $args[0]; "
+                "$acl.SetSecurityDescriptorSddlForm($args[1]); "
+                "Set-Acl -LiteralPath $args[0] -AclObject $acl"
+            )
+            setup = subprocess.run(
+                ["powershell.exe", "-NoProfile", "-NonInteractive",
+                 "-Command", script, str(base), sddl],
+                capture_output=True, text=True, errors="replace",
+            )
+            if setup.returncode:
+                self.fail(
+                    "Windows disposable ACL setup failed "
+                    f"(exit={setup.returncode}); "
+                    f"stdout={setup.stdout[-3000:]!r}; "
+                    f"stderr={setup.stderr[-3000:]!r}"
+                )
             self.assertTrue(require_private_windows_directory(base))
             # Add a real inherited broad read ACE: a nested folder must fail.
             subprocess.run(
