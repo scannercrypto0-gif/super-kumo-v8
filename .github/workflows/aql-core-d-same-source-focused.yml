@@ -6,13 +6,17 @@ on:
     paths:
       - 'research_wp_r0/aql_core_d_same_source_witness_v1.py'
       - 'research_wp_r0/aql_core_d_same_source_route_v1.py'
+      - 'research_wp_r0/aql_core_d_permitted_cohort_v1.py'
       - 'tests/test_aql_core_d_same_source_v1.py'
+      - 'tests/test_aql_core_d_permitted_cohort_v1.py'
       - '.github/workflows/aql-core-d-same-source-focused.yml'
   pull_request:
     paths:
       - 'research_wp_r0/aql_core_d_same_source_witness_v1.py'
       - 'research_wp_r0/aql_core_d_same_source_route_v1.py'
+      - 'research_wp_r0/aql_core_d_permitted_cohort_v1.py'
       - 'tests/test_aql_core_d_same_source_v1.py'
+      - 'tests/test_aql_core_d_permitted_cohort_v1.py'
       - '.github/workflows/aql-core-d-same-source-focused.yml'
   workflow_dispatch:
 jobs:
@@ -80,3 +84,4 @@ jobs:
       - name: Run ONLY newly added Core D delta
         run: |
           PYTHONPATH=.:tests:_pinned_raw_211:_pinned_scanner_227 python -m unittest discover -s tests -p 'test_aql_core_d_same_source_v1.py' -v
+          PYTHONPATH=.:tests:_pinned_raw_211:_pinned_scanner_227 python -m unittest discover -s tests -p 'test_aql_core_d_permitted_cohort_v1.py' -v
