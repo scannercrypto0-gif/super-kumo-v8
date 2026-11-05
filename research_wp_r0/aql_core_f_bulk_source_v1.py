@@ -15,7 +15,6 @@ import json
 import os
 from pathlib import Path
 import re
-import tempfile
 from urllib.request import Request, urlopen
 
 SCHEMA = "aql.core.f.bulk-source-manifest.v1"
@@ -131,9 +130,15 @@ def acquire_private_batch(manifest, private_dir, *, allow_network=False,
     _require(allow_network is True and permission_confirmed is True
              and terms_reviewed is True and publisher_origin_confirmed is True,
              "PRIVATE_NETWORK_RIGHTS_PROVENANCE_OPT_IN_REQUIRED")
-    root = Path(private_dir).resolve()
+    # Inspect the requested path before following any link/reparse component.
+    root = Path(private_dir).absolute()
     _require(root.is_dir() and not root.is_symlink(), "PRIVATE_DIRECTORY_REQUIRED")
-    _require((root.stat().st_mode & 0o077) == 0, "PRIVATE_DIRECTORY_PERMISSIONS_REQUIRED")
+    if os.name == "nt":
+        from research_wp_r0.aql_core_f_ntfs_acl_v1 import require_private_windows_directory
+        require_private_windows_directory(root)
+    else:
+        _require((root.stat().st_mode & 0o077) == 0,
+                 "PRIVATE_DIRECTORY_PERMISSIONS_REQUIRED")
     results = {}
     def worker(row):
         month = row["month"]
