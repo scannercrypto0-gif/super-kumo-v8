@@ -91,7 +91,7 @@ jobs:
         working-directory: project
         shell: bash
         run: |
-          PYTHONPATH=.:tests python -m unittest -v tools.scanner_strategy_f.test_retrospective_policy tools.scanner_strategy_f.test_bulk_census tools.scanner_strategy_f.test_policy_activation_request tools.scanner_strategy_f.test_independent_policy_verification tools.scanner_strategy_f.test_source_bound_intake
+          PYTHONPATH=.:tests python -m unittest -v tools.scanner_strategy_f.test_retrospective_policy tools.scanner_strategy_f.test_bulk_census tools.scanner_strategy_f.test_policy_activation_request tools.scanner_strategy_f.test_independent_policy_verification tools.scanner_strategy_f.test_source_bound_intake tools.scanner_strategy_f.test_secretary_factory_handoff
       - name: Scan no operational route or new synthetic issuer
         shell: bash
         run: |
