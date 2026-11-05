@@ -41,7 +41,7 @@ def _hash(x):
 def create_permitted_synthetic_cohort(core_root, raw_root, work_specs, *,
                                       symbol="AAA", count=8,
                                       start_ms=START, source_id="generator",
-                                      generation_id="CORE_D_PERMITTED_V1",
+                                      generation_id="fixture_v1",
                                       clock_delta_ms=1):
     """Create-and-admit ONE strictly synthetic permitted-symbol cohort.
 
@@ -65,7 +65,7 @@ def create_permitted_synthetic_cohort(core_root, raw_root, work_specs, *,
           and type(clock_delta_ms) is int and 0<clock_delta_ms<=1000,
           "BOUNDED_WINDOW")
     _deny(type(source_id) is str and source_id=="generator"
-          and type(generation_id) is str and generation_id.startswith("CORE_D_")
+          and type(generation_id) is str and generation_id=="fixture_v1"
           and len(generation_id)<=96,"TEST_ONLY_GENERATION")
     end=start_ms+count*WIDTH
     cutoff=end+10_000
