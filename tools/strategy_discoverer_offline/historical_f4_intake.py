@@ -145,6 +145,8 @@ def prepare_f4_intake(*, package, evidence, ledger_checkpoint_path,
     Flags indicate external verifications to be attested *again* by Factory.
     The Discoverer cannot issue a final Factory consumer ACK or Lab result.
     """
+    if not isinstance(cohort, F4RetrospectiveEvidence):
+        raise F4ContractError("cohort evidence type invalid")
     if package.nomination_evidence_digest != evidence.nomination_digest:
         raise F4ContractError("package/nomination mismatch")
     if package.candidate_id == "" or package.strategy_definition_digest == ZERO:
@@ -161,8 +163,6 @@ def prepare_f4_intake(*, package, evidence, ledger_checkpoint_path,
         or evidence.cutoff_ms != cohort.cutoff_ms
         or evidence.source_availability != "CONFIRMED_FINAL"):
         raise F4ContractError("source/cutoff/nomination binding mismatch")
-    if not isinstance(cohort,F4RetrospectiveEvidence):
-        raise F4ContractError("cohort evidence type invalid")
     # This is merely a guarded proposal. If the owner/custodian attestation is
     # missing, emit WAIT with no verified membership or source admission claim.
     reason = "independent source and retrospective research policy required"
@@ -170,6 +170,8 @@ def prepare_f4_intake(*, package, evidence, ledger_checkpoint_path,
     checkpoint_sha = None
     membership_sha = None
     if source_independently_authenticated is True and research_policy_independently_approved is True:
+        # Caller flags are assertions, never trusted authorizations. Only
+        # emit a proposed verification-ready intake, not admission.
         cohort.validate_admitted()
         durable = DurableDiscovererCheckpoint(ledger_checkpoint_path)
         snapshot = durable.read_latest_ledger()
@@ -181,8 +183,8 @@ def prepare_f4_intake(*, package, evidence, ledger_checkpoint_path,
             ledger_reference=ledger_reference)
         checkpoint_sha = snapshot["checkpoint_sha"]
         membership_sha = membership.verification_digest
-        status = ELIGIBLE
-        reason = "candidate provenance verified locally; Factory must reattest custody/policy"
+        status = WAIT
+        reason = "local checkpoint checked; independent Factory custody and policy approval required"
     fields = dict(schema_version=SCHEMA,status=status,reason=reason,
                   candidate_id=package.candidate_id,
                   package_digest=package.package_digest,
@@ -213,7 +215,7 @@ def verify_f4_intake(*, intake: F4ResearchIntake, package, evidence, cohort,
         intake.source_evidence!=cohort.to_dict()):
         raise F4ContractError("F4 cross-object parent drift")
     if intake.status != ELIGIBLE:
-        raise F4ContractError("historical F4 intake is blocked")
+        raise F4ContractError("historical F4 intake is blocked; independent approval must be recorded externally")
     if independently_confirm_source is not True or independently_confirm_policy is not True:
         raise F4ContractError("independent source and research policy approval unavailable")
     cohort.validate_admitted()
