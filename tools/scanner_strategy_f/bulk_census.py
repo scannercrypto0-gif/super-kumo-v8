@@ -56,7 +56,15 @@ def historical_bulk_intake_census(
             and coverage_ledger["secretary_historical_route"]=="NOT_AUTHORIZED"
             and coverage_ledger["historical_pit"]=="NOT_ATTESTED",
             "F_UNVERIFIED_SOURCE_OR_GRID")
-    # Verify each row really belongs to the immutable original Core F month\n    # and that retained Feb/Aug cannot be impersonated as a new source.\n    require(len(coverage_ledger["entries"])==len(manifest["rows"])\n            and all(entry["month"]==row["month"]\n                    and (row["inventory_status"]!="RETAINED_PREVIOUSLY_PINNED"\n                         or entry["status"]=="RETAINED_PREVIOUSLY_PINNED")\n                    for entry,row in zip(coverage_ledger["entries"],manifest["rows"])),\n            "F_CORE_COVERAGE_ROW_IDENTITY_DRIFT")\n    expected_status={"ACCEPTED_PREFLIGHT":"UNKNOWN_PREFLIGHT_ONLY",
+    # Verify each row really belongs to the immutable original Core F month
+    # and that retained Feb/Aug cannot be impersonated as a new source.
+    require(len(coverage_ledger["entries"])==len(manifest["rows"])
+            and all(entry["month"]==row["month"]
+                    and (row["inventory_status"]!="RETAINED_PREVIOUSLY_PINNED"
+                         or entry["status"]=="RETAINED_PREVIOUSLY_PINNED")
+                    for entry,row in zip(coverage_ledger["entries"],manifest["rows"])),
+            "F_CORE_COVERAGE_ROW_IDENTITY_DRIFT")
+    expected_status={"ACCEPTED_PREFLIGHT":"UNKNOWN_PREFLIGHT_ONLY",
                      "REJECTED_QUARANTINED":"QUARANTINED",
                      "MISSING_SOURCE":"UNKNOWN_MISSING_SOURCE",
                      "RETAINED_PREVIOUSLY_PINNED":"UNKNOWN_RETAINED_NOT_READBACK"}
