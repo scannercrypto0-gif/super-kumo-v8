@@ -78,8 +78,6 @@ class ScannerEHistoricalBoundaries(unittest.TestCase):
         # BTCUSDT; frozen Work235 permits AAA..EEE, never magic BTC approval.
         for w in self.work:
             self.assertNotIn("BTCUSDT",
-                w["payload"]["dna"]["payload"]["scanner_profile"]["allowed_symbols"]
-                if "payload" in w["payload"]["dna"] else
                 w["payload"]["dna"]["dna"]["scanner_profile"]["allowed_symbols"])
         result=Frozen.restore(self.call()).data
         self.assertEqual(result["decision"],"WAIT")
