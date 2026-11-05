@@ -54,7 +54,7 @@ def create_core_d_research_witness(core_root, warehouse, native_price_query,
              and 0<warehouse.get("bar_count",0)<=4096,
              "TEST_ONLY_IMMUTABLE_WAREHOUSE")
     verified=bind_dual_query_identities(native_price_query,local_query,warehouse)
-    _require(identity_map==verified,"TWO_QUERY_IDENTITY_MAP_DRIFT")
+    # Scanner D and Core C may include a signed strategy_evaluation_sha256\n    # parent; only immutable source/query identity fields are comparable here.\n    shared=("dataset_id","source_version","source_zip_sha256",\n            "manifest_integrity_sha256","warehouse_receipt_sha256",\n            "core_245_native_price_query_sha256",\n            "core_253_query_local_sha256","decision_cutoff_ms","bar_count")\n    _require(all(identity_map.get(k)==verified.get(k) for k in shared),\n             "TWO_QUERY_IDENTITY_MAP_DRIFT")
     _require(native_price_query["price_query_sha256"]!=local_query["query_sha256"],
              "QUERY_SHA_DOMAINS_MUST_REMAIN_SEPARATE")
     repeat=query_local(
