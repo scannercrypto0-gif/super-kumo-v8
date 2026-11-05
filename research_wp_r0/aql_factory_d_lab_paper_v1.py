@@ -16,6 +16,9 @@ from research_wp_r0.aql_core_backbone_local_v1 import query_local
 from research_wp_r0.aql_core_d_canonical_secretary_v1 import strategy_d_snapshot
 from research_wp_r0.aql_core_dual_query_identity_map_v1 import bind_dual_query_identities
 from research_wp_r0.aql_factory_same_source_lab_paper_v1 import LabHandoffError
+from research_wp_r0.aql_factory_historical_rule_projection import _vectors, _expression
+from research_wp_r0.strategy_definition import StrategyDefinition
+from research_wp_r0.indicator_library_v2 import IndicatorRegistryV2
 from src.aql.observation.contracts import PaperIntent
 from src.aql.observation.positions import PositionLedger
 from tools.strategy_service_offline.common import Frozen
@@ -55,7 +58,7 @@ def _sealed_body(body, key):
 def run_factory_d_same_source_lab_paper(
     *, core_root, route_id, now_ms, factory_ack, gate, warehouse,
     native_price_query, local_query, identity_map, core_d_witness,
-    scanner_d_handoff,
+    scanner_d_handoff, work_spec,
 ):
     """Execute pinned D cohort Lab→isolated Paper after genuine Core durable ACK.
 
@@ -126,6 +129,26 @@ def run_factory_d_same_source_lab_paper(
           and snap.get("actual_fills") is None
           and factory_ack.get("actual_fills") is None,
           "ACKED_ROUTE_STRATEGY_AUTHORITY")
+    strategy_spec = Frozen.restore(work_spec)
+    spec = strategy_spec.data
+    _need(strategy_spec.sha256 == gate.get("work235_spec_sha256")
+          and spec.get("schema") == "aql.strategy-screening-spec.v1"
+          and spec.get("scope") == "TEST_ONLY_UNAPPROVED_POLICY"
+          and spec.get("paper_approval") == "NOT_FOUND"
+          and spec.get("market") == "fixture"
+          and spec.get("strategy_id") == gate["strategy_id"]
+          and spec.get("strategy_version") == gate["strategy_version"]
+          and spec.get("config_digest") == gate["config_digest"]
+          and spec.get("definition", {}).get("digest")
+              == gate["strategy_definition_digest"],
+          "FROZEN_STRATEGY_DEFINITION_PARENT")
+    try:
+        definition = StrategyDefinition.from_dict(
+            spec["definition"], registry=IndicatorRegistryV2())
+    except (KeyError, TypeError, ValueError) as exc:
+        raise LabHandoffError("FACTORY_D_LAB_PAPER_STRATEGY_DEFINITION") from exc
+    _need(definition.digest == gate["strategy_definition_digest"],
+          "STRATEGY_DEFINITION_DIGEST")
     witness = Frozen.restore(core_d_witness)
     handoff = Frozen.restore(scanner_d_handoff)
     _need(witness.sha256 == gate["core_d_witness_sha256"]
@@ -211,6 +234,41 @@ def run_factory_d_same_source_lab_paper(
             "observed_next_close_return": str(ret),
             "causal_use": "POST_HOC_DIAGNOSTIC_ONLY",
         })
+    # Evaluate the actual immutable v1 research rules on each closed 15m
+    # prefix with Factory's existing indicator and typed rule interpreter.
+    # No use of future bars in the evaluation of an earlier bar.
+    typed_bars = [{
+        "open_ms": b["bar_open_ms"], "close_ms": b["bar_close_ms"],
+        "open": b["open"], "high": b["high"], "low": b["low"],
+        "close": b["close"], "volume": b["volume"],
+        "known_at_ms": None, "quality": "FINAL",
+        "bar_sha256": b["bar_checksum"],
+    } for b in bars]
+    states = ("ENTRY_TRIGGERED", "EXIT_TRIGGERED", "NO_SIGNAL",
+              "WARMUP_UNKNOWN", "AMBIGUOUS")
+    rule_counts = {state: 0 for state in states}
+    rule_decisions = []
+    for i in range(len(bars)-1):
+        try:
+            values = _vectors(definition, typed_bars[:i+1])
+            entry = _expression(definition.spec["entry"], i, values)
+            exit_ = _expression(definition.spec["exit"], i, values)
+        except (ValueError, TypeError, KeyError, ArithmeticError) as exc:
+            raise LabHandoffError("FACTORY_D_LAB_PAPER_RULE_EVALUATION") from exc
+        state = ("WARMUP_UNKNOWN" if entry is None or exit_ is None
+                 else "AMBIGUOUS" if entry and exit_
+                 else "ENTRY_TRIGGERED" if entry
+                 else "EXIT_TRIGGERED" if exit_ else "NO_SIGNAL")
+        rule_counts[state] += 1
+        rule_decisions.append({
+            "bar_open_ms": bars[i]["bar_open_ms"],
+            "decision_ms": bars[i]["bar_close_ms"] + 1,
+            "state": state,
+            "feature_clock": "SYNTHETIC_TEST_ONLY_NOT_HISTORICAL_PIT",
+        })
+    _need(len(rule_decisions) == len(observed) == 7
+          and sum(rule_counts.values()) == 7,
+          "LAB_RULE_DECISION_DENOMINATOR")
     lab = _sealed_body({
         "schema": LAB_SCHEMA, "route_id": route_id,
         "decision": "DESCRIPTIVE_COMPUTED_SYNTHETIC_TEST_ONLY",
@@ -235,9 +293,16 @@ def run_factory_d_same_source_lab_paper(
         "observed_bar_count": len(bars),
         "post_hoc_one_bar_observations": observed,
         "observed_one_bar_denominator": len(observed),
+        "work235_spec_sha256": strategy_spec.sha256,
+        "frozen_v1_definition_sha256": definition.digest,
+        "rule_evaluation": "ACTUAL_FACTORY_INDICATOR_PREFIX_ONLY",
+        "rule_decisions": rule_decisions,
+        "rule_decision_counts": rule_counts,
+        "rule_decision_denominator": len(rule_decisions),
+        "strategy_directional_performance": "NOT_SCOREABLE_SYNTHETIC_FIXTURE",
         "bar_direction_census": movement,
         "total_observed_volume": str(total_volume),
-        "strategy_rule_performance": "NOT_EVALUATED_NO_TRIAL_TIMELINE",
+        "strategy_rule_performance": "RULES_COMPUTED_NO_VALIDATED_TRADE_TIMELINE",
         "estimated_alpha": None, "modeled_fills": None,
         "source_evidence": "SYNTHETIC_TEST_ONLY_NOT_PUBLISHER",
         "historical_pit": "NOT_ATTESTED",
@@ -288,6 +353,8 @@ def run_factory_d_same_source_lab_paper(
         "core_253_query_local_sha256": local_query["query_sha256"],
         "observed_bar_count": 8, "decision_slots": 7,
         "lab_actual_computation": True,
+        "rule_interpreter_executed": True,
+        "rule_decision_denominator": len(rule_decisions),
         "paper_native_interface_checked": True,
         "historical_pit": "NOT_ATTESTED",
         "scientific_result": "INSUFFICIENT_EVIDENCE",
