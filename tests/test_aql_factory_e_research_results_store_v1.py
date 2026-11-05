@@ -80,12 +80,16 @@ class FactoryEResultsStoreTests(unittest.TestCase):
             experiment_id="E-BTC-BLOCKED", lane="HISTORICAL_SOURCE",
             source_status="HISTORICAL_SOURCE_BLOCKED",
             evidence_class="RETROSPECTIVE_NON_PIT",
+            source_sha256=None, source_query_245_sha256=None,
+            source_query_253_sha256=None, strategy_definition_sha256=None,
+            config_sha256=None,
             lab_receipt_sha256=None,
             paper_receipt_sha256=None, result_sha256=None)
         register_experiment(self.db, blocked)
         self.assertEqual(
             read_experiment(self.db, "E-BTC-BLOCKED")["source_status"],
             "HISTORICAL_SOURCE_BLOCKED")
+        self.assertIsNone(read_experiment(self.db, "E-BTC-BLOCKED")["source_sha256"])
         self.assertEqual(
             compare_experiments(self.db, "E-BTC-BLOCKED", "E-BTC-BLOCKED")[
                 "comparison_status"], "NOT_COMPARABLE_DISTINCT_OR_BLOCKED_SCOPE")
