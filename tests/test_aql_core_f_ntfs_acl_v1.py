@@ -39,12 +39,24 @@ class TestWindowsAclPolicy(unittest.TestCase):
                     validate_acl_entries([(U, 0, 0, 0x1F01FF),
                                           (sid, 0, flags, 0x120089)], U)
 
-    def test_denials_unknown_types_and_inherit_only_rejected(self):
+    def test_denials_and_unknown_types_or_flags_rejected(self):
         for entry in [(U, 1, 0, 0x1F01FF), (U, 5, 0, 0x1F01FF),
-                      (U, 0, 0x08, 0x1F01FF), (U, 0, 0x40, 0x1F01FF)]:
+                      (U, 0, 0x40, 0x1F01FF)]:
             with self.subTest(entry=entry), self.assertRaisesRegex(
                     ValueError, "WINDOWS_ACL_UNRECOGNIZED"):
                 validate_acl_entries([entry], U)
+
+    def test_inherit_only_aces_are_recognized_but_not_counted_as_own_access(self):
+        # Actual icacls (OI)(CI)(IO)(F) ACEs are valid Windows inheritance
+        # metadata; they grant no access to the containing directory.
+        self.assertTrue(validate_acl_entries([
+            (U, 0, 0x03, 0x1F01FF),
+            (SYSTEM, 0, 0x0B, 0x1F01FF),
+            (ADMINS, 0, 0x0B, 0x1F01FF),
+            (ADMINS, 0, 0x00, 0x1F01FF),
+        ], U))
+        with self.assertRaisesRegex(ValueError, "WINDOWS_ACL_USER_ACCESS_REQUIRED"):
+            validate_acl_entries([(U, 0, 0x0B, 0x1F01FF)], U)
 
     def test_no_usable_owner_and_invalid_ace(self):
         for entries, sid, message in [
