@@ -141,6 +141,10 @@ class FactoryDActualLabPaper(unittest.TestCase):
         self.assertEqual(sum(a["lab"]["rule_decision_counts"].values()), 7)
         self.assertGreater(a["lab"]["rule_decision_counts"]["ENTRY_TRIGGERED"], 0)
         self.assertTrue(a["batch"]["rule_interpreter_executed"])
+        self.assertEqual(a["lab"]["work235_config_digest"],
+                         self.fixture.gate["scanner_c_work235_config_digest"])
+        self.assertEqual(a["lab"]["native15m_config_digest"],
+                         self.fixture.gate["config_digest"])
         self.assertEqual(a["paper"]["decision"], "REJECT")
         self.assertTrue(a["paper"]["native_position_ledger_invoked"])
         self.assertEqual(a["paper"]["native_paper_intent"]["status"], "declined")
