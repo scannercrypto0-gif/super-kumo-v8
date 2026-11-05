@@ -31,3 +31,47 @@ python -m research_wp_r0.aql_core_f_bulk_source_v1 --first 2024-01 --last 2024-1
 ```
 
 The private path is a placeholder, not a path verified as existing or mounted. The latter command has NOT been run in this session. Quarantined/checkpoint state needs operator review prior to retry. No source checksum/ZIP evidence may be manufactured. No separate per-month Audit; Factory leads one exact pinned final batch F gate after genuine source admission + independent research-only NON_PIT policy approval. G0, holdout, operational Paper/trading and PR merge remain prohibited.
+
+## OWNER ACTION — execute private F1/F2 (2026-11-05, #275/6655810787)
+
+**This is the single actionable access handoff, NOT proof that the private runner was accessed.** On the current connector session only GitHub source and engineering CI are accessible; the publisher's ZIP and independently obtained CHECKSUM, owner's licensed private staging directory, and permitted private executor have **not** been presented or inspected. F1 and actual F2 **EXTERNALLY BLOCKED / READY_TO_RESUME**, and the code MUST NOT report accepted historical RAW, native/local query or Secretary proof.
+
+**Owner's one action:** provide an explicitly approved, private, isolated executor to the Core owner with writable private storage and authorized HTTPS read access to `data.binance.vision`, together with separately authenticated publisher CHECKSUM access and written rights/terms confirmation. The executor must be able to run the pinned repo branch with existing RAW #211 and Core warehouse #226 dependencies and retain the real originals privately. Do not attach original market ZIP/CSV or credentials to GitHub comments/public CI.
+
+**Preconditions to verify on that private executor:**
+1. Code pinned to Core F #275 exact reviewed HEAD; Core #226 canonical source module and #211 RawVault installed and accessible; Python 3.11+ recommended, do not silently replace frozen contracts.
+2. Source permission/licensing, publisher TLS/domain and independent CHECKSUM issuance provenance documented by the operator. The CLI `--publisher-origin-confirmed` is **operator declaration**, not cryptographic issuer-signature verification. A matching remotely fetched `.CHECKSUM` proves byte consistency with what that endpoint served, **not independently that the publisher issued it in 2024**.
+3. Confidential private source directory on isolated disk, free disk and backed-up custody path, strict user-only permissions. For 10 new months the existing code bounds download payload to 80,000,000 archive bytes + 5,120 CHECKSUM bytes (plus HTTP/TLS overhead). Budget **at least 256 MiB temporary staging**, plus separate verified RAW Vault, normalized decompression (up to 16 MiB CSV per month), warehouse SQLite/WAL indexes, backups and monitoring; this is a *minimum planning allocation*, not a measured actual footprint. If insufficient disk or rights, stop before transfer.
+4. Existing February/August are **previously pinned only**; do not reacquire or relabel as newly verified. Dataset is BTCUSDT Spot native 15m monthly 2024. Preflight refuses gaps/duplicate 900,000ms bars, unexpected native CSV/member or CHECKSUM drift. Complete-year planned count **35,136** bars (including pre-pinned months); actual 2024 new-month admission count must be obtained from real receipts, not this plan.
+5. Protected logging: only sanitized metadata/status/hash/census may leave the executor. Never publish raw ZIP/CSV, credentials, access tokens, original OHLCV or protected paths. No PIT, policy approval or trading inferred.
+
+**Safe local commands** (run on the **authorized private machine**, inside pinned checkout; `/private/aql/historical` is an example, not a verified location):
+
+```bash
+set -euo pipefail
+umask 077
+mkdir -p /private/aql/historical
+chmod 700 /private/aql/historical
+df -h /private/aql/historical
+python -m research_wp_r0.aql_core_f_bulk_source_v1 --first 2024-01 --last 2024-12 --max-workers 3
+# Only after operator-approved publisher rights, HTTPS/issuer-source verification,
+# independently obtained CHECKSUM authority and sufficient private disk:
+python -m research_wp_r0.aql_core_f_bulk_source_v1 \
+  --first 2024-01 --last 2024-12 \
+  --private-dir /private/aql/historical --max-workers 3 \
+  --allow-network --permission-confirmed --terms-reviewed \
+  --publisher-origin-confirmed
+```
+
+**Behavior and limitations:** Existing implementation is bounded concurrent full-file fetch, not byte-range resumable. Repeated runs do not safely resume existing ZIP fragments; pre-existing paths are quarantined for manual read-only reconciliation and must never be overwritten blindly. `ACCEPTED_PREFLIGHT` = checksum/native ZIP/UTC grid validation only. **The current F1 CLI does not itself perform Core RAW #211 admission, warehouse #226 readback, native #245 or local #253 query execution.** These remain a separately guarded F2 action on the *same private retained original bytes*, using existing `aql_authenticated_historical_admission_v1`, `aql_core_backbone_local_v1`, and `aql_core_dual_query_identity_map_v1`, with required actual source bytes, independently authenticated chain and policies. Do not substitute a new ingest engine or manufacture successful query receipts. If the actual runner cannot execute that canonical path, return `F2_BLOCKED` with exact missing dependency.
+
+**Required single sanitized return packet for Core/Factory** (no source payload):
+- Exact owner checkout SHA; private executor identifier that does not expose secrets; access approval evidence reference; publisher issuer/HTTPS/checksum provenance reference and observed capture timestamp (never backdated historical available_at).
+- For each of 12 months, exact final `ACCEPTED_PREFLIGHT | REJECTED_QUARANTINED | MISSING_SOURCE | RETAINED_PREVIOUSLY_PINNED`, actual observed bars and expected bars, original ZIP SHA + separate CHECKSUM-file SHA and native member SHA **only when validated**; unknowns strictly `null`; explicit missing/rejected denominator.
+- For every *actually* admitted month: separate RAW #211 immutable admission/readback SHA and receipt, #226 warehouse committed/readback receipt, independent #245 `price_query_sha256` and #253 `query_sha256` parent receipts (NOT aliased), coverage, 900,000ms UTC opening/closing and negative gap/duplicate census, clean restart replay/trace. `ACCEPTED_PREFLIGHT` cannot be relabeled RAW admitted.
+- Distinguish Source ACK, independent versioned Strategy/Policy Approval, and Factory Consumer ACK; without trusted historical policy approval, preserve Secretary `NOT_ENQUEUED` and Factory historical Lab `NOT_EVALUATED`.
+- Retrospective classification `RETROSPECTIVE_NON_PIT`, issuer historical available-at `NOT_ATTESTED`, Paper `NOT_ACTIVATED`, trading `NONE`; Source/PIT/policy external blockers explicitly listed.
+
+**Factory integration contract:** Factory F4/F5 leads only after the real Core batch custody+dual query receipt and separately approved Scanner #277 research-only policy exist. Use exact SHA-pinned F owner branches, store each acceptance/rejection/missing denominator immutably, reject wrong Core#245/#253 SHA/symbol/cutoff/coverage and run one final F audit packet. Already accepted B/D/E/#272/#273 engineering suites are not new historical proof and need no repeated independent review.
+
+**State at handoff:** `F0_COMPLETE`; `F1_SOURCE_ACCESS_REQUIRED` (no authorized private runner or newly authenticated source bytes available to this session); `F2_EXTERNAL_SOURCE_BLOCKED` (no real new-month RAW/warehouse/native/local query evidence); `PIT_NOT_ATTESTED`; `POLICY_NOT_APPROVED`. No code changes made as part of this owner-access handoff, no extra source-blocked PR, no merges/G0/trading.
