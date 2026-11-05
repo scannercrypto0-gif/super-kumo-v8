@@ -8,7 +8,7 @@ import unittest
 from tools.strategy_service_offline.common import Frozen
 from tools.strategy_service_offline.run import FIXTURES
 from tools.scanner_strategy_b.native15m import native_15m_policy
-from tools.scanner_strategy_b.test_integration import Native15mGate
+from tools.scanner_strategy_b import test_integration as scanner_b_fixture
 from .approval_route import (
     explicit_test_only_approval, verify_test_only_approval,
     seal_strategy_route_request, verify_strategy_route_request,
@@ -19,7 +19,7 @@ from .service import scan_and_prepare_test_only_routes
 
 class ScannerCContractGate(unittest.TestCase):
     def setUp(self):
-        fixture = Native15mGate(methodName="test_all_strategy_symbol_pairs_and_safety")
+        fixture = scanner_b_fixture.Native15mGate(methodName="test_all_strategy_symbol_pairs_and_safety")
         fixture.setUp()
         self.fixture = fixture
         self.specs = fixture.work
