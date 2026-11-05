@@ -1,0 +1,92 @@
+name: AQL Core D Same-Source Research (TEST ONLY)
+on:
+  push:
+    branches:
+      - feature/aql-d-core-same-source-strategy-bridge-20261105
+    paths:
+      - 'research_wp_r0/aql_core_d_same_source_witness_v1.py'
+      - 'research_wp_r0/aql_core_d_same_source_route_v1.py'
+      - 'research_wp_r0/aql_core_d_permitted_cohort_v1.py'
+      - 'research_wp_r0/aql_core_d_canonical_secretary_v1.py'
+      - 'tests/test_aql_core_d_same_source_v1.py'
+      - 'tests/test_aql_core_d_permitted_cohort_v1.py'
+      - 'tests/test_aql_core_d_canonical_secretary_v1.py'
+      - '.github/workflows/aql-core-d-same-source-focused.yml'
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_core_d_same_source_witness_v1.py'
+      - 'research_wp_r0/aql_core_d_same_source_route_v1.py'
+      - 'research_wp_r0/aql_core_d_permitted_cohort_v1.py'
+      - 'research_wp_r0/aql_core_d_canonical_secretary_v1.py'
+      - 'tests/test_aql_core_d_same_source_v1.py'
+      - 'tests/test_aql_core_d_permitted_cohort_v1.py'
+      - 'tests/test_aql_core_d_canonical_secretary_v1.py'
+      - '.github/workflows/aql-core-d-same-source-focused.yml'
+  workflow_dispatch:
+jobs:
+  new-delta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11','3.12','3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46
+          path: _pinned_raw_211
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: b9c9ff8602e79c534402f44bce83c56ec2fa6bb9
+          path: _pinned_scanner_227
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8
+          path: _pinned_work_235
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 30c37ae56851488b882998c7fa0085ec51dbfc92
+          path: _pinned_scanner_b_257
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 1659713c80d1934f3c08af1af422b89cd5706360
+          path: _pinned_scanner_c_259
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: b5287aeda6b00758bc4a839da941ce2b40d1bac2
+          path: _pinned_scanner_d_262
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: e66ac39a6443853c60463f7bd5bfaf590bb125a6
+          path: _pinned_factory_b_255
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Stage only pinned interfaces and fixtures
+        run: |
+          mkdir -p tools
+          cp -r _pinned_work_235/tools/strategy_service_offline tools/
+          cp -r _pinned_scanner_b_257/tools/scanner_strategy_b tools/
+          cp -r _pinned_scanner_c_259/tools/scanner_strategy_c tools/
+          cp -r _pinned_scanner_d_262/tools/scanner_strategy_d tools/
+          cp -r _pinned_scanner_227/tools/scanner_engine_offline tools/
+          cp _pinned_factory_b_255/research_wp_r0/aql_factory_unified_backbone_v1.py research_wp_r0/
+          cp _pinned_factory_b_255/research_wp_r0/aql_factory_authentic_research_admission.py research_wp_r0/
+      - name: Run ONLY newly added Core D delta
+        run: |
+          PYTHONPATH=.:tests:_pinned_raw_211:_pinned_scanner_227 python -m unittest discover -s tests -p 'test_aql_core_d_same_source_v1.py' -v
+          PYTHONPATH=.:tests:_pinned_raw_211:_pinned_scanner_227 python -m unittest discover -s tests -p 'test_aql_core_d_permitted_cohort_v1.py' -v
+          PYTHONPATH=.:tests:_pinned_raw_211:_pinned_scanner_227 python -m unittest discover -s tests -p 'test_aql_core_d_canonical_secretary_v1.py' -v
