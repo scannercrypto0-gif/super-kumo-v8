@@ -23,7 +23,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/checkout@v4
-        with: {ref: aea4406c987635c9d7a03f5a22bede2f5ca9356a, path: _pinned_factory_e, persist-credentials: false}
+        with: {ref: 6d5a4dd3e2a701fd14f21820bad549c446c8532b, path: _pinned_factory_e, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: a86a590a5e2c32c18e03522f52896dbcf50c60ff, path: _pinned_core_d, persist-credentials: false}
       - uses: actions/checkout@v4
@@ -73,7 +73,8 @@ jobs:
                        'aql_factory_e_discoverer_consumer_v1.py',
                        'aql_factory_e_historical_source_boundary_v1.py',
                        'aql_factory_e_core_scanner_historical_wait_v1.py',
-                       'aql_factory_e_durable_discoverer_consumer_v1.py'):
+                       'aql_factory_e_durable_discoverer_consumer_v1.py',
+                       'aql_factory_f_batch_ledger_v1.py'):
               copyfile(Path('_pinned_factory_e')/'research_wp_r0'/name,
                        Path('research_wp_r0')/name)
           copyfile(Path('_pinned_scanner_e')/'tools/scanner_strategy_e/historical_policy_approval_request.py',
@@ -86,7 +87,8 @@ jobs:
                        'test_aql_factory_e_core_scanner_historical_wait_v1.py',
                        'test_aql_factory_e_durable_discoverer_consumer_v1.py',
                        'test_aql_factory_e_migration_v1.py',
-                       'test_aql_factory_e_bounded_perf_v1.py'):
+                       'test_aql_factory_e_bounded_perf_v1.py',
+                       'test_aql_factory_f_batch_ledger_v1.py'):
               copyfile(Path('_pinned_factory_e')/'tests'/name,Path('tests')/name)
           copytree(Path('_pinned_work235')/'tools/strategy_service_offline/fixtures',
                    Path('tools/strategy_service_offline/fixtures'),dirs_exist_ok=True)
@@ -116,6 +118,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_aql_factory_e_core_scanner_historical_wait_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_factory_e_durable_discoverer_consumer_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_factory_e_migration_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_factory_f_batch_ledger_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_factory_e_bounded_perf_v1.py' -v
           python -m pytest tools/strategy_discoverer_offline/tests/test_package_e_durable_checkpoint.py -q
           python -m unittest discover -s tests -p 'test_aql_core_e_status_evidence_v1.py' -v
