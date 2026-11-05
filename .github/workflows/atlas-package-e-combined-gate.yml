@@ -23,21 +23,21 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/checkout@v4
-        with: {ref: 4212151a1be7f526a672b8a9ee49eb3b2c552f87, path: _pinned_factory_e, persist-credentials: false}
+        with: {ref: aec0b7eca88630bfca3fba0cd32c8fa59553215c, path: _pinned_factory_e, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: a86a590a5e2c32c18e03522f52896dbcf50c60ff, path: _pinned_core_d, persist-credentials: false}
       - uses: actions/checkout@v4
-        with: {ref: 3c23ba606c94a2d9e7a95d2dce122adbc7d9e88e, path: _pinned_core_e, persist-credentials: false}
+        with: {ref: 3af5b66d2b381b853a6b5be32c38b3d3d02e1ea7, path: _pinned_core_e, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: a91e370ae7e5197e9af71f8300eeaff4a7aff022, path: _pinned_scanner_d, persist-credentials: false}
       - uses: actions/checkout@v4
-        with: {ref: 58fc02ba4a0c5bb0a64d5187b400c0620a49f389, path: _pinned_scanner_e, persist-credentials: false}
+        with: {ref: c7c90c688b010d615168d9c6231955c997100e94, path: _pinned_scanner_e, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: 1659713c80d1934f3c08af1af422b89cd5706360, path: _pinned_scanner_c, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: 30c37ae56851488b882998c7fa0085ec51dbfc92, path: _pinned_scanner_b, persist-credentials: false}
       - uses: actions/checkout@v4
-        with: {ref: 79adda0b06d4299cde5dec3f14de985014cd330d, path: _pinned_discoverer_e, persist-credentials: false}
+        with: {ref: 149ca90c09b96abb45d3bc2839b657711c9826ac, path: _pinned_discoverer_e, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: f2006c0e431690ccea8b0532095bf4f2a2dc88ba, path: _pinned_discoverer_base, persist-credentials: false}
       - uses: actions/checkout@v4
@@ -71,12 +71,18 @@ jobs:
           # integration branch never changes the Factory owner branch.
           for name in ('aql_factory_e_research_results_store_v1.py',
                        'aql_factory_e_discoverer_consumer_v1.py',
-                       'aql_factory_e_historical_source_boundary_v1.py'):
+                       'aql_factory_e_historical_source_boundary_v1.py',
+                       'aql_factory_e_core_scanner_historical_wait_v1.py',
+                       'aql_factory_e_durable_discoverer_consumer_v1.py'):
               copyfile(Path('_pinned_factory_e')/'research_wp_r0'/name,
                        Path('research_wp_r0')/name)
           for name in ('test_aql_factory_e_research_results_store_v1.py',
                        'test_aql_factory_e_discoverer_consumer_v1.py',
-                       'test_aql_factory_e_historical_source_boundary_v1.py'):
+                       'test_aql_factory_e_historical_source_boundary_v1.py',
+                       'test_aql_factory_e_core_scanner_historical_wait_v1.py',
+                       'test_aql_factory_e_durable_discoverer_consumer_v1.py',
+                       'test_aql_factory_e_migration_v1.py',
+                       'test_aql_factory_e_bounded_perf_v1.py'):
               copyfile(Path('_pinned_factory_e')/'tests'/name,Path('tests')/name)
           copytree(Path('_pinned_work235')/'tools/strategy_service_offline/fixtures',
                    Path('tools/strategy_service_offline/fixtures'),dirs_exist_ok=True)
@@ -86,6 +92,8 @@ jobs:
               copyfile(Path('_pinned_core_d')/'tests'/name,Path('tests')/name)
           copyfile(Path('_pinned_core_e')/'tests/test_aql_core_e_historical_boundary_v1.py',
                    Path('tests/test_aql_core_e_historical_boundary_v1.py'))
+          copyfile(Path('_pinned_core_e')/'tests/test_aql_core_e_status_evidence_v1.py',
+                   Path('tests/test_aql_core_e_status_evidence_v1.py'))
           assert Path('tools/scanner_strategy_e/test_historical_core_screening.py').is_file()
           assert Path('tools/strategy_discoverer_offline/tests/test_package_e_membership.py').is_file()
           print('All E owner interfaces staged read-only from exact SHA heads')
@@ -101,13 +109,23 @@ jobs:
           python -m unittest discover -s tests -p 'test_aql_factory_e_discoverer_consumer_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_core_e_historical_boundary_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_factory_e_historical_source_boundary_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_factory_e_core_scanner_historical_wait_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_factory_e_durable_discoverer_consumer_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_factory_e_migration_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_factory_e_bounded_perf_v1.py' -v
+          python -m pytest tools/strategy_discoverer_offline/tests/test_package_e_durable_checkpoint.py -q
+          python -m unittest discover -s tests -p 'test_aql_core_e_status_evidence_v1.py' -v
+          python -m unittest tools.scanner_strategy_e.test_historical_research_policy -v
+          python tools/atlas_factory_e_bounded_perf.py --strategies 12 --symbols 8 --per-pair 4 --max-seconds 30 --max-peak-mib 96 --output e-factory-performance.json
           python -m unittest tools.scanner_strategy_e.test_historical_core_screening -v
           python -m pytest tools/strategy_discoverer_offline/tests/test_package_e_membership.py -q
           python tools/atlas_e_combined_gate_manifest.py
       - uses: actions/upload-artifact@v4
         with:
           name: e-gate-${{ matrix.python-version }}
-          path: e-gate-evidence.json
+          path: |
+            e-gate-evidence.json
+            e-factory-performance.json
           if-no-files-found: error
           retention-days: 14
   normalized-parity:
@@ -135,7 +153,7 @@ jobs:
                               ensure_ascii=True,allow_nan=False).encode()
               assert hashlib.sha256(body).hexdigest()==x['normalized_sha256']
               assert x['normalized']['historical_source']=='HISTORICAL_SOURCE_BLOCKED'
-              assert x['normalized']['final_package_e'].startswith('NOT_COMPLETE_')
+              assert x['normalized']['final_package_e']=='CLOSED_ENGINEERING_WITH_EXTERNAL_HISTORICAL_BLOCKERS'
           print('ATLAS_E_CROSS_VERSION_NORMALIZED_SHA256='+next(iter(sha)))
           print('E_ENGINEERING_BOUNDED_PASS_WITH_HISTORICAL_BLOCKERS')
           PY
