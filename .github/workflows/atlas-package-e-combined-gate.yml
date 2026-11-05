@@ -146,6 +146,16 @@ jobs:
           paths=sorted(Path('evidence').glob('*/e-gate-evidence.json'))
           assert len(paths)==3, paths
           reports=[json.loads(p.read_text()) for p in paths]
+          perf_paths=sorted(Path('evidence').glob('*/e-factory-performance.json'))
+          assert len(perf_paths)==3, perf_paths
+          performances=[json.loads(p.read_text()) for p in perf_paths]
+          assert all(q['threshold_pass'] and q['experiment_count']==96 and
+                     q['attempts_count']==384 and q['strategy_count']==12 and
+                     q['symbol_count']==8 and q['orders_created']==0 and
+                     q['trading_authority']=='NONE' for q in performances)
+          perf_shas={q['document_set_sha256'] for q in performances}
+          assert len(perf_shas)==1, perf_shas
+          print('ATLAS_E_CROSS_VERSION_BENCHMARK_SHA256='+next(iter(perf_shas)))
           versions={x['python'].split('.')[0]+'.'+x['python'].split('.')[1] for x in reports}
           assert versions=={'3.11','3.12','3.13'}, versions
           sha={x['normalized_sha256'] for x in reports}
