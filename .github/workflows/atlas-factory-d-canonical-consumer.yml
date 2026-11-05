@@ -1,0 +1,96 @@
+name: ATLAS Factory D Canonical Consumer Focused TEST ONLY
+on:
+  push:
+    branches:
+      - factory/package-d-canonical-consumer-20261105
+    paths:
+      - 'research_wp_r0/aql_factory_d_canonical_consumer_v1.py'
+      - 'tests/test_aql_factory_d_canonical_consumer_v1.py'
+      - '.github/workflows/atlas-factory-d-canonical-consumer.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  factory-d-ack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: a86a590a5e2c32c18e03522f52896dbcf50c60ff
+          path: _pinned_core_d
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: a91e370ae7e5197e9af71f8300eeaff4a7aff022
+          path: _pinned_scanner_d
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 1659713c80d1934f3c08af1af422b89cd5706360
+          path: _pinned_scanner_c
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 30c37ae56851488b882998c7fa0085ec51dbfc92
+          path: _pinned_scanner_b
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8
+          path: _pinned_work235
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46
+          path: _pinned_raw211
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: b9c9ff8602e79c534402f44bce83c56ec2fa6bb9
+          path: _pinned_scanner227
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Stage pinned interfaces without altering Factory-owned files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from shutil import copyfile
+          roots = ('_pinned_core_d','_pinned_scanner_d','_pinned_scanner_c',
+                   '_pinned_scanner_b','_pinned_work235','_pinned_raw211',
+                   '_pinned_scanner227')
+          for owner in roots:
+              for folder in ('research_wp_r0','tools','src'):
+                  source=Path(owner)/folder
+                  if source.is_dir():
+                      for item in source.rglob('*.py'):
+                          target=Path(folder)/item.relative_to(source)
+                          if not target.exists():
+                              target.parent.mkdir(parents=True, exist_ok=True)
+                              copyfile(item, target)
+          from shutil import copytree
+          fixture_source=Path('_pinned_work235')/'tools/strategy_service_offline/fixtures'
+          fixture_target=Path('tools/strategy_service_offline/fixtures')
+          assert (fixture_source/'strategies.json').is_file(), fixture_source
+          copytree(fixture_source,fixture_target,dirs_exist_ok=True)
+          for name in ('test_aql_core_d_same_source_v1.py',
+                       'test_aql_core_d_permitted_cohort_v1.py',
+                       'test_aql_core_d_canonical_secretary_v1.py'):
+              source=Path('_pinned_core_d')/'tests'/name
+              assert source.is_file(), source
+              copyfile(source, Path('tests')/name)
+          assert (Path('research_wp_r0/aql_factory_d_canonical_consumer_v1.py')).is_file()
+          print('Pinned Factory D, Core D, Scanner D contract staging complete')
+          PY
+      - name: Run Factory D ACK integration delta only
+        run: |
+          PYTHONPATH="$PWD:$PWD/tests:$PWD/_pinned_raw211" python -m unittest discover -s tests -p 'test_aql_factory_d_canonical_consumer_v1.py' -v
