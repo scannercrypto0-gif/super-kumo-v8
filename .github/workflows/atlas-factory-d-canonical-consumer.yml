@@ -77,6 +77,11 @@ jobs:
                           if not target.exists():
                               target.parent.mkdir(parents=True, exist_ok=True)
                               copyfile(item, target)
+          from shutil import copytree
+          fixture_source=Path('_pinned_work235')/'tools/strategy_service_offline/fixtures'
+          fixture_target=Path('tools/strategy_service_offline/fixtures')
+          assert (fixture_source/'strategies.json').is_file(), fixture_source
+          copytree(fixture_source,fixture_target,dirs_exist_ok=True)
           for name in ('test_aql_core_d_same_source_v1.py',
                        'test_aql_core_d_permitted_cohort_v1.py',
                        'test_aql_core_d_canonical_secretary_v1.py'):
