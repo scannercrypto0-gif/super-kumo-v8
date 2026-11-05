@@ -12,9 +12,12 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+from hashlib import sha256
 from pathlib import Path
 
-from research_wp_r0.aql_archive_custody_bridge_v1 import digest
+def digest(value):
+    return sha256(json.dumps(value, sort_keys=True, separators=(",", ":"),
+                             ensure_ascii=True, allow_nan=False).encode("utf-8")).hexdigest()
 
 SCHEMA = "aql.factory.e.research-experiment.v1"
 RESULT_SCHEMA = "aql.factory.e.research-store-receipt.v1"
