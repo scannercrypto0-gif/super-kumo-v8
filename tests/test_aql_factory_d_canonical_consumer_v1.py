@@ -111,6 +111,9 @@ class FactoryDActualLabPaper(unittest.TestCase):
             identity_map=self.fixture.f.c["mapping"],
             core_d_witness=self.fixture.f.c["witness"],
             scanner_d_handoff=self.fixture.f.produced.receipt(),
+            work_spec=next(w for w in self.fixture.f.work
+                           if w["payload"]["strategy_id"]
+                           == self.fixture.gate["strategy_id"]),
         )
         args.update(changes)
         return run_factory_d_same_source_lab_paper(**args)
@@ -131,7 +134,13 @@ class FactoryDActualLabPaper(unittest.TestCase):
         self.assertEqual(len(a["lab"]["post_hoc_one_bar_observations"]), 7)
         self.assertEqual(sum(a["lab"]["bar_direction_census"].values()), 8)
         self.assertEqual(a["lab"]["strategy_rule_performance"],
-                         "NOT_EVALUATED_NO_TRIAL_TIMELINE")
+                         "RULES_COMPUTED_NO_VALIDATED_TRADE_TIMELINE")
+        self.assertEqual(a["lab"]["rule_evaluation"],
+                         "ACTUAL_FACTORY_INDICATOR_PREFIX_ONLY")
+        self.assertEqual(a["lab"]["rule_decision_denominator"], 7)
+        self.assertEqual(sum(a["lab"]["rule_decision_counts"].values()), 7)
+        self.assertGreater(a["lab"]["rule_decision_counts"]["ENTRY_TRIGGERED"], 0)
+        self.assertTrue(a["batch"]["rule_interpreter_executed"])
         self.assertEqual(a["paper"]["decision"], "REJECT")
         self.assertTrue(a["paper"]["native_position_ledger_invoked"])
         self.assertEqual(a["paper"]["native_paper_intent"]["status"], "declined")
@@ -182,6 +191,14 @@ class FactoryDActualLabPaper(unittest.TestCase):
         witness["payload"]["scanner_source_id"] = "unverified"
         with self.assertRaises((ValueError, LabHandoffError)):
             self.run_lane(core_d_witness=witness)
+
+    def test_wrong_frozen_strategy_spec_fails_closed(self):
+        self.ack_core()
+        foreign_spec = next(w for w in self.fixture.f.work
+                            if w["payload"]["strategy_id"]
+                            != self.fixture.gate["strategy_id"])
+        with self.assertRaises((ValueError, LabHandoffError)):
+            self.run_lane(work_spec=foreign_spec)
 
     def test_expired_secretary_denies_lab_paper(self):
         self.ack_core()
