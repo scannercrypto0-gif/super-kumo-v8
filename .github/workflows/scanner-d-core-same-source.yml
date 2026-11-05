@@ -54,7 +54,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: scannercrypto0-gif/super-kumo-v8
-          ref: b29d02e34683f177fd4d4391136c9815c1e9efc0
+          ref: a86a590a5e2c32c18e03522f52896dbcf50c60ff
           path: upstream/core264
           persist-credentials: false
       - uses: actions/setup-python@v5
@@ -71,8 +71,9 @@ jobs:
           for file in upstream/core261/research_wp_r0/aql_*.py; do
             cp "$file" project/research_wp_r0/
           done
-          cp upstream/core264/research_wp_r0/aql_core_d_same_source_witness_v1.py project/research_wp_r0/
-          cp upstream/core264/research_wp_r0/aql_core_d_same_source_route_v1.py project/research_wp_r0/
+          for file in upstream/core264/research_wp_r0/aql_core_d_*.py; do
+            cp "$file" project/research_wp_r0/
+          done
           cp upstream/core261/tests/test_aql_core_dual_query_identity_map_v1.py project/tests/
           cp upstream/core261/tests/test_aql_core_authorized_source_transfer_v1.py project/tests/
       - name: One NEW Scanner D source replay/negative gate
