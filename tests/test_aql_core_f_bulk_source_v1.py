@@ -1,9 +1,12 @@
 import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 from research_wp_r0.aql_core_f_bulk_source_v1 import (
     acquire_private_batch, build_coverage_ledger, build_manifest,
     target_months, verify_coverage_ledger, verify_manifest,
+    build_local_f1, LOCAL_F1_PROVENANCE,
 )
 
 
@@ -69,6 +72,45 @@ class TestCoreFBulkSource(unittest.TestCase):
         m = build_manifest(first="2024-02", last="2024-03")
         with self.assertRaises(ValueError):
             build_coverage_ledger(m, {"2024-02": {"status": "ACCEPTED_PREFLIGHT"}})
+
+    def test_local_f1_reverify_is_offline_and_uses_local_provenance(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            root.chmod(0o700)
+            manifest = build_manifest()
+            for row in manifest["rows"]:
+                if row["month"] in ("2024-02", "2024-08"):
+                    continue
+                (root / row["archive_name"]).write_bytes(b"zip")
+                (root / row["checksum_name"]).write_bytes(b"checksum")
+            calls = []
+            def preflight(month, raw, checksum, *, provenance):
+                self.assertEqual(provenance, LOCAL_F1_PROVENANCE)
+                self.assertEqual(raw, b"zip")
+                self.assertEqual(checksum, b"checksum")
+                calls.append(month)
+                return {
+                    "archive_sha256": "a" * 64,
+                    "checksum_file_sha256": "b" * 64,
+                    "preflight_receipt_sha256": "c" * 64,
+                    "observed_bars": next(r["expected_native_15m_bars"]
+                                          for r in manifest["rows"] if r["month"] == month),
+                }
+            with patch("research_wp_r0.aql_core_bounded_monthly_source_preflight_v1.verify_native_month",
+                       side_effect=preflight), patch(
+                       "research_wp_r0.aql_core_f_bulk_source_v1._fetch",
+                       side_effect=AssertionError("no network")):
+                if __import__("os").name == "nt":
+                    with patch("research_wp_r0.aql_core_f_ntfs_acl_v1.require_private_windows_directory",
+                               return_value=True):
+                        result = build_local_f1(root)
+                else:
+                    result = build_local_f1(root)
+            self.assertEqual(len(calls), 10)
+            self.assertTrue(verify_coverage_ledger(result["manifest"], result["coverage"]))
+            self.assertEqual(result["coverage"]["census"]["ACCEPTED_PREFLIGHT"], 10)
+            self.assertEqual(result["coverage"]["census"]["RETAINED_PREVIOUSLY_PINNED"], 2)
+            self.assertEqual(result["coverage"]["raw_admission"], "NOT_CLAIMED")
 
     def test_private_network_not_allowed_by_default(self):
         m = build_manifest(first="2024-03", last="2024-03")
