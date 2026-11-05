@@ -64,11 +64,8 @@ def reconcile_scanner_c_candidate(
            and r["source_secretary_ack_is_strategy_approval"] is False
            and r["paper_authority"]=="NONE"
            and r["trading_authority"]=="NONE"
-           and r["operational_work235_native15m"]==
-               "NOT_CONNECTED_15M_UNSUPPORTED" if
-               "operational_work235_native15m" in r else
-               r["work235_operational_15m_status"]==
-                   "NOT_CONNECTED_15M_UNSUPPORTED",
+           and r.get("work235_operational_15m_status")==
+               "NOT_CONNECTED_15M_UNSUPPORTED",
            "SCANNER_C_IDENTITY_AUTHORITY")
     _sha(identity_map,"identity_map_sha256")
     _sha(warehouse_receipt,"receipt_sha256")
