@@ -27,13 +27,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-# P1-A fix: fcntl is POSIX-only. Guard the import so Windows gets a clear error
-# rather than a confusing ModuleNotFoundError at import time.
+# Keep the on-disk vault format identical across Windows and POSIX.
+# Windows uses a one-byte, kernel-managed advisory lock; POSIX uses flock.
 if sys.platform == "win32":
-    raise OSError(
-        "UNSUPPORTED_PLATFORM: raw_vault_offline.vault requires fcntl (POSIX only). "
-        "Windows is not supported."
-    )
+    import msvcrt
 else:
     import fcntl
 
@@ -61,28 +58,56 @@ LOCK_FILENAME = ".vault.lock"
 
 @contextmanager
 def _vault_lock(root: Path, timeout: float = 10.0):
+    """Exclusive, cross-process lock held for the entire admission transaction.
+
+    Never truncate the lock file: another process may already hold its inode.
+    Windows locks byte 0 with msvcrt; POSIX locks the file with flock.
+    """
     lockfile = root / LOCK_FILENAME
     lockfile.parent.mkdir(parents=True, exist_ok=True)
     start = time.monotonic()
-    fh = None
-    try:
-        fh = open(lockfile, 'w')
-        while True:
-            try:
-                fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
-            except BlockingIOError:
-                if time.monotonic() - start > timeout:
-                    raise TimeoutError(f"Could not acquire vault lock in {timeout}s")
-                time.sleep(0.05)
-        yield
-    finally:
-        if fh is not None:
-            try:
-                fcntl.flock(fh, fcntl.LOCK_UN)
-            except Exception:
-                pass
-            fh.close()
+    with open(lockfile, "a+b") as fh:
+        if sys.platform == "win32":
+            # Locking a stable, existing byte avoids EOF-dependent behavior.
+            fh.seek(0, os.SEEK_END)
+            if fh.tell() == 0:
+                fh.write(b"\\0")
+                fh.flush()
+                os.fsync(fh.fileno())
+        locked = False
+        try:
+            while not locked:
+                try:
+                    if sys.platform == "win32":
+                        fh.seek(0)
+                        msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+                    else:
+                        fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    locked = True
+                except (BlockingIOError, OSError) as exc:
+                    # Windows reports sharing/lock contention as EACCES/EDEADLOCK
+                    # or EAGAIN; unrelated I/O failures must fail closed.
+                    if sys.platform == "win32":
+                        import errno
+                        if getattr(exc, "errno", None) not in (
+                            errno.EACCES, errno.EAGAIN, errno.EDEADLK,
+                        ):
+                            raise
+                    elif not isinstance(exc, BlockingIOError):
+                        raise
+                    if time.monotonic() - start >= timeout:
+                        raise TimeoutError(
+                            f"Could not acquire vault lock in {timeout}s"
+                        ) from exc
+                    time.sleep(0.05)
+            yield
+        finally:
+            if locked:
+                if sys.platform == "win32":
+                    fh.seek(0)
+                    msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(fh, fcntl.LOCK_UN)
 
 
 # ── object path ───────────────────────────────────────────────────────────────
