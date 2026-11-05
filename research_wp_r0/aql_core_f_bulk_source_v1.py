@@ -265,8 +265,59 @@ def verify_coverage_ledger(manifest, ledger):
         return False
 
 
+
+LOCAL_F1_PROVENANCE = "PRIVATE_LOCAL_REVERIFICATION"
+
+
+def build_local_f1(private_dir):
+    """Read-only reconstruction of a NEW F1 receipt from existing private originals.
+
+    No network, downloads, or writes; caller must save the JSON privately and
+    pin its newly computed hashes independently. Does not certify publisher.
+    """
+    root = Path(private_dir).absolute()
+    _require(root.is_dir() and not root.is_symlink(), "PRIVATE_DIRECTORY_REQUIRED")
+    if os.name == "nt":
+        from research_wp_r0.aql_core_f_ntfs_acl_v1 import require_private_windows_directory
+        require_private_windows_directory(root)
+    else:
+        _require((root.stat().st_mode & 0o077) == 0,
+                 "PRIVATE_DIRECTORY_PERMISSIONS_REQUIRED")
+    from research_wp_r0.aql_core_bounded_monthly_source_preflight_v1 import verify_native_month
+    manifest = build_manifest()
+    outcomes = {}
+    for row in manifest["rows"]:
+        if row["month"] in PREVIOUSLY_PINNED:
+            continue
+        archive = root / row["archive_name"]
+        checksum = root / row["checksum_name"]
+        _require(archive.is_file() and not archive.is_symlink()
+                 and checksum.is_file() and not checksum.is_symlink(),
+                 "F1_LOCAL_SOURCE_MISSING_OR_LINK")
+        _require(0 < archive.stat().st_size <= MAX_ARCHIVE
+                 and 0 < checksum.stat().st_size <= MAX_CHECKSUM,
+                 "F1_LOCAL_SOURCE_SIZE_BOUND")
+        raw, cs = archive.read_bytes(), checksum.read_bytes()
+        receipt = verify_native_month(
+            row["month"], raw, cs, provenance=LOCAL_F1_PROVENANCE)
+        outcomes[row["month"]] = {
+            "status": "ACCEPTED_PREFLIGHT",
+            "archive_sha256": receipt["archive_sha256"],
+            "checksum_file_sha256": receipt["checksum_file_sha256"],
+            "preflight_receipt_sha256": receipt["preflight_receipt_sha256"],
+            "observed_bars": receipt["observed_bars"],
+            "raw_vault": "NOT_YET_ADMITTED",
+            "warehouse": "NOT_YET_ADMITTED",
+            "historical_pit": "NOT_ATTESTED",
+        }
+    ledger = build_coverage_ledger(manifest, outcomes)
+    _require(verify_coverage_ledger(manifest, ledger), "F1_LOCAL_LEDGER_INVALID")
+    return {"manifest": manifest, "coverage": ledger}
+
+
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--local-reverify-existing", action="store_true")
     parser.add_argument("--first", default="2024-01")
     parser.add_argument("--last", default="2024-12")
     parser.add_argument("--private-dir")
@@ -276,6 +327,12 @@ def main():
     parser.add_argument("--publisher-origin-confirmed", action="store_true")
     parser.add_argument("--max-workers", type=int, default=3)
     args = parser.parse_args()
+    if args.local_reverify_existing:
+        _require(args.private_dir and not args.allow_network and args.first == "2024-01"
+                 and args.last == "2024-12" and args.max_workers == 3,
+                 "F1_LOCAL_REVERIFY_SCOPE_OR_NETWORK_FORBIDDEN")
+        print(json.dumps(build_local_f1(args.private_dir), sort_keys=True))
+        return
     manifest = build_manifest(first=args.first, last=args.last, max_workers=args.max_workers)
     if args.allow_network:
         _require(args.private_dir, "PRIVATE_DIR_REQUIRED")
