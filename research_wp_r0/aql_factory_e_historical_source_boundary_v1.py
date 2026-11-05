@@ -16,7 +16,11 @@ def record_core_e_historical_boundary(*, preflight_receipt, store_path,
     from research_wp_r0.aql_core_e_historical_boundary_v1 import (
         verify_preflight_receipt, BLOCKED, VERIFIED,
     )
-    if not verify_preflight_receipt(preflight_receipt):
+    try:
+        verified = verify_preflight_receipt(preflight_receipt)
+    except (AttributeError, KeyError, TypeError, ValueError):
+        verified = False
+    if not verified:
         raise ResultsStoreError("FACTORY_E_CORE_E_PREFLIGHT_TAMPER")
     if preflight_receipt["source_kind"] != "ORIGINAL_PUBLISHER":
         raise ResultsStoreError("FACTORY_E_SYNTHETIC_NOT_HISTORICAL")
