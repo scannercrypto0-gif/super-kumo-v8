@@ -115,7 +115,21 @@ def _verified(con,route_id):
                and ack["source_ack_sha256"]==row[2]
                and ack["scanner_c_approval_sha256"]==
                    gate["scanner_c_approval_sha256"]
-               and ack["trading_authority"]=="NONE"\n           and ack.get("paper_authority")=="NONE"\n           and ack.get("orders_created")==0\n           and ack.get("paper_positions")==0\n           and ack.get("actual_fills") is None\n           and ack.get("route_id")==route_id\n           and ack.get("decision")=="ACCEPTED_TEST_ONLY_RESEARCH"\n           and ack.get("strategy_id")==gate["strategy_id"]\n           and ack.get("strategy_version")==gate["strategy_version"]\n           and ack.get("config_digest")==gate["config_digest"]\n           and ack.get("source_zip_sha256")==gate["source_zip_sha256"]\n           and ack.get("core_245_price_query_sha256")==gate["core_245_price_query_sha256"]\n           and ack.get("core_253_query_local_sha256")==gate["core_253_query_local_sha256"]\n           and ack.get("cutoff_ms")==gate["cutoff_ms"]\n           and type(ack.get("accepted_at_ms")) is int\n           and gate["cutoff_ms"]<=ack["accepted_at_ms"]<row[7],
+               and ack["trading_authority"]=="NONE"
+           and ack.get("paper_authority")=="NONE"
+           and ack.get("orders_created")==0
+           and ack.get("paper_positions")==0
+           and ack.get("actual_fills") is None
+           and ack.get("route_id")==route_id
+           and ack.get("decision")=="ACCEPTED_TEST_ONLY_RESEARCH"
+           and ack.get("strategy_id")==gate["strategy_id"]
+           and ack.get("strategy_version")==gate["strategy_version"]
+           and ack.get("config_digest")==gate["config_digest"]
+           and ack.get("source_zip_sha256")==gate["source_zip_sha256"]
+           and ack.get("core_245_price_query_sha256")==gate["core_245_price_query_sha256"]
+           and ack.get("core_253_query_local_sha256")==gate["core_253_query_local_sha256"]
+           and ack.get("cutoff_ms")==gate["cutoff_ms"]\n           and type(ack.get("accepted_at_ms")) is int
+           and gate["cutoff_ms"]<=ack["accepted_at_ms"]<row[7],
                "D_CONSUMER_ACK_PARENT_DRIFT")
     trace=_tail(con,route_id)
     _check(trace[-1]["state"]==row[4]
