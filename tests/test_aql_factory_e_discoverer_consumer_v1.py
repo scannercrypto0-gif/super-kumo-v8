@@ -67,9 +67,10 @@ class FactoryEDiscovererConsumerTests(unittest.TestCase):
         with self.assertRaises(ResultsStoreError):
             self.run_intake(handoff_decision=replace(self.decision,
                                                      intake_digest="a"*64))
+        bad_receipt = copy.copy(self.case[5])
+        object.__setattr__(bad_receipt, "package_digest", "a"*64)
         with self.assertRaises(ResultsStoreError):
-            self.run_intake(receipt=replace(self.case[5],
-                                            package_digest="a"*64))
+            self.run_intake(receipt=bad_receipt)
 
     def test_immutable_same_experiment_conflict(self):
         self.run_intake()
