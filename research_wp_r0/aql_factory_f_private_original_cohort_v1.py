@@ -78,6 +78,11 @@ def _witness(packet,witness,witness_sha):
              "TRUSTED_PARENT_"+name.upper())
     need(witness["core_245_query_sha256"] != witness["core_253_query_sha256"],
          "DUAL_QUERY_DISTINCT")
+    authority_ids=(witness["core_f2_report_sha256"],witness["source_ack_sha256"],
+                   witness["independent_policy_approval_sha256"],
+                   witness["strategy_approval_sha256"])
+    need(len(set(authority_ids))==len(authority_ids),
+         "DISTINCT_SOURCE_POLICY_STRATEGY_ACK")
     need(type(witness["issuer_reference"]) is str
          and len(witness["issuer_reference"])>=8
          and type(witness["authorization_reference"]) is str
@@ -153,7 +158,8 @@ def validate_input(packet,witness,witness_sha):
              "CORE_F2_ENTRY_UNVERIFIED")
         entries_by_month[m]=entry
         months.append(m)
-    need(packet["admitted_months"]==sorted(months)
+    need(type(packet["admitted_months"]) is list
+         and packet["admitted_months"]==sorted(months)
          and packet["admitted_months"]
          and report["authorization_document_sha256"] is not None
          and _sha(report["authorization_document_sha256"]),
@@ -185,6 +191,10 @@ def validate_input(packet,witness,witness_sha):
         expected.add(trial["attempt_id"])
     need(sum(x["state"]=="SELECTED" for x in packet["attempts"])==1,
          "EXACTLY_ONE_SOURCE_BOUND_SELECTED_TRIAL")
+    need(all(_sha(packet[name]) for name in ("strategy_definition_sha256",
+                                           "config_sha256","code_sha256",
+                                           "environment_sha256")),
+         "STRATEGY_CONFIG_CODE_ENV_IDENTITY")
     definition=StrategyDefinition.from_dict(packet["strategy"],
                                               registry=IndicatorRegistryV2())
     need(definition.digest==packet["strategy_definition_sha256"],
@@ -226,6 +236,11 @@ def validate_input(packet,witness,witness_sha):
              for bar in trial["bars"]), "MONTH_GRID_SOURCE_SWAP")
     need(trial.get("selected_attempt_id")==
          sel["attempt_id"],"SELECTED_ATTEMPT_PLAN")
+    need(type(trial.get("trials")) is list
+         and any(t.get("attempt_id")==sel["attempt_id"] and
+                 t.get("candidate_digest")==definition.digest and
+                 t.get("state")=="PROPOSED" for t in trial["trials"]),
+         "TRIAL_SELECTED_DEFINITION_PARENT")
     need(len(trial["bars"])<=MAX_BARS
          and all(type(x["open_ms"]) is int
                  and x["open_ms"]%900000==0 for x in trial["bars"]),
