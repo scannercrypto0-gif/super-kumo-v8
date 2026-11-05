@@ -93,7 +93,7 @@ class ScannerF3ActualCoreFIntake(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.call(manifest=bad)
         bad=copy.deepcopy(self.ledger)
-        bad["entries"][0]["status"]="ACCEPTED_PREFLIGHT"
+        bad["entries"][1]["status"]="ACCEPTED_PREFLIGHT"
         with self.assertRaises(ValueError):
             self.call(coverage_ledger=bad)
         bad=copy.deepcopy(self.ledger)
