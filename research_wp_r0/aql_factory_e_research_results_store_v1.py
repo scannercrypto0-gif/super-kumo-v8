@@ -246,3 +246,135 @@ def compare_experiments(path, left_id, right_id):
         "profitability_comparison": "NOT_AUTHORIZED",
         "trading_authority": "NONE",
     })
+
+
+# Store layout v2 is an additive, journaled migration. Existing v1 experiment
+# documents and their original experiment SHA never change. Rollback is only
+# allowed if no v2-only consumer evidence has been written.
+LAYOUT_SCHEMA = "aql.factory.e.sqlite-layout.v2"
+MIGRATION_SCHEMA = "aql.factory.e.store-layout-migration.v1"
+
+
+def _layout(con):
+    row = con.execute("PRAGMA user_version").fetchone()
+    return row[0]
+
+
+def migrate_store_v2(path, *, fail_after_step=None):
+    """Atomic v1->v2 metadata migration; no mutation of historical receipts.
+
+    A caller can inject a pre-commit failure and prove a clean rollback.
+    The new metadata table is an append-only receipt index; ordinary v1
+    registration remains compatible. v2 records must be reproducible from
+    immutable canonical documents, not a caller-supplied receipt.
+    """
+    _need(fail_after_step in (None, "metadata", "backfill"), "FAULT_POINT")
+    con = _connect(path)
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        current = _layout(con)
+        _need(current in (0, 1, 2), "UNKNOWN_LAYOUT_VERSION")
+        if current == 2:
+            con.rollback()
+            return _seal({"schema": MIGRATION_SCHEMA, "operation": "UPGRADE",
+                          "status": "ALREADY_V2", "layout_version": 2,
+                          "experiment_count": con.execute(
+                              "SELECT count(*) FROM experiments").fetchone()[0]})
+        # Each operation uses SQLite's rollback journal/WAL transaction.
+        con.execute("""CREATE TABLE IF NOT EXISTS experiment_index_v2(
+          experiment_id TEXT PRIMARY KEY,
+          canonical_sha256 TEXT NOT NULL,
+          source_status TEXT NOT NULL,
+          lane TEXT NOT NULL,
+          FOREIGN KEY(experiment_id) REFERENCES experiments(experiment_id)
+        )""")
+        if fail_after_step == "metadata":
+            raise ResultsStoreError("FACTORY_E_INJECTED_MIGRATION_CRASH")
+        rows = con.execute("SELECT experiment_id,sha,document FROM experiments ORDER BY experiment_id").fetchall()
+        for experiment_id, pinned_sha, encoded in rows:
+            try:
+                item = json.loads(encoded)
+                _check_seal(item)
+                _need(item["sha256"] == pinned_sha
+                      and item["experiment_id"] == experiment_id,
+                      "MIGRATION_PARENT_CONFLICT")
+                con.execute(
+                    "INSERT INTO experiment_index_v2(experiment_id,canonical_sha256,source_status,lane) VALUES(?,?,?,?)",
+                    (experiment_id,pinned_sha,item["source_status"],item["lane"]))
+            except (KeyError, TypeError, json.JSONDecodeError) as exc:
+                raise ResultsStoreError("FACTORY_E_MIGRATION_CORRUPT_ROW") from exc
+        if fail_after_step == "backfill":
+            raise ResultsStoreError("FACTORY_E_INJECTED_MIGRATION_CRASH")
+        con.execute("PRAGMA user_version = 2")
+        con.commit()
+        return _seal({"schema": MIGRATION_SCHEMA, "operation": "UPGRADE",
+                      "status": "UPGRADED_V2", "layout_version": 2,
+                      "experiment_count": len(rows)})
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+
+
+def rollback_store_v1(path, *, fail_before_commit=False):
+    """Atomic downgrade of the additive index. Never alters sealed v1 docs."""
+    _need(type(fail_before_commit) is bool, "FAULT_POINT")
+    con = _connect(path)
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        current = _layout(con)
+        _need(current in (0, 1, 2), "UNKNOWN_LAYOUT_VERSION")
+        if current < 2:
+            con.rollback()
+            return _seal({"schema": MIGRATION_SCHEMA, "operation": "ROLLBACK",
+                          "status": "ALREADY_V1", "layout_version": current})
+        count = con.execute("SELECT count(*) FROM experiments").fetchone()[0]
+        index_rows = con.execute("SELECT experiment_id,canonical_sha256,source_status,lane FROM experiment_index_v2 ORDER BY experiment_id").fetchall()
+        rows = con.execute("SELECT experiment_id,sha,document FROM experiments ORDER BY experiment_id").fetchall()
+        _need(len(index_rows) == len(rows) == count, "ROLLBACK_INDEX_DRIFT")
+        for idx, row in zip(index_rows, rows):
+            item=json.loads(row[2])
+            _check_seal(item)
+            _need(idx == (row[0],row[1],item["source_status"],item["lane"]),
+                  "ROLLBACK_PARENT_DRIFT")
+        con.execute("DROP TABLE experiment_index_v2")
+        if fail_before_commit:
+            raise ResultsStoreError("FACTORY_E_INJECTED_ROLLBACK_CRASH")
+        con.execute("PRAGMA user_version = 1")
+        con.commit()
+        return _seal({"schema": MIGRATION_SCHEMA, "operation": "ROLLBACK",
+                      "status": "ROLLED_BACK_V1", "layout_version": 1,
+                      "experiment_count": count})
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+
+
+def audit_store_layout(path):
+    """Read-only full document/index census for restart/recovery gate."""
+    con=_connect(path)
+    try:
+        version=_layout(con)
+        _need(version in (0,1,2), "UNKNOWN_LAYOUT_VERSION")
+        rows=con.execute("SELECT experiment_id,sha,document FROM experiments ORDER BY experiment_id").fetchall()
+        for experiment_id,pin,serialized in rows:
+            obj=json.loads(serialized)
+            _check_seal(obj)
+            _need(obj["experiment_id"]==experiment_id and obj["sha256"]==pin,
+                  "STORE_ROW_MUTATION")
+        if version == 2:
+            indexed=con.execute("SELECT experiment_id,canonical_sha256,source_status,lane FROM experiment_index_v2 ORDER BY experiment_id").fetchall()
+            _need(len(indexed)==len(rows), "STORE_INDEX_MISSING_ROW")
+            for row, idx in zip(rows,indexed):
+                obj=json.loads(row[2])
+                _need(idx==(row[0],row[1],obj["source_status"],obj["lane"]),
+                      "STORE_INDEX_MISMATCH")
+        return _seal({"schema":LAYOUT_SCHEMA,"layout_version":version,
+                      "experiment_count":len(rows),
+                      "all_document_shas":[r[1] for r in rows],
+                      "trading_authority":"NONE"})
+    finally:
+        con.close()
