@@ -75,6 +75,32 @@ class TestWindowsAclPolicy(unittest.TestCase):
                         manifest, d, allow_network=True, permission_confirmed=True,
                         terms_reviewed=True, publisher_origin_confirmed=True)
 
+    @unittest.skipUnless(os.name == "nt", "native effective NTFS test requires Windows")
+    def test_real_ntfs_private_directory_and_inherited_broad_rejection(self):
+        import csv
+        import subprocess
+        identity = subprocess.check_output(
+            ["whoami", "/user", "/fo", "csv", "/nh"], text=True).strip()
+        current_sid = next(csv.reader([identity]))[-1]
+        self.assertTrue(current_sid.startswith("S-1-"))
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d)
+            subprocess.run(["icacls", str(base), "/inheritance:r"], check=True,
+                           capture_output=True)
+            for sid in (current_sid, SYSTEM, ADMINS):
+                subprocess.run(
+                    ["icacls", str(base), "/grant:r", "*"+sid+":(OI)(CI)F"],
+                    check=True, capture_output=True)
+            self.assertTrue(require_private_windows_directory(base))
+            # Add a real inherited broad read ACE: a nested folder must fail.
+            subprocess.run(
+                ["icacls", str(base), "/grant", "*S-1-1-0:(OI)(CI)R"],
+                check=True, capture_output=True)
+            child = base / "inherited"
+            child.mkdir()
+            with self.assertRaisesRegex(ValueError, "WINDOWS_ACL_UNSAFE_PRINCIPAL"):
+                require_private_windows_directory(child)
+
 
 if __name__ == "__main__":
     unittest.main()
