@@ -256,6 +256,24 @@ def validate_input(packet,witness,witness_sha):
 def run_private_cohort(packet,witness,witness_sha,store_path):
     definition,selected,entries=validate_input(
         packet,witness,witness_sha)
+    # Factory consumer ACK is distinct from Source ACK and StrategyApproval;
+    # it binds exactly the independently approved source/policy/strategy/input
+    # graph *before* the Lab executes. Lab result SHA is a separate child.
+    ack_body={
+        "schema":"aql.factory.f.consumer-ack.v1",
+        "core_source_ack_sha256":packet["source_ack_sha256"],
+        "independent_policy_approval_sha256":
+             packet["independent_policy_approval_sha256"],
+        "strategy_approval_sha256":packet["strategy_approval_sha256"],
+        "source_manifest_sha256":packet["source_manifest_sha256"],
+        "core_f2_report_sha256":packet["core_f2_report_sha256"],
+        "core_245_query_sha256":packet["core_245_query_sha256"],
+        "core_253_query_sha256":packet["core_253_query_sha256"],
+        "factory_input_sha256":packet["sha256"],
+        "historical_pit":"NOT_ATTESTED",
+        "trading_authority":"NONE",
+    }
+    factory_consumer_ack=digest(ack_body)
     # The outer positive decision is permitted only after the independently
     # trusted witness is verified. The underlying reusable kernel deliberately
     # keeps retrospective original-source status unverified/PIT NOT_ATTESTED.
@@ -273,15 +291,7 @@ def run_private_cohort(packet,witness,witness_sha,store_path):
         "independent_policy_approval_sha256":
              packet["independent_policy_approval_sha256"],
         "strategy_approval_sha256":packet["strategy_approval_sha256"],
-        "factory_consumer_ack_sha256":digest({
-            "schema":"aql.factory.f.consumer-ack.v1",
-            "core_source_ack_sha256":packet["source_ack_sha256"],
-            "independent_policy_approval_sha256":
-                 packet["independent_policy_approval_sha256"],
-            "strategy_approval_sha256":packet["strategy_approval_sha256"],
-            "lab_receipt_sha256":lab_sha,
-            "source_manifest_sha256":packet["source_manifest_sha256"],
-            "trading_authority":"NONE"}),
+        "factory_consumer_ack_sha256":factory_consumer_ack,
         "core_f2_report_sha256":packet["core_f2_report_sha256"],
         "lab_receipt_sha256":lab_sha,
         "unknown_outcomes":lab["unknown_outcomes"],
