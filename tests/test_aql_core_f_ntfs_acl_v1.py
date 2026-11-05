@@ -102,21 +102,27 @@ class TestWindowsAclPolicy(unittest.TestCase):
             # named SIDs; it does NOT remove unrelated explicit ACEs.
             # Replace the DACL on this disposable test folder only, retaining
             # its actual owner. Never weaken the production ACL validator.
-            sddl = (
-                f"D:P(A;OICI;FA;;;{current_sid})"
-                "(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)"
-            )
             script = (
                 "$ErrorActionPreference='Stop'; "
-                "$acl=Get-Acl -LiteralPath $env:AQL_TEST_DIR; "
-                "$acl.SetSecurityDescriptorSddlForm($env:AQL_TEST_SDDL); "
-                "Set-Acl -LiteralPath $env:AQL_TEST_DIR -AclObject $acl"
+                "$dir=New-Object System.IO.DirectoryInfo($env:AQL_TEST_DIR); "
+                "$acl=$dir.GetAccessControl(); "
+                "$acl.SetAccessRuleProtection($true,$false); "
+                "foreach($rule in @($acl.GetAccessRules($true,$true,"
+                "[System.Security.Principal.SecurityIdentifier]))) { "
+                "[void]$acl.RemoveAccessRuleSpecific($rule) }; "
+                "foreach($sid in @($env:AQL_TEST_SID,'S-1-5-18','S-1-5-32-544')) { "
+                "$identity=New-Object System.Security.Principal.SecurityIdentifier($sid); "
+                "$rule=New-Object System.Security.AccessControl.FileSystemAccessRule("
+                "$identity,'FullControl','ContainerInherit,ObjectInherit','None','Allow'); "
+                "$acl.AddAccessRule($rule) }; "
+                "$dir.SetAccessControl($acl)"
             )
             setup = subprocess.run(
-                ["powershell.exe", "-NoProfile", "-NonInteractive",
-                 "-Command", script],
+                [str(Path(os.environ["SystemRoot"]) / "System32" /
+                     "WindowsPowerShell" / "v1.0" / "powershell.exe"),
+                 "-NoProfile", "-NonInteractive", "-Command", script],
                 env={**os.environ, "AQL_TEST_DIR": str(base),
-                     "AQL_TEST_SDDL": sddl},
+                     "AQL_TEST_SID": current_sid},
                 capture_output=True, text=True, errors="replace",
             )
             if setup.returncode:
