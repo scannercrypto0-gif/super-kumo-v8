@@ -1,0 +1,24 @@
+name: ATLAS Core E Historical Boundary
+on:
+  push:
+    branches:
+      - core/package-e-historical-boundary-20261105
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_core_e_historical_boundary_v1.py'
+      - 'tests/test_aql_core_e_historical_boundary_v1.py'
+      - '.github/workflows/aql-core-e-historical-boundary.yml'
+jobs:
+  core-e-boundary:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Test Core E fail-closed source boundary
+        run: python -m unittest discover -s tests -p 'test_aql_core_e_historical_boundary_v1.py' -v
