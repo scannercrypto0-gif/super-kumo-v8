@@ -79,7 +79,7 @@ jobs:
         working-directory: project
         shell: bash
         run: |
-          PYTHONPATH=.:tests python -m unittest -v tools.scanner_strategy_e.test_historical_core_screening
+          PYTHONPATH=.:tests python -m unittest -v tools.scanner_strategy_e.test_historical_core_screening tools.scanner_strategy_e.test_historical_research_policy
       - name: Scan no operational route or new synthetic issuer
         shell: bash
         run: |
