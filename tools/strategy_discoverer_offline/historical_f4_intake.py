@@ -241,21 +241,10 @@ def verify_f4_intake(*, intake: F4ResearchIntake, package, evidence, cohort,
         intake.strategy_digest!=package.strategy_definition_digest or
         intake.source_evidence!=cohort.to_dict()):
         raise F4ContractError("F4 cross-object parent drift")
-    if intake.status != ELIGIBLE:
-        raise F4ContractError("historical F4 intake is blocked; independent approval must be recorded externally")
-    if independently_confirm_source is not True or independently_confirm_policy is not True:
-        raise F4ContractError("independent source and research policy approval unavailable")
-    cohort.validate_admitted()
-    if durable_ledger_path is None:
-        raise F4ContractError("independent durable checkpoint path required")
-    durable = DurableDiscovererCheckpoint(durable_ledger_path)
-    snapshot = durable.read_latest_ledger()
-    if snapshot["checkpoint_sha"] != intake.ledger_checkpoint_sha256:
-        raise F4ContractError("checkpoint custody pin drift")
-    membership = durable.verify_membership(
-        package=package,ledger_attempt_id=intake.ledger_attempt_id,
-        ledger_head_digest=package.attempt_ledger_head,
-        ledger_reference="discoverer-f4")
-    if membership.verification_digest != intake.membership_verification_sha256:
-        raise F4ContractError("independent membership drift")
-    return True
+    # Legacy v1 has no cryptographic source/policy/ledger authority chain.
+    # Even a canonical, locally resealed READY plus True booleans is NOT
+    # independent authorization. Only the signed, externally witnessed v2
+    # receiver path above can accept optional research intake.
+    raise F4ContractError(
+        "legacy v1 READY unsupported; independently signed F4 v2 required"
+    )
