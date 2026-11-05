@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: scannercrypto0-gif/super-kumo-v8
-          ref: 74602f248b19b142d05aecfef19a560ceaf9ce13
+          ref: 759507ea97548ae56e228b034dfb37a1d94f186f
           path: upstream/core-f
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -69,6 +69,8 @@ jobs:
           set -euo pipefail
           cp -a upstream/work235/tools/strategy_service_offline project/tools/
           cp upstream/core-f/research_wp_r0/aql_core_f_bulk_source_v1.py project/research_wp_r0/
+          cp upstream/core-f/research_wp_r0/aql_core_f_private_f2_v1.py project/research_wp_r0/
+          cp upstream/core-f/research_wp_r0/aql_core_f_ntfs_acl_v1.py project/research_wp_r0/
           cp -a upstream/scanner-b/tools/scanner_strategy_b project/tools/
           cp -a upstream/scanner227/tools/scanner_engine_offline project/tools/
           cp -a upstream/raw/tools/raw_vault_offline project/tools/
@@ -89,7 +91,7 @@ jobs:
         working-directory: project
         shell: bash
         run: |
-          PYTHONPATH=.:tests python -m unittest -v tools.scanner_strategy_f.test_retrospective_policy tools.scanner_strategy_f.test_bulk_census tools.scanner_strategy_f.test_policy_activation_request tools.scanner_strategy_f.test_independent_policy_verification
+          PYTHONPATH=.:tests python -m unittest -v tools.scanner_strategy_f.test_retrospective_policy tools.scanner_strategy_f.test_bulk_census tools.scanner_strategy_f.test_policy_activation_request tools.scanner_strategy_f.test_independent_policy_verification tools.scanner_strategy_f.test_source_bound_intake
       - name: Scan no operational route or new synthetic issuer
         shell: bash
         run: |
