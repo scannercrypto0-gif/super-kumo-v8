@@ -6,6 +6,7 @@ on:
     paths:
       - 'tools/atlas_e_combined_gate_manifest.py'
       - 'docs/research/package-e-combined-gate-evidence-scope.md'
+      - 'docs/research/package-f-original-cohort-one-run-e2e-runbook-v1.md'
       - '.github/workflows/atlas-package-e-combined-gate.yml'
   workflow_dispatch:
 permissions:
@@ -24,6 +25,12 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v4
         with: {ref: 6d5a4dd3e2a701fd14f21820bad549c446c8532b, path: _pinned_factory_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 74602f248b19b142d05aecfef19a560ceaf9ce13, path: _pinned_core_f, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 8dcf20021c859eed139c199b31c9d346e6a0be74, path: _pinned_scanner_f, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 58959b22de9bc96f03b03dfc565815282fd1a939, path: _pinned_discoverer_f, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: a86a590a5e2c32c18e03522f52896dbcf50c60ff, path: _pinned_core_d, persist-credentials: false}
       - uses: actions/checkout@v4
@@ -54,7 +61,8 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           from shutil import copyfile, copytree
-          owners=('_pinned_core_e','_pinned_core_d','_pinned_scanner_e',
+          owners=('_pinned_core_f','_pinned_scanner_f','_pinned_discoverer_f',
+                  '_pinned_core_e','_pinned_core_d','_pinned_scanner_e',
                   '_pinned_scanner_d','_pinned_scanner_c','_pinned_scanner_b',
                   '_pinned_discoverer_e','_pinned_discoverer_base',
                   '_pinned_work235','_pinned_raw211','_pinned_scanner227')
@@ -100,6 +108,9 @@ jobs:
                    Path('tests/test_aql_core_e_historical_boundary_v1.py'))
           copyfile(Path('_pinned_core_e')/'tests/test_aql_core_e_status_evidence_v1.py',
                    Path('tests/test_aql_core_e_status_evidence_v1.py'))
+          assert Path('research_wp_r0/aql_core_f_bulk_source_v1.py').is_file()
+          assert Path('tools/scanner_strategy_f/retrospective_policy.py').is_file()
+          assert Path('tools/strategy_discoverer_offline/historical_f4_intake.py').is_file()
           assert Path('tools/scanner_strategy_e/test_historical_core_screening.py').is_file()
           assert Path('tools/strategy_discoverer_offline/tests/test_package_e_membership.py').is_file()
           print('All E owner interfaces staged read-only from exact SHA heads')
