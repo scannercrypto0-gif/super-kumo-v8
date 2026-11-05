@@ -64,6 +64,9 @@ class PermittedSameSourceCoreD(unittest.TestCase):
         self.assertEqual(self.produced.data["source_binding_status"],
                          "CORE_QUERY_TO_SCANNER_BYTES_VERIFIED_SOFTWARE_ONLY")
         self.assertEqual(self.service["total_attempts"],2)
+        statuses=[Frozen.restore(r).data["scanner_nomination_status"] for r in self.service["strategy_route_requests"]]
+        self.assertTrue(all(x in ("SELECTED","REJECTED","UNKNOWN","INELIGIBLE","UNSCANNED","FAILED") for x in statuses))
+        self.assertIn("SELECTED",statuses)
         for n in range(2):
             x=self.gate(n)
             self.assertEqual(x,self.gate(n))
