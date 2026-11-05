@@ -258,7 +258,7 @@ class CoreDSameSource(unittest.TestCase):
         mutated["rows"][3]["close"]+=0.2
         raw=canonical(mutated)
         manifest={**self.scan_manifest,"raw_sha256":sha(raw)}
-        with self.assertRaisesRegex(BackboneError,"CORE_D_SCANNER_MANIFEST_SOURCE_DRIFT|CORE_D_SCANNER_RAW_MANIFEST_OR_CENSUS_DRIFT"):
+        with self.assertRaisesRegex(BackboneError,"CORE_D_SCANNER_UNIVERSE_DRIFT"):
             self.proof(scanner_raw_bytes=raw,scanner_manifest=manifest)
 
     def test_wrong_original_zip_bytes_and_local_checksum_fail_closed(self):
