@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@v4
         with: {ref: 759507ea97548ae56e228b034dfb37a1d94f186f, path: _pinned_core_f, persist-credentials: false}
       - uses: actions/checkout@v4
-        with: {ref: 88ddb782cf13e892ee790a0a65ccfa5767090ca4, path: _pinned_scanner_f, persist-credentials: false}
+        with: {ref: 1dd0175bf5a6f2b9832c819f8ba05cc316f44e2e, path: _pinned_scanner_f, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: 58959b22de9bc96f03b03dfc565815282fd1a939, path: _pinned_discoverer_f, persist-credentials: false}
       - uses: actions/checkout@v4
