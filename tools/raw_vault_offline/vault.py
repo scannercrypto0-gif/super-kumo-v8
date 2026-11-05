@@ -351,7 +351,7 @@ class RawVault:
         obj_path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self._staging / (uuid.uuid4().hex + ".obj.tmp")
         tmp.write_bytes(raw_bytes)
-        with open(tmp, 'rb') as fh:
+        with open(tmp, 'r+b') as fh:
             os.fsync(fh.fileno())
         tmp.replace(obj_path)
         return obj_path
