@@ -164,6 +164,9 @@ jobs:
           python -m unittest discover -s tests -p 'test_aql_factory_f_scanner_bulk_consumer_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_factory_f_private_original_cohort_v1.py' -v
           python -m unittest tools.scanner_strategy_f.test_bulk_census -v
+          python -m unittest tools.scanner_strategy_f.test_independent_policy_verification -v
+          python -m unittest tools.scanner_strategy_f.test_source_bound_intake -v
+          python -m unittest tools.scanner_strategy_f.test_secretary_factory_handoff -v
           python -m unittest tools.scanner_strategy_f.test_strategy_specific_decision -v
           python -m unittest discover -s tests -p 'test_aql_factory_e_bounded_perf_v1.py' -v
           python -m pytest tools/strategy_discoverer_offline/tests/test_package_e_durable_checkpoint.py -q
