@@ -81,7 +81,7 @@ class FactoryFScannerBulkConsumer(unittest.TestCase):
         with self.assertRaises(ResultsStoreError):
             self.run_consumer(manifest=bad)
         with self.assertRaises(ResultsStoreError):
-            self.run_consumer(environment_sha256="f"*64) if self.db.exists() else self.run_consumer(code_sha256="f"*64,environment_sha256=None)
+            self.run_consumer(environment_sha256=None)
 
     def test_immutable_same_id_conflicting_coverage(self):
         self.run_consumer()
@@ -91,9 +91,11 @@ class FactoryFScannerBulkConsumer(unittest.TestCase):
         with self.assertRaisesRegex(ResultsStoreError,"IMMUTABLE_IDEMPOTENCY_CONFLICT"):
             self.run_consumer(coverage_ledger=replacement)
 
-    def test_forged_source_ack_no_promotion(self):
+    def test_forged_source_parent_no_promotion(self):
+        bad=copy.deepcopy(self.coverage)
+        bad["core_245_native_query_sha256"]="f"*64
         with self.assertRaises(ResultsStoreError):
-            self.run_consumer(source_ack={"sha256":"f"*64})
+            self.run_consumer(coverage_ledger=bad)
 
 if __name__=="__main__":
     unittest.main()
