@@ -54,14 +54,22 @@ class CoreF2Safety(unittest.TestCase):
             Path(d).chmod(0o700)
             with patch("research_wp_r0.aql_core_f_private_f2_v1._fetch",
                        side_effect=AssertionError("no network without local files")):
-                rows, raw = check_local_batch(
-                    self.m, self.missing, d,
-                    allow_network=True, publisher_recheck=True)
-            self.assertEqual(raw, {})
-            self.assertEqual(sum(r["state"] == "RETAINED_INVENTORY_ONLY"
-                                 for r in rows), 2)
-            self.assertEqual(sum(r["state"] == "MISSING_OR_QUARANTINED"
-                                 for r in rows), 10)
+                if __import__("os").name == "nt":
+                    # Windows Actions TEMP inherits ACL principals. A chmod(0700)
+                    # does not remove inherited NTFS grants: fail closed.
+                    with self.assertRaisesRegex(ValueError,
+                                                 "WINDOWS_ACL_UNSAFE_PRINCIPAL"):
+                        check_local_batch(self.m, self.missing, d,
+                                          allow_network=True, publisher_recheck=True)
+                else:
+                    rows, raw = check_local_batch(
+                        self.m, self.missing, d,
+                        allow_network=True, publisher_recheck=True)
+                    self.assertEqual(raw, {})
+                    self.assertEqual(sum(r["state"] == "RETAINED_INVENTORY_ONLY"
+                                         for r in rows), 2)
+                    self.assertEqual(sum(r["state"] == "MISSING_OR_QUARANTINED"
+                                         for r in rows), 10)
 
     def test_authorization_requires_separate_pin(self):
         correct = digest(self.auth)
