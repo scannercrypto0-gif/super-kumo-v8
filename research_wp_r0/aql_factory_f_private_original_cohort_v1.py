@@ -209,6 +209,10 @@ def validate_input(packet,witness,witness_sha):
          "TEN_MONTH_FULL_STRATEGY_CENSUS")
     need(sum(x["state"]=="SELECTED" for x in packet["attempts"])==1,
          "EXACTLY_ONE_SOURCE_BOUND_SELECTED_TRIAL")
+    # Factory never promotes a self-issued selected row: the independently
+    # witnessed authorization MUST bind the exact complete attempt census.
+    # The current trust-v1 witness pins the entire Factory input digest; its
+    # external approver is responsible for full strategy/selection identity.
     need(all(_sha(packet[name]) for name in ("strategy_definition_sha256",
                                            "config_sha256","code_sha256",
                                            "environment_sha256")),
