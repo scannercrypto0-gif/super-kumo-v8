@@ -79,7 +79,7 @@ jobs:
         shell: bash
         working-directory: project
         run: |
-          PYTHONPATH=.:tests python -m unittest -v tools.scanner_strategy_d.test_same_source
+          PYTHONPATH=.:tests python -m unittest -v tools.scanner_strategy_d.test_same_source tools.scanner_strategy_d.test_permitted_cohort
       - name: Assert no actuation surface
         shell: bash
         run: |
