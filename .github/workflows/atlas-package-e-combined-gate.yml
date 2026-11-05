@@ -23,7 +23,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/checkout@v4
-        with: {ref: aec0b7eca88630bfca3fba0cd32c8fa59553215c, path: _pinned_factory_e, persist-credentials: false}
+        with: {ref: aea4406c987635c9d7a03f5a22bede2f5ca9356a, path: _pinned_factory_e, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: a86a590a5e2c32c18e03522f52896dbcf50c60ff, path: _pinned_core_d, persist-credentials: false}
       - uses: actions/checkout@v4
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
         with: {ref: a91e370ae7e5197e9af71f8300eeaff4a7aff022, path: _pinned_scanner_d, persist-credentials: false}
       - uses: actions/checkout@v4
-        with: {ref: c7c90c688b010d615168d9c6231955c997100e94, path: _pinned_scanner_e, persist-credentials: false}
+        with: {ref: a2aa9c195095bcfe852fdc760e385ccb2acf3d5d, path: _pinned_scanner_e, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: 1659713c80d1934f3c08af1af422b89cd5706360, path: _pinned_scanner_c, persist-credentials: false}
       - uses: actions/checkout@v4
@@ -76,6 +76,8 @@ jobs:
                        'aql_factory_e_durable_discoverer_consumer_v1.py'):
               copyfile(Path('_pinned_factory_e')/'research_wp_r0'/name,
                        Path('research_wp_r0')/name)
+          copyfile(Path('_pinned_scanner_e')/'tools/scanner_strategy_e/historical_policy_approval_request.py',
+                   Path('tools/scanner_strategy_e/historical_policy_approval_request.py'))
           copyfile(Path('_pinned_factory_e')/'tools/atlas_factory_e_bounded_perf.py',
                    Path('tools/atlas_factory_e_bounded_perf.py'))
           for name in ('test_aql_factory_e_research_results_store_v1.py',
