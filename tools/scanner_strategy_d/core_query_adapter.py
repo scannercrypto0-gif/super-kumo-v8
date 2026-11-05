@@ -93,8 +93,11 @@ def _project(core_root, warehouse, native_price_query, local_query, dual_map,
     require(type(clocks) is list and len(clocks) == len(local_query["bars"])
             and 0 < len(clocks) <= 4096,
             "D_TEST_AVAILABILITY_WITNESS_REQUIRED")
-    source_id = "core_d_" + warehouse["dataset_id"]
-    generation_id = "v" + str(warehouse["version"]) + "_same_source_test"
+    source_id = w.get("scanner_source_id")
+    generation_id = w.get("scanner_generation_id")
+    require(type(source_id) is str and source_id and type(generation_id) is str
+            and generation_id and len(source_id) <= 160 and len(generation_id) <= 160,
+            "D_SCANNER_POLICY_SOURCE_LABEL_REQUIRED")
     original_mapping, rows = [], []
     for idx, (bar,clock) in enumerate(zip(local_query["bars"], clocks)):
         require(type(clock) is dict
