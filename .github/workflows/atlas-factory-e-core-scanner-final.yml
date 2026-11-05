@@ -46,6 +46,8 @@ jobs:
                           if not dst.exists():
                               dst.parent.mkdir(parents=True,exist_ok=True)
                               copyfile(src,dst)
+          copyfile('_pinned_scanner_e/tools/scanner_strategy_e/historical_policy_approval_request.py',
+                   'tools/scanner_strategy_e/historical_policy_approval_request.py')
           copytree('_pinned_work235/tools/strategy_service_offline/fixtures',
                    'tools/strategy_service_offline/fixtures',dirs_exist_ok=True)
           PY
