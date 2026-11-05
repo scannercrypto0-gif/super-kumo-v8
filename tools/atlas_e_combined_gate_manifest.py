@@ -12,7 +12,7 @@ import platform
 from pathlib import Path
 
 PINS = {
- "factory_e":"6d5a4dd3e2a701fd14f21820bad549c446c8532b",
+ "factory_e":"d107d9d95d254af7a394775dc1bf849cf0edbd15",
  "factory_d":"a695e262da6787f752a13820f02dd00eef8ef1cd",
  "core_e":"3af5b66d2b381b853a6b5be32c38b3d3d02e1ea7",
  "core_d":"a86a590a5e2c32c18e03522f52896dbcf50c60ff",
@@ -22,8 +22,8 @@ PINS = {
  "discoverer_base":"f2006c0e431690ccea8b0532095bf4f2a2dc88ba",
  "work235":"6acbcc7fc243b132f58170df4c6469bbf7f4eff8",
  "raw211":"7d97b09c0c6ee2650a61d523acb8d8c771a99c46",
- "core_f":"74602f248b19b142d05aecfef19a560ceaf9ce13",
- "scanner_f":"8dcf20021c859eed139c199b31c9d346e6a0be74",
+ "core_f":"b80cca1b55e9addd4aac2ccae90d843c9154204b",
+ "scanner_f":"a9e4a8fbcf614337d7ec0a65f14cf3429fe0d2be",
  "discoverer_f":"58959b22de9bc96f03b03dfc565815282fd1a939",
 }
 # PASS is restricted to demonstrated bounded engineering subgate.
@@ -75,10 +75,10 @@ def main():
       "orders_created":0, "actual_fills":None,
       "holdout":"SEALED_UNOPENED",
       "final_package_e":"CLOSED_ENGINEERING_WITH_EXTERNAL_HISTORICAL_BLOCKERS",
-      "package_f":"F4_RUNBOOK_READY_F1_F2_SOURCE_AND_F3_APPROVAL_BLOCKED",
+      "package_f":"F4_SCANNER_REAL_CONTRACT_CENSUS_PERSISTED_BUT_F2_AND_F3_BLOCKED",
       "package_f_policy":"OWNER_PROVISIONAL_CONDITIONAL_A_DORMANT",
-      "package_f_f0_manifest":"READY_F1_ORIGINAL_SOURCE_NOT_ADMITTED",
-      "package_f_scanner_f3":"DRAFT_NOT_APPROVED_FOR_HISTORICAL_EXECUTION",
+      "package_f_f0_manifest":"10_OPERATOR_REPORTED_PREFLIGHT_ONLY_NOT_RAW_ADMITTED",
+      "package_f_scanner_f3":"24_ATTEMPT_CENSUS_FROM_F1_PREFLIGHT_ONLY_ZERO_SELECTED",
       "package_f_discoverer_f4":"WAIT_NOT_CONNECTED_OPTIONAL",
       "package_f_actual_original_source_backtest":"NOT_EXECUTED",
       "audit_verdict":"PENDING_FINAL_INDEPENDENT_DELTA_REVIEW",
