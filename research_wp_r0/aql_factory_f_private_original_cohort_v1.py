@@ -214,6 +214,16 @@ def validate_input(packet,witness,witness_sha):
              for x in trial["bars"]),
          "BAR_SHA")
     sel=next(x for x in packet["attempts"] if x["state"]=="SELECTED")
+    month_prefix=sel["month"]
+    # Hard-bind each private bar to the exact Core F2 monthly source range.
+    # Native 15m bars from other months are forbidden in a one-month run.
+    from datetime import datetime, timezone
+    from calendar import monthrange
+    yy,mm=map(int,month_prefix.split("-"))
+    first=int(datetime(yy,mm,1,tzinfo=timezone.utc).timestamp()*1000)
+    last=int(datetime(yy,mm,monthrange(yy,mm)[1],tzinfo=timezone.utc).timestamp()*1000)+86400000
+    need(all(first<=bar["open_ms"] and bar["close_ms"]<last
+             for bar in trial["bars"]), "MONTH_GRID_SOURCE_SWAP")
     need(trial.get("selected_attempt_id")==
          sel["attempt_id"],"SELECTED_ATTEMPT_PLAN")
     need(len(trial["bars"])<=MAX_BARS
