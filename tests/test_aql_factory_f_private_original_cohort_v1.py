@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 
 from research_wp_r0.aql_factory_f_private_original_cohort_v1 import (
-    validate_input,run_private_cohort,ResultsStoreError,
+    validate_input,run_private_cohort,ResultsStoreError,_witness,
 )
 
 
@@ -39,6 +39,34 @@ class FactoryFPrivateE2EGate(unittest.TestCase):
         with self.assertRaises(ResultsStoreError):
             _load(Path(self.tmp.name)/"not-available-original.json",50_000_000)
         self.assertFalse(self.db.exists())
+    def test_resealed_but_reused_source_strategy_ack_denied(self):
+        from research_wp_r0.aql_factory_e_research_results_store_v1 import digest
+        packet={
+            "sha256":"1"*64,
+            "core_f2_report_sha256":"2"*64,
+            "source_ack_sha256":"3"*64,
+            "independent_policy_approval_sha256":"4"*64,
+            "strategy_approval_sha256":"3"*64,
+            "core_245_query_sha256":"5"*64,
+            "core_253_query_sha256":"6"*64,
+            "admitted_months":["2024-01"],
+        }
+        witness=dict(schema="aql.factory.f.external-independent-trust-witness.v1",
+                     factory_input_sha256=packet["sha256"],
+                     trust_class="OUT_OF_BAND_INDEPENDENT_APPROVER",
+                     issuer_reference="external-issuer-authorization",
+                     authorization_reference="independent-policy-and-secretary",
+                     approved_months=packet["admitted_months"],
+                     **{k:packet[k] for k in (
+                         "core_f2_report_sha256","source_ack_sha256",
+                         "independent_policy_approval_sha256",
+                         "strategy_approval_sha256",
+                         "core_245_query_sha256",
+                         "core_253_query_sha256")})
+        with self.assertRaisesRegex(ResultsStoreError,"DISTINCT_SOURCE_POLICY_STRATEGY_ACK"):
+            _witness(packet,witness,digest(witness))
+        self.assertFalse(self.db.exists())
+
     def test_reject_oversized_or_symlinked_raw_input(self):
         from research_wp_r0.aql_factory_f_private_original_cohort_v1 import _load
         bad=Path(self.tmp.name)/"bad.json"
