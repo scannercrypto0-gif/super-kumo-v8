@@ -67,7 +67,7 @@ def _source_ack_present(root, warehouse, source_ack):
             "scanner_nomination_sha256":envelope["scanner_nomination"]["digest"],
         }
         _verify_source_ack(con,request,source_ack,envelope["scanner_nomination"])
-        return envelope["scanner_nomination"]
+        return envelope
     finally:
         con.close()
 
@@ -190,13 +190,14 @@ def verify_same_source_research(
             and raw_request["core245_price_query_sha256"]!=
                 raw_request["core253_query_local_sha256"],
             "CORE_D_SCANNER_CORE_PARENT_DRIFT")
-    source_nomination=_source_ack_present(root,warehouse_receipt,source_ack_receipt)
+    source_delivery=_source_ack_present(root,warehouse_receipt,source_ack_receipt)
+    source_nomination=source_delivery["scanner_nomination"]
     require(source_nomination.get("source_manifest",{}).get("dataset_sha")==zip_sha
             and source_nomination.get("stage")=="UNKNOWN",
             "CORE_D_LEGACY_SOURCE_ROUTE_DRIFT")
-    require(raw_request["strategy_id"]==source_nomination.get("_ignored_strategy_id",
-            raw_request["strategy_id"]) and
-            raw_request["strategy_version"]==policy.data["strategy_version"]
+    require(raw_request["strategy_id"]==source_delivery["strategy_id"]
+            and raw_request["strategy_version"]==source_delivery["strategy_version"]
+            and raw_request["strategy_version"]==policy.data["strategy_version"]
             and raw_request["config_digest"]==policy.data["config_digest"]
             and raw_request["definition_digest"]==policy.data["definition"]["digest"],
             "CORE_D_STRATEGY_IDENTITY_DRIFT")
@@ -335,7 +336,7 @@ def connect_canonical_test_only_strategy(
     policy=same_source_inputs["native15m_policy_receipt"]
     warehouse=same_source_inputs["warehouse_receipt"]
     source_ack=same_source_inputs["source_ack_receipt"]
-    source_nomination=_source_ack_present(root,warehouse,source_ack)
+    source_nomination=_source_ack_present(root,warehouse,source_ack)["scanner_nomination"]
     request=make_strategy_route_request(
         identity_map=same_source_inputs["identity_map"],warehouse=warehouse,
         nomination=source_nomination,source_ack=source_ack,
