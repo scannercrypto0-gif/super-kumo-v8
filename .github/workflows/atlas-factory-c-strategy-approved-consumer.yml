@@ -1,0 +1,109 @@
+name: ATLAS Factory C isolated strategy-approved research consumer
+on:
+  push:
+    branches:
+      - factory/package-c-strategy-approved-consumer-20261105
+    paths:
+      - 'research_wp_r0/aql_factory_strategy_approved_consumer_c_v1.py'
+      - 'tests/test_aql_factory_strategy_approved_consumer_c_v1.py'
+      - 'research_wp_r0/aql_factory_c_canonical_wait_adapter_v1.py'
+      - 'tests/test_aql_factory_c_canonical_wait_adapter_v1.py'
+      - '.github/workflows/atlas-factory-c-strategy-approved-consumer.yml'
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_factory_strategy_approved_consumer_c_v1.py'
+      - 'tests/test_aql_factory_strategy_approved_consumer_c_v1.py'
+      - '.github/workflows/atlas-factory-c-strategy-approved-consumer.yml'
+permissions:
+  contents: read
+jobs:
+  factory-c-consumer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Stage pinned Scanner C/ Core C B dependencies for actual owner-contract test
+        uses: actions/checkout@v4
+        with:
+          ref: 0e4e2e48d58e59eaf4bc62d42b39c80eb4240614
+          path: _pinned_core_c
+          persist-credentials: false
+      - name: Stage pinned Scanner C owner modules
+        uses: actions/checkout@v4
+        with:
+          ref: 72ea87fc22a45df43fc4a990ade176837e7c42af
+          path: _pinned_scanner_c
+          persist-credentials: false
+      - name: Stage pinned Scanner B native15m module
+        uses: actions/checkout@v4
+        with:
+          ref: 30c37ae56851488b882998c7fa0085ec51dbfc92
+          path: _pinned_scanner_b
+          persist-credentials: false
+      - name: Stage pinned frozen Work235 policy module
+        uses: actions/checkout@v4
+        with:
+          ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8
+          path: _pinned_work235
+          persist-credentials: false
+      - name: Stage pinned RawVault #211
+        uses: actions/checkout@v4
+        with:
+          ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46
+          path: _pinned_raw211
+          persist-credentials: false
+      - name: Stage pinned frozen Scanner #227
+        uses: actions/checkout@v4
+        with:
+          ref: b9c9ff8602e79c534402f44bce83c56ec2fa6bb9
+          path: _pinned_scanner227
+          persist-credentials: false
+      - name: Stage missing exact owner code and fixture helpers, no original bytes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          for name in ('_pinned_core_c','_pinned_scanner_c',
+                       '_pinned_scanner_b','_pinned_work235',
+                       '_pinned_raw211','_pinned_scanner227'):
+              for root in ('research_wp_r0','tools','src'):
+                  folder=Path(name)/root
+                  if not folder.is_dir(): continue
+                  for p in folder.rglob('*.py'):
+                      target=Path(root)/p.relative_to(folder)
+                      if not target.exists():
+                          target.parent.mkdir(parents=True,exist_ok=True)
+                          shutil.copyfile(p,target)
+          for filename in (
+              'test_aql_core_c_scanner_reconciliation_v1.py',
+              'test_aql_core_c_strategy_secretary_route_v1.py',
+              'test_aql_core_authorized_source_transfer_v1.py',
+              'test_aql_core_dual_query_identity_map_v1.py',
+          ):
+              p=Path('_pinned_core_c')/'tests'/filename
+              assert p.is_file(),str(p)
+              shutil.copyfile(p,Path('tests')/filename)
+          for source,dest in (
+              (Path('_pinned_work235')/'tools/strategy_service_offline/fixtures',
+               Path('tools/strategy_service_offline/fixtures')),
+              (Path('_pinned_scanner_b')/'tools/scanner_strategy_b/fixtures',
+               Path('tools/scanner_strategy_b/fixtures')),
+          ):
+              if source.is_dir():
+                  shutil.copytree(source,dest,dirs_exist_ok=True)
+          assert (Path('_pinned_scanner_c')/'tools/scanner_strategy_c/test_contract.py').is_file()
+          print('Pinned owner dependencies staged, no original source prices')
+          PY
+      - name: Factory C consumer only — synthetic isolated contract negatives/replay
+        run: |
+          PYTHONPATH="$PWD:$PWD/tests" python -m unittest -v tests/test_aql_factory_strategy_approved_consumer_c_v1.py
+          PYTHONPATH="$PWD:$PWD/tests" python -m unittest -v tests/test_aql_factory_c_canonical_wait_adapter_v1.py
