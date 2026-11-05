@@ -85,12 +85,29 @@ class TestWindowsAclPolicy(unittest.TestCase):
         self.assertTrue(current_sid.startswith("S-1-"))
         with tempfile.TemporaryDirectory() as d:
             base = Path(d)
-            subprocess.run(["icacls", str(base), "/inheritance:r"], check=True,
-                           capture_output=True)
-            for sid in (current_sid, SYSTEM, ADMINS):
-                subprocess.run(
-                    ["icacls", str(base), "/grant:r", "*"+sid+":(OI)(CI)F"],
-                    check=True, capture_output=True)
+            # Install a fresh explicit *private* DACL for the controlled test
+            # directory, rather than relying on inherited GitHub runner ACLs.
+            # This change is test-local and never touches the owner's E: drive.
+            target = str(base).replace("'", "''")
+            script = (
+                "$ErrorActionPreference='Stop'; "
+                "$p='" + target + "'; "
+                "$acl=Get-Acl -LiteralPath $p; "
+                "$acl.SetAccessRuleProtection($true,$false); "
+                "foreach($old in @($acl.Access)){[void]$acl.RemoveAccessRuleAll($old)}; "
+                "$inh=[System.Security.AccessControl.InheritanceFlags]::ContainerInherit "
+                "-bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit; "
+                "$prop=[System.Security.AccessControl.PropagationFlags]::None; "
+                "$allow=[System.Security.AccessControl.AccessControlType]::Allow; "
+                "foreach($s in @('" + current_sid + "','" + SYSTEM + "','" + ADMINS + "')) { "
+                "$id=[System.Security.Principal.SecurityIdentifier]::new($s); "
+                "$rule=[System.Security.AccessControl.FileSystemAccessRule]::new("
+                "$id,[System.Security.AccessControl.FileSystemRights]::FullControl,"
+                "$inh,$prop,$allow);[void]$acl.AddAccessRule($rule) }; "
+                "Set-Acl -LiteralPath $p -AclObject $acl"
+            )
+            subprocess.run(["pwsh", "-NoProfile", "-Command", script],
+                           check=True, capture_output=True)
             self.assertTrue(require_private_windows_directory(base))
             # Add a real inherited broad read ACE: a nested folder must fail.
             subprocess.run(
