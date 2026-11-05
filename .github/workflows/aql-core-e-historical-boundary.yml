@@ -7,6 +7,8 @@ on:
     paths:
       - 'research_wp_r0/aql_core_e_historical_boundary_v1.py'
       - 'tests/test_aql_core_e_historical_boundary_v1.py'
+      - 'research_wp_r0/aql_core_e_status_evidence_v1.py'
+      - 'tests/test_aql_core_e_status_evidence_v1.py'
       - '.github/workflows/aql-core-e-historical-boundary.yml'
 jobs:
   core-e-boundary:
@@ -20,5 +22,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Test Core E fail-closed source boundary
-        run: python -m unittest discover -s tests -p 'test_aql_core_e_historical_boundary_v1.py' -v
+      - name: Test Core E original-source boundary and sealed blocker
+        run: |
+          python -m unittest discover -s tests -p 'test_aql_core_e_historical_boundary_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_core_e_status_evidence_v1.py' -v
