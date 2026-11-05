@@ -16,7 +16,7 @@ import re
 
 from research_wp_r0.aql_core_f_bulk_source_v1 import (
     _fetch, MAX_CHECKSUM, build_coverage_ledger, verify_coverage_ledger,
-    verify_manifest, PREVIOUSLY_PINNED,
+    verify_manifest, PREVIOUSLY_PINNED, LOCAL_F1_PROVENANCE,
 )
 from research_wp_r0.aql_core_f_ntfs_acl_v1 import require_private_windows_directory
 
@@ -110,15 +110,17 @@ def check_local_batch(manifest, ledger, local_dir, *,
             need(actual_zip_sha == entry["archive_sha256"]
                  and actual_cs_sha == entry["checksum_file_sha256"],
                  "F2_LOCAL_SHA_NOT_F1_LEDGER")
-            remote_checksum = _fetch(m["publisher_checksum_url"], MAX_CHECKSUM)
-            need(remote_checksum == checksum, "F2_INDEPENDENT_PUBLISHER_CHECKSUM_DRIFT")
+            # The receipt always describes LOCAL bytes. Publisher recheck is a
+            # separate, later witness; never rewrite local provenance to match it.
             receipt = verify_native_month(
-                month, raw, checksum, provenance="PRIVATE_PUBLISHER_FETCH_OPERATOR_ATTESTED")
+                month, raw, checksum, provenance=LOCAL_F1_PROVENANCE)
             need(receipt["preflight_receipt_sha256"]
                  == entry["preflight_receipt_sha256"], "F2_PREFLIGHT_RECEIPT_DRIFT")
             need(receipt["observed_bars"] == m["expected_native_15m_bars"]
                  and receipt["coverage"] == "COMPLETE",
                  "F2_NATIVE_MONTH_CENSUS")
+            remote_checksum = _fetch(m["publisher_checksum_url"], MAX_CHECKSUM)
+            need(remote_checksum == checksum, "F2_INDEPENDENT_PUBLISHER_CHECKSUM_DRIFT")
             candidates[month] = (raw, checksum, receipt)
             rows.append({"month": month, "state": "REVERIFIED_PRIVATE_BYTES",
                          "archive_sha256": actual_zip_sha,
