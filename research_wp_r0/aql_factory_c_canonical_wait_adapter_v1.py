@@ -102,7 +102,6 @@ def consume_canonical_scanner_core_wait(
             and type(c.get("core_cutoff_ms")) is int
             and type(c.get("scanner_c_cutoff_ms")) is int
             and c.get("core_cutoff_ms") >= 0
-            and c.get("core_cutoff_ms") % 900_000 == 0
             and c.get("historical_pit") == "NOT_ATTESTED"
             and c.get("operational_scanner_status") == "UNKNOWN"
             and c.get("source_only_ack_is_strategy_approval") is False
