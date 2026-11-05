@@ -423,6 +423,11 @@ def enqueue_strategy_route(root, request, identity_map, warehouse,
     try:
         _create(con)
         con.execute("BEGIN IMMEDIATE")
+        other=con.execute(
+            "SELECT route_id FROM c_strategy_routes WHERE request_sha=?",
+            (request["request_sha256"],)).fetchone()
+        _check(other is None or other[0]==route_id,
+               "AMBIGUOUS_DUPLICATE_REQUEST_ROUTE")
         existing=con.execute(
             "SELECT request_sha,approval_sha FROM c_strategy_routes WHERE route_id=?",
             (route_id,)).fetchone()
