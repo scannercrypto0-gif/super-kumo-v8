@@ -122,8 +122,15 @@ class TestWindowsAclPolicy(unittest.TestCase):
             shell = shutil.which("pwsh") or shutil.which("powershell.exe")
             if shell is None:
                 self.skipTest("PowerShell executable unavailable")
-            subprocess.run([shell, "-NoProfile", "-NonInteractive", "-Command", script],
-                           check=True, capture_output=True)
+            setup = subprocess.run(
+                [shell, "-NoProfile", "-NonInteractive", "-Command", script],
+                capture_output=True, text=True, errors="replace")
+            if setup.returncode:
+                self.fail(
+                    "Windows test-local ACL setup failed "
+                    f"(exit={setup.returncode}); "
+                    f"stdout={setup.stdout[-3000:]!r}; "
+                    f"stderr={setup.stderr[-3000:]!r}")
             self.assertTrue(require_private_windows_directory(base))
             # Add a real inherited broad read ACE: a nested folder must fail.
             subprocess.run(
