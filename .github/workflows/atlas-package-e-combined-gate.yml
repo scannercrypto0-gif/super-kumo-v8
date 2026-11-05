@@ -1,0 +1,126 @@
+name: ATLAS Package E One Pinned Cross-Owner Combined Gate
+on:
+  push:
+    branches:
+      - integration/package-e-g1-g12-pinned-20261105
+    paths:
+      - 'tools/atlas_e_combined_gate_manifest.py'
+      - '.github/workflows/atlas-package-e-combined-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bounded-e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11','3.12','3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with: {ref: a86a590a5e2c32c18e03522f52896dbcf50c60ff, path: _pinned_core_d, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 3c23ba606c94a2d9e7a95d2dce122adbc7d9e88e, path: _pinned_core_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: a91e370ae7e5197e9af71f8300eeaff4a7aff022, path: _pinned_scanner_d, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 58fc02ba4a0c5bb0a64d5187b400c0620a49f389, path: _pinned_scanner_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 1659713c80d1934f3c08af1af422b89cd5706360, path: _pinned_scanner_c, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 30c37ae56851488b882998c7fa0085ec51dbfc92, path: _pinned_scanner_b, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 79adda0b06d4299cde5dec3f14de985014cd330d, path: _pinned_discoverer_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: f2006c0e431690ccea8b0532095bf4f2a2dc88ba, path: _pinned_discoverer_base, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8, path: _pinned_work235, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46, path: _pinned_raw211, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: b9c9ff8602e79c534402f44bce83c56ec2fa6bb9, path: _pinned_scanner227, persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Stage pinned read-only owner dependencies and exact tests
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from shutil import copyfile, copytree
+          owners=('_pinned_core_e','_pinned_core_d','_pinned_scanner_e',
+                  '_pinned_scanner_d','_pinned_scanner_c','_pinned_scanner_b',
+                  '_pinned_discoverer_e','_pinned_discoverer_base',
+                  '_pinned_work235','_pinned_raw211','_pinned_scanner227')
+          for owner in owners:
+              for folder in ('research_wp_r0','tools','src'):
+                  source=Path(owner)/folder
+                  if not source.is_dir(): continue
+                  for item in source.rglob('*.py'):
+                      target=Path(folder)/item.relative_to(source)
+                      if not target.exists():
+                          target.parent.mkdir(parents=True,exist_ok=True)
+                          copyfile(item,target)
+          copytree(Path('_pinned_work235')/'tools/strategy_service_offline/fixtures',
+                   Path('tools/strategy_service_offline/fixtures'),dirs_exist_ok=True)
+          for name in ('test_aql_core_d_same_source_v1.py',
+                       'test_aql_core_d_permitted_cohort_v1.py',
+                       'test_aql_core_d_canonical_secretary_v1.py'):
+              copyfile(Path('_pinned_core_d')/'tests'/name,Path('tests')/name)
+          copyfile(Path('_pinned_core_e')/'tests/test_aql_core_e_historical_boundary_v1.py',
+                   Path('tests/test_aql_core_e_historical_boundary_v1.py'))
+          assert Path('tools/scanner_strategy_e/test_historical_core_screening.py').is_file()
+          assert Path('tools/strategy_discoverer_offline/tests/test_package_e_membership.py').is_file()
+          print('All E owner interfaces staged read-only from exact SHA heads')
+          PY
+      - name: Install test-only pytest for Discoverer fixtures
+        run: python -m pip install pytest
+      - name: ONE combined bounded E software gate
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD:$PWD/tests:$PWD/_pinned_raw211"
+          python -m unittest discover -s tests -p 'test_aql_factory_d_canonical_consumer_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_factory_e_research_results_store_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_factory_e_discoverer_consumer_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_core_e_historical_boundary_v1.py' -v
+          python -m unittest tools.scanner_strategy_e.test_historical_core_screening -v
+          python -m pytest tools/strategy_discoverer_offline/tests/test_package_e_membership.py -q
+          python tools/atlas_e_combined_gate_manifest.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: e-gate-${{ matrix.python-version }}
+          path: e-gate-evidence.json
+          if-no-files-found: error
+          retention-days: 14
+  normalized-parity:
+    needs: bounded-e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: e-gate-*
+          path: evidence
+      - name: Verify normalized SHA across 3 Python interpreters
+        run: |
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          paths=sorted(Path('evidence').glob('*/e-gate-evidence.json'))
+          assert len(paths)==3, paths
+          reports=[json.loads(p.read_text()) for p in paths]
+          versions={x['python'].split('.')[0]+'.'+x['python'].split('.')[1] for x in reports}
+          assert versions=={'3.11','3.12','3.13'}, versions
+          sha={x['normalized_sha256'] for x in reports}
+          assert len(sha)==1, sha
+          for x in reports:
+              body=json.dumps(x['normalized'],sort_keys=True,separators=(',',':'),
+                              ensure_ascii=True,allow_nan=False).encode()
+              assert hashlib.sha256(body).hexdigest()==x['normalized_sha256']
+              assert x['normalized']['historical_source']=='HISTORICAL_SOURCE_BLOCKED'
+              assert x['normalized']['final_package_e'].startswith('NOT_COMPLETE_')
+          print('ATLAS_E_CROSS_VERSION_NORMALIZED_SHA256='+next(iter(sha)))
+          print('E_ENGINEERING_BOUNDED_PASS_WITH_HISTORICAL_BLOCKERS')
+          PY
