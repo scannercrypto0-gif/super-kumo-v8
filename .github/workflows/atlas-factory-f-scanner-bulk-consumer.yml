@@ -1,0 +1,56 @@
+name: ATLAS Factory F Scanner Core Bulk Consumer
+on:
+  push:
+    branches:
+      - factory/package-e-historical-research-results-20261105
+    paths:
+      - 'research_wp_r0/aql_factory_f_scanner_bulk_consumer_v1.py'
+      - 'tests/test_aql_factory_f_scanner_bulk_consumer_v1.py'
+      - '.github/workflows/atlas-factory-f-scanner-bulk-consumer.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  factory-f:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11','3.12','3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: bd83b006f2c4647a64350976ed157bae36a7e866, path: _pinned_core_f, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: a9e4a8fbcf614337d7ec0a65f14cf3429fe0d2be, path: _pinned_scanner_f, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: a2aa9c195095bcfe852fdc760e385ccb2acf3d5d, path: _pinned_scanner_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8, path: _pinned_work235, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 30c37ae56851488b882998c7fa0085ec51dbfc92, path: _pinned_scanner_b, persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Stage exact frozen parent owner contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from shutil import copyfile,copytree
+          for owner in ('_pinned_core_f','_pinned_scanner_f','_pinned_scanner_e','_pinned_work235','_pinned_scanner_b'):
+              for folder in ('research_wp_r0','tools'):
+                  source=Path(owner)/folder
+                  if source.is_dir():
+                      for item in source.rglob('*.py'):
+                          target=Path(folder)/item.relative_to(source)
+                          if not target.exists():
+                              target.parent.mkdir(parents=True,exist_ok=True)
+                              copyfile(item,target)
+          copytree('_pinned_work235/tools/strategy_service_offline/fixtures',
+                   'tools/strategy_service_offline/fixtures',dirs_exist_ok=True)
+          PY
+      - name: Exact-owner Scanner F3 to Factory F4 immutable attempt census
+        run: |
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_factory_f_scanner_bulk_consumer_v1.py' -v
