@@ -5,6 +5,7 @@ on:
       - integration/package-e-g1-g12-pinned-20261105
     paths:
       - 'tools/atlas_e_combined_gate_manifest.py'
+      - 'docs/research/package-e-combined-gate-evidence-scope.md'
       - '.github/workflows/atlas-package-e-combined-gate.yml'
   workflow_dispatch:
 permissions:
