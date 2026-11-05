@@ -176,7 +176,11 @@ def consume_test_only_strategy_approval(
           and nomination.get("evidence_class") == PIT_SCOPE
           and strategy_route.get("work235_actual_route") == PAPER_ROUTE
           and consumer_ack.get("orders_created") == 0
-          and consumer_ack.get("actual_fills") is None,
+          and consumer_ack.get("actual_fills") is None
+          and _sha(approval.get("config_digest"))
+          and _sha(approval.get("strategy_definition_digest"))
+          and _sha(approval.get("strategy_digest")),
+
           "RETROSPECTIVE_UNKNOWN_OR_PAPER_AUTHORITY")
     _need(approval.get("core_evaluation_sha256") ==
           calculation.get("evaluation_sha256")
