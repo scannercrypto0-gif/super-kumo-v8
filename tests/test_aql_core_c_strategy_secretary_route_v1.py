@@ -67,11 +67,24 @@ class CoreCSecretaryContract(unittest.TestCase):
             payload_sha256=queued["payload_sha256"],
             acknowledgement_sha256="c"*64,
         )
+        policy={
+            "schema":"aql.scanner.native15m-policy.v1",
+            "strategy_id":"test_momentum","strategy_version":"v1",
+            "definition":{"digest":"b"*64},"timeframe":"15m",
+            "override_is_explicit":True,"evidence_class":"TEST_ONLY",
+            "approved_paper_registry":"NOT_CONNECTED",
+            "operational_work235_15m":"NOT_CONNECTED_15M_UNSUPPORTED",
+            "trading_authority":"NONE",
+        }
+        policy["config_digest"]=digest(policy)
+        self.policy={"payload":policy,"sha256":digest(policy)}
         self.request=make_strategy_route_request(
             identity_map=self.mapping,warehouse=self.warehouse,
             nomination=self.nomination,source_ack=self.source_ack,
+            strategy_policy_receipt=self.policy,
             strategy_id="test_momentum",strategy_version="v1",
-            config_digest="a"*64,strategy_definition_digest="b"*64,
+            config_digest=policy["config_digest"],
+            strategy_definition_digest=policy["definition"]["digest"],
             expires_at_ms=self.now+100000,
         )
         self.approval=self.make_approval()
@@ -91,6 +104,7 @@ class CoreCSecretaryContract(unittest.TestCase):
             "core_253_query_local_sha256":r["core_253_query_local_sha256"],
             "scanner_nomination_sha256":r["scanner_nomination_sha256"],
             "source_ack_sha256":r["source_ack_sha256"],
+            "policy_receipt_sha256":r["policy_receipt_sha256"],
             "request_sha256":r["request_sha256"],"cutoff_ms":r["cutoff_ms"],
             "issued_at_ms":self.now-1,"expires_at_ms":self.now+60000,
             "historical_known_at_ms":None,"historical_pit":"NOT_ATTESTED",
@@ -107,6 +121,7 @@ class CoreCSecretaryContract(unittest.TestCase):
             "route_id":route_id,"request_sha256":r["request_sha256"],
             "approval_sha256":self.approval["approval_sha256"],
             "source_ack_sha256":r["source_ack_sha256"],
+            "policy_receipt_sha256":r["policy_receipt_sha256"],
             "strategy_id":r["strategy_id"],"strategy_version":r["strategy_version"],
             "config_digest":r["config_digest"],
             "source_zip_sha256":r["source_zip_sha256"],
@@ -122,13 +137,14 @@ class CoreCSecretaryContract(unittest.TestCase):
 
     def enqueue(self,*,approval=None,request=None,source_ack=None,
                 nomination=None,identity_map=None,warehouse=None,
-                route_id="CORE-C-1"):
+                strategy_policy_receipt=None,route_id="CORE-C-1"):
         return enqueue_strategy_route(
             self.root,self.request if request is None else request,
             self.mapping if identity_map is None else identity_map,
             self.warehouse if warehouse is None else warehouse,
             self.nomination if nomination is None else nomination,
             self.source_ack if source_ack is None else source_ack,
+            self.policy if strategy_policy_receipt is None else strategy_policy_receipt,
             approval=approval,now_ms=self.now,route_id=route_id,
         )
 
@@ -186,8 +202,9 @@ class CoreCSecretaryContract(unittest.TestCase):
                  "request_sha256")
         with self.assertRaisesRegex(BackboneError,"SOURCE_ACK_NOT_DURABLE"):
             self.enqueue(request=req,source_ack=bad)
-        self.assertIsNone(self.root.joinpath("missing-nonexistent").exists()
-                          if False else None)
+        with sqlite3.connect(self.root/"warehouse.sqlite") as con:
+            count=con.execute("SELECT COUNT(*) FROM c_strategy_routes").fetchone()[0]
+        self.assertEqual(count,0)
 
     def test_source_strategy_mismatch_resealed_fails_closed(self):
         bad=deepcopy(self.request)
@@ -268,6 +285,35 @@ class CoreCSecretaryContract(unittest.TestCase):
         self.assertFalse(result["route_ready_for_isolated_lab"])
         self.assertEqual(retry_strategy_route(
             self.root,"CORE-C-1",reason="LATE",now_ms=later)["state"],"EXPIRED")
+
+    def test_policy_parent_is_required_and_cannot_be_aliased(self):
+        bad=deepcopy(self.policy)
+        bad["payload"]["config_digest"]="0"*64
+        bad["sha256"]=digest(bad["payload"])
+        with self.assertRaisesRegex(BackboneError,"POLICY_CONFIG_DIGEST_DRIFT"):
+            self.enqueue(strategy_policy_receipt=bad)
+        bad=deepcopy(self.policy)
+        bad["payload"]["strategy_id"]="test_reversion"
+        body={k:v for k,v in bad["payload"].items() if k!="config_digest"}
+        bad["payload"]["config_digest"]=digest(body)
+        bad["sha256"]=digest(bad["payload"])
+        with self.assertRaisesRegex(BackboneError,"POLICY_REQUEST_IDENTITY_DRIFT"):
+            self.enqueue(strategy_policy_receipt=bad)
+
+    def test_one_route_per_request_and_expired_ack_not_lab_ready(self):
+        self.enqueue(approval=self.approval)
+        with self.assertRaisesRegex(BackboneError,"AMBIGUOUS_DUPLICATE_REQUEST_ROUTE"):
+            self.enqueue(approval=self.approval,route_id="CORE-C-ANOTHER")
+        ack=self.make_consumer()
+        accepted=acknowledge_strategy_consumer(
+            self.root,"CORE-C-1",ack,now_ms=self.now+3)
+        self.assertTrue(accepted["route_ready_for_isolated_lab"])
+        after=strategy_route_snapshot(
+            self.root,"CORE-C-1",now_ms=self.approval["expires_at_ms"])
+        self.assertEqual(after["state"],"ACKED_CONSUMER")
+        self.assertFalse(after["approval_valid_at_now"])
+        self.assertFalse(after["route_ready_for_isolated_lab"])
+        self.assertEqual(after["trading_authority"],"NONE")
 
     def test_restart_tamper_source_outbox_and_hash_chain(self):
         self.enqueue(approval=self.approval)
