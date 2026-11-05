@@ -185,3 +185,20 @@ def test_no_positive_without_full_external_approval_even_when_self_flags_true(tm
                           trusted_now_ms=NOW,independently_pinned_f2_report_sha256=REPORT,
                           source_independently_authenticated=True,
                           research_policy_independently_approved=True)
+
+
+def test_legacy_v1_resealed_ready_cannot_bypass_signed_v2(tmp_path):
+    from tools.strategy_discoverer_offline.historical_f4_intake import (
+        F4ResearchIntake, F4ContractError,
+    )
+    args,ready,receiver,roots,witnesses=build_case(tmp_path)
+    forged=dict(ready.waiting_intake)
+    forged["status"]="READY_FOR_FACTORY_RESEARCH_INTAKE"
+    forged["ledger_checkpoint_sha256"]=ready.ledger_checkpoint_sha256
+    forged["membership_verification_sha256"]=ready.membership_verification_sha256
+    forged["intake_digest"]=_digest({k:v for k,v in forged.items() if k!="intake_digest"})
+    legacy=F4ResearchIntake(**forged)  # SHA seal alone is NOT authorization
+    with pytest.raises(F4ContractError, match="signed F4 v2"):
+        verify_f4_intake(**{**receiver, "intake":legacy,
+                            "independently_confirm_source":True,
+                            "independently_confirm_policy":True})
