@@ -194,7 +194,7 @@ def build_coverage_ledger(manifest, outcomes=None):
         outcome = outcomes.get(month)
         if row["inventory_status"] == "RETAINED_PREVIOUSLY_PINNED":
             status = "RETAINED_PREVIOUSLY_PINNED"
-            _require(outcome is None or outcome.get("status") == status, "RETAINED_CANNOT_BE_RELABELED")
+            _require(outcome is None or (type(outcome) is dict and outcome.get("status") == status), "RETAINED_CANNOT_BE_RELABELED")
         elif outcome is None:
             outcome = {"status": "MISSING_SOURCE", "reason": "SOURCE_ACCESS_REQUIRED"}
             status = "MISSING_SOURCE"
@@ -202,6 +202,8 @@ def build_coverage_ledger(manifest, outcomes=None):
             _require(type(outcome) is dict and outcome.get("status") in STATES
                      and outcome["status"] != "RETAINED_PREVIOUSLY_PINNED", "INVALID_SOURCE_OUTCOME")
             status = outcome["status"]
+            if status != "ACCEPTED_PREFLIGHT":
+                _require(all(outcome.get(k) is None for k in ("archive_sha256", "checksum_file_sha256", "preflight_receipt_sha256")), "NONACCEPTED_SOURCE_HASHES_FORBIDDEN")
             if status == "ACCEPTED_PREFLIGHT":
                 _require(all(type(outcome.get(k)) is str and re.fullmatch(r"[a-f0-9]{64}", outcome[k])
                              for k in ("archive_sha256", "checksum_file_sha256", "preflight_receipt_sha256"))
