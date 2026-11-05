@@ -147,7 +147,8 @@ def reconcile_scanner_c_candidate(
     # hash there is NO signed original→synthetic provenance bridge here.
     block(True,"SCANNER_SYNTHETIC_RAW_TO_CORE_ZIP_NOT_ATTESTED")
     body={
-        "schema":SCHEMA,"decision":"WAIT","reason":"SOURCE_LINEAGE_NOT_CONNECTED",
+        "schema":SCHEMA,"decision":"WAIT",
+        "reason":"WAIT_SOURCE_PROVENANCE_NOT_CONNECTED",
         "blocking_conditions":sorted(set(reasons)),
         "scanner_c_route_sha256":scan_route.sha256,
         "scanner_c_approval_sha256":approval.sha256,
@@ -179,6 +180,13 @@ def reconcile_scanner_c_candidate(
         "core_legacy_source_nomination_sha256":
             delivery["scanner_nomination"]["digest"],
         "source_only_ack_is_strategy_approval":False,
+        "scanner_approval_envelope_schema":"aql.scanner-c.strategy-approval.v1",
+        "scanner_route_envelope_schema":"aql.scanner-c.strategy-route-request.v1",
+        "scanner_envelope_seal_key":"sha256",
+        "core_source_ack_seal_key":"receipt_sha256",
+        "factory_provisional_artifact_sha256_is_not_scanner_sha256":True,
+        "strategy_approval_is_engineering_test_only":True,
+        "strategy_consumer_ack_sha256":None,
         "historical_known_at_ms":None,"historical_pit":"NOT_ATTESTED",
         "operational_scanner_status":"UNKNOWN",
         "strategy_secretary_status":"NOT_ENQUEUED",
