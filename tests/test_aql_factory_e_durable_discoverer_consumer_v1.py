@@ -55,9 +55,9 @@ class FactoryEDurableDiscovererTest(unittest.TestCase):
     def test_replaced_stored_ledger_denied(self):
         import sqlite3
         with sqlite3.connect(self.durable_path) as conn:
-            conn.execute("UPDATE ledger_checkpoints SET snapshot_sha=?",
+            conn.execute("UPDATE ledger_checkpoints SET checkpoint_sha=?",
                          ("f"*64,))
-        # Owner's durable checkpoint snapshot_sha index must also be pinned.
+        # Owner's signed checkpoint SHA chain must remain intact.
         with self.assertRaises((ValueError,ResultsStoreError)):
             self.consume()
 
