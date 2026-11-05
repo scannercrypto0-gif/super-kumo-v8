@@ -15,9 +15,10 @@ WIDTH_MS = 900_000
 
 
 def _sealed_core(obj, key, *, schema=None):
+    from research_wp_r0.aql_archive_custody_bridge_v1 import digest as core_digest
     require(type(obj) is dict and type(obj.get(key)) is str
             and len(obj[key]) == 64
-            and digest({k:v for k,v in obj.items() if k != key}) == obj[key],
+            and core_digest({k:v for k,v in obj.items() if k != key}) == obj[key],
             "D_CORE_SEALED_PARENT_DRIFT:"+key)
     if schema is not None:
         require(obj.get("schema") == schema, "D_CORE_PARENT_SCHEMA:"+key)
