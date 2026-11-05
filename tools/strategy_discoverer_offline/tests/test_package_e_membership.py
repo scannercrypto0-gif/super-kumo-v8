@@ -1,6 +1,13 @@
 """Package E focused regression: verified ledger prefix, attempt association and intake."""
 from dataclasses import replace
 
+PROTECTED = {"evaluation_status", "scientific_acceptance", "execution_status", "publishable", "delivery_authorized", "holdout_status", "factory_routing"}
+
+
+def package_fields(package):
+    return {k: v for k, v in package._fields_for_digest().items() if k not in PROTECTED}
+
+
 import pytest
 
 from tools.strategy_discoverer_offline.contracts import DiscoveryCandidatePackageV1
@@ -27,7 +34,7 @@ def setup_case():
     )
     ledger.transition(attempt_id, AttemptState.PENDING)
     checkpoint = ledger.head_digest()
-    fields = preliminary._fields_for_digest()
+    fields = package_fields(preliminary)
     fields["attempt_ledger_head"] = checkpoint
     package = DiscoveryCandidatePackageV1.build(**fields)
     ledger.transition(attempt_id, AttemptState.COMPLETE)
@@ -92,7 +99,7 @@ def test_tampered_chain_denied():
 
 def test_swapped_candidate_identity_denied():
     e, p, ledger, attempt, head, receipt, log_head = setup_case()
-    fields = p._fields_for_digest()
+    fields = package_fields(p)
     fields["candidate_id"] = "swapped"
     swapped = DiscoveryCandidatePackageV1.build(**fields)
     with pytest.raises(ValueError, match="candidate binding mismatch"):
@@ -131,7 +138,7 @@ def test_quarantined_receipt_denied():
     e, p, ledger, attempt, head, receipt, log_head = setup_case()
     e2 = _make_evidence(source_availability="UNKNOWN")
     bridge = DiscovererToFactoryBridge(ledger_reference="e-ledger")
-    fields = p._fields_for_digest()
+    fields = package_fields(p)
     fields["nomination_evidence_digest"] = e2.nomination_digest
     p2 = DiscoveryCandidatePackageV1.build(**fields)
     r = bridge.route(package=p2, evidence=e2,
@@ -169,7 +176,7 @@ def test_wrong_head_denied():
 
 def test_wrong_strategy_binding_denied():
     e, p, ledger, attempt, head, receipt, log_head = setup_case()
-    fields = p._fields_for_digest()
+    fields = package_fields(p)
     fields["strategy_definition_digest"] = "f" * 64
     mutated = DiscoveryCandidatePackageV1.build(**fields)
     with pytest.raises(ValueError, match="candidate binding mismatch"):
