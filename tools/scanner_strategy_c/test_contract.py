@@ -28,9 +28,8 @@ class ScannerCContractGate(unittest.TestCase):
         self.rows = [Frozen.restore(x).data for x in self.run.data["nominations"]]
         self.selected = next(x for x in self.run.data["nominations"]
                              if x["payload"]["status"] == "SELECTED")
-        self.policy = next((p, w) for p, w in zip(self.policies, self.specs)
-                           if p["payload"]["strategy_id"] == self.selected["payload"]["strategy_id"])
-        self.work, self.native = self.policy
+        self.work, self.native = next((w, p) for p, w in zip(self.policies, self.specs)
+                                      if p["payload"]["strategy_id"] == self.selected["payload"]["strategy_id"])
         self.actions = dict(action="APPROVE_TEST_ONLY", governance_policy_id="ATLAS_TEST_POLICY_C",
                             approver_id="officer_test", approval_nonce="C-001")
         self.pins = dict(source_custody_receipt_sha256="a"*64,
