@@ -1,6 +1,5 @@
 """Offline ACL policy cases; no source bytes or network."""
 import os
-import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -98,39 +97,26 @@ class TestWindowsAclPolicy(unittest.TestCase):
         self.assertTrue(current_sid.startswith("S-1-"))
         with tempfile.TemporaryDirectory() as d:
             base = Path(d)
-            # Install a fresh explicit *private* DACL for the controlled test
-            # directory, rather than relying on inherited GitHub runner ACLs.
-            # This change is test-local and never touches the owner's E: drive.
-            target = str(base).replace("'", "''")
-            script = (
-                "$ErrorActionPreference='Stop'; "
-                "$p='" + target + "'; "
-                "$acl=Get-Acl -LiteralPath $p; "
-                "$acl.SetAccessRuleProtection($true,$false); "
-                "foreach($old in @($acl.Access)){[void]$acl.RemoveAccessRuleAll($old)}; "
-                "$inh=[System.Security.AccessControl.InheritanceFlags]::ContainerInherit "
-                "-bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit; "
-                "$prop=[System.Security.AccessControl.PropagationFlags]::None; "
-                "$allow=[System.Security.AccessControl.AccessControlType]::Allow; "
-                "foreach($s in @('" + current_sid + "','" + SYSTEM + "','" + ADMINS + "')) { "
-                "$id=[System.Security.Principal.SecurityIdentifier]::new($s); "
-                "$rule=[System.Security.AccessControl.FileSystemAccessRule]::new("
-                "$id,[System.Security.AccessControl.FileSystemRights]::FullControl,"
-                "$inh,$prop,$allow);[void]$acl.AddAccessRule($rule) }; "
-                "Set-Acl -LiteralPath $p -AclObject $acl"
-            )
-            shell = shutil.which("pwsh") or shutil.which("powershell.exe")
-            if shell is None:
-                self.skipTest("PowerShell executable unavailable")
-            setup = subprocess.run(
-                [shell, "-NoProfile", "-NonInteractive", "-Command", script],
-                capture_output=True, text=True, errors="replace")
-            if setup.returncode:
-                self.fail(
-                    "Windows test-local ACL setup failed "
-                    f"(exit={setup.returncode}); "
-                    f"stdout={setup.stdout[-3000:]!r}; "
-                    f"stderr={setup.stderr[-3000:]!r}")
+            # Use icacls on this disposable test directory only. Set-Acl can
+            # require SeSecurityPrivilege on ordinary Windows PowerShell hosts.
+            # Remove inherited grants and install only trusted explicit SIDs.
+            # No owner's historical files or parent ACLs are modified.
+            setup_commands = [
+                ["icacls", str(base), "/inheritance:r"],
+                ["icacls", str(base), "/grant:r",
+                 f"*{current_sid}:(OI)(CI)F",
+                 f"*{SYSTEM}:(OI)(CI)F",
+                 f"*{ADMINS}:(OI)(CI)F"],
+            ]
+            for command in setup_commands:
+                setup = subprocess.run(command, capture_output=True,
+                                       text=True, errors="replace")
+                if setup.returncode:
+                    self.fail(
+                        "Windows test-local ACL setup failed "
+                        f"(exit={setup.returncode}); "
+                        f"stdout={setup.stdout[-3000:]!r}; "
+                        f"stderr={setup.stderr[-3000:]!r}")
             self.assertTrue(require_private_windows_directory(base))
             # Add a real inherited broad read ACE: a nested folder must fail.
             subprocess.run(
