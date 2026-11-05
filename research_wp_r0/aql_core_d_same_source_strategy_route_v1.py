@@ -216,6 +216,7 @@ def project_test_only_scanner_native15m(
 def verify_same_source_research(
     root, vault, *, synthetic_zip_bytes, local_test_checksum_bytes,
     scanner_raw_bytes, scanner_manifest, scanner_universe,
+    scanner_projection_receipt,
     scanner_run_receipt, scanner_nomination_receipt,
     scanner_route_receipt, scanner_approval_receipt,
     work235_spec_receipt, native15m_policy_receipt,
@@ -283,6 +284,34 @@ def verify_same_source_research(
     require(regenerated["identity_map_sha256"]==
               identity_map["identity_map_sha256"],
             "CORE_D_DUAL_QUERY_MAP_DRIFT")
+    _sealed(scanner_projection_receipt,"projection_sha256")
+    require(scanner_projection_receipt.get("schema")==
+                "aql.core.d.read-only-scanner-native15m-projection.v1"
+            and scanner_projection_receipt.get("status")==
+                "READY_FOR_SCANNER_TEST_ONLY"
+            and scanner_projection_receipt.get("source_zip_sha256")==zip_sha
+            and scanner_projection_receipt.get("csv_member_sha256")==_hash(csv)
+            and scanner_projection_receipt.get("warehouse_receipt_sha256")==
+                warehouse_receipt["receipt_sha256"]
+            and scanner_projection_receipt.get("dual_query_map_sha256")==
+                identity_map["identity_map_sha256"]
+            and scanner_projection_receipt.get("core_245_native_price_query_sha256")==
+                native_price_query["price_query_sha256"]
+            and scanner_projection_receipt.get("core_253_local_query_sha256")==
+                core_local_query["query_sha256"]
+            and scanner_projection_receipt.get("scanner_raw_sha256")==
+                _hash(scanner_raw_bytes)
+            and scanner_projection_receipt.get("scanner_manifest_sha256")==
+                digest(scanner_manifest)
+            and scanner_projection_receipt.get("scanner_universe_sha256")==
+                digest(scanner_universe)
+            and scanner_projection_receipt.get("bar_count")==
+                warehouse_receipt["bar_count"]
+            and scanner_projection_receipt.get("cutoff_ms")==
+                warehouse_receipt["decision_cutoff_ms"]
+            and scanner_projection_receipt.get("historical_known_at_ms") is None
+            and scanner_projection_receipt.get("trading_authority")=="NONE",
+            "CORE_D_READ_ONLY_PROJECTION_PARENT_DRIFT")
     bars=core_local_query["bars"]
     require(0<len(bars)<=MAX_BARS
             and len(csv.splitlines())==len(bars)==warehouse_receipt["bar_count"],
@@ -437,6 +466,8 @@ def verify_same_source_research(
         "publisher_authenticity":"NOT_ATTESTED",
         "zip_csv_member_sha256":_hash(csv),
         "scanner_consumed_raw_sha256":_hash(scanner_raw_bytes),
+        "read_only_scanner_projection_sha256":
+            scanner_projection_receipt["projection_sha256"],
         "scanner_manifest_sha256":digest(scanner_manifest),
         "scanner_universe_sha256":digest(scanner_universe),
         "scanner_run_sha256":scanner_run.sha256,
@@ -652,6 +683,8 @@ def read_factory_canonical_strategy_offer(
         "core_253_local_query_sha256":proof["core_253_local_query_sha256"],
         "core_warehouse_receipt_sha256":proof["core_warehouse_receipt_sha256"],
         "scanner_raw_source_sha256":proof["scanner_consumed_raw_sha256"],
+        "read_only_scanner_projection_sha256":
+            proof["read_only_scanner_projection_sha256"],
         "source_zip_sha256":proof["raw_vault_source_sha256"],
         "strategy_id":request["strategy_id"],
         "strategy_version":request["strategy_version"],
