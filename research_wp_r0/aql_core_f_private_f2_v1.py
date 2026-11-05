@@ -113,7 +113,7 @@ def check_local_batch(manifest, ledger, local_dir, *,
             remote_checksum = _fetch(m["publisher_checksum_url"], MAX_CHECKSUM)
             need(remote_checksum == checksum, "F2_INDEPENDENT_PUBLISHER_CHECKSUM_DRIFT")
             receipt = verify_native_month(
-                month, raw, checksum, provenance="F2_OWNER_PRIVATE_RECHECK_TLS_NON_PIT")
+                month, raw, checksum, provenance="PRIVATE_PUBLISHER_FETCH_OPERATOR_ATTESTED")
             need(receipt["preflight_receipt_sha256"]
                  == entry["preflight_receipt_sha256"], "F2_PREFLIGHT_RECEIPT_DRIFT")
             need(receipt["observed_bars"] == m["expected_native_15m_bars"]
