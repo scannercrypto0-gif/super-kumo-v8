@@ -12,7 +12,7 @@ import platform
 from pathlib import Path
 
 PINS = {
- "factory_e":"aea4406c987635c9d7a03f5a22bede2f5ca9356a",
+ "factory_e":"6d5a4dd3e2a701fd14f21820bad549c446c8532b",
  "factory_d":"a695e262da6787f752a13820f02dd00eef8ef1cd",
  "core_e":"3af5b66d2b381b853a6b5be32c38b3d3d02e1ea7",
  "core_d":"a86a590a5e2c32c18e03522f52896dbcf50c60ff",
@@ -72,6 +72,8 @@ def main():
       "orders_created":0, "actual_fills":None,
       "holdout":"SEALED_UNOPENED",
       "final_package_e":"CLOSED_ENGINEERING_WITH_EXTERNAL_HISTORICAL_BLOCKERS",
+      "package_f":"F4_BATCH_BLOCKED_PENDING_F0_F1_F2_F3",
+      "package_f_actual_original_source_backtest":"NOT_EXECUTED",
       "audit_verdict":"PENDING_FINAL_INDEPENDENT_DELTA_REVIEW",
     }
     report={"normalized":normalized,"normalized_sha256":sha(normalized),
