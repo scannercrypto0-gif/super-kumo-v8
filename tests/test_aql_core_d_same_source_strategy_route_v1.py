@@ -260,6 +260,28 @@ class CoreDSameSource(unittest.TestCase):
         manifest={**self.scan_manifest,"raw_sha256":sha(raw)}
         with self.assertRaisesRegex(BackboneError,"CORE_D_SCANNER_UNIVERSE_DRIFT"):
             self.proof(scanner_raw_bytes=raw,scanner_manifest=manifest)
+        # Reseal source, universe, Scanner run, nomination and route, not
+        # merely the outer source hash. The actual Core RAW bar stays pinned.
+        universe={**self.scan_universe,"source_raw_sha256":sha(raw)}
+        new_run=scan_native15m(
+            [self.policy],[self.work],raw,manifest,universe,
+            cutoff_ms=self.cutoff,symbol_budget=1)
+        new_nom=new_run.data["nominations"][0]
+        self.assertEqual(Frozen.restore(new_nom).data["status"],"SELECTED")
+        new_route=seal_strategy_route_request(
+            self.work,self.policy,self.approval.receipt(),
+            new_run.receipt(),new_nom,
+            source_custody_receipt_sha256=self.warehouse["receipt_sha256"],
+            core245_price_query_sha256=self.native["price_query_sha256"],
+            core253_query_local_sha256=self.local["query_sha256"],
+            source_zip_sha256=self.warehouse["source_zip_sha256"],
+        ).receipt()
+        with self.assertRaisesRegex(BackboneError,"CORE_D_BAR_PROJECTION_MISMATCH"):
+            self.proof(scanner_raw_bytes=raw,scanner_manifest=manifest,
+                       scanner_universe=universe,
+                       scanner_run_receipt=new_run.receipt(),
+                       scanner_nomination_receipt=new_nom,
+                       scanner_route_receipt=new_route)
 
     def test_wrong_original_zip_bytes_and_local_checksum_fail_closed(self):
         with self.assertRaisesRegex(BackboneError,"CORE_D_RAW_VAULT_READBACK_MISMATCH"):
