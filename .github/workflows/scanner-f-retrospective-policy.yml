@@ -82,11 +82,14 @@ jobs:
           cp upstream/core-c/tests/test_aql_core_authorized_source_transfer_v1.py project/tests/
           cp upstream/core-d/tests/test_aql_core_d_permitted_cohort_v1.py project/tests/
           cp upstream/core-d/tests/test_aql_core_d_canonical_secretary_v1.py project/tests/
+      - name: Install trusted Ed25519 verifier for Scanner F tests
+        shell: bash
+        run: python -m pip install 'cryptography>=43,<48'
       - name: New Scanner F policy + Core F1 preflight consumer tests
         working-directory: project
         shell: bash
         run: |
-          PYTHONPATH=.:tests python -m unittest -v tools.scanner_strategy_f.test_retrospective_policy tools.scanner_strategy_f.test_bulk_census tools.scanner_strategy_f.test_policy_activation_request
+          PYTHONPATH=.:tests python -m unittest -v tools.scanner_strategy_f.test_retrospective_policy tools.scanner_strategy_f.test_bulk_census tools.scanner_strategy_f.test_policy_activation_request tools.scanner_strategy_f.test_independent_policy_verification
       - name: Scan no operational route or new synthetic issuer
         shell: bash
         run: |
