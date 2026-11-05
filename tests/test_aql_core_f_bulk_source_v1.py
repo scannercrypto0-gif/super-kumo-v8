@@ -101,6 +101,12 @@ class TestCoreFBulkSource(unittest.TestCase):
         with self.assertRaises(ValueError):
             build_coverage_ledger(m, {"2024-03": receipt})
 
+    def test_missing_and_quarantined_cannot_claim_parent_hashes(self):
+        m = build_manifest(first="2024-03", last="2024-03")
+        for status in ("MISSING_SOURCE", "REJECTED_QUARANTINED"):
+            with self.subTest(status=status), self.assertRaisesRegex(ValueError, "NONACCEPTED_SOURCE_HASHES_FORBIDDEN"):
+                build_coverage_ledger(m, {"2024-03": {"status": status, "archive_sha256": "f" * 64}})
+
 
 if __name__ == "__main__":
     unittest.main()
