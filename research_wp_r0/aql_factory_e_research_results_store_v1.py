@@ -83,16 +83,23 @@ def build_experiment(*, experiment_id, lane, source_status, source_sha256,
     _need(type(experiment_id) is str and 0 < len(experiment_id) <= 160
           and re.fullmatch(r"[A-Za-z0-9_.:+-]+", experiment_id)
           and lane in LANES and source_status in ALLOWED, "EXPERIMENT_SCOPE")
-    for item in (source_sha256, source_query_245_sha256,
-                 source_query_253_sha256, strategy_definition_sha256,
-                 config_sha256, code_sha256, environment_sha256,
-                 parent_receipt_sha256):
-        _need(_sha(item), "PARENT_SHA_REQUIRED")
+    source_parents = (source_sha256, source_query_245_sha256,
+                      source_query_253_sha256, strategy_definition_sha256,
+                      config_sha256)
+    if source_status == "HISTORICAL_SOURCE_BLOCKED":
+        _need(all(x is None or _sha(x) for x in source_parents),
+              "BLOCKED_UNKNOWN_PARENT_MUST_BE_NULL_OR_SHA")
+    else:
+        _need(all(_sha(x) for x in source_parents),
+              "PARENT_SHA_REQUIRED")
+    for item in (code_sha256, environment_sha256, parent_receipt_sha256):
+        _need(_sha(item), "CODE_ENV_AND_BLOCKER_RECEIPT_REQUIRED")
     for item in (lab_receipt_sha256, paper_receipt_sha256, result_sha256):
         _need(item is None or _sha(item), "RESULT_SHA")
     _attempts(attempts)
-    _need(source_query_245_sha256 != source_query_253_sha256,
-          "CORE_NATIVE_LOCAL_SHA_ALIAS")
+    if source_status != "HISTORICAL_SOURCE_BLOCKED":
+        _need(source_query_245_sha256 != source_query_253_sha256,
+              "CORE_NATIVE_LOCAL_SHA_ALIAS")
     _need(evidence_class in ("TEST_ONLY", "RETROSPECTIVE_NON_PIT")
           and historical_pit == "NOT_ATTESTED"
           and holdout == "SEALED_UNOPENED"
