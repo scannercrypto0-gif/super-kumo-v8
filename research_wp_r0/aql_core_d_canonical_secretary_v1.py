@@ -106,7 +106,7 @@ def _verified(con,route_id):
                gate["scanner_d_handoff_sha256"]
            and source["core_d_witness_sha256"]==
                gate["core_d_witness_sha256"],"D_SOURCE_ACK_BINDING_DRIFT")
-    ack=json.loads(row[6]) if row[6] else None
+    _check(type(row[7]) is int and type(row[8]) is int and type(row[9]) is int\n           and row[7]>gate["cutoff_ms"] and row[8]>=0 and row[9]>=0,\n           "D_STORED_LIFECYCLE_DRIFT")\n    ack=json.loads(row[6]) if row[6] else None
     if ack is not None:
         _sha(ack,"consumer_ack_sha256")
         _check(ack["consumer_ack_sha256"]==row[5]
@@ -133,7 +133,7 @@ def _verified(con,route_id):
            and gate["cutoff_ms"]<=ack["accepted_at_ms"]<row[7],
                "D_CONSUMER_ACK_PARENT_DRIFT")
     trace=_tail(con,route_id)
-    _check(trace[-1]["state"]==row[4]
+    _check(trace[0]["state"]=="PENDING_CONSUMER"\n           and trace[-1]["state"]==row[4]
            and trace[-1]["gate_sha256"]==row[0]
            and trace[-1]["source_ack_sha256"]==row[2]
            and trace[-1]["consumer_ack_sha256"]==row[5]
