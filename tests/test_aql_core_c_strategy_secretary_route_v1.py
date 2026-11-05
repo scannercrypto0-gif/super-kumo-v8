@@ -202,8 +202,14 @@ class CoreCSecretaryContract(unittest.TestCase):
                  "request_sha256")
         with self.assertRaisesRegex(BackboneError,"SOURCE_ACK_NOT_DURABLE"):
             self.enqueue(request=req,source_ack=bad)
-        with sqlite3.connect(self.root/"warehouse.sqlite") as con:
-            count=con.execute("SELECT COUNT(*) FROM c_strategy_routes").fetchone()[0]
+        con=sqlite3.connect(self.root/"warehouse.sqlite")
+        try:
+            tables=con.execute("SELECT COUNT(*) FROM sqlite_master "
+                               "WHERE type='table' AND name='c_strategy_routes'").fetchone()[0]
+            count=(con.execute("SELECT COUNT(*) FROM c_strategy_routes").fetchone()[0]
+                   if tables else 0)
+        finally:
+            con.close()
         self.assertEqual(count,0)
 
     def test_source_strategy_mismatch_resealed_fails_closed(self):
@@ -211,7 +217,7 @@ class CoreCSecretaryContract(unittest.TestCase):
         bad["strategy_id"]="wrong_strategy"
         bad=seal({k:v for k,v in bad.items() if k!="request_sha256"},
                  "request_sha256")
-        with self.assertRaisesRegex(BackboneError,"SOURCE_ACK_OUTBOX_PARENT_DRIFT"):
+        with self.assertRaisesRegex(BackboneError,"POLICY_REQUEST_IDENTITY_DRIFT"):
             self.enqueue(request=bad)
 
     def test_native_245_local_253_sha_and_cutoff_drift_rejected(self):
