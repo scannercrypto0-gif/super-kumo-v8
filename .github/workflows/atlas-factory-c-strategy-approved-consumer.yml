@@ -92,6 +92,14 @@ jobs:
               p=Path('_pinned_core_c')/'tests'/filename
               assert p.is_file(),str(p)
               shutil.copyfile(p,Path('tests')/filename)
+          for source,dest in (
+              (Path('_pinned_work235')/'tools/strategy_service_offline/fixtures',
+               Path('tools/strategy_service_offline/fixtures')),
+              (Path('_pinned_scanner_b')/'tools/scanner_strategy_b/fixtures',
+               Path('tools/scanner_strategy_b/fixtures')),
+          ):
+              if source.is_dir():
+                  shutil.copytree(source,dest,dirs_exist_ok=True)
           assert (Path('_pinned_scanner_c')/'tools/scanner_strategy_c/test_contract.py').is_file()
           print('Pinned owner dependencies staged, no original source prices')
           PY
