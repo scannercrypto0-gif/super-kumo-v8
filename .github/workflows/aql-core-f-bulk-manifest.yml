@@ -1,0 +1,24 @@
+name: ATLAS Core F Bulk Historical Manifest
+on:
+  push:
+    branches:
+      - core/package-f-bulk-source-20261105
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_core_f_bulk_source_v1.py'
+      - 'tests/test_aql_core_f_bulk_source_v1.py'
+      - '.github/workflows/aql-core-f-bulk-manifest.yml'
+jobs:
+  core-f-source-plan:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Core F source planning/coverage negatives without network
+        run: python -m unittest discover -s tests -p 'test_aql_core_f_bulk_source_v1.py' -v
