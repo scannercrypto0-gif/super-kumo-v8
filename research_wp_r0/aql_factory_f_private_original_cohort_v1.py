@@ -207,6 +207,9 @@ def validate_input(packet,witness,witness_sha):
                       if row["month"]==m})==2
                  for m in packet["admitted_months"]),
          "TEN_MONTH_FULL_STRATEGY_CENSUS")
+    # A Scanner strategy signal is a proposal, not authority. Positive
+    # selection is allowed only via a separately authenticated Secretary
+    # strategy approval bound to the full selected source/strategy identity.
     need(sum(x["state"]=="SELECTED" for x in packet["attempts"])==1,
          "EXACTLY_ONE_SOURCE_BOUND_SELECTED_TRIAL")
     # Factory never promotes a self-issued selected row: the independently
