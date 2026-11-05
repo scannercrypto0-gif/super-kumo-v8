@@ -1,5 +1,6 @@
 """Offline ACL policy cases; no source bytes or network."""
 import os
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -118,7 +119,10 @@ class TestWindowsAclPolicy(unittest.TestCase):
                 "$inh,$prop,$allow);[void]$acl.AddAccessRule($rule) }; "
                 "Set-Acl -LiteralPath $p -AclObject $acl"
             )
-            subprocess.run(["pwsh", "-NoProfile", "-Command", script],
+            shell = shutil.which("pwsh") or shutil.which("powershell.exe")
+            if shell is None:
+                self.skipTest("PowerShell executable unavailable")
+            subprocess.run([shell, "-NoProfile", "-NonInteractive", "-Command", script],
                            check=True, capture_output=True)
             self.assertTrue(require_private_windows_directory(base))
             # Add a real inherited broad read ACE: a nested folder must fail.
