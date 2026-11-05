@@ -26,9 +26,9 @@ jobs:
       - uses: actions/checkout@v4
         with: {ref: aa361ff3117b07f38600695e3dbabe619a929458, path: _pinned_factory_e, persist-credentials: false}
       - uses: actions/checkout@v4
-        with: {ref: 1ce3b697af3f8c49c7cead397dc4193c2a9456b1, path: _pinned_core_f, persist-credentials: false}
+        with: {ref: a640c7822794bd2a7fd510b77ae7eb3507cf463f, path: _pinned_core_f, persist-credentials: false}
       - uses: actions/checkout@v4
-        with: {ref: a35e9a4e8a144f63c286e5c6da363c97ec4780e2, path: _pinned_scanner_f, persist-credentials: false}
+        with: {ref: 012f9f19de2111ac4113a9f773fe3ef6baca9b02, path: _pinned_scanner_f, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: 58959b22de9bc96f03b03dfc565815282fd1a939, path: _pinned_discoverer_f, persist-credentials: false}
       - uses: actions/checkout@v4
@@ -75,6 +75,34 @@ jobs:
                       if not target.exists():
                           target.parent.mkdir(parents=True,exist_ok=True)
                           copyfile(item,target)
+          # F HEAD precedence: fail closed if a stale base or historical overlay
+          # shadows the pinned F modules. Historical owners fill missing paths only.
+          import hashlib
+          authoritative = {
+              '_pinned_core_f': ('research_wp_r0/aql_core_f_bulk_source_v1.py',),
+              '_pinned_scanner_f': (
+                  'tools/scanner_strategy_f/independent_policy_verification.py',
+                  'tools/scanner_strategy_f/source_bound_intake.py',
+                  'tools/scanner_strategy_f/secretary_factory_handoff.py',
+                  'tools/scanner_strategy_f/strategy_specific_decision.py',
+                  'tools/scanner_strategy_f/secretary_ack_requirements.py',
+                  'tools/scanner_strategy_f/test_strategy_specific_decision.py',
+                  'tools/scanner_strategy_f/test_secretary_ack_requirements.py',
+              ),
+              '_pinned_discoverer_f': (
+                  'tools/strategy_discoverer_offline/historical_f4_intake.py',
+              ),
+          }
+          for owner, paths in authoritative.items():
+              for relative in paths:
+                  source, target = Path(owner)/relative, Path(relative)
+                  assert source.is_file(), ('MISSING_PINN_F_FILE', owner, relative)
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  copyfile(source, target)
+                  digest = hashlib.sha256(source.read_bytes()).hexdigest()
+                  assert hashlib.sha256(target.read_bytes()).hexdigest() == digest, (
+                      'STALE_F_OVERLAY', owner, relative)
+                  print('PINNED_F_FILE_SHA256', owner, relative, digest)
           # Exact Factory E owner HEAD is the source for its own modules/tests;
           # integration branch never changes the Factory owner branch.
           for name in ('aql_factory_e_research_results_store_v1.py',
@@ -137,6 +165,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_aql_factory_f_scanner_bulk_consumer_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_factory_f_private_original_cohort_v1.py' -v
           python -m unittest tools.scanner_strategy_f.test_bulk_census -v
+          python -m unittest tools.scanner_strategy_f.test_strategy_specific_decision -v
+          python -m unittest tools.scanner_strategy_f.test_secretary_ack_requirements -v
           python -m unittest discover -s tests -p 'test_aql_factory_e_bounded_perf_v1.py' -v
           python -m pytest tools/strategy_discoverer_offline/tests/test_package_e_durable_checkpoint.py -q
           python -m unittest discover -s tests -p 'test_aql_core_e_status_evidence_v1.py' -v
