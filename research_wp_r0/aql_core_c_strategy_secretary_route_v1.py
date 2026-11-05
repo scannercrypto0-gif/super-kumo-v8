@@ -52,6 +52,8 @@ def _create(con):
         state TEXT NOT NULL, attempts INTEGER NOT NULL,
         consumer_ack_sha TEXT, next_attempt_ms INTEGER NOT NULL
       );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_c_strategy_unique_request
+        ON c_strategy_routes(request_sha);
       CREATE TABLE IF NOT EXISTS c_strategy_events (
         event_seq INTEGER PRIMARY KEY AUTOINCREMENT,
         route_id TEXT NOT NULL, state TEXT NOT NULL,
@@ -531,9 +533,11 @@ def strategy_route_snapshot(root,route_id,*,now_ms):
         if now_ms>=request["expires_at_ms"] and state not in (
              "ACKED_CONSUMER","QUARANTINED","EXPIRED"):
             state="EXPIRED"  # read-only projection, not a committed transition
+        approval_valid_at_now=False
         if approval is not None:
             try:
                 _approval(approval,request,now_ms=now_ms)
+                approval_valid_at_now=True
             except ValueError:
                 if state not in ("ACKED_CONSUMER","QUARANTINED","EXPIRED"):
                     state="WAIT_APPROVAL"
@@ -562,8 +566,11 @@ def strategy_route_snapshot(root,route_id,*,now_ms):
            "historical_pit":"NOT_ATTESTED","operational_scanner_status":"UNKNOWN",
            "paper_authority":"NONE","trading_authority":"NONE",
            "paper_execution":"NOT_ACTIVATED",
-           "route_ready_for_isolated_lab":state=="ACKED_CONSUMER",
+           "route_ready_for_isolated_lab":(
+               state=="ACKED_CONSUMER" and approval_valid_at_now
+               and now_ms<request["expires_at_ms"]),
            "strategy_policy_approved_test_only":row[2] is not None,
+           "approval_valid_at_now":approval_valid_at_now,
         }
         return {**receipt,"route_receipt_sha256":digest(receipt)}
     finally:
