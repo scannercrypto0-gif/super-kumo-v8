@@ -202,7 +202,10 @@ def validate_input(packet,witness,witness_sha):
     need(len(packet["attempts"])==20
          and all(sum(row["month"]==m for row in packet["attempts"])==2
                  for m in packet["admitted_months"])
-         and len({row["candidate_id"] for row in packet["attempts"]})==2,
+         and len({row["candidate_id"] for row in packet["attempts"]})==2
+         and all(len({row["candidate_id"] for row in packet["attempts"]
+                      if row["month"]==m})==2
+                 for m in packet["admitted_months"]),
          "TEN_MONTH_FULL_STRATEGY_CENSUS")
     need(sum(x["state"]=="SELECTED" for x in packet["attempts"])==1,
          "EXACTLY_ONE_SOURCE_BOUND_SELECTED_TRIAL")
