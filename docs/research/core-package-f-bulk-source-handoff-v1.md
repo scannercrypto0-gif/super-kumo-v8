@@ -75,3 +75,57 @@ python -m research_wp_r0.aql_core_f_bulk_source_v1 \
 **Factory integration contract:** Factory F4/F5 leads only after the real Core batch custody+dual query receipt and separately approved Scanner #277 research-only policy exist. Use exact SHA-pinned F owner branches, store each acceptance/rejection/missing denominator immutably, reject wrong Core#245/#253 SHA/symbol/cutoff/coverage and run one final F audit packet. Already accepted B/D/E/#272/#273 engineering suites are not new historical proof and need no repeated independent review.
 
 **State at handoff:** `F0_COMPLETE`; `F1_SOURCE_ACCESS_REQUIRED` (no authorized private runner or newly authenticated source bytes available to this session); `F2_EXTERNAL_SOURCE_BLOCKED` (no real new-month RAW/warehouse/native/local query evidence); `PIT_NOT_ATTESTED`; `POLICY_NOT_APPROVED`. No code changes made as part of this owner-access handoff, no extra source-blocked PR, no merges/G0/trading.
+
+## F2 NEW: owner-reported Windows 10/10 F1 evidence and private one-command intake (#275/6656669009)
+
+**Evidence boundary.** The owner reported a local Windows F1 result on the private E: drive: 10 NEW monthly objects with `ACCEPTED_PREFLIGHT`, 0 new rejects/missing, Feb/Aug `RETAINED_PREVIOUSLY_PINNED` **inventory only**, without original retained bytes independently re-read. The following two SHA references were relayed through the owner's PM handoff; they have NOT been independently proven against the private bytes in this GitHub-only session:
+
+```text
+F1 manifest SHA256: f559c82c2c3827382338ab8f84f4a71a1e6705e08105b9b1bdbfaceb3bcbc8b7
+F1 coverage ledger SHA256: 303cf791ff01be9d74f824909814e7a015ae6b265ba61e824f374f21648a2ab7
+```
+
+No public repository change pretends to contain private original ZIP/CSV or original CHECKSUM bytes. F1 receipt validity is separate from actual F2 RAW admission.
+
+**Core-owned code delta:**
+- `aql_core_f_ntfs_acl_v1.py`: on Windows, inspect actual NTFS DACL ACEs and the effective process token, not POSIX `st_mode`; reject `Everyone`, `Users`, `Authenticated Users`, unknown allow principals, deny/unsupported ACE types and inherited unsafe ACEs. No bypass flag. Only the current SID, SYSTEM and Administrators are permitted principals; the OS must authorize actual generic READ/WRITE. A Windows directory inherited from a permissive parent is **not** private just because Python's `chmod(0o700)` was called. This is a deliberately restrictive owner-private custody profile. Linux POSIX guard remains unchanged.
+- `aql_core_f_private_f2_v1.py`: F1 saved output JSON `{"manifest":..., "coverage":...}` must match both out-of-band SHA pins; locally re-read original private ZIP and CHECKSUM for all TEN new months, re-fetch the separate original publisher CHECKSUM through HTTPS in the authorized private runner, re-run existing Core #226 monthly native ZIP/UTC/bar validation, and refuse an incomplete batch **before** any RAW writes. It then uses canonical `RawVault` #211, `admit_local_original` #226, fresh read-only native #245 and indexed local #253 query re-read, and `bind_dual_query_identities`. Unknown historical `available_at` remains `None`, PIT `NOT_ATTESTED`. No scanner/policy/strategy/Factory ACK is automatically issued, and no new parser or vault is introduced.
+- If a private source or SHA drifts: quarantine/report, **no new source automatically admitted**. Any failure after some immutable commits requires inspection of committed generations and idempotent replay before rerun, never deletion/overwrite.
+- Detached local authorization document must be independently issued/reviewed and its SHA pinned through a separate trusted channel. A caller supplying matching JSON+SHA is only local *document integrity*, **not a cryptographic issuer signature, proof of license, 2024 publisher issuance or PIT**. The operator must also independently verify provenance/rights before exercising `--allow-raw-admission`.
+
+**Windows operator check** (read-only; do not weaken ACLs):
+```powershell
+icacls "E:\AQL_PRIVATE\historical"
+icacls "E:\AQL_PRIVATE\core_warehouse"
+icacls "E:\AQL_PRIVATE\raw_vault"
+```
+Ensure only the executing user's exact SID, LocalSystem and built-in Administrators receive allow ACEs, *including inherited entries*; personally review the NTFS effective access and resolve unsafe inherited grants using approved IT procedure, never `chmod(0o777)` or an env bypass. The root paths above are illustrative and have **not** been inspected in this session. Create private warehouse/vault directories and allocate sufficient private storage before running.
+
+**One owner-run command on the actual authorized private Windows host** after preserving F1's full JSON output as a file, separately re-verifying source rights/HTTPS publisher provenance, producing the detached private custodian authorization JSON, and obtaining its independently published SHA:
+
+```powershell
+python -m research_wp_r0.aql_core_f_private_f2_v1 --f1-output "E:\AQL_PRIVATE\f1-owner-output.json" --private-dir "E:\AQL_PRIVATE\historical" --warehouse-root "E:\AQL_PRIVATE\core_warehouse" --vault-root "E:\AQL_PRIVATE\raw_vault" --authorization-json "E:\AQL_PRIVATE\custody-authorization.json" --authorization-sha256 "<AUTHORIZATION_SHA256_FROM_INDEPENDENT_TRUST_CHANNEL>" --expected-manifest-sha256 f559c82c2c3827382338ab8f84f4a71a1e6705e08105b9b1bdbfaceb3bcbc8b7 --expected-ledger-sha256 303cf791ff01be9d74f824909814e7a015ae6b265ba61e824f374f21648a2ab7 --allow-network --recheck-publisher-checksums --allow-raw-admission
+```
+
+No shell redirection of raw source to console/GitHub; CLI prints only sanitized receipt metadata. Local F1 JSON must be the **actual** owner-run output, never a reconstructed count from the PM comment. `--authorization-sha256` is deliberately unfilled; this command must remain blocked until separately trusted owner/custodian authority and verified source rights are available. If the publisher is unreachable for independent checksum re-fetch, stop at `F2_SOURCE_OR_ISSUER_CHECK_BLOCKED`, do not relabel as admitted.
+
+Authorization JSON schema (example **shape only**, not an issued approval):
+```json
+{
+  "schema": "aql.core.f.private-custody-authorization.v1",
+  "owner_permission": true,
+  "rights_evidence_reference": "OUT_OF_BAND_DOCUMENT_REFERENCE",
+  "issuer_provenance_reference": "OUT_OF_BAND_ISSUER_SOURCE_REFERENCE",
+  "publisher_checksum_issued_via": "SEPARATE_PUBLISHER_HTTPS",
+  "authorized_months": ["2024-01", "2024-03", "2024-04", "2024-05", "2024-06", "2024-07", "2024-09", "2024-10", "2024-11", "2024-12"],
+  "source_class": "ORIGINAL_PUBLISHER_RETROSPECTIVE_NON_PIT",
+  "historical_pit": "NOT_ATTESTED",
+  "trading_authority": "NONE"
+}
+```
+
+Do not copy the example as if it were actual external approval. Private authorities need actual evidence references and a trusted SHA bound to the exact document. The CLI verifies integrity/shape/parents and actual current publisher TLS CHECKSUM agreement; **it does not cryptographically verify an issuer signature or independently authenticate an out-of-band signer**. A 2026 HTTPS checksum fetch cannot attest 2024 historical availability. The legal data-use right is a separate owner/custodian check.
+
+**Expected sanitized F2 return to Factory**: exactly 10 new original months only if every new-month ZIP/CHECKSUM validates and actually commits to the existing RAW Vault/warehouse with dual query receipts, distinct #245 `price_query_sha256` and #253 `query_sha256`, and source SHA/cutoff/bar census. Feb/Aug stay **2 inventory-only**, not `12/12 RAW`. The command returns `secretary_historical_strategy_route=NOT_AUTHORIZED`, `factory_consumer_ack=null`, PIT `NOT_ATTESTED`, trading `NONE`. Core source integrity can be acceptable for retrospective NON_PIT custody while still not proving historical scientific PIT, Scanner policy approval or Factory historical execution.
+
+**This owner session did not run the Windows private command or inspect E: bytes.** F2 historical source RAW/warehouse/query proof remains unverified here. Factory F4/F5 must verify exact Core F HEAD/receipts and independent Scanner F3 approval before activation. One final Audit after genuine source/strategy/Factory evidence, no monthly micro-gates, no merge/G0/holdout/trading.
