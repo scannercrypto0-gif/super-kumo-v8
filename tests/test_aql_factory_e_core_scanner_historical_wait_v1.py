@@ -9,6 +9,7 @@ from research_wp_r0.aql_core_e_status_evidence_v1 import make_core_e_status
 from research_wp_r0.aql_factory_e_core_scanner_historical_wait_v1 import record_historical_core_scanner_wait
 from research_wp_r0.aql_factory_e_research_results_store_v1 import read_experiment, ResultsStoreError
 from tools.scanner_strategy_e.historical_research_policy import propose_historical_research_policy
+from tools.scanner_strategy_e.historical_policy_approval_request import prepare_historical_policy_approval_request
 from tools.strategy_service_offline.run import FIXTURES
 
 class FactoryEFinalHistoricalPolicyGate(unittest.TestCase):
@@ -22,10 +23,12 @@ class FactoryEFinalHistoricalPolicyGate(unittest.TestCase):
             dataset_id="BTCUSDT-2024-03",source_kind="ORIGINAL_PUBLISHER")
         self.status=make_core_e_status(preflight_receipt=self.preflight)
         self.policy=propose_historical_research_policy(self.work)
+        self.request=prepare_historical_policy_approval_request(self.policy,self.work)
     def consume(self,**changes):
         data=dict(store_path=self.db,experiment_id="HIST-E-FINAL-WAIT",
                   core_preflight=self.preflight,core_status=self.status,
-                  scanner_policy_proposal=self.policy,frozen_work_specs=self.work,
+                  scanner_policy_proposal=self.policy,approval_request=self.request,
+                  frozen_work_specs=self.work,
                   code_sha256="1"*64,environment_sha256="2"*64)
         data.update(changes)
         return record_historical_core_scanner_wait(**data)
@@ -43,6 +46,7 @@ class FactoryEFinalHistoricalPolicyGate(unittest.TestCase):
         self.assertIsNone(saved["core_245_price_query_sha256"])
         self.assertIsNone(saved["lab_receipt_sha256"])
         self.assertEqual(a["trading_authority"],"NONE")
+        self.assertEqual(a["scanner_approval_request_sha256"],self.request["sha256"])
     def test_forged_core_status_denied(self):
         v=copy.deepcopy(self.status)
         v["historical_policy_approval"]="APPROVED"
@@ -58,6 +62,12 @@ class FactoryEFinalHistoricalPolicyGate(unittest.TestCase):
         v["payload"]["actual_historical_source_receipt_sha256"]="f"*64
         with self.assertRaises((ResultsStoreError,ValueError)):
             self.consume(scanner_policy_proposal=v)
+    def test_forged_owner_approval_request_denied(self):
+        v=copy.deepcopy(self.request)
+        v["payload"]["policy_approval_status"]="APPROVED"
+        with self.assertRaises((ResultsStoreError,ValueError)):
+            self.consume(approval_request=v)
+
     def test_changed_frozen_strategy_list_denied(self):
         with self.assertRaises((ResultsStoreError,ValueError)):
             self.consume(frozen_work_specs=self.work[:1])
