@@ -12,6 +12,7 @@ import re
 from research_wp_r0.aql_archive_custody_bridge_v1 import digest
 from research_wp_r0.aql_core_backbone_local_v1 import _connect, require
 from research_wp_r0.aql_core_dual_query_identity_map_v1 import SCHEMA as MAP_SCHEMA
+from research_wp_r0.aql_core_secretary_routing_v1 import _trace as _source_trace
 
 REQUEST_SCHEMA = "aql.core.c.strategy-route-request.v1"
 APPROVAL_SCHEMA = "aql.scanner.c.strategy-approval.v1"
@@ -46,6 +47,7 @@ def _create(con):
       CREATE TABLE IF NOT EXISTS c_strategy_routes (
         route_id TEXT PRIMARY KEY, request_sha TEXT NOT NULL,
         request_json TEXT NOT NULL, approval_sha TEXT,
+        source_ack_json TEXT NOT NULL, consumer_ack_json TEXT,
         approval_json TEXT, source_ack_sha TEXT NOT NULL,
         state TEXT NOT NULL, attempts INTEGER NOT NULL,
         consumer_ack_sha TEXT, next_attempt_ms INTEGER NOT NULL
@@ -98,6 +100,49 @@ def _event(con, route_id, state, *, request_sha, approval_sha,
     con.execute("INSERT INTO c_strategy_events(route_id,state,event_json,event_sha) "
                 "VALUES(?,?,?,?)",(route_id,state,json.dumps(body,sort_keys=True,
                 separators=(",",":")),digest(body)))
+
+
+def _verify_source_ack(con, request, source_ack, nomination=None):
+    """Validate actual durable Core #226 source ACK, not a resealed dict."""
+    _sha(source_ack,"receipt_sha256")
+    _check(source_ack.get("schema")==SOURCE_ACK_SCHEMA
+           and source_ack.get("state")=="ACKED"
+           and source_ack.get("authority")=="OFFLINE_RESEARCH_ONLY"
+           and request.get("source_ack_sha256")==source_ack["receipt_sha256"],
+           "SOURCE_ACK_SIGNED_PARENT")
+    mid=source_ack.get("message_id")
+    _check(type(mid) is str and IDENT.fullmatch(mid) is not None,
+           "SOURCE_ACK_MESSAGE_ID")
+    row=con.execute("SELECT payload_hash,state,ack_sha,delivery_json "
+                    "FROM distribution_outbox WHERE message_id=?",
+                    (mid,)).fetchone()
+    _check(row is not None and row[1]=="ACKED"
+           and row[0]==source_ack.get("payload_sha256")
+           and row[2]==source_ack.get("acknowledgement_sha256"),
+           "SOURCE_ACK_NOT_DURABLE")
+    trace=_source_trace(con,mid)
+    _check(trace[-1]["state"]=="ACKED"
+           and trace[-1]["reason"]==source_ack["acknowledgement_sha256"]
+           and trace[-1]["payload_sha256"]==row[0],
+           "SOURCE_ACK_TRACE_DRIFT")
+    delivery=json.loads(row[3])
+    _sha(delivery,"payload_sha256")
+    _check(delivery["payload_sha256"]==row[0]
+           and delivery.get("schema")=="aql.core.scanner-secretary-offline-route.v1"
+           and delivery.get("strategy_id")==request.get("strategy_id")
+           and delivery.get("strategy_version")==request.get("strategy_version")
+           and delivery.get("source_zip_sha256")==request.get("source_zip_sha256")
+           and delivery.get("source_manifest_sha256")==
+                request.get("manifest_integrity_sha256")
+           and delivery.get("warehouse_receipt_sha256")==
+                request.get("warehouse_receipt_sha256")
+           and delivery.get("scanner_nomination",{}).get("digest")==
+                request.get("scanner_nomination_sha256")
+           and delivery.get("secretary_trading_authority")=="NONE",
+           "SOURCE_ACK_OUTBOX_PARENT_DRIFT")
+    if nomination is not None:
+        _check(delivery["scanner_nomination"]==nomination,
+               "SOURCE_ACK_NOMINATION_BODY_DRIFT")
 
 
 def _verify_request(request, identity_map, warehouse, nomination, source_ack,
@@ -265,7 +310,8 @@ def _approval(approval, request, *, now_ms):
 
 def _verify_stored(con, route_id):
     row=con.execute("SELECT request_sha,request_json,approval_sha,approval_json,"
-                    "source_ack_sha,state,attempts,consumer_ack_sha,next_attempt_ms "
+                    "source_ack_sha,state,attempts,consumer_ack_sha,next_attempt_ms,"
+                    "source_ack_json,consumer_ack_json "
                     "FROM c_strategy_routes WHERE route_id=?",(route_id,)).fetchone()
     _check(row is not None,"ROUTE_NOT_FOUND")
     request=json.loads(row[1])
@@ -279,6 +325,18 @@ def _verify_stored(con, route_id):
         _check(approval["approval_sha256"]==row[2]
                and approval["request_sha256"]==row[0],
                "STORED_APPROVAL_PARENT")
+    source_ack=json.loads(row[9])
+    _verify_source_ack(con,request,source_ack)
+    if row[10] is not None:
+        consumed=json.loads(row[10])
+        _sha(consumed,"consumer_ack_sha256")
+        _check(row[7]==consumed["consumer_ack_sha256"]
+               and approval is not None
+               and consumed.get("approval_sha256")==approval["approval_sha256"]
+               and consumed.get("request_sha256")==request["request_sha256"],
+               "STORED_CONSUMER_ACK_DRIFT")
+    else:
+        _check(row[7] is None,"STORED_CONSUMER_ACK_MISSING")
     trace=_trace(con,route_id)
     return row,request,approval,trace
 
@@ -295,6 +353,11 @@ def enqueue_strategy_route(root, request, identity_map, warehouse,
     _check(type(route_id) is str and IDENT.fullmatch(route_id) is not None,
            "ROUTE_ID")
     _verify_request(request,identity_map,warehouse,nomination,source_ack,now_ms=now_ms)
+    source_con=_connect(root)
+    try:
+        _verify_source_ack(source_con,request,source_ack,nomination)
+    finally:
+        source_con.close()
     valid=_approval(approval,request,now_ms=now_ms)
     state="PENDING_CONSUMER" if valid is not None else "WAIT_APPROVAL"
     con=_connect(root)
@@ -312,12 +375,14 @@ def enqueue_strategy_route(root, request, identity_map, warehouse,
         else:
             con.execute("INSERT INTO c_strategy_routes("
                 "route_id,request_sha,request_json,approval_sha,approval_json,"
-                "source_ack_sha,state,attempts,consumer_ack_sha,next_attempt_ms)"
-                "VALUES(?,?,?,?,?,?,?,?,?,?)",
+                "source_ack_sha,state,attempts,consumer_ack_sha,next_attempt_ms,"
+                "source_ack_json,consumer_ack_json)"
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                 (route_id,request["request_sha256"],json.dumps(request,sort_keys=True),
                  valid["approval_sha256"] if valid else None,
                  json.dumps(valid,sort_keys=True) if valid else None,
-                 source_ack["receipt_sha256"],state,0,None,0))
+                 source_ack["receipt_sha256"],state,0,None,0,
+                 json.dumps(source_ack,sort_keys=True),None))
             _event(con,route_id,state,request_sha=request["request_sha256"],
                    approval_sha=valid["approval_sha256"] if valid else None,
                    source_ack_sha=source_ack["receipt_sha256"],
@@ -364,6 +429,8 @@ def _transition(root, route_id, *, now_ms, action, approval=None,
             reason="EXPLICIT_APPROVAL"
         elif action=="RETRY":
             _check(row[5] in ("PENDING_CONSUMER","RETRY"),"RETRY_NOT_ALLOWED")
+            _check(row[5]!="RETRY" or now_ms>=row[8],
+                   "RETRY_BACKOFF_NOT_ELAPSED")
             _check(type(retry_reason) is str and IDENT.fullmatch(retry_reason) is not None
                    and type(max_attempts) is int and 1<=max_attempts<=10,
                    "RETRY_PARAMETERS")
@@ -373,6 +440,11 @@ def _transition(root, route_id, *, now_ms, action, approval=None,
             app=prior;ack=None;reason=retry_reason
         elif action=="ACK":
             _check(row[5] in ("PENDING_CONSUMER","RETRY"),"ACK_NOT_ALLOWED")
+            _check(row[5]!="RETRY" or now_ms>=row[8],
+                   "CONSUMER_BACKOFF_NOT_ELAPSED")
+            _check(consumer_ack is not None
+                   and consumer_ack.get("route_id")==route_id,
+                   "CONSUMER_ROUTE_ID_DRIFT")
             _check(prior is not None,"MISSING_EXPLICIT_APPROVAL")
             _approval(prior,request,now_ms=now_ms)
             _verify_consumer_ack(consumer_ack,request,prior,now_ms)
@@ -384,11 +456,13 @@ def _transition(root, route_id, *, now_ms, action, approval=None,
         next_ms=(now_ms+min(3600,2**max(0,attempts-1))*1000
                  if state=="RETRY" else 0)
         con.execute("UPDATE c_strategy_routes SET approval_sha=?,approval_json=?,"
-                    "state=?,attempts=?,consumer_ack_sha=?,next_attempt_ms=?"
-                    "WHERE route_id=?",
+                    "state=?,attempts=?,consumer_ack_sha=?,next_attempt_ms=?,"
+                    "consumer_ack_json=? WHERE route_id=?",
                     (app["approval_sha256"] if app else None,
                      json.dumps(app,sort_keys=True) if app else None,
-                     state,attempts,ack,next_ms,route_id))
+                     state,attempts,ack,next_ms,
+                     json.dumps(consumer_ack,sort_keys=True)
+                        if state=="ACKED_CONSUMER" else None,route_id))
         _event(con,route_id,state,request_sha=request["request_sha256"],
                approval_sha=app["approval_sha256"] if app else None,
                source_ack_sha=row[4],consumer_ack_sha=ack,
@@ -417,6 +491,14 @@ def _verify_consumer_ack(ack, request, approval, now_ms):
            and ack.get("core_253_query_local_sha256")==
                 request["core_253_query_local_sha256"]
            and ack.get("cutoff_ms")==request["cutoff_ms"]
+           and ack.get("route_id") is not None
+           and ack.get("source_ack_sha256")==request["source_ack_sha256"]
+           and ack.get("scanner_nomination_sha256")==
+                request["scanner_nomination_sha256"]
+           and ack.get("manifest_integrity_sha256")==
+                request["manifest_integrity_sha256"]
+           and ack.get("warehouse_receipt_sha256")==
+                request["warehouse_receipt_sha256"]
            and type(ack.get("accepted_at_ms")) is int
            and request["cutoff_ms"]<=ack["accepted_at_ms"]<=now_ms
            and ack["accepted_at_ms"]<request["expires_at_ms"],
