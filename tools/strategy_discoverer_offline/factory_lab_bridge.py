@@ -70,6 +70,22 @@ class SafetyFlagError(ValueError):
     """Raised when a package's safety flags do not satisfy hard constraints."""
 
 
+class ProvenanceMismatchError(ValueError):
+    """
+    Raised when cross-object provenance binding fails.
+
+    Specifically, one or more of:
+      - package.nomination_evidence_digest ≠ evidence.nomination_digest
+        (the package was not built from the supplied evidence object)
+      - package.attempt_ledger_head ≠ caller-supplied ledger_head_digest
+        (the caller-supplied ledger head does not match what was sealed in the package)
+
+    Either mismatch means the (package, evidence, ledger_head) triple is not
+    self-consistent and cannot be routed.  The bridge always records a
+    REJECTED_PROVENANCE_MISMATCH receipt so the attempt is auditable.
+    """
+
+
 def _verify_package_safety(pkg: DiscoveryCandidatePackageV1) -> None:
     """
     Verify that all Discoverer safety flags are intact before routing.
@@ -233,13 +249,52 @@ class DiscovererToFactoryBridge:
             self._log.append(receipt)
             return BridgeRoutingResult(receipt=receipt, routed=False, quarantine_rule=None)
 
-        # --- 2. Denominator snapshot ----------------------------------------
+        # --- 2. Cross-object provenance binding --------------------------------
+        # Validate that (package, evidence, ledger_head_digest) form a coherent
+        # triple.  Both checks must pass; independent, fail-closed.
+        provenance_errors = []
+        if package.nomination_evidence_digest != evidence.nomination_digest:
+            provenance_errors.append(
+                f"nomination_evidence_digest mismatch: "
+                f"package={package.nomination_evidence_digest[:16]}… "
+                f"evidence={evidence.nomination_digest[:16]}…"
+            )
+        if package.attempt_ledger_head != ledger_head_digest:
+            provenance_errors.append(
+                f"attempt_ledger_head mismatch: "
+                f"package={package.attempt_ledger_head[:16]}… "
+                f"supplied={ledger_head_digest[:16]}…"
+            )
+        if provenance_errors:
+            reason = "Provenance binding failed: " + "; ".join(provenance_errors)
+            receipt = FactoryLabReceiptV1.build(
+                receipt_id=receipt_id,
+                routing_status=FactoryRoutingStatus.REJECTED_PROVENANCE_MISMATCH,
+                quarantine_reason=reason,
+                candidate_id=package.candidate_id,
+                package_digest=package.package_digest,
+                strategy_definition_digest=package.strategy_definition_digest,
+                family_id=package.family_id,
+                nomination_evidence_digest=package.nomination_evidence_digest,
+                denominator_snapshot=LabDenominatorSnapshotV1.from_evidence(evidence),
+                ledger_attempt_id=ledger_attempt_id,
+                ledger_head_digest=ledger_head_digest,
+                predecessor_receipt_digest=predecessor,
+                routed_at_ns=routed_at_ns,
+                safety_flags_verified=safety_verified,
+            )
+            self._log.append(receipt)
+            return BridgeRoutingResult(
+                receipt=receipt, routed=False, quarantine_rule=None
+            )
+
+        # --- 3. Denominator snapshot ----------------------------------------
         denominator_snapshot = LabDenominatorSnapshotV1.from_evidence(evidence)
 
-        # --- 3. Data isolation ----------------------------------------------
+        # --- 4. Data isolation ----------------------------------------------
         isolation = self._isolator.evaluate(evidence)
 
-        # --- 4. Assign routing status ----------------------------------------
+        # --- 5. Assign routing status ----------------------------------------
         if isolation.admitted:
             routing_status = FactoryRoutingStatus.ROUTED_SYNTHETIC_ONLY
             quarantine_reason = None
@@ -263,7 +318,7 @@ class DiscovererToFactoryBridge:
             quarantine_reason = isolation.reason
             quarantine_rule = isolation.rule_id
 
-        # --- 5. Build and log receipt ----------------------------------------
+        # --- 6. Build and log receipt ----------------------------------------
         receipt = FactoryLabReceiptV1.build(
             receipt_id=receipt_id,
             routing_status=routing_status,

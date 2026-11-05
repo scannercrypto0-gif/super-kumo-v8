@@ -45,6 +45,7 @@ from tools.strategy_discoverer_offline.factory_lab_contracts import (
 from tools.strategy_discoverer_offline.factory_lab_bridge import (
     DiscovererToFactoryBridge,
     SafetyFlagError,
+    ProvenanceMismatchError,
     _verify_package_safety,
 )
 
@@ -651,3 +652,142 @@ class TestSafetyFlagVerification:
             ledger_attempt_id="x", ledger_head_digest=NULL_SHA,
         )
         assert result.receipt.holdout_accessed is False
+
+
+# ---------------------------------------------------------------------------
+# TestProvenanceBinding — cross-object provenance validation (PM comment #258)
+# ---------------------------------------------------------------------------
+
+class TestProvenanceBinding:
+    """
+    Verifies that route() enforces full cross-object provenance binding:
+      (a) package.nomination_evidence_digest == evidence.nomination_digest
+      (b) package.attempt_ledger_head == caller-supplied ledger_head_digest
+
+    A mismatch on either (or both) must produce REJECTED_PROVENANCE_MISMATCH
+    with an auditable receipt; the attempt must appear in log counts.
+    A matching triple must be admitted normally.
+
+    Tests use independently valid packages and evidence objects — the objects
+    are individually well-formed, but are not bound to each other.
+    """
+
+    def test_evidence_digest_mismatch_rejected(self):
+        """
+        Package built from evidence_A, but route() receives evidence_B.
+        The nomination_evidence_digest stored in the package does not match
+        evidence_B.nomination_digest → REJECTED_PROVENANCE_MISMATCH.
+        """
+        evidence_a = _make_evidence(source_dataset_id="dataset-A")
+        evidence_b = _make_evidence(source_dataset_id="dataset-B")  # different object
+        # Package references evidence_A's digest
+        pkg = _make_package(evidence_a)
+        assert pkg.nomination_evidence_digest == evidence_a.nomination_digest
+        assert pkg.nomination_evidence_digest != evidence_b.nomination_digest
+
+        bridge = DiscovererToFactoryBridge()
+        result = bridge.route(
+            package=pkg,
+            evidence=evidence_b,          # wrong evidence supplied
+            ledger_attempt_id="attempt-001",
+            ledger_head_digest=NULL_SHA,  # matches pkg.attempt_ledger_head
+        )
+        assert result.routed is False
+        assert result.receipt.routing_status == FactoryRoutingStatus.REJECTED_PROVENANCE_MISMATCH.value
+        assert "nomination_evidence_digest" in result.receipt.quarantine_reason
+        # Attempt is recorded in the log
+        assert bridge.log.rejected_count == 1
+
+    def test_ledger_head_mismatch_rejected(self):
+        """
+        Package seals attempt_ledger_head=NULL_SHA, but caller supplies a
+        different ledger_head_digest → REJECTED_PROVENANCE_MISMATCH.
+        """
+        ev = _make_evidence()
+        pkg = _make_package(ev)              # attempt_ledger_head == NULL_SHA
+        wrong_head = _sha256({"seq": "wrong-head"})
+
+        bridge = DiscovererToFactoryBridge()
+        result = bridge.route(
+            package=pkg,
+            evidence=ev,
+            ledger_attempt_id="attempt-002",
+            ledger_head_digest=wrong_head,  # does not match pkg.attempt_ledger_head
+        )
+        assert result.routed is False
+        assert result.receipt.routing_status == FactoryRoutingStatus.REJECTED_PROVENANCE_MISMATCH.value
+        assert "attempt_ledger_head" in result.receipt.quarantine_reason
+        assert bridge.log.rejected_count == 1
+
+    def test_both_mismatches_produce_single_receipt(self):
+        """
+        Both evidence digest AND ledger head are mismatched.
+        Still produces exactly one REJECTED_PROVENANCE_MISMATCH receipt and
+        the reason string mentions both failures.
+        """
+        evidence_a = _make_evidence(source_dataset_id="ev-A")
+        evidence_b = _make_evidence(source_dataset_id="ev-B")
+        pkg = _make_package(evidence_a)      # binds to ev-A and NULL_SHA ledger head
+        wrong_head = _sha256({"seq": "wrong-head-2"})
+
+        bridge = DiscovererToFactoryBridge()
+        result = bridge.route(
+            package=pkg,
+            evidence=evidence_b,
+            ledger_attempt_id="attempt-003",
+            ledger_head_digest=wrong_head,
+        )
+        assert result.routed is False
+        assert result.receipt.routing_status == FactoryRoutingStatus.REJECTED_PROVENANCE_MISMATCH.value
+        # Both failures must appear in the reason
+        assert "nomination_evidence_digest" in result.receipt.quarantine_reason
+        assert "attempt_ledger_head" in result.receipt.quarantine_reason
+        # Exactly one receipt recorded
+        assert len(bridge.log) == 1
+        assert bridge.log.rejected_count == 1
+
+    def test_exact_cross_binding_admitted(self):
+        """
+        When package, evidence, and ledger_head_digest all match exactly,
+        a fully admitted evidence object is routed ROUTED_SYNTHETIC_ONLY.
+        This is the positive complement of the negative cases.
+        """
+        ev = _make_evidence()
+        pkg = _make_package(ev)
+        # pkg.attempt_ledger_head == NULL_SHA by fixture convention
+        assert pkg.nomination_evidence_digest == ev.nomination_digest
+
+        bridge = DiscovererToFactoryBridge()
+        result = bridge.route(
+            package=pkg,
+            evidence=ev,
+            ledger_attempt_id="attempt-004",
+            ledger_head_digest=NULL_SHA,   # matches pkg.attempt_ledger_head
+        )
+        assert result.routed is True
+        assert result.receipt.routing_status == FactoryRoutingStatus.ROUTED_SYNTHETIC_ONLY.value
+        assert bridge.log.routed_count == 1
+        assert bridge.log.rejected_count == 0
+
+    def test_provenance_check_before_isolation(self):
+        """
+        Provenance binding is enforced before data-source isolation.
+        Even evidence that would be quarantined by isolation rules gets
+        REJECTED_PROVENANCE_MISMATCH (not a QUARANTINED_* status) when
+        the package doesn't reference it.
+        """
+        evidence_a = _make_evidence(source_dataset_id="ev-prov-A")
+        # evidence_b has cutoff_ms=0 (would trigger R3 → QUARANTINED_UNDOCUMENTED_TIME)
+        evidence_b = _make_evidence(source_dataset_id="ev-prov-B", cutoff_ms=0)
+        pkg = _make_package(evidence_a)   # bound to ev-A, not ev-B
+
+        bridge = DiscovererToFactoryBridge()
+        result = bridge.route(
+            package=pkg,
+            evidence=evidence_b,          # wrong evidence (also R3 trigger)
+            ledger_attempt_id="attempt-005",
+            ledger_head_digest=NULL_SHA,
+        )
+        # Provenance check takes precedence over isolation rules
+        assert result.receipt.routing_status == FactoryRoutingStatus.REJECTED_PROVENANCE_MISMATCH.value
+        assert "nomination_evidence_digest" in result.receipt.quarantine_reason
