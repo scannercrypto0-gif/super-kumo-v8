@@ -429,3 +429,102 @@ def connect_canonical_test_only_strategy(
         "orders_created":0,"paper_positions":0,"actual_fills":None,
     }
     return {**body,"canonical_bridge_sha256":digest(body)}
+
+
+def read_factory_canonical_strategy_offer(
+    root, *, same_source_inputs, canonical_bridge_receipt, now_ms,
+):
+    """Verified read-only Factory handoff, not a Factory consumer ACK.
+
+    Recomputes the actual RAW->Core queries->Scanner bytes proof before
+    reporting Core C's durable strategy offer and canonical owner SHA links.
+    No source-only ACK, synthetic Scanner SELECTED or Core projected approval
+    is allowed to stand in for a Factory consumer receipt.
+    """
+    from research_wp_r0.aql_core_c_strategy_secretary_route_v1 import _verify_stored
+    _sealed(canonical_bridge_receipt, "canonical_bridge_sha256")
+    proof=verify_same_source_research(root,**same_source_inputs)
+    _check= require
+    bridge=canonical_bridge_receipt
+    _check(bridge.get("schema")==BRIDGE_SCHEMA
+           and bridge.get("status")=="PENDING_FACTORY_CONSUMER_TEST_ONLY"
+           and bridge.get("same_source_proof_sha256")==
+               proof["same_source_proof_sha256"]
+           and bridge.get("canonical_scanner_c_approval_sha256")==
+               proof["scanner_c_explicit_approval_sha256"]
+           and bridge.get("canonical_scanner_c_route_sha256")==
+               proof["scanner_c_route_sha256"]
+           and bridge.get("source_only_ack_sha256")==
+               proof["source_only_ack_sha256"]
+           and bridge.get("factory_consumer_ack_sha256") is None,
+           "CORE_D_FACTORY_BRIDGE_PARENT_DRIFT")
+    con=_connect(root)
+    try:
+        row,request,approval,trace=_verify_stored(con,bridge["route_id"])
+    finally:
+        con.close()
+    _check(row[5]=="PENDING_CONSUMER" and row[7] is None
+           and approval is not None
+           and request["schema"]==INTERNAL_REQUEST_SCHEMA
+           and request["request_sha256"]==bridge["core_c_request_sha256"]
+           and request["canonical_scanner_c_route_sha256"]==
+               proof["scanner_c_route_sha256"]
+           and request["canonical_scanner_c_approval_sha256"]==
+               proof["scanner_c_explicit_approval_sha256"]
+           and request["same_source_proof_sha256"]==
+               proof["same_source_proof_sha256"]
+           and request["source_ack_sha256"]==
+               proof["source_only_ack_sha256"]
+           and approval["approval_sha256"]==
+               bridge["core_c_strategy_approval_projection_sha256"]
+           and approval["external_scanner_approval_sha256"]==
+               proof["scanner_c_explicit_approval_sha256"]
+           and approval["same_source_proof_sha256"]==
+               proof["same_source_proof_sha256"]
+           and approval["core_d_approval_kind"]==
+               "PROJECTION_ONLY_OF_EXPLICIT_SCANNER_C_ACTION"
+           and approval["core_d_route_ttl_not_scanner_approval_expiry"] is True,
+           "CORE_D_STORED_STRATEGY_PARENT_DRIFT")
+    snap=strategy_route_snapshot(root,bridge["route_id"],now_ms=now_ms)
+    _check(snap["state"]=="PENDING_CONSUMER"
+           and snap["route_receipt_sha256"]==
+               bridge["core_c_strategy_route_sha256"]
+           and snap["consumer_ack_sha256"] is None
+           and snap["route_ready_for_isolated_lab"] is False
+           and snap["trading_authority"]=="NONE",
+           "CORE_D_FACTORY_OFFER_NOT_WAITING")
+    body={
+        "schema":"aql.core.d.factory-canonical-strategy-offer.v1",
+        "status":"READY_FOR_EXPLICIT_FACTORY_RESEARCH_CONSUMER_ONLY",
+        "route_id":bridge["route_id"],
+        "canonical_bridge_sha256":bridge["canonical_bridge_sha256"],
+        "same_source_proof_sha256":proof["same_source_proof_sha256"],
+        "scanner_c_approval_sha256":proof["scanner_c_explicit_approval_sha256"],
+        "scanner_c_route_sha256":proof["scanner_c_route_sha256"],
+        "scanner_c_run_sha256":proof["scanner_run_sha256"],
+        "scanner_c_nomination_sha256":proof["scanner_nomination_sha256"],
+        "source_only_ack_sha256":proof["source_only_ack_sha256"],
+        "core_c_strategy_request_sha256":request["request_sha256"],
+        "core_c_approval_projection_sha256":approval["approval_sha256"],
+        "core_c_strategy_route_sha256":snap["route_receipt_sha256"],
+        "core_245_native_query_sha256":proof["core_245_native_query_sha256"],
+        "core_253_local_query_sha256":proof["core_253_local_query_sha256"],
+        "core_warehouse_receipt_sha256":proof["core_warehouse_receipt_sha256"],
+        "scanner_raw_source_sha256":proof["scanner_consumed_raw_sha256"],
+        "source_zip_sha256":proof["raw_vault_source_sha256"],
+        "strategy_id":request["strategy_id"],
+        "strategy_version":request["strategy_version"],
+        "config_digest":request["config_digest"],
+        "strategy_definition_digest":request["strategy_definition_digest"],
+        "symbol":request["symbol"],"timeframe":"15m",
+        "cutoff_ms":request["cutoff_ms"],
+        "expiry_ms":request["expires_at_ms"],
+        "source_only_ack_is_strategy_approval":False,
+        "scanner_approval_has_authenticated_issuer":False,
+        "factory_consumer_ack_sha256":None,
+        "lab_invoked":False,"paper_invoked":False,
+        "orders_created":0,"paper_positions":0,"actual_fills":None,
+        "historical_known_at_ms":None,"historical_pit":"NOT_ATTESTED",
+        "operational_paper_authority":"NONE","trading_authority":"NONE",
+    }
+    return {**body,"factory_offer_sha256":digest(body)}
