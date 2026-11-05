@@ -128,7 +128,8 @@ def _verified(con,route_id):
            and ack.get("source_zip_sha256")==gate["source_zip_sha256"]
            and ack.get("core_245_price_query_sha256")==gate["core_245_price_query_sha256"]
            and ack.get("core_253_query_local_sha256")==gate["core_253_query_local_sha256"]
-           and ack.get("cutoff_ms")==gate["cutoff_ms"]\n           and type(ack.get("accepted_at_ms")) is int
+           and ack.get("cutoff_ms")==gate["cutoff_ms"]
+           and type(ack.get("accepted_at_ms")) is int
            and gate["cutoff_ms"]<=ack["accepted_at_ms"]<row[7],
                "D_CONSUMER_ACK_PARENT_DRIFT")
     trace=_tail(con,route_id)
