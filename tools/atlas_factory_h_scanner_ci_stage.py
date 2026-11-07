@@ -13,6 +13,7 @@ import tarfile
 
 SCANNER_SHA="3c82448702c9ae35783716e4e2c3b640010db97c"
 CORE_SHA="59510d302e7bb97a63e3d9603b9fb9f81f8f378a"
+SCANNER_B_SHA="30c37ae56851488b882998c7fa0085ec51dbfc92"
 WORK235_SHA="6acbcc7fc243b132f58170df4c6469bbf7f4eff8"
 WORK235_BLOB="c27eb5aa70a6d671791ba1e55e9b078a272b611f"
 ALLOWED_ROOTS={"tools","research_wp_r0","src","tests"}
@@ -105,6 +106,32 @@ def main():
         work.parent.mkdir(parents=True,exist_ok=True)
         work.write_bytes(subprocess.check_output([
             "git","show",WORK235_SHA+":"+ALLOWED_FIXTURE]))
+    # Historical Scanner B native15m policy dependency lives on its own
+    # unmerged draft #257, not in the Scanner H isolated PR.
+    subprocess.run(["git","fetch","--no-tags","--depth=1",
+                    "origin",SCANNER_B_SHA],check=True)
+    b_archive=subprocess.check_output(["git","archive","--format=tar",
+                                       SCANNER_B_SHA])
+    b_count=0
+    with tarfile.open(fileobj=io.BytesIO(b_archive),mode="r:") as archive:
+        for item in archive:
+            path=PurePosixPath(item.name)
+            if (not item.isfile() or not path.parts or
+                path.parts[0] not in ALLOWED_ROOTS or
+                any(p in (".","..") for p in path.parts) or
+                not str(path).endswith(".py")):
+                continue
+            target=Path(str(path))
+            if target.exists():
+                continue
+            handle=archive.extractfile(item)
+            if handle is None:
+                continue
+            target.parent.mkdir(parents=True,exist_ok=True)
+            target.write_bytes(handle.read())
+            b_count+=1
+    print("STAGED_SCANNER_B_EXACT_SHA:",SCANNER_B_SHA,flush=True)
+    print("STAGED_MISSING_SCANNER_B_DEPENDENCIES:",b_count,flush=True)
     required={
         "tools/scanner_strategy_f/research_strategy_plugin.py",
         "tools/scanner_strategy_f/test_research_strategy_plugin.py",
