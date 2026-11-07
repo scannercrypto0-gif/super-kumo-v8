@@ -10,9 +10,8 @@ import json
 from pathlib import Path
 
 from research_wp_r0.aql_core_f_research_diagnostic_query_v1 import (
-    ADMITTED_MONTHS, _month_bounds, _one_read_only,
+    ADMITTED_MONTHS, _month_bounds,
 )
-from tools.raw_vault_offline.vault import RawVault
 
 SCHEMA = "aql.integration.f2-recovery-evidence.v1"
 EXPECTED_RECOVERY_FILE_SHA256 = (
@@ -76,34 +75,38 @@ def load_recovery_evidence(path, mapping):
 
 
 def read_recovered_diagnostic(warehouse_root, vault_root, recovery_path, mapping):
-    """Read existing source 10 times, with no admission or original F2 alias.
+    """Delegate all source/warehouse/dual-query verification to Core owner.
 
-    The underlying Core read-only primitive re-reads vault, stage, native245,
-    local253, compares 15m bar identity and enforces cutoff. Here we ALSO
-    recompute SHA256 of actual RawVault bytes instead of trusting the entry.
+    In particular, never construct RawVault or OfflineBridgeStager here:
+    their constructors may create directories or modify private custody.
     """
-    entries = load_recovery_evidence(recovery_path, mapping)
-    result = {}
-    for month in ADMITTED_MONTHS:
-        entry = entries[month]
-        start, end = _month_bounds(month)
-        readback = _one_read_only(
-            warehouse_root, vault_root, month=month, source_entry=entry,
-            start_ms=start, end_exclusive_ms=end, cutoff_ms=end + 1000)
-        actual_raw = RawVault(vault_root).read(entry["source_sha256"])
-        require(sha256(actual_raw).hexdigest() == entry["source_sha256"],
-                "RECOMPUTED_RAW_BYTES_DRIFT")
-        receipt = readback["receipt"]
-        require(receipt["readback_bar_count"] == entry["bars"] and
-                receipt["core245_native_query_sha256"] ==
-                entry["core_245_native_price_query_sha256"] and
-                receipt["core253_local_query_sha256"] ==
-                entry["core_253_local_query_sha256"] and
-                receipt["owner_f2_report_sha256"] is None and
-                receipt["owner_f2_report_pin_verified"] is False,
-                "SOURCE_QUERY_OR_F2_BOUNDARY_DRIFT")
-        result[month] = readback
-    return result
+    from research_wp_r0.aql_core_f_recovery_readonly_v1 import (
+        read_recovery_diagnostic,
+    )
+    # Independently verify actual opaque file bytes and strict untrusted
+    # mapping shape first, then Core recomputes each month from original bytes.
+    load_recovery_evidence(recovery_path, mapping)
+    results = read_recovery_diagnostic(
+        warehouse_root, vault_root, recovery_path, mapping)
+    require(type(results) is dict and set(results) == set(ADMITTED_MONTHS),
+            "CORE_SOURCE_COHORT_MISMATCH")
+    for month, result in results.items():
+        receipt = result["receipt"]
+        require(receipt["schema"] ==
+                "aql.core.f2-recovery-readonly-source.v1"
+                and receipt["month"] == month
+                and receipt["original_f2_report_sha256"] is None
+                and receipt["recovery_file_sha256"] ==
+                    EXPECTED_RECOVERY_FILE_SHA256
+                and receipt["bar_count"] == mapping["entries"][
+                    [x["month"] for x in mapping["entries"]].index(month)]["bars"]
+                and receipt["source_ack_sha256"] is None
+                and receipt["strategy_approval_sha256"] is None
+                and receipt["factory_consumer_ack_sha256"] is None
+                and receipt["trading_authority"] == "NONE",
+                "CORE_RECOVERY_RECEIPT_BOUNDARY_DRIFT")
+    return results
+
 
 def main():
     """Standalone source gate only; NOT the full Scanner/Factory diagnostic."""
@@ -123,7 +126,7 @@ def main():
         mapping = json.loads(p.read_text(encoding="utf-8"))
         result = read_recovered_diagnostic(
             a.warehouse_root, a.vault_root, a.recovery_file, mapping)
-        counts = {m: result[m]["receipt"]["readback_bar_count"]
+        counts = {m: result[m]["receipt"]["bar_count"]
                   for m in ADMITTED_MONTHS}
         require(len(counts) == 10 and sum(counts.values()) == 29376,
                 "RECOMPUTED_BAR_CENSUS")
