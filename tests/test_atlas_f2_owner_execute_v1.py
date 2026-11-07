@@ -39,26 +39,40 @@ class OwnerF2NegativeTests(unittest.TestCase):
             self.assertEqual(outcome["status"],"PRIVATE_WAIT")
             self.assertEqual(outcome["trading_authority"],"NONE")
             self.assertTrue({"warehouse_root","vault_root","recovery_file",
-                             "policy.costs","trial_ledger.trials",
-                             "inventory.2024-02.source_receipt_sha256"}.issubset(
+                             "operator_policy.schema",
+                             "operator_policy.costs.fee_entry_bps",
+                             "operator_policy.research_window.train_end_exclusive_ms"}.issubset(
                                  set(outcome["missing_fields"])))
+            self.assertFalse(any("trial_ledger" in x or "inventory." in x
+                                 for x in outcome["missing_fields"]))
             self.assertEqual(list(workspace.iterdir()),[])
 
     def test_unapproved_manifest_is_denied_without_touching_sources(self):
         self.assertEqual(runner.run({})["missing_fields"],
                          ["operator.manifest_or_authorization"])
 
-    def test_factory_ledger_cost_policy_inventory_not_fabricated(self):
-        self.assertEqual(policy_missing(None,None,None),[
-            "inventory.2024-02.source_receipt_sha256",
-            "inventory.2024-08.source_receipt_sha256",
-            "inventory.schema",
-            "policy.costs","policy.direction","policy.focus_month",
-            "policy.focus_strategy_id","policy.research_window",
-            "policy.schema","trial_ledger.plan_digest",
-            "trial_ledger.schema","trial_ledger.selected_attempt_id",
-            "trial_ledger.trials",
-        ])
+    def test_factory_v2_authorized_policy_missing_fields_not_fabricated(self):
+        missing=policy_missing(None,None,None)
+        expected={
+            "operator_policy.schema",
+            "operator_policy.owner_operator_authorized",
+            "operator_policy.costs",
+            "operator_policy.research_window",
+            "operator_policy.direction",
+            "operator_policy.ambiguity_policy",
+            "operator_policy.focus_month",
+            "operator_policy.focus_strategy_id",
+        }
+        expected.update("operator_policy.costs."+k for k in (
+            "fee_entry_bps","fee_exit_bps","spread_entry_bps",
+            "spread_exit_bps","slippage_entry_bps",
+            "slippage_exit_bps","funding_bps_per_bar"))
+        expected.update("operator_policy.research_window."+k for k in (
+            "train_end_exclusive_ms","embargo_ms","holdout_start_ms",
+            "holdout_end_exclusive_ms"))
+        self.assertEqual(missing,sorted(expected))
+        self.assertFalse(any("trial_ledger" in x or "inventory." in x
+                             for x in missing))
 
     def test_private_derived_bar_hash_is_factory_canonical(self):
         synthetic_test_only={
