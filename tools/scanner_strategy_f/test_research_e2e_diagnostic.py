@@ -176,11 +176,11 @@ class LocalResearchDiagnostic(unittest.TestCase):
         self.assertNotIn("PRIVATE_DO_NOT_EXPOSE",str(blocked))
 
     def test_exact_integration_windows_path_subclass_scope(self):
-        """Real pinned policy/Work235; a concrete Path must reach AST."""
+        """Integration passes concrete Path: verify real policy and scope."""
         from tools.scanner_strategy_f import research_e2e_diagnostic as diag
         phases=[]
-        with patch.object(diag.StrategyDefinition,"from_dict",
-                          side_effect=ValueError("TEST_AST_STOP")):
+        with patch.object(diag,"_code_sha",
+                          side_effect=ValueError("TEST_STOP_AFTER_AST")):
             with self.assertRaises(ValueError) as ctx:
                 diag.diagnostic_original_cohort(
                     warehouse_root=Path("/synthetic-only"),
@@ -188,8 +188,9 @@ class LocalResearchDiagnostic(unittest.TestCase):
                     policy_draft=self.draft,proposal=self.proposal,
                     approval_request=self.request,work_specs=self.work,
                     phase_callback=phases.append)
-        self.assertEqual(str(ctx.exception),"TEST_AST_STOP")
+        self.assertEqual(str(ctx.exception),"TEST_STOP_AFTER_AST")
         self.assertIn("COHORT_AST_RECONSTRUCT",phases)
+        self.assertEqual(phases[-1],"COHORT_CODE_FINGERPRINT")
         self.assertTrue(issubclass(type(Path(".")),Path))
 
     def test_scope_failures_distinguishable_without_private_values(self):
