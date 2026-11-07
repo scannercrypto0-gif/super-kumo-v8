@@ -67,6 +67,14 @@ def prepare_original_evaluator_operator_bundle(
             and a.data["scope"]["policy_draft_sha256"]==p.sha256
             and s["policy_draft_sha256"]==p.sha256,
             "F3_OPERATOR_SOURCE_POLICY_STRATEGY_SCOPE")
+    require(type(x.get("source_zip_sha256")) is str
+            and x["source_zip_sha256"]==next(
+                (v["original_source_sha256"] for v in
+                 (Frozen.restore(a).data for a in s["attempts"])
+                 if v["month"]==x["month"]
+                 and v["strategy_id"]==x["strategy_id"]
+                 and v["strategy_version"]==x["strategy_version"]), None),
+            "F3_OPERATOR_ORIGINAL_SOURCE_REQUIRED")
     original=[Frozen.restore(v).data for v in s["attempts"]]
     candidates=[v for v in original
                 if v["month"]==x["month"]
