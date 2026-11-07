@@ -11,6 +11,9 @@ on:
       - 'tools/atlas_f2_owner_provenance_v1.py'
       - 'tools/atlas_f2_owner_factory_packet_v1.py'
       - 'tools/atlas_f2_owner_execute.py'
+      - 'tools/atlas_integration_collect_all_gate.py'
+      - 'tools/atlas_integration_comprehensive_preflight.py'
+      - 'tests/test_atlas_integration_comprehensive_preflight.py'
       - 'tools/atlas_f2_stage_owner_overlay.py'
       - 'tools/atlas_f2_owner_run.ps1'
       - 'tests/test_atlas_f2_owner_execute_v1.py'
@@ -231,98 +234,19 @@ jobs:
           PY
       - name: Install test-only pytest and Scanner Ed25519 verifier dependency
         run: python -m pip install pytest cryptography
-      - name: ONE combined bounded E software gate
+      - name: ONE collect-all 42-suite diagnostic report (no first-failure abort)
         run: |
           set -euo pipefail
           export PYTHONPATH="$PWD:$PWD/tests:$PWD/_pinned_raw211"
-          python -m unittest discover -s tests -p 'test_aql_factory_d_canonical_consumer_v1.py' -v
-          python -m unittest discover -s tests -p 'test_aql_factory_e_research_results_store_v1.py' -v
-          python -m unittest discover -s tests -p 'test_aql_factory_e_discoverer_consumer_v1.py' -v
-          python -m unittest discover -s tests -p 'test_aql_core_e_historical_boundary_v1.py' -v
-          python -m unittest discover -s tests -p 'test_aql_factory_e_historical_source_boundary_v1.py' -v
-          python -m unittest discover -s tests -p 'test_aql_factory_e_core_scanner_historical_wait_v1.py' -v
-          python -m unittest discover -s tests -p 'test_aql_factory_e_durable_discoverer_consumer_v1.py' -v
-          python -m unittest discover -s tests -p 'test_aql_factory_e_migration_v1.py' -v
-          python -m unittest discover -s tests -p 'test_aql_factory_f_batch_ledger_v1.py' -v
-          python -m unittest discover -s tests -p 'test_aql_factory_f_scanner_bulk_consumer_v1.py' -v
-          python -m unittest discover -s tests -p 'test_aql_factory_f_private_original_cohort_v1.py' -v
-          python -m unittest discover -s tests -p 'test_aql_factory_f_role_authority_v1.py' -v
-          python -m unittest tools.scanner_strategy_f.test_bulk_census -v
-          python -m unittest tools.scanner_strategy_f.test_independent_policy_verification -v
-          python -m unittest tools.scanner_strategy_f.test_source_bound_intake -v
-          python -m unittest tools.scanner_strategy_f.test_secretary_factory_handoff -v
-          python -m unittest tools.scanner_strategy_f.test_strategy_specific_decision -v
-          python -m unittest tools.scanner_strategy_f.test_independent_evaluator_nomination -v
-          python -m unittest tools.scanner_strategy_f.test_private_operator_bundle -v
-          python -m unittest tools.scanner_strategy_f.test_research_e2e_diagnostic -v
-          python -m unittest discover -s tests -p 'test_aql_core_f_research_diagnostic_query_v1.py' -v
-          python -m unittest discover -s tests -p 'test_aql_factory_f_research_e2e_diagnostic_v1.py' -v
-          python -m unittest discover -s tests -p 'test_atlas_f_research_diagnostic_operator.py' -v
-          python -m unittest discover -s tests -p 'test_atlas_f2_recovery_evidence_v1.py' -v
-          python -m unittest discover -s tests -p 'test_atlas_f2_recovery_research_operator.py' -v
-          python -m unittest discover -s tests -p 'test_aql_factory_f_f2_recovery_research_v2.py' -v
-          python -m unittest discover -s tests -p 'test_atlas_f2_owner_execute_v1.py' -v
-          python -m unittest discover -s tests -p 'test_atlas_integration_comprehensive_preflight.py' -v
-          python -m tools.atlas_integration_comprehensive_preflight
-          python -m compileall -q tools/atlas_f2_owner_provenance_v1.py tools/atlas_f2_owner_factory_packet_v1.py tools/atlas_f2_owner_execute.py tools/atlas_f2_stage_owner_overlay.py
-          python -m unittest discover -s tests -p 'test_aql_core_f_recovery_readonly_v1.py' -v
-          python -m unittest tools.scanner_strategy_f.test_recovery_diagnostic_adapter -v
-          python -m unittest discover -s tests -p 'test_aql_factory_f_f2_recovery_diagnostic_v1.py' -v
-          python -m unittest discover -s tests -p 'test_aql_core_f5_secretary_authority_v1.py' -v
-          python -m unittest discover -s tests -p 'test_aql_factory_e_bounded_perf_v1.py' -v
-          python -m pytest tools/strategy_discoverer_offline/tests/test_package_e_durable_checkpoint.py -q
-          python -m unittest discover -s tests -p 'test_aql_core_e_status_evidence_v1.py' -v
-          python -m unittest tools.scanner_strategy_e.test_historical_research_policy -v
-          python tools/atlas_factory_e_bounded_perf.py --strategies 12 --symbols 8 --per-pair 4 --max-seconds 30 --max-peak-mib 96 --output e-factory-performance.json
-          python -m unittest tools.scanner_strategy_e.test_historical_core_screening -v
-          python -m pytest tools/strategy_discoverer_offline/tests/test_package_e_membership.py -q
-          python tools/atlas_e_combined_gate_manifest.py
-      - uses: actions/upload-artifact@v4
+          python -m tools.atlas_integration_collect_all_gate
+      - name: Upload combined bounded suite report even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: e-gate-${{ matrix.python-version }}
-          path: |
-            e-gate-evidence.json
-            e-factory-performance.json
-          if-no-files-found: error
-          retention-days: 14
-  windows-owner-operator-syntax:
-    runs-on: windows-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-        with: {persist-credentials: false}
-      - uses: actions/checkout@v4
-        with: {ref: 0ec35238de6cf48db07c5c977e1f0d04bc299f58, path: _pinned_factory_e, persist-credentials: false}
-      - uses: actions/checkout@v4
-        with: {ref: 998e3bcca8ca6f1150964dfa9d94726fec96b846, path: _pinned_core_f, persist-credentials: false}
-      - uses: actions/checkout@v4
-        with: {ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46, path: _pinned_raw211, persist-credentials: false}
-      - uses: actions/checkout@v4
-        with: {ref: e368dd491a0d80618bdc6c6e8f731a195d763dda, path: _pinned_raw_windows_lock, persist-credentials: false}
-      - uses: actions/checkout@v4
-        with: {ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8, path: _pinned_work235, persist-credentials: false}
-      - uses: actions/checkout@v4
-        with: {ref: 7bf0107a321c3018700e0dc7a5c7a6f0ecbaaa8e, path: _pinned_scanner_f, persist-credentials: false}
-      - uses: actions/checkout@v4
-        with: {ref: a2aa9c195095bcfe852fdc760e385ccb2acf3d5d, path: _pinned_scanner_e, persist-credentials: false}
-      - uses: actions/checkout@v4
-        with: {ref: a91e370ae7e5197e9af71f8300eeaff4a7aff022, path: _pinned_scanner_d, persist-credentials: false}
-      - uses: actions/checkout@v4
-        with: {ref: 1659713c80d1934f3c08af1af422b89cd5706360, path: _pinned_scanner_c, persist-credentials: false}
-      - uses: actions/checkout@v4
-        with: {ref: 30c37ae56851488b882998c7fa0085ec51dbfc92, path: _pinned_scanner_b, persist-credentials: false}
-      - uses: actions/checkout@v4
-        with: {ref: 1cb70f1212283fe34117882d18e0501fc6409fe7, path: _pinned_discoverer_f, persist-credentials: false}
-      - uses: actions/checkout@v4
-        with: {ref: 149ca90c09b96abb45d3bc2839b657711c9826ac, path: _pinned_discoverer_e, persist-credentials: false}
-      - uses: actions/checkout@v4
-        with: {ref: f2006c0e431690ccea8b0532095bf4f2a2dc88ba, path: _pinned_discoverer_base, persist-credentials: false}
-      - uses: actions/checkout@v4
-        with: {ref: 3af5b66d2b381b853a6b5be32c38b3d3d02e1ea7, path: _pinned_core_e, persist-credentials: false}
-      - uses: actions/checkout@v4
-        with: {ref: a86a590a5e2c32c18e03522f52896dbcf50c60ff, path: _pinned_core_d, persist-credentials: false}
-      - uses: actions/setup-python@v5
-        with: {python-version: '3.12'}
+          name: aql-collect-all-${{ matrix.python-version }}
+          path: aql-comprehensive-suite-report.json
+          if-no-files-found: warn
+
       - name: Stage SHA-verified Factory v2 and Core in isolated Windows CI
         shell: bash
         run: |
