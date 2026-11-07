@@ -111,6 +111,7 @@ def stage(root):
         "aql_factory_f_role_authority_v1.py",
         "aql_factory_f_research_e2e_diagnostic_v1.py",
         "aql_factory_f_f2_recovery_diagnostic_v1.py",
+        "aql_factory_f_f2_recovery_research_v2.py",
     ):
         _copy_checked(fac/name,target/"research_wp_r0"/name)
     base=root/"_pinned_raw211"/"tools/raw_vault_offline"
