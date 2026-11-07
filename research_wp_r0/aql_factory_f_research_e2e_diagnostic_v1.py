@@ -120,7 +120,10 @@ def validate_diagnostic_input(packet):
         attempts.append({k:row[k] for k in (
             "attempt_id","candidate_id","state","source_receipt_sha256")})
     need(len(candidates)==2 and all(x==2 for x in admitted_counts.values())
-         and all(x==2 for x in retained_counts.values()),
+         and all(x==2 for x in retained_counts.values())
+         and all({row["candidate_id"] for row in packet["attempts"]
+                  if row["month"]==m}==candidates
+                 for m in MONTHS+["2024-02","2024-08"]),
          "MISSING_STRATEGY_MONTH_DENOMINATOR")
     packet_trial=packet["trial_packet"]
     need(type(packet_trial) is dict and packet_trial.get("schema")
@@ -161,6 +164,10 @@ def validate_diagnostic_input(packet):
          (None,definition.digest),"STRATEGY_PARENT")
     need(packet_trial.get("selected_attempt_id") in seen,
          "RULE_TRIAL_NOT_IN_CENSUS")
+    need(packet_trial.get("selected_attempt_id") in
+         {row["attempt_id"] for row in packet["attempts"]
+          if row["month"]==month and row["state"]=="UNKNOWN"},
+         "COMPUTATIONAL_FOCUS_ONLY_NOT_SELECTED")
     need(any(r["attempt_id"]==packet_trial["selected_attempt_id"] and
              r["month"]==month for r in packet["attempts"]),
          "RULE_MONTH_IDENTITY")
