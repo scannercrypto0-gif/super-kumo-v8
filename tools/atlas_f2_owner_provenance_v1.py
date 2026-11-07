@@ -297,7 +297,7 @@ def _project_verified_recovery_entry(row):
     }
 
 
-def collect_recovery_source(warehouse_root, vault_root, recovery_file):
+def collect_recovery_source(warehouse_root, vault_root, recovery_file, stage_callback=None):
     """Derive two missing parents from ORIGINAL source bytes, never a claim.
 
     This module intentionally carries a reviewed source-only derivation
@@ -312,6 +312,8 @@ def collect_recovery_source(warehouse_root, vault_root, recovery_file):
         _owner_report_pins, read_recovery_diagnostic,
     )
     from tools.atlas_f2_recovery_evidence_v1 import load_recovery_evidence
+    mark = stage_callback if stage_callback is not None else (lambda _: None)
+    mark("RECOVERY_REPORT_PIN")
     recovery = _existing(recovery_file, limit=5_000_000)
     report = _owner_report_pins(recovery.read_bytes())
     source_rows = {row["month"]: row for row in report["entries"]}
@@ -320,6 +322,7 @@ def collect_recovery_source(warehouse_root, vault_root, recovery_file):
     for month in ADMITTED_MONTHS:
         row = source_rows[month]
         producer = _project_verified_recovery_entry(row)
+        mark("RECOVERY_SOURCE_MONTH")
         source = _derive_existing_month(
             warehouse_root, vault_root, month, producer)
         receipt = source["receipt"]
@@ -345,7 +348,9 @@ def collect_recovery_source(warehouse_root, vault_root, recovery_file):
         "owner_f2_report_sha256": None,
         "entries": rows,
     }
+    mark("RECOVERY_MAPPING_VALIDATION")
     load_recovery_evidence(recovery_file, mapping)
+    mark("CORE_INDEPENDENT_READBACK")
     original = read_recovery_diagnostic(
         warehouse_root, vault_root, recovery_file, mapping)
     need(set(original) == set(ADMITTED_MONTHS) and
