@@ -274,6 +274,29 @@ def _derive_existing_month(warehouse_root, vault_root, month, untrusted):
     }
 
 
+def _project_verified_recovery_entry(row):
+    """Bridge report entry to the separate Core *mapping* state only.
+
+    Recovery producer reports DUAL_READBACK_VERIFIED. Core's strict mapping
+    verifier requires RAW_AND_DUAL_QUERY_READBACK after reconstruction of
+    warehouse and dual-map source parents. The latter is NOT an assertion that
+    the original F2 report was restored; the official Core source verifier
+    must still independently replay the reconstructed ten-month mapping.
+    """
+    need(type(row) is dict and row.get("state") == "DUAL_READBACK_VERIFIED",
+         "RECOVERY_ENTRY_STATE_DRIFT")
+    return {
+        "month": row["month"],
+        "state": "RAW_AND_DUAL_QUERY_READBACK",
+        "bars": row["bars"],
+        "source_sha256": row["source_sha256"],
+        "core_245_native_price_query_sha256":
+            row["core245_native_query_sha256"],
+        "core_253_local_query_sha256":
+            row["core253_local_query_sha256"],
+    }
+
+
 def collect_recovery_source(warehouse_root, vault_root, recovery_file):
     """Derive two missing parents from ORIGINAL source bytes, never a claim.
 
@@ -296,14 +319,7 @@ def collect_recovery_source(warehouse_root, vault_root, recovery_file):
     rows = []
     for month in ADMITTED_MONTHS:
         row = source_rows[month]
-        producer = {
-            "month": month, "state": row["state"], "bars": row["bars"],
-            "source_sha256": row["source_sha256"],
-            "core_245_native_price_query_sha256":
-                row["core245_native_query_sha256"],
-            "core_253_local_query_sha256":
-                row["core253_local_query_sha256"],
-        }
+        producer = _project_verified_recovery_entry(row)
         source = _derive_existing_month(
             warehouse_root, vault_root, month, producer)
         receipt = source["receipt"]
