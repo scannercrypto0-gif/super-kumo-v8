@@ -61,6 +61,10 @@ def _sanitized_exception(exc):
     # No str(exc), traceback, private paths, data or hash values.
     # Builtin failure class is useful to distinguish a code bug from IO/SQLite.
     kind=type(exc).__name__
+    # Work235 uses BoundaryError(ValueError): retain its *base class*
+    # without exposing its potentially private, dynamically built message.
+    if isinstance(exc, ValueError):
+        kind="ValueError"
     if kind not in {
         "NameError","UnboundLocalError","TypeError","KeyError","AttributeError",
         "IndexError","ValueError","AssertionError","RuntimeError",
@@ -68,7 +72,24 @@ def _sanitized_exception(exc):
         "DatabaseError","IntegrityError","JSONDecodeError",
     }:
         kind="OTHER_EXCEPTION"
-    return {"failure_stage":CURRENT_STAGE,"failure_class":kind}
+    result={"failure_stage":CURRENT_STAGE,"failure_class":kind}
+    # Only these static, audited Scanner/Work235 failure identifiers may
+    # cross the privacy boundary. No dynamic DEPENDENCY_REFUSED details.
+    if CURRENT_STAGE=="SCANNER_RECOVERY_DIAGNOSTIC" and isinstance(exc, ValueError):
+        safe_scanner_codes=frozenset((
+            "FROZEN_DIGEST_DRIFT","INPUT_BYTE_LIMIT","DUPLICATE_JSON_KEY",
+            "NONFINITE_JSON","F_DIAG_RECOVERY_VERSION_OR_COHORT_MISMATCH",
+            "F_DIAG_RECOVERY_CORE_RESULT_SHAPE",
+            "F_DIAG_RECOVERY_CANNOT_IMPERSONATE_F2_OR_SIGNED_F5",
+            "F_DIAG_RECOVERY_LOCAL253_RECOMPUTED_SHA_DRIFT",
+            "F_DIAG_RECOVERY_CORE_PARENT_MISSING",
+            "F_DIAG_RECOVERY_NATIVE_LOCAL_BAR_DRIFT",
+            "F_DIAG_RECOVERY_CANNOT_PROMOTE_AUTHORITY",
+        ))
+        reason=str(exc)
+        if reason in safe_scanner_codes:
+            result["failure_reason_code"]=reason
+    return result
 
 
 
