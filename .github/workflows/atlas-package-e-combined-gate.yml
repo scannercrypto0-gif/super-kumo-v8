@@ -338,8 +338,17 @@ jobs:
               dest.parent.mkdir(parents=True,exist_ok=True)
               shutil.copyfile(source,dest)
               assert source.read_bytes()==dest.read_bytes(), ('RAW_VAULT_WINDOWS_BYTES',name)
-          v=rawfixed/'vault.py'
-          assert hashlib.sha1(b'blob '+str(v.stat().st_size).encode()+bytes([0])+v.read_bytes()).hexdigest()=='6b5bcc1d684088934f5ed7110064380b8d2bc0cd', 'RAW_VAULT_WINDOWS_BLOB_DRIFT'
+          # Windows checkout may CRLF-convert this canonical raw blob.
+          # Rehydrate EXACT bytes using git cat-file, as the owner runner does.
+          vault_blob='6b5bcc1d684088934f5ed7110064380b8d2bc0cd'
+          original=subprocess.check_output(['git','-C','_pinned_raw_windows_lock',
+                                            'cat-file','blob',vault_blob])
+          actual_blob=hashlib.sha1(b'blob '+str(len(original)).encode()+
+                                   bytes([0])+original).hexdigest()
+          assert actual_blob==vault_blob, 'RAW_VAULT_WINDOWS_BLOB_DRIFT'
+          vault_dest=Path('tools/raw_vault_offline/vault.py')
+          vault_dest.write_bytes(original)
+          assert vault_dest.read_bytes()==original, 'RAW_VAULT_EXACT_BYTES_DRIFT'
           names={
             '_pinned_factory_e':(
               'aql_factory_e_research_results_store_v1.py',
