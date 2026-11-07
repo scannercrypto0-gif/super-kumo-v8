@@ -71,7 +71,8 @@ def _validate_original_owner_report(report):
     _require(type(entries) is list and len(entries) == 10 and
              all(type(x) is dict for x in entries) and
              {x.get("month") for x in entries} == set(ADMITTED_MONTHS) and
-             sum(x.get("bars", 0) for x in entries) == 29376 and
+             all(type(x.get("bars")) is int for x in entries) and
+             sum(x["bars"] for x in entries) == 29376 and
              all(x.get("state") == "RAW_AND_DUAL_QUERY_READBACK"
                  and x.get("historical_pit") == "NOT_ATTESTED"
                  and x.get("bars") ==
@@ -114,9 +115,15 @@ def _one_read_only(warehouse_root, vault_root, *, month, source_entry,
     _require(all((vault_root / name).is_dir() and
                  not (vault_root / name).is_symlink()
                  for name in ("objects", ".staging")) and
-             (vault_root / "manifest.jsonl").is_file() and
-             (vault_root / "index.json").is_file(),
+             all((vault_root / name).is_file() and
+                 not (vault_root / name).is_symlink()
+                 for name in ("manifest.jsonl", "index.json")),
              "DIAGNOSTIC_EXISTING_VAULT_ONLY")
+    object_parent = vault_root / "objects" / source_sha[:2]
+    object_file = object_parent / source_sha[2:]
+    _require(object_parent.is_dir() and not object_parent.is_symlink() and
+             object_file.is_file() and not object_file.is_symlink(),
+             "DIAGNOSTIC_RAW_OBJECT_LINK_OR_MISSING")
     # Open preexisting SQLite database RO, never invoke _connect/admit.
     con = sqlite3.connect(
         (warehouse_root / "warehouse.sqlite").as_uri() + "?mode=ro",
