@@ -60,7 +60,7 @@ class F3ExternalEvaluatorNomination(SourceBoundIntake):
         self.key=Ed25519PrivateKey.generate()
         pub=self.key.public_key().public_bytes(
             serialization.Encoding.Raw,serialization.PublicFormat.Raw)
-        self.keys={"evaluator-authorized":{
+        self.evaluator_keys={"evaluator-authorized":{
             "public_key_hex":pub.hex(),
             "approver_identity":"external-evaluator-owner",
             "authority":"INDEPENDENT_EVALUATOR",
@@ -98,7 +98,7 @@ class F3ExternalEvaluatorNomination(SourceBoundIntake):
         args=dict(signed_evaluation=self.receipt,
                   strategy_decision=self.decision,
                   source_bound_census=self.census,
-                  trusted_evaluator_keyring=self.keys,
+                  trusted_evaluator_keyring=self.evaluator_keys,
                   observed_at_utc="2026-11-07T09:00:00Z")
         args.update(kw)
         return verify_external_evaluator_receipt(**args)
@@ -123,18 +123,18 @@ class F3ExternalEvaluatorNomination(SourceBoundIntake):
     def test_wrong_missing_disabled_root_and_signer_rejected(self):
         for keys in (
             {},
-            {"evaluator-authorized":{**self.keys["evaluator-authorized"],
+            {"evaluator-authorized":{**self.evaluator_keys["evaluator-authorized"],
                 "authority":"SCANNER_SELF"}},
-            {"evaluator-authorized":{**self.keys["evaluator-authorized"],
+            {"evaluator-authorized":{**self.evaluator_keys["evaluator-authorized"],
                 "enabled":False}},
-            {"evaluator-authorized":{**self.keys["evaluator-authorized"],
+            {"evaluator-authorized":{**self.evaluator_keys["evaluator-authorized"],
                 "approver_identity":"other"}},
         ):
             with self.subTest(keys=keys),self.assertRaises(ValueError):
                 self.verify(trusted_evaluator_keyring=keys)
         badkey=Ed25519PrivateKey.generate().public_key().public_bytes(
             serialization.Encoding.Raw,serialization.PublicFormat.Raw)
-        keys=copy.deepcopy(self.keys)
+        keys=copy.deepcopy(self.evaluator_keys)
         keys["evaluator-authorized"]["public_key_hex"]=badkey.hex()
         with self.assertRaises(ValueError):
             self.verify(trusted_evaluator_keyring=keys)
