@@ -172,6 +172,8 @@ def research_signal_policy(*, source_class="TEST_ONLY"):
 
 
 def _validate_policy(policy):
+    require(type(policy) is dict and set(policy)=={"payload","sha256"},
+            "H_POLICY_REQUIRED")
     p=Frozen.restore(policy).data
     require(set(p)=={
         "schema","source_class","research_scope","historical_pit",
@@ -296,6 +298,8 @@ def evaluate_strategy_plugin(
     PARTIAL/UNKNOWN inputs are entirely quarantined to UNKNOWN: no indicator
     warmup across missing bars, no fake NO_SIGNAL denominator.
     """
+    require(type(plugin) is dict and set(plugin)=={"payload","sha256"},
+            "H_PLUGIN_RECEIPT_REQUIRED")
     obj=Frozen.restore(plugin)
     data=obj.data
     require(set(data)==PLUGIN_FIELDS
@@ -416,6 +420,8 @@ def evaluate_strategy_plugin(
 
 def verify_factory_signal_batch(batch):
     """Verify deterministic event identity and invariants; NOT price replay."""
+    require(type(batch) is dict and set(batch)=={"payload","sha256"},
+            "H_FACTORY_BATCH_RECEIPT_REQUIRED")
     obj=Frozen.restore(batch)
     x=obj.data
     require(set(x)==BATCH_FIELDS
@@ -441,7 +447,8 @@ def verify_factory_signal_batch(batch):
     require(all(_hex(x.get(k)) for k in (
         "source_query_sha256","strategy_plugin_sha256",
         "evaluator_code_sha256","config_digest",
-        "strategy_definition_digest","policy_sha256"))
+        "strategy_definition_digest","policy_sha256",
+        "source_bytes_sha256","manifest_integrity_sha256"))
         and type(x.get("event_count")) is int
         and type(x.get("events")) is list
         and len(x["events"])==x["event_count"]
@@ -453,7 +460,10 @@ def verify_factory_signal_batch(batch):
         and all(type(v) is int and v>=0
                 for v in x["signal_counts"].values())
         and sum(x["signal_counts"].values())==x["event_count"]
+        and type(x.get("dataset_id")) is str
+        and type(x.get("decision_cutoff_ms")) is int
         and type(x.get("start_ms")) is int
+        and x["start_ms"]>=0 and x["start_ms"]%STEP==0
         and type(x.get("end_exclusive_ms")) is int
         and x["end_exclusive_ms"]-x["start_ms"]==
             x["event_count"]*STEP
