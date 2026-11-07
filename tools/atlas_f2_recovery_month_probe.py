@@ -101,6 +101,34 @@ def _reject_constant(_):
     raise ValueError("nonfinite json")
 
 
+# Evidence-grounded candidates represent distinct historical source
+# stages; only the literal selected after inspecting the original producer
+# can be promoted into the Core research receipt contract. Never accept
+# any of these candidates automatically as source authority.
+STATE_CANDIDATES = (
+    "RAW_AND_DUAL_QUERY_READBACK",          # F2 original admission
+    "OWNER_LOCAL_DUAL_READBACK_PASS",       # observed report disposition
+    "REVERIFIED_PRIVATE_BYTES",             # F2 local byte recheck
+    "OFFLINE_LOCAL_WAREHOUSE_COMMITTED",    # indexed warehouse receipt
+    "ORIGINAL_PIN_MATCHED_PROVENANCE_PENDING",  # sealed #226 admission
+)
+
+
+def state_equality_classes(report):
+    """Boolean-only candidate matches; no raw producer state string output."""
+    if type(report) is not dict or type(report.get("entries")) is not list:
+        return {"uniform": False, "matches": [], "all_ten_matched": False}
+    rows=report["entries"]
+    if len(rows)!=10 or any(type(row) is not dict for row in rows):
+        return {"uniform": False, "matches": [], "all_ten_matched": False}
+    vals=[row.get("state") for row in rows]
+    uniform=all(type(v) is str and v==vals[0] for v in vals)
+    matches=[{"candidate":name,"all_ten_equal":all(v==name for v in vals)}
+             for name in STATE_CANDIDATES]
+    return {"uniform":uniform,"matches":matches,
+            "all_ten_matched":any(x["all_ten_equal"] for x in matches)}
+
+
 def probe(path):
     """Only static safe output. Never trusts caller SHA or user-provided mapping."""
     try:
@@ -127,8 +155,11 @@ def probe(path):
                     "mismatches":[]}
         mismatches=categories(obj)
         if mismatches:
-            return {"status":"PRIVATE_WAIT","code":ERROR,
+            result={"status":"PRIVATE_WAIT","code":ERROR,
                     "mismatches":mismatches}
+            if len(mismatches)==1 and mismatches[0]["category"]=="STATE_LITERAL":
+                result["state_equality"]=state_equality_classes(obj)
+            return result
         # Keep all separate F5 authority predicates even though this probe is
         # diagnostic-only and does not sign or confer any authority.
         if obj.get("historical_pit")!="NOT_ATTESTED" or obj.get(
