@@ -93,9 +93,9 @@ class TestRecoveryDiagnostic(unittest.TestCase):
             start,end=_month_ms(month)
             count=(end-start)//900000
             bars=[{"bar_open_ms":start,"bar_close_ms":start+899999,
-                   "bar_checksum":"a"*64}]
+                   "bar_checksum":"a"*64}]*count
             native=[{"bar_open_ms":start,"bar_close_ms":start+899999,
-                     "checksum":"a"*64}]
+                     "checksum":"a"*64}]*count
             q={"query_sha256":"b"*64,"bars":bars,
                "available_bar_count":count,
                "source_bytes_sha256":"c"*64,
