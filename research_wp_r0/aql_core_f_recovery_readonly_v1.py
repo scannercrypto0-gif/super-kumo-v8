@@ -30,9 +30,17 @@ from tools.raw_vault_offline.schema import RawObjectMeta, logical_identity_key
 
 SCHEMA = "aql.core.f2-recovery-readonly-source.v1"
 MAPPING_SCHEMA = "aql.integration.f2-recovery-evidence.v1"
+# Owner-observed SHA256 of ACTUAL JSON FILE BYTES (PowerShell Get-FileHash).
 EXPECTED_RECOVERY_BYTES_SHA256 = (
+    "52b47d7d93f5966fffe41ae16cb21486fb14a0753a2821dccc35f4f09e4903d2"
+)
+# The producer's separate INTERNAL report identity; its canonical producer
+# algorithm was NOT independently available. Never alias it to file-byte SHA.
+EXPECTED_RECOVERY_INTERNAL_SHA256 = (
     "0428e7b02b7b57bded9906c49f956b76816c179cd8659d61e1c7f1af1df68220"
 )
+OWNER_REPORT_SCHEMA = "aql.owner-local.f2-recovery-evidence.v1"
+OWNER_REPORT_DISPOSITION = "OWNER_LOCAL_DUAL_READBACK_PASS"
 MONTH_FIELDS = frozenset((
     "month", "state", "bars", "source_sha256",
     "core_245_native_price_query_sha256", "core_253_local_query_sha256",
@@ -89,6 +97,38 @@ def _tree_fingerprint(roots):
                 out.append((str(p.relative_to(root)), p.is_dir(),
                             st.st_size, st.st_mtime_ns, str(root)))
     return digest(out)
+
+
+def _owner_report_pins(raw):
+    """Verify genuine owner-observed bytes AND internal identity separately.
+
+    The full producer's internal digest algorithm is not known; we verify
+    its explicitly recorded value inside a byte-pinned owner report, but
+    MUST NOT falsely claim independent canonical recomputation.
+    """
+    need(hashlib.sha256(raw).hexdigest() == EXPECTED_RECOVERY_BYTES_SHA256,
+         "OPAQUE_RECOVERY_FILE_SHA_MISMATCH")
+    def _pairs(items):
+        data = {}
+        for k, v in items:
+            need(k not in data, "REPORT_DUPLICATE_KEY")
+            data[k] = v
+        return data
+    def _reject_nonfinite(_):
+        raise ValueError("CORE_F2_RECOVERY_REPORT_NONFINITE")
+    try:
+        report = json.loads(raw, object_pairs_hook=_pairs,
+                            parse_constant=_reject_nonfinite)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError("CORE_F2_RECOVERY_OWNER_REPORT_INVALID_JSON") from exc
+    need(type(report) is dict and
+         report.get("schema") == OWNER_REPORT_SCHEMA and
+         report.get("recovery_sha256") == EXPECTED_RECOVERY_INTERNAL_SHA256 and
+         report.get("disposition") == OWNER_REPORT_DISPOSITION and
+         type(report.get("verified_months")) in (list, dict) and
+         len(report["verified_months"]) == len(ADMITTED_MONTHS),
+         "OWNER_REPORT_SCHEMA_OR_INTERNAL_PIN_DRIFT")
+    return report
 
 
 def _verify_mapping(mapping):
@@ -370,8 +410,9 @@ def read_recovery_diagnostic(warehouse_root, vault_root, recovery_file,
     are pinned. All 10 mapping rows are independently source-backed.
     """
     recovery = _existing(recovery_file,limit=5_000_000)
-    need(hashlib.sha256(recovery.read_bytes()).hexdigest() ==
-         EXPECTED_RECOVERY_BYTES_SHA256, "OPAQUE_RECOVERY_FILE_SHA_MISMATCH")
+    # Real file bytes and internal producer identity are two DIFFERENT pins.
+    # Do not attempt to regenerate the producer's unknown digest algorithm.
+    _owner_report_pins(recovery.read_bytes())
     entries = _verify_mapping(untrusted_mapping)
     results = {
         m:_read_existing_month(warehouse_root,vault_root,m,entries[m])
@@ -382,7 +423,12 @@ def read_recovery_diagnostic(warehouse_root, vault_root, recovery_file,
     for result in results.values():
         body = {k:v for k,v in result["receipt"].items()
                 if k != "receipt_sha256"}
-        body["recovery_file_sha256"] = EXPECTED_RECOVERY_BYTES_SHA256
+        # Keep the cross-owner receipt field as the existing INTERNAL
+        # recovery identifier. Add explicit raw-byte evidence without silently
+        # changing the original field's semantics.
+        body["recovery_file_sha256"] = EXPECTED_RECOVERY_INTERNAL_SHA256
+        body["recovery_raw_bytes_sha256"] = EXPECTED_RECOVERY_BYTES_SHA256
+        body["recovery_internal_canonical_recomputed"] = False
         body["opaque_recovery_file_pin_verified"] = True
         result["receipt"] = {**body,"receipt_sha256":digest(body)}
     return results
