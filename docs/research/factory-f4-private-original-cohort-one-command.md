@@ -29,6 +29,9 @@ Set-Location 'E:\ATLAS\repo'
   --input-json 'E:\ATLAS\private\historical\f4\actual-input.json' `
   --trusted-witness-json 'E:\ATLAS\private\historical\f4\independent-witness.json' `
   --trusted-witness-sha256 '<independently verified 64-char SHA>' `
+  --role-attestations-json 'E:\\ATLAS\\private\\historical\\f4\\role-attestations.json' `
+  --independent-trust-registry-json 'E:\\ATLAS\\private\\historical\\f4\\independent-keyring.json' `
+  --trusted-now-utc '<independently trusted UTC, YYYY-MM-DDTHH:MM:SSZ>' `
   --results-store 'E:\ATLAS\private\historical\f4\results.sqlite' `
   --sanitized-out 'E:\ATLAS\private\historical\f4\factory-f4-sanitized-result.json'
 if ($LASTEXITCODE -ne 0) { throw 'FACTORY_F4_FAIL_CLOSED' }
@@ -42,3 +45,9 @@ On real accepted input, the code invokes existing AQL indicator AST rule evaluat
 ## Exact F2 handoff and one final report rule
 
 Core handoff: https://github.com/scannercrypto0-gif/super-kumo-v8/pull/275#issuecomment-6658725082 . Private F2 report SHA `daf1208bf824e58040858a817c709f7943c19668dc23ce3fd3b0368e01156f40` (owner-supplied); 10 admitted months, 29,376 bars, February/August inventory-only, historical PIT NOT_ATTESTED. The Windows RawVault lock/fsync branch is separate and should not be assumed merged into Core #275. Do NOT rerun populated warehouse/vault or invent a second store. Keep exact private source/approval proof and Lab receipt for **one** consolidated Audit #256; sanitized output only on GitHub. A later F2 report for a different exact source SHA creates a NEW immutable experiment/cohort ID.
+
+## 2026-11-07 F4 authority hardening and full census
+
+The private command now requires a **separate independently provisioned five-role Ed25519 key registry** and five role-signed attestation envelopes. Roles: SOURCE_CUSTODIAN, RESEARCH_POLICY_APPROVER, CORE_SOURCE_SECRETARY, CORE_STRATEGY_SECRETARY, INDEPENDENT_EVALUATOR. Each attestation `aql.factory.f.external-role-approval.v1` contains schema, role, key_id, approver_id, subject_sha256 = SHA of the entire private F4 input, issued_at_utc, expires_at_utc and Ed25519 signature_hex. The independently controlled registry maps each role to its distinct key_id, approver_id, public_key_hex and enabled flag. It must NOT be generated from F4 input or GitHub test fixtures, and the independently trusted UTC time is mandatory. The command checks five unique roots/approvers/signatures and temporal validity before issuing its own Consumer ACK or evaluating Lab. A self-created SHA-only witness no longer suffices. Original Scanner F3 Ed25519 policy verification and private source byte-to-bar membership still require independent operator checks.
+
+The Factory E immutable experiment now carries **24 attempts** in one final census: exactly 20 source-admitted candidate×month identities plus 4 February/August `UNKNOWN` rows with special `INVENTORY_ONLY_NOT_READBACK` *metadata placeholder* SHA, not a source archive hash. The sanitized report includes `full_attempt_count=24`, `full_attempt_census_sha256`, `feb_aug_inventory_only_unknown=4`. The F4 private run stays WAIT unless a real original-source strategy-selected and separately Secretary-approved input exists. Retrospective NON_PIT, no execution/Paper/G0.
