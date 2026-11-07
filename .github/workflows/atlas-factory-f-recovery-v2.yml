@@ -1,0 +1,29 @@
+name: ATLAS Factory Recovery 24-Attempt V2 (Research Only)
+on:
+  push:
+    branches:
+      - factory/package-e-historical-research-results-20261105
+    paths:
+      - 'research_wp_r0/aql_factory_f_f2_recovery_research_v2.py'
+      - 'tests/test_aql_factory_f_f2_recovery_research_v2.py'
+      - '.github/workflows/atlas-factory-f-recovery-v2.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recovery-v2-focused:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11','3.12','3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Recovery V2 24-attempt research-only contract and replay
+        run: |
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_factory_f_f2_recovery_research_v2.py' -v
