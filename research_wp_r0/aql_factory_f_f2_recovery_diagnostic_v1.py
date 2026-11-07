@@ -20,6 +20,9 @@ from research_wp_r0.aql_factory_f_research_e2e_diagnostic_v1 import (
 SCHEMA="aql.factory.f.f2-recovery-evidence-diagnostic-input.v1"
 REPORT="aql.factory.f.f2-recovery-evidence-diagnostic-report.v1"
 RECOVERY_SHA="0428e7b02b7b57bded9906c49f956b76816c179cd8659d61e1c7f1af1df68220"
+# Raw JSON byte digest is distinct from the producer's internal identifier.
+# We do not claim to have recomputed the producer's internal canonical hash.
+RECOVERY_RAW_BYTES_SHA="52b47d7d93f5966fffe41ae16cb21486fb14a0753a2821dccc35f4f09e4903d2"
 CORE_SCHEMA="aql.core.f2-recovery-readonly-source.v1"
 RECEIPT_FIELDS={
     "schema","month","dataset_id","status","recovery_file_sha256",
@@ -29,6 +32,7 @@ RECEIPT_FIELDS={
     "dual_map_sha256","bar_count","start_ms","end_exclusive_ms",
     "decision_cutoff_ms","no_write_tree_fingerprint_sha256",
     "opaque_recovery_file_pin_verified",
+    "recovery_raw_bytes_sha256","recovery_internal_canonical_recomputed",
     "historical_pit","source_ack_sha256","strategy_approval_sha256",
     "factory_consumer_ack_sha256","secretary_state","trading_authority",
     "receipt_sha256"
@@ -73,6 +77,8 @@ def verified_core_receipts(recovery):
              and receipt["recovery_file_sha256"]==RECOVERY_SHA
              and receipt["original_f2_report_sha256"] is None
              and receipt["opaque_recovery_file_pin_verified"] is True
+             and receipt["recovery_raw_bytes_sha256"]==RECOVERY_RAW_BYTES_SHA
+             and receipt["recovery_internal_canonical_recomputed"] is False
              and receipt["historical_pit"]=="NOT_ATTESTED"
              and receipt["secretary_state"]=="NOT_ENQUEUED"
              and receipt["trading_authority"]=="NONE"
