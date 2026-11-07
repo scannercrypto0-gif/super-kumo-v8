@@ -175,6 +175,26 @@ class DiagnosticOriginalCausality(unittest.TestCase):
                 {"schema":"aql.core.f.private-raw-warehouse-dual-query-report.v1",
                  "report_sha256":"0"*64}, month="2024-01")
 
+    def test_diagnostic_receipt_cannot_be_promoted_to_signed_f5(self):
+        from research_wp_r0.aql_core_f5_secretary_authority_v1 import (
+            SOURCE_ROLE, STRATEGY_ROLE, _signed,
+        )
+        untrusted_diagnostic = {
+            "schema": SCHEMA,
+            "kind":"RESEARCH_E2E_DIAGNOSTIC",
+            "source_ack_sha256":None,
+            "strategy_approval_sha256":None,
+            "historical_pit":"NOT_ATTESTED",
+            "trading_authority":"NONE",
+            "receipt_sha256":"a"*64,
+        }
+        for authority in (SOURCE_ROLE, STRATEGY_ROLE):
+            with self.subTest(authority=authority),self.assertRaisesRegex(
+                    ValueError,"CORE_F5_RECEIPT_FIELDS_DRIFT"):
+                _signed(authority, untrusted_diagnostic,
+                        trusted_registry={},
+                        trusted_now_utc="2026-11-07T06:00:00Z")
+
     def test_public_diagnostic_refuses_inventory_only_feb_and_aug(self):
         # No real original report available; month eligibility remains strict.
         from research_wp_r0.aql_core_f_research_diagnostic_query_v1 import _month_bounds
