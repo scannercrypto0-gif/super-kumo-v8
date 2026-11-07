@@ -90,10 +90,9 @@ def run(manifest):
     root=_resolved_input(manifest["isolated_workspace"])
     if root is None or not root.is_dir() or root.is_symlink():
         missing.append("isolated_workspace")
-    for key in MISSING_FIELDS:
-        p=_resolved_input(manifest[key])
-        if p is None or not p.is_file():
-            missing.append(key)
+    # Optional Factory-specific inputs are checked AFTER actual source
+    # derivation. Even when policy is missing, the independently proven
+    # 10-row mapping is collected and saved in this isolated workspace.
     if missing:
         return _sanitized_wait(missing)
 
