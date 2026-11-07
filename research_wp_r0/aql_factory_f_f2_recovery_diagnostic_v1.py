@@ -28,6 +28,7 @@ RECEIPT_FIELDS={
     "core245_native_query_sha256","core253_local_query_sha256",
     "dual_map_sha256","bar_count","start_ms","end_exclusive_ms",
     "decision_cutoff_ms","no_write_tree_fingerprint_sha256",
+    "opaque_recovery_file_pin_verified",
     "historical_pit","source_ack_sha256","strategy_approval_sha256",
     "factory_consumer_ack_sha256","secretary_state","trading_authority",
     "receipt_sha256"
@@ -71,6 +72,7 @@ def verified_core_receipts(recovery):
              and receipt["status"]=="SOURCE_BACKED_RECOVERY_READBACK_ONLY"
              and receipt["recovery_file_sha256"]==RECOVERY_SHA
              and receipt["original_f2_report_sha256"] is None
+             and receipt["opaque_recovery_file_pin_verified"] is True
              and receipt["historical_pit"]=="NOT_ATTESTED"
              and receipt["secretary_state"]=="NOT_ENQUEUED"
              and receipt["trading_authority"]=="NONE"
@@ -185,6 +187,14 @@ def validate_recovery_input(packet):
 
 
 def run_recovery_diagnostic(packet,store_path):
+    """Run isolated local diagnostic and return a status-bound sealed report.
+
+    First registration returns STORED_IMMUTABLE, identical subsequent runs
+    return REPLAY_IDENTICAL. The outer receipt_sha256 seals store_status too,
+    so it MUST differ between these statuses; lab/experiment/result hashes
+    and substantive result fields MUST remain identical. Never treat the
+    diagnostic receipt as an independent signed F5/Consumer ACK.
+    """
     legacy,parents=validate_recovery_input(packet)
     # Distinct experiment namespace and separate local-trust evidence body.
     result=run_diagnostic(legacy,store_path)
