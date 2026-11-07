@@ -268,7 +268,7 @@ def _owner_report_pins(raw):
              WIDTH_MS and
              row["dataset_id"] ==
              "BINANCE-SPOT-BTCUSDT-15M-" + row["month"] + "-F-v1" and
-             row["state"] == "RAW_AND_DUAL_QUERY_READBACK" and
+             row["state"] == "DUAL_READBACK_VERIFIED" and
              all(hexsha(row[k]) for k in (
                  "source_sha256", "manifest_sha256",
                  "core245_native_query_sha256",
