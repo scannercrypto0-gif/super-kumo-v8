@@ -15,6 +15,7 @@ from research_wp_r0.aql_core_backbone_local_v1 import query_local
 from research_wp_r0.indicator_library_v2 import IndicatorRegistryV2
 from research_wp_r0.strategy_definition import StrategyDefinition
 from tools.strategy_service_offline.common import Frozen, require
+from tools.scanner_strategy_f.frozen_diagnostic_contracts import FROZEN
 from tools.scanner_strategy_f.research_e2e_diagnostic import (
     STEP, _code_sha, _eval_strategy,
 )
@@ -34,6 +35,13 @@ CORE_FIELDS=frozenset((
     "source_availability","historical_pit","universe","query_sha256",
 ))
 MAX_BARS=4096
+EVENT_FIELDS=frozenset((
+    "schema","sequence","bar_open_ms","bar_close_ms","research_asof_ms",
+    "historical_known_at_ms","historical_pit","signal_state",
+    "source_observed","next_eligible_open_ms","next_open_is_fill",
+    "cost_or_pnl_computed","source_query_sha256","strategy_plugin_sha256",
+    "evaluator_code_sha256","decision_cutoff_ms","event_sha256",
+))
 
 
 def _hex(value):
@@ -47,6 +55,13 @@ def _definition(receipt):
     return StrategyDefinition.from_dict(receipt,registry=IndicatorRegistryV2())
 
 
+def manual_config_digest(definition_receipt):
+    """Bind manual AST indicators, risk and timing to the config identity."""
+    spec=_definition(definition_receipt).spec
+    return digest({"indicators":spec["indicators"],
+                   "risk":spec["risk"],"timing":spec["timing"]})
+
+
 def register_strategy_plugin(
     definition_receipt, *, config_digest, source_spec_receipt=None,
     origin="MANUAL", candidate_sha256=None,
@@ -58,6 +73,9 @@ def register_strategy_plugin(
     """
     definition=_definition(definition_receipt)
     require(_hex(config_digest),"H_PLUGIN_CONFIG_SHA")
+    if source_spec_receipt is None:
+        require(config_digest==manual_config_digest(definition_receipt),
+                "H_PLUGIN_MANUAL_CONFIG_DRIFT")
     require(origin in ("MANUAL","DISCOVERER_CANDIDATE")
             and ((origin=="MANUAL" and candidate_sha256 is None)
                  or (origin=="DISCOVERER_CANDIDATE"
@@ -74,6 +92,12 @@ def register_strategy_plugin(
                 and payload.get("scope")=="TEST_ONLY_UNAPPROVED_POLICY"
                 and payload.get("paper_approval")=="NOT_FOUND",
                 "H_PLUGIN_WORK235_SOURCE_DRIFT")
+        known=FROZEN.get(definition.spec["strategy_id"])
+        require(known is not None
+                and spec.sha256==known["spec_sha256"]
+                and config_digest==known["config_digest"]
+                and definition.digest==known["definition_digest"],
+                "H_PLUGIN_WORK235_PIN_DRIFT")
         source_sha=spec.sha256
     parameters=[
         {"name":ref["name"],"indicator_id":ref["indicator_id"],
@@ -90,6 +114,9 @@ def register_strategy_plugin(
         "parameters":parameters,
         "evaluator_code_sha256":_code_sha(),
         "source_spec_sha256":source_sha,
+        "config_identity_class":(
+            "WORK235_FROZEN_TEST_ONLY" if source_sha is not None
+            else "MANUAL_AST_PARAMETERS"),
         "input_origin":origin,
         "candidate_sha256":candidate_sha256,
         "timing":definition.spec["timing"],
@@ -268,6 +295,20 @@ def evaluate_strategy_plugin(
                  "version":ref["version"],"parameters":ref["parameters"]}
                 for ref in definition.spec["indicators"]],
             "H_PLUGIN_DEFINITION_OR_PARAMS_DRIFT")
+    source_sha=data.get("source_spec_sha256")
+    if source_sha is not None:
+        frozen=FROZEN.get(data["strategy_id"])
+        require(frozen is not None
+                and source_sha==frozen["spec_sha256"]
+                and data["config_digest"]==frozen["config_digest"]
+                and definition.digest==frozen["definition_digest"]
+                and data.get("config_identity_class")=="WORK235_FROZEN_TEST_ONLY",
+                "H_PLUGIN_WORK235_CONFIG_IDENTITY_DRIFT")
+    else:
+        require(data.get("config_identity_class")=="MANUAL_AST_PARAMETERS"
+                and data["config_digest"]==
+                    manual_config_digest(data["definition"]),
+                "H_PLUGIN_MANUAL_CONFIG_DRIFT")
     source=_validate_policy(policy)
     expected=_validate_query(core_query)
     actual=query_local(
@@ -316,6 +357,8 @@ def evaluate_strategy_plugin(
         "dataset_id":core_query["dataset_id"],
         "policy_sha256":Frozen.restore(policy).sha256,
         "decision_cutoff_ms":core_query["decision_cutoff_ms"],
+        "start_ms":core_query["start_ms"],
+        "end_exclusive_ms":core_query["end_exclusive_ms"],
         "coverage":core_query["coverage"],
         "expected_bar_count":len(expected),
         "observed_bar_count":len(core_query["bars"]),
