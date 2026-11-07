@@ -351,6 +351,41 @@ def run_private_cohort(packet,witness,witness_sha,store_path):
         lab_receipt_sha256=lab_sha,
         result_sha256=result_sha,
         evidence_class="RETROSPECTIVE_NON_PIT")
+    # Preserve Feb/Aug as four immutable UNKNOWN rows in the same final
+    # experiment; the evaluated census remains the original full 24 attempts.
+    # These source-month rows explicitly have no authentic source receipt.
+    from research_wp_r0.aql_factory_e_research_results_store_v1 import _seal
+    retained=[]
+    for month in ("2024-02","2024-08"):
+        for candidate in sorted({x["candidate_id"] for x in packet["attempts"]}):
+            retained.append({"attempt_id":f"RETAINED-{month}-{candidate}",
+                "candidate_id":candidate,"state":"UNKNOWN",
+                "source_receipt_sha256":digest({
+                    "schema":"aql.factory.f.retained-inventory-only.v1",
+                    "month":month,"candidate_id":candidate,
+                    "status":"INVENTORY_ONLY_NOT_READBACK",
+                    "core_f2_report_sha256":packet["core_f2_report_sha256"]})})
+    need(len(retained)==4, "RETAINED_FEB_AUG_CENSUS")
+    # Rebuild the immutable E experiment with all 20 authenticated-month
+    # attempts plus exactly four unevaluated inventory-only rows.
+    kwargs=dict(
+        experiment_id=packet["experiment_id"],lane="SCANNER",
+        source_status="RETROSPECTIVE_SOURCE_ADMITTED_NOT_PIT",
+        source_sha256=selected["source_receipt_sha256"],
+        source_query_245_sha256=entries[selected["month"]]["core_245_native_price_query_sha256"],
+        source_query_253_sha256=entries[selected["month"]]["core_253_local_query_sha256"],
+        strategy_definition_sha256=definition.digest,
+        config_sha256=packet["config_sha256"],code_sha256=packet["code_sha256"],
+        environment_sha256=packet["environment_sha256"],
+        parent_receipt_sha256=packet["strategy_approval_sha256"],
+        attempts=[{"attempt_id":x["attempt_id"],"candidate_id":x["candidate_id"],
+                   "state":x["state"],"source_receipt_sha256":x["source_receipt_sha256"]}
+                  for x in packet["attempts"]]+retained,
+        lab_receipt_sha256=lab_sha,result_sha256=result_sha,
+        evidence_class="RETROSPECTIVE_NON_PIT")
+    immutable=build_experiment(**kwargs)
+    need(immutable["attempt_count"]==24 and
+         immutable["attempt_states"]["UNKNOWN"]>=4, "FULL_24_ATTEMPT_CENSUS")
     registered=register_experiment(store_path,immutable)
     reread=read_experiment(store_path,packet["experiment_id"])
     need(reread==immutable,"RESULT_REPLAY_DRIFT")
