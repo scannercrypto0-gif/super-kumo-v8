@@ -12,7 +12,7 @@ import platform
 from pathlib import Path
 
 PINS = {
- "factory_e":"aa361ff3117b07f38600695e3dbabe619a929458",
+ "factory_e":"e21d949a66f378a7bc6d4695599bbdd31ca992a5",
  "factory_d":"a695e262da6787f752a13820f02dd00eef8ef1cd",
  "core_e":"3af5b66d2b381b853a6b5be32c38b3d3d02e1ea7",
  "core_d":"a86a590a5e2c32c18e03522f52896dbcf50c60ff",
@@ -24,7 +24,7 @@ PINS = {
  "raw211":"7d97b09c0c6ee2650a61d523acb8d8c771a99c46",
  "core_f":"a640c7822794bd2a7fd510b77ae7eb3507cf463f",
  "scanner_f":"012f9f19de2111ac4113a9f773fe3ef6baca9b02",
- "discoverer_f":"58959b22de9bc96f03b03dfc565815282fd1a939",
+ "discoverer_f":"1cb70f1212283fe34117882d18e0501fc6409fe7",
 }
 # PASS is restricted to demonstrated bounded engineering subgate.
 # PARTIAL / BLOCKED are NOT successful Package E completion.
