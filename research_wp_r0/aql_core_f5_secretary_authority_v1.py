@@ -269,8 +269,79 @@ def verify_source_ack(receipt, *, custodian_attestation, authorization_document,
     return digest(receipt)
 
 
+
+NOMINATION_SCHEMA = "aql.scanner-f.original-research-nomination.v1"
+
+
+def verify_scanner_nomination(nomination, *, nomination_sha256,
+                              independent_policy_sha256,
+                              evaluator_receipt_sha256,
+                              strategy_definition_sha256,
+                              expected_f2_report_sha256,
+                              month, warehouse_receipt_sha256,
+                              native245_sha256, local253_sha256):
+    """Verify sealed Scanner candidate, not a real research selection.
+
+    Sender must independently run the full Scanner verifier against original
+    source and signed evaluator/policy. The SHA seal alone is NOT that proof.
+    """
+    require(type(nomination) is dict
+            and set(nomination) == {"payload", "sha256"}
+            and type(nomination["payload"]) is dict
+            and valid_sha(nomination_sha256)
+            and nomination["sha256"] == nomination_sha256
+            and digest(nomination["payload"]) == nomination_sha256,
+            "CORE_F5_SCANNER_NOMINATION_SEAL_REQUIRED")
+    data = nomination["payload"]
+    require(data.get("schema") == NOMINATION_SCHEMA
+            and data.get("decision") == "NOMINATED_RESEARCH_ONLY"
+            and data.get("selected") is False
+            and data.get("secretary_status") == "NOT_ENQUEUED"
+            and data.get("factory_lab") == "NOT_EVALUATED"
+            and data.get("paper") == "NOT_ACTIVATED"
+            and data.get("holdout") == "SEALED"
+            and data.get("historical_pit") == "NOT_ATTESTED"
+            and data.get("research_class") == "RETROSPECTIVE_NON_PIT"
+            and data.get("trading_authority") == "NONE"
+            and data.get("core_source_ack_sha256") is None
+            and data.get("core_secretary_strategy_approval_sha256") is None
+            and data.get("factory_consumer_ack_sha256") is None
+            and data.get("core_f2_report_sha256") == expected_f2_report_sha256
+            and data.get("verified_policy_approval_sha256") ==
+                independent_policy_sha256
+            and data.get("signed_evaluator_receipt_sha256") ==
+                evaluator_receipt_sha256
+            and data.get("strategy_definition_digest") ==
+                strategy_definition_sha256
+            and data.get("month") == month
+            and data.get("symbol") == "BTCUSDT"
+            and data.get("timeframe") == "15m"
+            and data.get("market") == "BINANCE:SPOT:USDT"
+            and data.get("warehouse_receipt_sha256") ==
+                warehouse_receipt_sha256
+            and data.get("core245_native_query_sha256") ==
+                native245_sha256
+            and data.get("core253_local_query_sha256") ==
+                local253_sha256
+            and all(valid_sha(data.get(k)) for k in (
+                "strategy_decision_sha256",
+                "source_bound_census_sha256",
+                "verified_independent_evaluator_sha256",
+                "dna_digest", "native15m_config_digest", "dual_query_map_sha256"))
+            and type(data.get("strategy_id")) is str
+            and ID.fullmatch(data["strategy_id"])
+            and type(data.get("strategy_version")) is str
+            and ID.fullmatch(data["strategy_version"])
+            and type(data.get("cutoff_ms")) is int
+            and type(data.get("last_evaluated_open_ms")) is int
+            and 0 <= data["last_evaluated_open_ms"] + 900000 <
+                data["cutoff_ms"],
+            "CORE_F5_SCANNER_NOMINATION_OR_SOURCE_SCOPE_DRIFT")
+    return data
+
+
 def verify_strategy_approval(receipt, *, source_receipt, source_attestation,
-                             authorization_document, f2_report,
+                             authorization_document, f2_report, scanner_nomination,
                              source_zip_sha256, warehouse_receipt_sha256,
                              native245_sha256, local253_sha256, month,
                              strategy_nomination_sha256,
@@ -301,6 +372,15 @@ def verify_strategy_approval(receipt, *, source_receipt, source_attestation,
         source_ack_sha256, strategy_nomination_sha256,
         independent_policy_sha256, evaluator_receipt_sha256,
         strategy_definition_sha256)), "CORE_F5_STRATEGY_PARENTS_INVALID")
+    nominee = verify_scanner_nomination(
+        scanner_nomination,
+        nomination_sha256=strategy_nomination_sha256,
+        independent_policy_sha256=independent_policy_sha256,
+        evaluator_receipt_sha256=evaluator_receipt_sha256,
+        strategy_definition_sha256=strategy_definition_sha256,
+        expected_f2_report_sha256=EXPECTED_F2_REPORT,
+        month=month, warehouse_receipt_sha256=warehouse_receipt_sha256,
+        native245_sha256=native245_sha256, local253_sha256=local253_sha256)
     require(type(receipt) is dict and
             receipt.get("source_ack_sha256") == source_ack_sha256,
             "CORE_F5_SOURCE_ACK_NOT_VERIFIED")
@@ -321,6 +401,13 @@ def verify_strategy_approval(receipt, *, source_receipt, source_attestation,
         "independent_policy_sha256": independent_policy_sha256,
         "evaluator_receipt_sha256": evaluator_receipt_sha256,
         "strategy_definition_sha256": strategy_definition_sha256,
+        "strategy_id": nominee["strategy_id"],
+        "strategy_version": nominee["strategy_version"],
+        "strategy_dna_digest": nominee["dna_digest"],
+        "native15m_config_digest": nominee["native15m_config_digest"],
+        "dual_query_map_sha256": nominee["dual_query_map_sha256"],
+        "cutoff_ms": nominee["cutoff_ms"],
+        "month": nominee["month"],
     })
     require(receipt.get("payload_sha256") == expected,
             "CORE_F5_STRATEGY_APPROVAL_PARENT_DRIFT")
