@@ -200,7 +200,15 @@ def secretary_research_receipt(*, packet, factory_report, ledger, lab):
     body={
         "schema":RECEIPT,
         "state":"RESEARCH_RESULT_READY_FOR_REVIEW_NOT_ACK",
-        "factory_report_receipt_sha256":factory_report["receipt_sha256"],
+        # The Factory outer receipt seals store_status (first/replay), hence is
+        # never an immutable scientific parent. Pin only stable result bodies.
+        "factory_result_body_sha256":digest({
+            "input_sha256":factory_report["input_sha256"],
+            "experiment_sha256":factory_report["experiment_sha256"],
+            "result_sha256":factory_report["result_sha256"],
+            "lab_sha256":factory_report["lab_sha256"],
+            "core_receipt_graph_sha256":factory_report["core_receipt_graph_sha256"],
+        }),
         "source_graph_sha256":ledger["source_graph_sha256"],
         "source_sha256":ledger["source_bytes_sha256"],
         "strategy_definition_sha256":ledger["strategy_digest"],
