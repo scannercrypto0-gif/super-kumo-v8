@@ -118,13 +118,23 @@ def stage(root):
     for name in ("__init__.py","schema.py"):
         need((base/name).read_bytes()==(fixed/name).read_bytes(),
              "RAW_VAULT_PACKAGE_DRIFT")
-    for name in ("__init__.py","schema.py","vault.py"):
-        _copy_checked(fixed/name,target/"tools/raw_vault_offline"/name)
+    # Verify exact Git blob bytes, not a Windows checkout's text-filtered
+    # working copy. A CRLF-converted checkout is NOT a valid raw-byte pin.
     v=fixed/"vault.py"
-    blob=sha1(b"blob "+str(v.stat().st_size).encode()+b"\0"+
-              v.read_bytes()).hexdigest()
+    original=subprocess.check_output([
+        "git","-C",str(fixed),"cat-file","blob",
+        "6b5bcc1d684088934f5ed7110064380b8d2bc0cd"])
+    blob=sha1(b"blob "+str(len(original)).encode()+b"\0"+
+              original).hexdigest()
     need(blob=="6b5bcc1d684088934f5ed7110064380b8d2bc0cd",
-         "RAW_VAULT_WINDOWS_FIX_BLOB")
+         "RAW_VAULT_WINDOWS_FIX_GIT_BLOB")
+    for name in ("__init__.py","schema.py"):
+        _copy_checked(fixed/name,target/"tools/raw_vault_offline"/name)
+    dst=target/"tools/raw_vault_offline/vault.py"
+    need(not dst.is_symlink(),"DEST_SYMLINK")
+    dst.parent.mkdir(parents=True,exist_ok=True)
+    dst.write_bytes(original)
+    need(dst.read_bytes()==original,"RAW_VAULT_WINDOWS_FIX_BYTES")
     src=root/"_pinned_work235"/(
         "tools/strategy_service_offline/fixtures/strategies.json")
     dst=target/"tools/strategy_service_offline/fixtures/strategies.json"
