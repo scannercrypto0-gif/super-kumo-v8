@@ -196,9 +196,25 @@ def register_experiment(path, record):
                              ensure_ascii=True, allow_nan=False)
         _need(old is None or old == (record["sha256"], encoded),
               "IMMUTABLE_IDEMPOTENCY_CONFLICT")
+        layout = _layout(con)
+        _need(layout in (0, 1, 2), "UNKNOWN_LAYOUT_VERSION")
+        if layout == 2:
+            index = con.execute(
+                "SELECT canonical_sha256,source_status,lane FROM experiment_index_v2 WHERE experiment_id=?",
+                (record["experiment_id"],)).fetchone()
+            if old is None:
+                _need(index is None, "V2_ORPHAN_INDEX_ENTRY")
+            else:
+                _need(index == (record["sha256"],record["source_status"],
+                                  record["lane"]), "V2_EXISTING_INDEX_DRIFT")
         if old is None:
             con.execute("INSERT INTO experiments(experiment_id,sha,document) VALUES(?,?,?)",
                         (record["experiment_id"],record["sha256"],encoded))
+            if layout == 2:
+                con.execute(
+                    "INSERT INTO experiment_index_v2(experiment_id,canonical_sha256,source_status,lane) VALUES(?,?,?,?)",
+                    (record["experiment_id"],record["sha256"],
+                     record["source_status"],record["lane"]))
         con.commit()
     except Exception:
         con.rollback()
