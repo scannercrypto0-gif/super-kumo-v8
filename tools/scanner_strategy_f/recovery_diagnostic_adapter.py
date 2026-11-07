@@ -8,6 +8,8 @@ canonical F2, never calls signed F5, never issues Source/Strategy/Factory ACK.
 from __future__ import annotations
 
 from tools.strategy_service_offline.common import Frozen,require
+from research_wp_r0.aql_core_backbone_local_v1 import query_local
+from research_wp_r0.aql_archive_custody_bridge_v1 import digest
 from tools.scanner_strategy_f.frozen_diagnostic_contracts import (
     identify_frozen_work235_contracts,
 )
@@ -39,50 +41,61 @@ def diagnostic_from_verified_recovery(
         require(type(result) is dict
                 and set(result)=={"receipt","native_bars","local_bars"}
                 and type(result["receipt"]) is dict
-                and result["receipt"].get("month")==month
-                and result["receipt"].get("owner_f2_report_sha256") is None
-                and result["receipt"].get("owner_f2_report_pin_verified") is False
-                and result["receipt"].get("readback_evidence")==
-                    "SOURCE_BACKED_DUAL_QUERY_NO_F2_REPORT_AUTHORITY"
-                and result["receipt"].get("historical_pit")=="NOT_ATTESTED"
-                and result["receipt"].get("source_ack_sha256") is None
-                and result["receipt"].get("strategy_approval_sha256") is None
-                and result["receipt"].get("factory_consumer_ack_sha256") is None
+                and type(result["native_bars"]) is list
                 and type(result["local_bars"]) is list,
-                "F_DIAG_RECOVERY_CANNOT_IMPERSONATE_F2_OR_SIGNED_F5")
-        from research_wp_r0.aql_archive_custody_bridge_v1 import digest
+                "F_DIAG_RECOVERY_CORE_RESULT_SHAPE")
         receipt=result["receipt"]
-        require(receipt.get("receipt_sha256")==digest({
-            k:v for k,v in receipt.items() if k!="receipt_sha256"
-        }) and
-            type(result["native_bars"]) is list
-            and len(result["native_bars"])==len(result["local_bars"])
-                ==receipt["readback_bar_count"],
-            "F_DIAG_RECOVERY_RECEIPT_OR_BAR_COUNT_DRIFT")
-        # Integration independently checks original publisher raw, source,
-        # original Core native #245 and local #253. Scanner re-reads #253
-        # instead of relying on a digest provided by the caller.
-        q={
-            "schema":"aql.core.local-history-query.v1",
-            "dataset_id":receipt["dataset_id"],
-            "version":receipt["version"],
-            "source_bytes_sha256":receipt["source_zip_sha256"],
-            "manifest_integrity_sha256":receipt["manifest_integrity_sha256"],
-            "start_ms":receipt["start_ms"],
-            "end_exclusive_ms":receipt["end_exclusive_ms"],
-            "decision_cutoff_ms":receipt["decision_cutoff_ms"],
-            "coverage":"COMPLETE",
-            "missing_bar_opens":[],
-            "required_bar_count":receipt["readback_bar_count"],
-            "available_bar_count":receipt["readback_bar_count"],
-            "bars":result["local_bars"],
-            "source_availability":"RETROSPECTIVE_NON_PIT",
-            "historical_pit":"NOT_ATTESTED",
-            "universe":"NOT_ATTESTED",
-        }
-        q["query_sha256"]=digest(q)
-        require(q["query_sha256"]==receipt["core253_local_query_sha256"],
+        require(receipt.get("schema")=="aql.core.f2-recovery-readonly-source.v1"
+                and receipt.get("month")==month
+                and receipt.get("status")=="SOURCE_BACKED_RECOVERY_READBACK_ONLY"
+                and receipt.get("recovery_file_sha256")==recovery_file_sha256
+                and receipt.get("opaque_recovery_file_pin_verified") is True
+                and receipt.get("original_f2_report_sha256") is None
+                and receipt.get("historical_pit")=="NOT_ATTESTED"
+                and receipt.get("source_ack_sha256") is None
+                and receipt.get("strategy_approval_sha256") is None
+                and receipt.get("factory_consumer_ack_sha256") is None
+                and receipt.get("secretary_state")=="NOT_ENQUEUED"
+                and receipt.get("trading_authority")=="NONE"
+                and type(receipt.get("bar_count")) is int
+                and len(result["native_bars"])==len(result["local_bars"])
+                    ==receipt["bar_count"]
+                and receipt.get("receipt_sha256")==digest({
+                    k:v for k,v in receipt.items() if k!="receipt_sha256"
+                }),
+                "F_DIAG_RECOVERY_CANNOT_IMPERSONATE_F2_OR_SIGNED_F5")
+        # Recompute Core #253 from the actual immutable warehouse. Neither
+        # caller-authored query objects nor receipt-only SHA claims are trusted.
+        q=query_local(
+            warehouse_root,receipt["dataset_id"],1,
+            receipt["start_ms"],receipt["end_exclusive_ms"],
+            receipt["decision_cutoff_ms"],
+            required_source_sha256=receipt["source_zip_sha256"],
+            require_complete=True,sqlite_immutable=True,
+        )
+        require(q["query_sha256"]==receipt.get("core253_local_query_sha256")
+                and q["bars"]==result["local_bars"]
+                and q["available_bar_count"]==receipt["bar_count"]
+                and q["source_bytes_sha256"]==receipt["source_zip_sha256"]
+                and q["manifest_integrity_sha256"]==
+                    receipt["manifest_integrity_sha256"],
                 "F_DIAG_RECOVERY_LOCAL253_RECOMPUTED_SHA_DRIFT")
+        # #245 and the dual-map are independently recomputed by Core's
+        # read_recovery_diagnostic; Scanner refuses missing/invalid parent
+        # identities rather than pretending its local query verifies #245.
+        for key in ("core245_native_query_sha256","dual_map_sha256",
+                    "warehouse_receipt_sha256",
+                    "no_write_tree_fingerprint_sha256"):
+            require(type(receipt.get(key)) is str
+                    and len(receipt[key])==64
+                    and all(c in "0123456789abcdef" for c in receipt[key]),
+                    "F_DIAG_RECOVERY_CORE_PARENT_MISSING")
+        require(all(a["bar_open_ms"]==b["bar_open_ms"]
+                    and a["bar_close_ms"]==b["bar_close_ms"]
+                    and a["checksum"]==b["bar_checksum"]
+                    and a["bar_close_ms"]<receipt["decision_cutoff_ms"]
+                    for a,b in zip(result["native_bars"],q["bars"])),
+                "F_DIAG_RECOVERY_NATIVE_LOCAL_BAR_DRIFT")
         originals[month]=q
     identities=identify_frozen_work235_contracts(work_specs)
     out=diagnostic_original_cohort(
