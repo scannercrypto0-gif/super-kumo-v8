@@ -46,6 +46,8 @@ def main():
         "tools/scanner_strategy_f/research_e2e_diagnostic.py",
         "tools/strategy_service_offline/fixtures/strategies.json",
     }
+    print("STAGED_MISSING_RESEARCH_DEPENDENCIES:",len(written),flush=True)
+    print("PINNED_REQUIRED_EXISTS:",{x:Path(x).is_file() for x in sorted(required)},flush=True)
     if not all(Path(x).is_file() for x in required):
         raise RuntimeError("Scanner pinned staged contract incomplete")
     print("STAGED_SCANNER_EXACT_SHA:",SCANNER_SHA)
