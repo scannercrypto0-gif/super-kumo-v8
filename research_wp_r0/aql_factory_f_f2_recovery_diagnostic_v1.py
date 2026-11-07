@@ -159,7 +159,15 @@ def validate_recovery_input(packet):
     legacy["schema"]=LEGACY
     # This is solely an internal compatibility validation; it never becomes
     # an exported original F2 approval or canonical F2 source receipt.
-    legacy["core_f2_report_sha256"]=packet["sha256"]
+    # Legacy structural validator's nonnull field is NEVER an F2 report pin:
+    # this internal type adapter binds a derived, domain-separated diagnostic
+    # graph hash. It is not emitted as a Core F2 report, and cannot be passed
+    # to F5 validation.
+    legacy["core_f2_report_sha256"]=digest({
+        "schema":"aql.factory.f.internal-recovery-compatibility-parent.v1",
+        "recovery_file_sha256":RECOVERY_SHA,
+        "core_receipt_graph_sha256":digest(parents),
+        "diagnostic_input_sha256":packet["sha256"]})
     legacy["sha256"]=digest(legacy)
     validate_diagnostic_input(legacy)
     return legacy,parents
