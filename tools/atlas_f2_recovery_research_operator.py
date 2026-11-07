@@ -73,11 +73,14 @@ def run(manifest):
            scanner_data["trading_authority"]=="NONE",
            "RECOVERY_SCANNER_SCOPE_OR_AUTHORITY_DRIFT")
     factory=read_json(manifest["factory_recovery_input_file"])
-    from research_wp_r0.aql_factory_f_f2_recovery_diagnostic_v1 import (
-        validate_recovery_input,run_recovery_diagnostic,
+    from research_wp_r0.aql_factory_f_f2_recovery_research_v2 import (
+        validate_recovery_research_input, run_recovery_research_v2,
     )
-    legacy,parents=validate_recovery_input(factory)
-    month=legacy["trial_packet"]["diagnostic_month"]
+    from research_wp_r0.aql_factory_e_research_results_store_v1 import (
+        migrate_store_v2, digest as factory_digest,
+    )
+    definitions, parents=validate_recovery_research_input(factory)
+    month=factory["trial_packet"]["diagnostic_month"]
     demand(month in original,"RECOVERY_FACTORY_FOCUS_NOT_ORIGINAL")
     receipt=original[month]["receipt"]
     demand(factory["original_f2_report_sha256"] is None and
@@ -87,11 +90,12 @@ def run(manifest):
            receipt["source_zip_sha256"] and
            len(factory["recovery_core_receipts"])==10 and
            {x["receipt_sha256"] for x in factory["recovery_core_receipts"]}==
-           {x["receipt"]["receipt_sha256"] for x in original.values()},
+           {x["receipt"]["receipt_sha256"] for x in original.values()} and
+           factory["scanner_receipt_sha256"]==scanner["sha256"],
            "RECOVERY_FACTORY_SOURCE_RECEIPT_GRAPH_DRIFT")
     original_bars={x["bar_open_ms"]:x for x in original[month]["local_bars"]}
     from decimal import Decimal
-    trial=legacy["trial_packet"]["bars"]
+    trial=factory["trial_packet"]["bars"]
     demand(type(trial) is list and len(trial)>=2,
            "RECOVERY_FOCUS_BARS_REQUIRED")
     last=None
@@ -104,18 +108,13 @@ def run(manifest):
                        for k in ("open","high","low","close","volume")),
                "RECOVERY_FACTORY_FOCUS_OHLCV_OR_TIME_DRIFT")
         last=start
-    # Never initialize a store before all private source and strategy checks.
-    from research_wp_r0.aql_factory_e_research_results_store_v1 import (
-        migrate_store_v2,
-    )
+    # No mutable store before the genuine source, frozen strategy and
+    # owner-authorized policy pass validation.
     migrated=migrate_store_v2(store)
     demand(migrated["status"]=="UPGRADED_V2",
            "RECOVERY_FRESH_SQLITE_V2_REQUIRED")
-    first=run_recovery_diagnostic(factory,store)
-    second=run_recovery_diagnostic(factory,store)
-    from research_wp_r0.aql_factory_e_research_results_store_v1 import (
-        digest as factory_digest,
-    )
+    first=run_recovery_research_v2(factory,store)
+    second=run_recovery_research_v2(factory,store)
     demand(first["store_status"]=="STORED_IMMUTABLE"
            and second["store_status"]=="REPLAY_IDENTICAL"
            and all(first[k]==second[k] for k in
@@ -125,6 +124,7 @@ def run(manifest):
                    row["receipt_sha256"] for row in (first,second))
            and first["receipt_sha256"]!=second["receipt_sha256"]
            and first["attempt_count"]==second["attempt_count"]==24
+           and first["diagnostic_evaluated"]==second["diagnostic_evaluated"]==20
            and first["feb_aug_inventory_unknown"]==
                second["feb_aug_inventory_unknown"]==4
            and first["original_f2_report_sha256"] is None
