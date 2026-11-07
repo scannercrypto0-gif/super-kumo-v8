@@ -22,7 +22,7 @@ MODULE_BLOBS = {
     "research_wp_r0/aql_core_f_research_diagnostic_query_v1.py":
         "ee129da558867d195258fc6507fba93be2fd6066",
     "tools/scanner_strategy_f/research_e2e_diagnostic.py":
-        "42423739cff54c38d7e258b1c624f83b656a01ef",
+        "0021f1c3137bb31c7d02de3d114b23d304cd1319",
     "research_wp_r0/aql_factory_f_research_e2e_diagnostic_v1.py":
         "65b74ef25bc9fc223e490fdc81d0c2fe93767c1d",
 }
