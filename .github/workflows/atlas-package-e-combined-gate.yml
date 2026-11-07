@@ -230,6 +230,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_aql_factory_f_research_e2e_diagnostic_v1.py' -v
           python -m unittest discover -s tests -p 'test_atlas_f_research_diagnostic_operator.py' -v
           python -m unittest discover -s tests -p 'test_atlas_f2_recovery_evidence_v1.py' -v
+          python -m unittest discover -s tests -p 'test_atlas_f2_recovery_research_operator.py' -v
           python -m unittest discover -s tests -p 'test_aql_core_f_recovery_readonly_v1.py' -v
           python -m unittest tools.scanner_strategy_f.test_recovery_diagnostic_adapter -v
           python -m unittest tools.scanner_strategy_f.test_frozen_diagnostic_contracts -v
