@@ -83,6 +83,7 @@ jobs:
           cp upstream/factory-f/research_wp_r0/indicator_library_v2.py project/research_wp_r0/
           cp upstream/factory-f/research_wp_r0/aql_factory_authentic_research_admission.py project/research_wp_r0/
           cp upstream/factory-f/research_wp_r0/aql_p2_factory_real_development.py project/research_wp_r0/
+          cp upstream/factory-f/research_wp_r0/aql_p2_factory_lab.py project/research_wp_r0/
           cp -a upstream/scanner-b/tools/scanner_strategy_b project/tools/
           cp -a upstream/scanner227/tools/scanner_engine_offline project/tools/
           cp -a upstream/raw/tools/raw_vault_offline project/tools/
