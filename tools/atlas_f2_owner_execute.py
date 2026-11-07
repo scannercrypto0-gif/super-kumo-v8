@@ -46,6 +46,11 @@ SAFE_STAGES=frozenset((
     "CORE_INDEPENDENT_READBACK","FROZEN_WORK235_CONTRACT",
     "SCANNER_RECOVERY_DIAGNOSTIC","FACTORY_POLICY_INPUTS",
     "FACTORY_PACKET_BUILD","RESEARCH_OPERATOR_EXECUTE",
+    # Scanner #277 independently exposes these fixed, privacy-safe subphases.
+    "SCANNER_RECEIPT_SCOPE","SCANNER_CORE253_IMMUTABLE_QUERY",
+    "SCANNER_CORE253_PARENT_COMPARISON","SCANNER_NATIVE_LOCAL_COMPARISON",
+    "SCANNER_FROZEN_WORK235_IDENTITIES","SCANNER_COHORT_DIAGNOSTIC",
+    "SCANNER_DIAGNOSTIC_RECEIPT_VERIFY","SCANNER_OUTPUT_EMIT",
 ))
 CURRENT_STAGE="MANIFEST_INPUTS"
 
@@ -75,7 +80,7 @@ def _sanitized_exception(exc):
     result={"failure_stage":CURRENT_STAGE,"failure_class":kind}
     # Only these static, audited Scanner/Work235 failure identifiers may
     # cross the privacy boundary. No dynamic DEPENDENCY_REFUSED details.
-    if CURRENT_STAGE=="SCANNER_RECOVERY_DIAGNOSTIC" and isinstance(exc, ValueError):
+    if CURRENT_STAGE.startswith("SCANNER_") and isinstance(exc, ValueError):
         safe_scanner_codes=frozenset((
             "FROZEN_DIGEST_DRIFT","INPUT_BYTE_LIMIT","DUPLICATE_JSON_KEY",
             "NONFINITE_JSON","F_DIAG_RECOVERY_VERSION_OR_COHORT_MISMATCH",
@@ -188,7 +193,8 @@ def run(manifest):
         warehouse_root=warehouse,
         verified_recovery_readbacks=original,
         recovery_file_sha256=EXPECTED_RECOVERY_FILE_SHA256,
-        work_specs=frozen["work_specs"])
+        work_specs=frozen["work_specs"],
+        phase_callback=_set_stage)
     _set_stage("FACTORY_POLICY_INPUTS")
     policy=docs["policy_file"]
     if optional_needed:
