@@ -41,6 +41,12 @@ class DiagnosticOperatorFailClosed(unittest.TestCase):
                 require_scope(manifest)
             self.assertFalse((vault/"tamper.sqlite").exists())
             manifest["diagnostic_store_path"]=str(p/"diagnostic.sqlite")
+            # Disposable negative-only fixture files satisfy path preflight;
+            # they are never interpreted as authentic source or read by F2.
+            for key in ("core_f2_report_path","scanner_policy_draft_path",
+                        "scanner_proposal_path","scanner_approval_request_path",
+                        "frozen_work_specs_path","factory_diagnostic_input_path"):
+                Path(manifest[key]).write_text("{}",encoding="utf-8")
             assert require_scope(manifest)[2] == p/"diagnostic.sqlite"
             (p/"diagnostic.sqlite").write_bytes(b"preexisting")
             with self.assertRaisesRegex(ValueError, "FRESH_RUN_OUTPUT_REQUIRED"):
