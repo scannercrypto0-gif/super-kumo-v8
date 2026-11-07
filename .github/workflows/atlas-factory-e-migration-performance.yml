@@ -1,0 +1,41 @@
+name: ATLAS Factory E Migration and Bounded Performance
+on:
+  push:
+    branches:
+      - factory/package-e-historical-research-results-20261105
+    paths:
+      - 'research_wp_r0/aql_factory_e_research_results_store_v1.py'
+      - 'tests/test_aql_factory_e_migration_v1.py'
+      - 'tests/test_aql_factory_e_bounded_perf_v1.py'
+      - 'tools/atlas_factory_e_bounded_perf.py'
+      - '.github/workflows/atlas-factory-e-migration-performance.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  factory-e-closure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11','3.12','3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Migration and fault injection
+        run: |
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_factory_e_migration_v1.py' -v
+      - name: Bounded reproducible research-store performance
+        run: |
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_factory_e_bounded_perf_v1.py' -v
+          PYTHONPATH=. python tools/atlas_factory_e_bounded_perf.py --strategies 12 --symbols 8 --per-pair 4 --max-seconds 30 --max-peak-mib 96 --output e-factory-performance.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: factory-e-performance-${{ matrix.python-version }}
+          path: e-factory-performance.json
+          retention-days: 14
+          if-no-files-found: error

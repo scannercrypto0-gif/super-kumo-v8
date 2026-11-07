@@ -1,0 +1,49 @@
+name: ATLAS Factory E Durable Discoverer Owner Intake
+on:
+  push:
+    branches:
+      - factory/package-e-historical-research-results-20261105
+    paths:
+      - 'research_wp_r0/aql_factory_e_durable_discoverer_consumer_v1.py'
+      - 'tests/test_aql_factory_e_durable_discoverer_consumer_v1.py'
+      - '.github/workflows/atlas-factory-e-durable-discoverer.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  durable-owner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11','3.12','3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 197ac28d4bcec5e20b0774a0503cc586f2227ddd, path: _pinned_discoverer_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: f2006c0e431690ccea8b0532095bf4f2a2dc88ba, path: _pinned_discoverer_base, persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Stage Discoverer owner contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from shutil import copyfile
+          for owner in ('_pinned_discoverer_e','_pinned_discoverer_base'):
+              p=Path(owner)/'tools'
+              if p.is_dir():
+                  for src in p.rglob('*.py'):
+                      dst=Path('tools')/src.relative_to(p)
+                      if not dst.exists():
+                          dst.parent.mkdir(parents=True,exist_ok=True)
+                          copyfile(src,dst)
+          PY
+      - name: Install test dependency
+        run: python -m pip install pytest
+      - name: Factory-owned durable checkpoint store integration
+        run: |
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_factory_e_durable_discoverer_consumer_v1.py' -v
