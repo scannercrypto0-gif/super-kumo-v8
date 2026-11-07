@@ -44,8 +44,9 @@ def _dd(sequence):
 
 def evaluate_immutable_ledger(ledger, *, comparison=None):
     """Descriptive comparable research statistics, not a profitable strategy claim."""
-    _need(type(ledger) is dict and ledger.get("schema")==
-          "aql.factory.h.trade-event-ledger.v1" and
+    _need(type(ledger) is dict and ledger.get("schema") in (
+          "aql.factory.h.trade-event-ledger.v1",
+          "aql.factory.h.generic-trade-event-ledger.v1") and
           ledger.get("sha256")==digest({k:v for k,v in ledger.items()
                                        if k!="sha256"}) and
           ledger.get("trading_authority")=="NONE" and
@@ -54,14 +55,34 @@ def evaluate_immutable_ledger(ledger, *, comparison=None):
           "PARENT_SEAL_OR_AUTHORITY")
     cohort=ledger["cohort"]
     outcomes=ledger["outcomes"]
-    _need(type(outcomes) is list and type(cohort) is dict and
-          cohort["attempts"]==24 and cohort["evaluated"]==20 and
-          cohort["inventory_unknown"]==4 and
-          cohort["source_months"]==10 and cohort["original_bars"]==29376
-          and cohort["decision_slots"]>0 and
-          cohort["focus_bar_count"]==cohort["decision_slots"]+1
-          and len(ledger["events"])>=cohort["decision_slots"],
+    _need(type(outcomes) is list and type(cohort) is dict,
           "DENOMINATOR_OR_SCOPE")
+    generic=ledger["schema"]=="aql.factory.h.generic-trade-event-ledger.v1"
+    if generic:
+        _need(cohort.get("cohort_class")=="GENERIC_SCANNER_H" and
+              cohort.get("coverage") in ("COMPLETE","PARTIAL","UNKNOWN") and
+              all(type(cohort.get(k)) is int and cohort[k]>=0 for k in (
+                  "expected_bars","observed_bars","missing_bars",
+                  "decision_slots","focus_bar_count","signal_unknown")) and
+              cohort["expected_bars"]>0 and
+              cohort["observed_bars"]+cohort["missing_bars"]==
+                  cohort["expected_bars"] and
+              cohort["decision_slots"]==cohort["expected_bars"] and
+              cohort["focus_bar_count"]==cohort["observed_bars"] and
+              len(ledger["events"])==cohort["decision_slots"] and
+              (cohort["coverage"]=="COMPLETE" and
+               cohort["missing_bars"]==0 or
+               cohort["coverage"]!="COMPLETE" and
+               cohort["signal_unknown"]==cohort["expected_bars"]),
+              "GENERIC_DENOMINATOR_OR_QUARANTINE")
+    else:
+        _need(cohort["attempts"]==24 and cohort["evaluated"]==20 and
+              cohort["inventory_unknown"]==4 and
+              cohort["source_months"]==10 and cohort["original_bars"]==29376
+              and cohort["decision_slots"]>0 and
+              cohort["focus_bar_count"]==cohort["decision_slots"]+1 and
+              len(ledger["events"])>=cohort["decision_slots"],
+              "F2_DENOMINATOR_OR_SCOPE")
     count=Counter(r["status"] for r in outcomes)
     _need(count["MODEL_ONLY"]==cohort["modeled_trades"] and
           sum(v for k,v in count.items() if k!="MODEL_ONLY")==
@@ -93,7 +114,7 @@ def evaluate_immutable_ledger(ledger, *, comparison=None):
         exposure=Decimal(sum(holding))/Decimal(decision_slots) if decision_slots else None
         _need(exposure is None or exposure<=1,"EXPOSURE_OVERLAP")
         # Conservative: no annualization or observed-fill inference.
-        if n>=MIN_RISK_N and not cohort["unknown_trades"]:
+        if n>=MIN_RISK_N and not cohort["unknown_trades"] and not cohort.get("signal_unknown",0):
             mean=sum(returns,Decimal(0))/Decimal(n)
             variance=sum(((v-mean)**2 for v in returns),Decimal(0))/Decimal(n-1)
             sd=variance.sqrt()
@@ -130,10 +151,10 @@ def evaluate_immutable_ledger(ledger, *, comparison=None):
             "turnover_round_trip_proxy":n if n else None,
             "max_drawdown_trade_close_only":str(_dd(returns)) if n else None,
             "win_rate":str(Decimal(winners)/n) if n>=MIN_WIN_RATE_N and
-                        not cohort["unknown_trades"] else None,
+                        not cohort["unknown_trades"] and not cohort.get("signal_unknown",0) else None,
             "profit_factor":_ratio(pos,neg) if neg>0 and
                            n>=MIN_WIN_RATE_N and
-                           not cohort["unknown_trades"] else None,
+                           not cohort["unknown_trades"] and not cohort.get("signal_unknown",0) else None,
             "sharpe_per_trade_unannualized":sharpe,
             "unknown_outcomes":cohort["unknown_trades"],
             "insufficient_sample":n<MIN_WIN_RATE_N,
@@ -161,12 +182,13 @@ def evaluate_immutable_ledger(ledger, *, comparison=None):
         "sensitivity":{"cost_extra_bps_round_trip":adjusted,
                        "parameter_change":"NOT_EVALUATED_NO_REOPTIMIZATION"},
         "uncertainty":{"unknown_outcomes":cohort["unknown_trades"],
-                       "incomplete_months":["2024-02","2024-08"],
+                       "incomplete_months":("SOURCE_GAP_BOUNDED_RANGE" if generic and cohort["coverage"]!="COMPLETE" else [] if generic else ["2024-02","2024-08"]),
                        "in_sample_only":True,
                        "holdout_opened":False,
                        "historical_pit":"NOT_ATTESTED",
                        "independent_source_rights":"NOT_ATTESTED",
-                       "economic_claim":"NOT_ATTESTED"},
+                       "economic_claim":"NOT_ATTESTED",
+                       "signal_unknown_slots":cohort.get("signal_unknown",0)},
         "economic_class":ledger["economic_policy_class"],
         "assessment":"DESCRIPTIVE_RESEARCH_ONLY_NO_ALPHA_CLAIM",
         "research_ready_for_review":True,
