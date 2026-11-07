@@ -124,6 +124,19 @@ class OwnerF2NegativeTests(unittest.TestCase):
                 self.assertNotIn("SECRET",repr(safe))
         runner._set_stage("MANIFEST_INPUTS")
 
+    def test_scanner_cohort_phase_allowlist_and_private_redaction(self):
+        from tools.scanner_strategy_f.research_e2e_diagnostic import SAFE_COHORT_PHASES
+        self.assertEqual(len(SAFE_COHORT_PHASES),10)
+        self.assertTrue(SAFE_COHORT_PHASES.issubset(runner.SAFE_STAGES))
+        for phase in SAFE_COHORT_PHASES:
+            runner._set_stage(phase)
+            result=runner._sanitized_exception(ValueError("PRIVATE_E_PATH_DO_NOT_PRINT"))
+            self.assertEqual(result["failure_stage"],phase)
+            self.assertNotIn("PRIVATE_E_PATH",repr(result))
+        with self.assertRaises(ValueError):
+            runner._set_stage("COHORT_PRIVATE_SOURCE_2024_01")
+        runner._set_stage("MANIFEST_INPUTS")
+
     def test_phase_callback_cannot_change_source_verifier_code(self):
         stages=[]
         with self.assertRaisesRegex(ValueError,"CORE_F2_RECOVERY_"):
