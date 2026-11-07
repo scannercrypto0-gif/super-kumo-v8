@@ -14,6 +14,7 @@ on:
       - 'tools/atlas_f2_stage_owner_overlay.py'
       - 'tools/atlas_f2_owner_run.ps1'
       - 'tests/test_atlas_f2_owner_execute_v1.py'
+      - 'docs/research/owner-f2-recovery-real-one-command-20261107.md'
       - 'tools/atlas_f2_recovery_research_operator.py'
       - 'tests/test_atlas_f2_recovery_evidence_v1.py'
       - 'tests/test_atlas_f2_recovery_research_operator.py'
