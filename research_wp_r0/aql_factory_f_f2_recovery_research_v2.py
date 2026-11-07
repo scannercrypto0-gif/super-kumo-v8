@@ -129,14 +129,17 @@ def _definitions(raw):
         definition = StrategyDefinition.from_dict(
             raw[identity], registry=IndicatorRegistryV2())
         spec = definition.spec
-        need(identity == spec["strategy_id"] + "@" + spec["strategy_version"]
-             and definition.digest == FROZEN_DEFINITION_DIGESTS[identity]
-             and spec["scope"] == "RESEARCH_ONLY"
-             and spec["timing"] == {
+        need(identity == spec["strategy_id"] + "@" + spec["strategy_version"],
+             "V2_FROZEN_STRATEGY_IDENTITY")
+        need(definition.digest == FROZEN_DEFINITION_DIGESTS[identity],
+             "V2_FROZEN_DEFINITION_DIGEST")
+        need(spec["scope"] == "RESEARCH_ONLY",
+             "V2_FROZEN_STRATEGY_SCOPE")
+        need(spec["timing"] == {
                  "decision":"CONFIRMED_CLOSE",
                  "entry_execution":"NEXT_ELIGIBLE_OPEN",
                  "ambiguity":"REJECT",
-             }, "V2_FROZEN_STRATEGY_IDENTITY")
+             }, "V2_FROZEN_STRATEGY_TIMING")
         definitions[identity] = definition
     return definitions
 
