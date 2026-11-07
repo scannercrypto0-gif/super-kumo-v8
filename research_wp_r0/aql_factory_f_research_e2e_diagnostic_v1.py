@@ -147,6 +147,9 @@ def validate_diagnostic_input(packet):
              and type(bar.get("close_ms")) is int
              and first<=bar["open_ms"] and bar["close_ms"]<last
              for bar in packet_trial["bars"]),"CROSS_MONTH_SOURCE_ACCESS")
+    need(type(packet_trial.get("research_window")) is dict and
+         type(packet_trial["research_window"].get("train_end_exclusive_ms")) is int,
+         "RESEARCH_WINDOW_REQUIRED")
     need(packet_trial["bars"][-1]["close_ms"]<
          packet_trial["research_window"]["train_end_exclusive_ms"],
          "FUTURE_BAR_BLOCK")
