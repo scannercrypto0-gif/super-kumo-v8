@@ -287,6 +287,42 @@ class FactoryRecoveryResearchV2(unittest.TestCase):
             run_recovery_research_v2(p,self.db)
         self.assertFalse(self.db.exists())
 
+    def test_windows_sqlite_native_first_replay_and_tamper_cleanup(self):
+        """Close all native handles before deleting SQLite on Windows.
+
+        Exercises first registration, identical replay, and a tampered-record
+        failure in two separate temporary folders with deterministic cleanup.
+        No ignore_errors or suppressed PermissionError: NTFS must delete the
+        SQLite files with no live Factory readback handle.
+        """
+        with tempfile.TemporaryDirectory() as location:
+            db=Path(location)/"windows-native-replay.sqlite"
+            packet=fixture_packet()
+            self.assertEqual(migrate_store_v2(db)["status"],"UPGRADED_V2")
+            first=run_recovery_research_v2(packet,db)
+            replay=run_recovery_research_v2(packet,db)
+            self.assertEqual(first["store_status"],"STORED_IMMUTABLE")
+            self.assertEqual(replay["store_status"],"REPLAY_IDENTICAL")
+            for key in ("lab_sha256","experiment_sha256","result_sha256"):
+                self.assertEqual(first[key],replay[key])
+            self.assertNotEqual(first["receipt_sha256"],
+                                replay["receipt_sha256"])
+            # Native Windows file delete while test objects are still alive.
+            db.unlink()
+            self.assertFalse(db.exists())
+        with tempfile.TemporaryDirectory() as location:
+            db=Path(location)/"windows-native-tamper.sqlite"
+            packet=fixture_packet()
+            migrate_store_v2(db)
+            run_recovery_research_v2(packet,db)
+            with sqlite3.connect(db) as con:
+                con.execute(
+                    "UPDATE recovery_research_v2 SET document='{}'")
+            with self.assertRaises(ResultsStoreError):
+                run_recovery_research_v2(packet,db)
+            db.unlink()
+            self.assertFalse(db.exists())
+
     def test_conflicting_replay_or_sqlite_tamper_fails_closed(self):
         p=fixture_packet()
         migrate_store_v2(self.db)
