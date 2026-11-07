@@ -176,10 +176,9 @@ class LocalResearchDiagnostic(unittest.TestCase):
         self.assertNotIn("PRIVATE_DO_NOT_EXPOSE",str(blocked))
 
     def test_exact_integration_windows_path_subclass_scope(self):
-        """The real operator sends a concrete Path subclass (WindowsPath)."""
+        """Real pinned policy/Work235; a concrete Path must reach AST."""
         from tools.scanner_strategy_f import research_e2e_diagnostic as diag
         phases=[]
-        # Fail in the AST stage: all four scope checks must have passed first.
         with patch.object(diag.StrategyDefinition,"from_dict",
                           side_effect=ValueError("TEST_AST_STOP")):
             with self.assertRaises(ValueError) as ctx:
