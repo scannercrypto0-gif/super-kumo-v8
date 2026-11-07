@@ -24,13 +24,13 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/checkout@v4
-        with: {ref: aa361ff3117b07f38600695e3dbabe619a929458, path: _pinned_factory_e, persist-credentials: false}
+        with: {ref: e21d949a66f378a7bc6d4695599bbdd31ca992a5, path: _pinned_factory_e, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: a640c7822794bd2a7fd510b77ae7eb3507cf463f, path: _pinned_core_f, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: 012f9f19de2111ac4113a9f773fe3ef6baca9b02, path: _pinned_scanner_f, persist-credentials: false}
       - uses: actions/checkout@v4
-        with: {ref: 58959b22de9bc96f03b03dfc565815282fd1a939, path: _pinned_discoverer_f, persist-credentials: false}
+        with: {ref: 1cb70f1212283fe34117882d18e0501fc6409fe7, path: _pinned_discoverer_f, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: a86a590a5e2c32c18e03522f52896dbcf50c60ff, path: _pinned_core_d, persist-credentials: false}
       - uses: actions/checkout@v4
@@ -111,7 +111,8 @@ jobs:
                        'aql_factory_e_durable_discoverer_consumer_v1.py',
                        'aql_factory_f_batch_ledger_v1.py',
                        'aql_factory_f_scanner_bulk_consumer_v1.py',
-                       'aql_factory_f_private_original_cohort_v1.py'):
+                       'aql_factory_f_private_original_cohort_v1.py',
+                       'aql_factory_f_role_authority_v1.py'):
               copyfile(Path('_pinned_factory_e')/'research_wp_r0'/name,
                        Path('research_wp_r0')/name)
           copyfile(Path('_pinned_scanner_e')/'tools/scanner_strategy_e/historical_policy_approval_request.py',
@@ -127,7 +128,8 @@ jobs:
                        'test_aql_factory_e_bounded_perf_v1.py',
                        'test_aql_factory_f_batch_ledger_v1.py',
                        'test_aql_factory_f_scanner_bulk_consumer_v1.py',
-                       'test_aql_factory_f_private_original_cohort_v1.py'):
+                       'test_aql_factory_f_private_original_cohort_v1.py',
+                       'test_aql_factory_f_role_authority_v1.py'):
               copyfile(Path('_pinned_factory_e')/'tests'/name,Path('tests')/name)
           copytree(Path('_pinned_work235')/'tools/strategy_service_offline/fixtures',
                    Path('tools/strategy_service_offline/fixtures'),dirs_exist_ok=True)
@@ -163,6 +165,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_aql_factory_f_batch_ledger_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_factory_f_scanner_bulk_consumer_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_factory_f_private_original_cohort_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_factory_f_role_authority_v1.py' -v
           python -m unittest tools.scanner_strategy_f.test_bulk_census -v
           python -m unittest tools.scanner_strategy_f.test_independent_policy_verification -v
           python -m unittest tools.scanner_strategy_f.test_source_bound_intake -v
