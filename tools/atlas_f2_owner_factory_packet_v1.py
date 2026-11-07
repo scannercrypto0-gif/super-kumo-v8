@@ -64,7 +64,7 @@ def build_factory_packet(*,original,scanner_receipt,work_specs,policy,
     if not (scan["attempts"]==24 and scan["diagnostic_evaluated"]==20
             and scan["feb_aug_unknown"]==4 and scan["selected"]==0
             and scan["trading_authority"]=="NONE"
-            and set(scan["frozen_strategy_ids"])==set(definitions)):
+            and {x+"@v1" for x in scan["frozen_strategy_ids"]}==set(definitions)):
         raise ValueError("F2_OWNER_FACTORY_SCANNER_SCOPE")
     receipts=[original[m]["receipt"] for m in MONTHS]
     if not all(x["opaque_recovery_file_pin_verified"] is True
