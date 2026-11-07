@@ -38,8 +38,10 @@ class OwnerF2NegativeTests(unittest.TestCase):
             outcome=runner.run(m)
             self.assertEqual(outcome["status"],"PRIVATE_WAIT")
             self.assertEqual(outcome["trading_authority"],"NONE")
-            self.assertEqual(set(outcome["missing_fields"]),
-                             {"warehouse_root","vault_root","recovery_file"})
+            self.assertTrue({"warehouse_root","vault_root","recovery_file",
+                             "policy.costs","trial_ledger.trials",
+                             "inventory.2024-02.source_receipt_sha256"}.issubset(
+                                 set(outcome["missing_fields"])))
             self.assertEqual(list(workspace.iterdir()),[])
 
     def test_unapproved_manifest_is_denied_without_touching_sources(self):
