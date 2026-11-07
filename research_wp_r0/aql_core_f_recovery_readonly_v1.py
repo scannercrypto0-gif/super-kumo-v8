@@ -99,6 +99,120 @@ def _tree_fingerprint(roots):
     return digest(out)
 
 
+
+def owner_report_entry_mismatch_categories(report):
+    """Return bounded PUBLIC-SAFE predicate classes; never return source values.
+
+    Month labels are the only per-entry payload allowed. This is a read-only
+    diagnostic, not an authority override. It does not change strict gates.
+    """
+    expected = set(ADMITTED_MONTHS)
+    allowed = frozenset((
+        "bars", "core245_native_query_sha256",
+        "core253_local_query_sha256", "dataset_id", "manifest_sha256",
+        "month", "source_sha256", "state",
+    ))
+    problems = {}
+    def flag(category, month=None):
+        slot = problems.setdefault(category, set())
+        if type(month) is str and month in expected:
+            slot.add(month)
+
+    if type(report) is not dict:
+        flag("ENTRY_FIELDS")
+    else:
+        entries = report.get("entries")
+        if type(entries) is not list:
+            flag("ENTRY_COUNT")
+        else:
+            if len(entries) != len(ADMITTED_MONTHS):
+                flag("ENTRY_COUNT")
+            seen = []
+            total = 0
+            numeric_bars = True
+            for item in entries[:24]:
+                if type(item) is not dict:
+                    flag("ENTRY_FIELDS")
+                    numeric_bars = False
+                    continue
+                month = item.get("month")
+                known = month if type(month) is str and month in expected else None
+                if set(item) != allowed:
+                    flag("ENTRY_FIELDS", known)
+                if known is None:
+                    flag("MONTH_SET")
+                else:
+                    seen.append(known)
+                    try:
+                        start, end = _month_bounds(known)
+                        if type(item.get("bars")) is not int or item["bars"] != (
+                                end - start) // WIDTH_MS:
+                            flag("MONTH_BAR_CENSUS", known)
+                    except (ValueError, TypeError, KeyError):
+                        flag("MONTH_BAR_CENSUS", known)
+                    if item.get("dataset_id") != (
+                            "BINANCE-SPOT-BTCUSDT-15M-" + known + "-F-v1"):
+                        flag("DATASET_ID_PATTERN", known)
+                if item.get("state") != "RAW_AND_DUAL_QUERY_READBACK":
+                    flag("STATE_LITERAL", known)
+                if any(not hexsha(item.get(k)) for k in (
+                    "source_sha256", "manifest_sha256",
+                    "core245_native_query_sha256",
+                    "core253_local_query_sha256",
+                )):
+                    flag("DIGEST_FORMAT", known)
+                if type(item.get("bars")) is int:
+                    total += item["bars"]
+                else:
+                    numeric_bars = False
+            if len(entries) > 24:
+                flag("ENTRY_COUNT")
+            if set(seen) != expected or len(seen) != len(expected):
+                flag("MONTH_SET")
+                for missing in expected.difference(seen):
+                    flag("MONTH_SET", missing)
+                for month in set(seen):
+                    if seen.count(month) > 1:
+                        flag("MONTH_SET", month)
+            if not numeric_bars or total != 29376 or len(entries) > 24:
+                flag("TOTAL_BARS")
+    return [
+        {"category": category, "months": sorted(months)[:10]}
+        for category, months in sorted(problems.items())
+    ][:8]
+
+
+def owner_report_safe_probe(path):
+    """Read at most 5MB and return safe categories, never source values/errors."""
+    try:
+        original = _existing(path, limit=5_000_000).read_bytes()
+        # Do not diagnose data with an unexpected raw file-byte SHA.
+        if hashlib.sha256(original).hexdigest() != EXPECTED_RECOVERY_BYTES_SHA256:
+            return {"status":"PRIVATE_WAIT","code":"OWNER_REPORT_FILE_PIN_MISMATCH",
+                    "mismatches":[]}
+        _owner_report_pins(original)
+        return {"status":"ENTRY_PREDICATES_PASS",
+                "code":"NONE","mismatches":[]}
+    except ValueError as exc:
+        # Only expose bounded static categories from verified report bytes.
+        if str(exc) != "CORE_F2_RECOVERY_OWNER_REPORT_MONTH_CENSUS_OR_IDENTITY_DRIFT":
+            return {"status":"PRIVATE_WAIT","code":"OWNER_REPORT_ROOT_OR_SCHEMA_BLOCKED",
+                    "mismatches":[]}
+        try:
+            # File already passed SHA check. Parser duplicate/nonfinite gate
+            # already passed in _owner_report_pins before entry predicates.
+            report = json.loads(original)
+            return {"status":"PRIVATE_WAIT",
+                    "code":"OWNER_REPORT_MONTH_CENSUS_OR_IDENTITY_DRIFT",
+                    "mismatches":owner_report_entry_mismatch_categories(report)}
+        except (ValueError, TypeError, KeyError):
+            return {"status":"PRIVATE_WAIT","code":"OWNER_REPORT_ROOT_OR_SCHEMA_BLOCKED",
+                    "mismatches":[]}
+    except (OSError, TypeError, OverflowError):
+        return {"status":"PRIVATE_WAIT","code":"OWNER_REPORT_READ_DENIED",
+                "mismatches":[]}
+
+
 def _owner_report_pins(raw):
     """Require both real owner SHA pins and the observed producer report shape.
 
