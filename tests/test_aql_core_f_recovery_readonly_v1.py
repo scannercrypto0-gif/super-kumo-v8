@@ -21,6 +21,7 @@ from research_wp_r0.aql_core_f_recovery_readonly_v1 import (
     SCHEMA, EXPECTED_RECOVERY_BYTES_SHA256,
     EXPECTED_RECOVERY_INTERNAL_SHA256, OWNER_REPORT_SCHEMA,
     _owner_report_pins, _month_bounds,
+    owner_report_entry_mismatch_categories, owner_report_safe_probe,
     _verify_mapping, _read_existing_month, read_recovery_diagnostic,
 )
 from research_wp_r0.aql_core_backbone_local_v1 import admit_local_original, query_local
@@ -30,6 +31,7 @@ from research_wp_r0.aql_native_price_custody_query_v1 import query_price_custody
 from research_wp_r0.aql_core_dual_query_identity_map_v1 import bind_dual_query_identities
 from research_wp_r0.historical_library import HistoricalLibrary
 from tools.raw_vault_offline.vault import RawVault
+from tools.atlas_f2_recovery_month_probe import categories as standalone_categories, probe as standalone_probe
 
 SHA=lambda b:sha256(b).hexdigest()
 MONTH="2024-01"
@@ -186,6 +188,76 @@ class RecoveryNoWriteContract(unittest.TestCase):
                 ):
                     with self.assertRaisesRegex(ValueError, reason):
                         _owner_report_pins(raw)
+
+    def test_owner_safe_probe_matches_core_categories_without_leaking_values(self):
+        import json
+        fixture=self._genuine_structure_fixture()
+        self.assertEqual(owner_report_entry_mismatch_categories(fixture),[])
+        self.assertEqual(standalone_categories(fixture),[])
+        mutations=(
+            ("dataset_id","DATASET_ID_PATTERN"),
+            ("state","STATE_LITERAL"),
+            ("bars","MONTH_BAR_CENSUS"),
+            ("manifest_sha256","DIGEST_FORMAT"),
+        )
+        for field,expected in mutations:
+            damaged=deepcopy(fixture)
+            bad="SENSITIVE_OWNER_PRODUCER_VALUE_DO_NOT_OUTPUT"
+            damaged["entries"][0][field]=bad
+            internal=owner_report_entry_mismatch_categories(damaged)
+            standalone=standalone_categories(damaged)
+            self.assertEqual(internal,standalone)
+            self.assertIn(expected,{x["category"] for x in internal})
+            self.assertIn("2024-01",next(
+                x["months"] for x in internal if x["category"]==expected))
+            leak=json.dumps(internal)
+            self.assertNotIn(bad,leak)
+            self.assertNotIn("source_sha256",leak)
+            self.assertNotIn("dataset_id",leak)
+            self.assertNotIn("manifest_sha256",leak)
+            self.assertEqual(set().union(*(set(x) for x in internal)),
+                             {"category","months"})
+
+        damaged=deepcopy(fixture)
+        damaged["entries"][1]["month"]=damaged["entries"][0]["month"]
+        mismatch=owner_report_entry_mismatch_categories(damaged)
+        self.assertEqual(mismatch,standalone_categories(damaged))
+        month_problem=next(x for x in mismatch if x["category"]=="MONTH_SET")
+        self.assertIn("2024-01",month_problem["months"])
+        self.assertIn("2024-03",month_problem["months"])
+
+    def test_one_file_only_safe_probe_byte_pin_then_categorizes(self):
+        import json
+        import tools.atlas_f2_recovery_month_probe as isolated
+        fixture=self._genuine_structure_fixture()
+        fixture["entries"][0]["dataset_id"]="OWNER_SECRET_DATASET_ID"
+        raw=json.dumps(fixture,sort_keys=True).encode()
+        with TemporaryDirectory(prefix="aql-owner-shape-probe-fixture-") as temp:
+            p=Path(temp)/"only-fixture.json"
+            p.write_bytes(raw)
+            original=SHA(p.read_bytes())
+            with self.assertRaisesRegex(ValueError,
+                                        "OPAQUE_RECOVERY_FILE_SHA_MISMATCH"):
+                _owner_report_pins(raw)
+            self.assertEqual(standalone_probe(p)["code"],
+                             "OWNER_REPORT_FILE_PIN_MISMATCH")
+            self.assertEqual(owner_report_safe_probe(p)["code"],
+                             "OWNER_REPORT_FILE_PIN_MISMATCH")
+            # ONLY in fixture scoped test replace the immutable byte pin;
+            # no bypass exists in the published operator probe.
+            with patch.object(isolated,"EXPECTED_RAW_SHA",original), patch(
+                "research_wp_r0.aql_core_f_recovery_readonly_v1.EXPECTED_RECOVERY_BYTES_SHA256",
+                original,
+            ):
+                a=standalone_probe(p)
+                b=owner_report_safe_probe(p)
+            self.assertEqual(a["status"],"PRIVATE_WAIT")
+            self.assertEqual(b["status"],"PRIVATE_WAIT")
+            self.assertEqual(a["mismatches"],b["mismatches"])
+            self.assertIn("DATASET_ID_PATTERN",
+                          {x["category"] for x in a["mismatches"]})
+            self.assertNotIn("OWNER_SECRET_DATASET_ID",json.dumps(a))
+            self.assertEqual(raw,p.read_bytes())
 
     def test_untrusted_mapping_is_only_shape_preflight(self):
         with self.assertRaisesRegex(ValueError,"EXACT_TEN_ADMITTED_MONTHS_REQUIRED"):
