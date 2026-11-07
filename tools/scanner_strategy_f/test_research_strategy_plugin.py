@@ -175,6 +175,32 @@ class ResearchStrategyPlugin(unittest.TestCase):
         self.assertEqual(Frozen.restore(candidate).data["policy_status"],
                          "RESEARCH_ONLY_NO_INDEPENDENT_APPROVAL")
 
+    def test_closed_envelopes_reject_extra_fields_and_forged_candidate(self):
+        bad=copy.deepcopy(self.plugin["payload"])
+        bad["private_data_passthrough"]="should-never-cross-boundary"
+        with self.assertRaises(ValueError):
+            self.evaluate(plugin=Frozen.build(bad).receipt())
+        bad=copy.deepcopy(self.plugin["payload"])
+        bad["input_origin"]="DISCOVERER_CANDIDATE"
+        with self.assertRaises(ValueError):
+            self.evaluate(plugin=Frozen.build(bad).receipt())
+        batch=self.evaluate()
+        bad=copy.deepcopy(batch["payload"])
+        bad["f5_signed_approval_sha256"]="a"*64
+        with self.assertRaises(ValueError):
+            h.verify_factory_signal_batch(Frozen.build(bad).receipt())
+        bad=copy.deepcopy(batch["payload"])
+        bad["research_asof_basis"]="PIT_ATTESTED"
+        with self.assertRaises(ValueError):
+            h.verify_factory_signal_batch(Frozen.build(bad).receipt())
+        bad=copy.deepcopy(batch["payload"])
+        bad["events"][0]["private_price"]=100.0
+        bad["events"][0]["event_sha256"]=digest({
+            k:v for k,v in bad["events"][0].items()
+            if k!="event_sha256"})
+        with self.assertRaises(ValueError):
+            h.verify_factory_signal_batch(Frozen.build(bad).receipt())
+
     def test_missing_bars_quarantined_and_not_miscounted_as_no_signal(self):
         partial=synthetic_query(missing_index=2)
         out=h.verify_factory_signal_batch(self.evaluate(query=partial)).data
