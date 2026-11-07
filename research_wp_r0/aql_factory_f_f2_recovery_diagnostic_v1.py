@@ -52,7 +52,8 @@ def verified_core_receipts(recovery):
          "RECOVERY_CONTRACT_OR_F2_IMPERSONATION")
     docs=recovery["readback_receipts"]
     need(type(docs) is list and len(docs)==10 and
-         {row.get("month") for row in docs if type(row) is dict}==set(MONTHS),
+         all(type(row) is dict for row in docs) and
+         {row.get("month") for row in docs}==set(MONTHS),
          "RECOVERY_EXACT_TEN_MONTHS")
     parents={}
     count=0
