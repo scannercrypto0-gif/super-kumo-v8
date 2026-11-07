@@ -1,0 +1,38 @@
+name: ATLAS Factory H Generic Scanner→Lab (not F2/F5)
+on:
+  push:
+    branches:
+      - factory/package-e-historical-research-results-20261105
+    paths:
+      - 'research_wp_r0/aql_factory_h_generic_signal_adapter_v1.py'
+      - 'research_wp_r0/aql_factory_h_scientific_lab_v1.py'
+      - 'tools/atlas_factory_h_scanner_ci_stage.py'
+      - 'tests/test_aql_factory_h_generic_signal_adapter_v1.py'
+      - '.github/workflows/atlas-factory-h-generic-scanner.yml'
+      - 'docs/research/factory-package-h-generic-scanner-v1-20261107.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  generic-scanner-verified-research:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.11','3.12','3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Stage pinned Scanner H contract only when absent in disposable checkout
+        run: python tools/atlas_factory_h_scanner_ci_stage.py
+      - name: Run generic third-AST Factory Lab and native SQLite adversarial matrix
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p test_aql_factory_h_generic_signal_adapter_v1.py -v
