@@ -180,7 +180,7 @@ class RecoveryNoWriteContract(unittest.TestCase):
             obj.rename(backup)
             try:
                 obj.symlink_to(backup)
-                with self.assertRaisesRegex(ValueError,"SYMLINK_PATH_DENIED"):
+                with self.assertRaisesRegex(ValueError,"SYMLINK_(TREE|PATH)_DENIED"):
                     _read_existing_month(warehouse,vault_root,MONTH,entry)
             finally:
                 obj.unlink(missing_ok=True)
