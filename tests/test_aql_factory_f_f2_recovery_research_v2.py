@@ -18,6 +18,8 @@ from research_wp_r0.aql_factory_f_f2_recovery_research_v2 import (
     run_recovery_research_v2,
 )
 from research_wp_r0.aql_factory_authentic_research_admission import seal
+from research_wp_r0.strategy_definition import StrategyDefinition
+from research_wp_r0.indicator_library_v2 import IndicatorRegistryV2
 from research_wp_r0.aql_factory_f_research_e2e_diagnostic_v1 import (
     _month_boundaries,
 )
@@ -211,6 +213,8 @@ class FactoryRecoveryResearchV2(unittest.TestCase):
 
     def test_forged_or_missing_inventories_and_53_fake_trials_rejected(self):
         for mutation in ("feb_sha","feb_state","missing","duplicate",
+                         "missing_core_month","tampered_core_receipt",
+                         "mutated_frozen_strategy",
                          "wrong_month","fifty_three","tampered_parent",
                          "f5_escalation","selected","policy_cost",
                          "future","unclosed","missing_cost",
@@ -229,6 +233,17 @@ class FactoryRecoveryResearchV2(unittest.TestCase):
                     p["attempts"][0]["attempt_id"]=p["attempts"][1]["attempt_id"]
                 elif mutation=="wrong_month":
                     p["attempts"][0]["month"]="2024-02"
+                elif mutation=="missing_core_month":
+                    p["recovery_core_receipts"].pop()
+                elif mutation=="tampered_core_receipt":
+                    p["recovery_core_receipts"][0]["source_zip_sha256"]="f"*64
+                elif mutation=="mutated_frozen_strategy":
+                    raw=p["strategy_definitions"]["test_momentum@v1"]
+                    raw["definition"]["entry"]["right"]["value"]=111
+                    d=StrategyDefinition(raw["definition"],
+                                         registry=IndicatorRegistryV2())
+                    raw["digest"]=d.digest
+                    p["trial_packet"]["strategy"]=raw
                 elif mutation=="fifty_three":
                     p["trial_packet"]["trials"]=[{}]*53
                 elif mutation=="tampered_parent":
@@ -241,8 +256,14 @@ class FactoryRecoveryResearchV2(unittest.TestCase):
                     p["operator_policy"]["costs"]["fee_entry_bps"]="-5"
                 elif mutation=="future":
                     p["trial_packet"]["bars"][-1]["close_ms"]+=900000
+                    b=p["trial_packet"]["bars"][-1]
+                    b["bar_sha256"]=seal({k:v for k,v in b.items()
+                                          if k!="bar_sha256"})["artifact_sha256"]
                 elif mutation=="unclosed":
                     p["trial_packet"]["bars"][-1]["quality"]="OPEN"
+                    b=p["trial_packet"]["bars"][-1]
+                    b["bar_sha256"]=seal({k:v for k,v in b.items()
+                                          if k!="bar_sha256"})["artifact_sha256"]
                 elif mutation=="missing_cost":
                     del p["operator_policy"]["costs"]["spread_exit_bps"]
                 elif mutation=="unapproved_policy":
