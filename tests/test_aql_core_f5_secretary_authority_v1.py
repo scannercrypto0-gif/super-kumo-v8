@@ -7,6 +7,7 @@ from research_wp_r0.aql_core_f5_secretary_authority_v1 import (
     CUSTODIAN_ROLE, FACTORY_ROLE_SCHEMA, canonical, digest,
     _signed, _verify_external_role_attestation, _require_distinct_signers,
     pending_authority, verify_source_ack, verify_strategy_approval,
+    verify_scanner_nomination,
 )
 
 
@@ -33,7 +34,7 @@ class TestCoreF5AuthorityNoSyntheticApproval(unittest.TestCase):
             verify_strategy_approval(
                 {}, source_receipt={}, source_attestation=None,
                 authorization_document=None, f2_report={},
-                source_zip_sha256="a"*64, warehouse_receipt_sha256="b"*64,
+                scanner_nomination={}, source_zip_sha256="a"*64, warehouse_receipt_sha256="b"*64,
                 native245_sha256="c"*64, local253_sha256="d"*64,
                 month="2024-01", strategy_nomination_sha256="e"*64,
                 independent_policy_sha256="f"*64,
@@ -50,6 +51,59 @@ class TestCoreF5AuthorityNoSyntheticApproval(unittest.TestCase):
                 trusted_role_registry={}, trusted_now_utc="2026-11-07T05:00:00Z")
         with self.assertRaisesRegex(ValueError, "SIGNER_ROLE_ALIAS"):
             _require_distinct_signers([("same", "abc"), ("same", "def")])
+
+
+    def test_scanner_nomination_never_promotes_by_sha_alone(self):
+        body = {
+            "schema":"aql.scanner-f.original-research-nomination.v1",
+            "decision":"NOMINATED_RESEARCH_ONLY","selected":False,
+            "secretary_status":"NOT_ENQUEUED","factory_lab":"NOT_EVALUATED",
+            "paper":"NOT_ACTIVATED","holdout":"SEALED",
+            "historical_pit":"NOT_ATTESTED",
+            "research_class":"RETROSPECTIVE_NON_PIT","trading_authority":"NONE",
+            "core_source_ack_sha256":None,
+            "core_secretary_strategy_approval_sha256":None,
+            "factory_consumer_ack_sha256":None,
+            "core_f2_report_sha256":"daf1208bf824e58040858a817c709f7943c19668dc23ce3fd3b0368e01156f40",
+            "verified_policy_approval_sha256":"a"*64,
+            "signed_evaluator_receipt_sha256":"b"*64,
+            "strategy_definition_digest":"c"*64,
+            "month":"2024-01","symbol":"BTCUSDT","timeframe":"15m",
+            "market":"BINANCE:SPOT:USDT",
+            "warehouse_receipt_sha256":"d"*64,
+            "core245_native_query_sha256":"e"*64,
+            "core253_local_query_sha256":"f"*64,
+            "strategy_decision_sha256":"1"*64,
+            "source_bound_census_sha256":"2"*64,
+            "verified_independent_evaluator_sha256":"3"*64,
+            "dna_digest":"4"*64,"native15m_config_digest":"5"*64,
+            "dual_query_map_sha256":"6"*64,
+            "strategy_id":"test_momentum","strategy_version":"v1",
+            "cutoff_ms":1738368000000,
+            "last_evaluated_open_ms":1735688700000,
+        }
+        receipt={"payload":body,"sha256":digest(body)}
+        args={
+            "nomination_sha256":receipt["sha256"],
+            "independent_policy_sha256":"a"*64,
+            "evaluator_receipt_sha256":"b"*64,
+            "strategy_definition_sha256":"c"*64,
+            "expected_f2_report_sha256":body["core_f2_report_sha256"],
+            "month":"2024-01","warehouse_receipt_sha256":"d"*64,
+            "native245_sha256":"e"*64,"local253_sha256":"f"*64,
+        }
+        self.assertEqual(verify_scanner_nomination(receipt,**args),body)
+        # This seal is a contract fixture only. It is not external policy/evaluator
+        # authority, a strategy approval, or a real original-bar run.
+        for field,value in (("selected",True),("month","2024-02"),
+                            ("core253_local_query_sha256","a"*64),
+                            ("secretary_status","ENQUEUED")):
+            forged={**body,field:value}
+            new_receipt={"payload":forged,"sha256":digest(forged)}
+            with self.subTest(field=field),self.assertRaisesRegex(
+                    ValueError,"SCANNER_NOMINATION"):
+                verify_scanner_nomination(
+                    new_receipt,**{**args,"nomination_sha256":new_receipt["sha256"]})
 
 
 @unittest.skipUnless(__import__("importlib").util.find_spec("cryptography") is not None,
