@@ -74,6 +74,32 @@ class OwnerF2NegativeTests(unittest.TestCase):
         self.assertFalse(any("trial_ledger" in x or "inventory." in x
                              for x in missing))
 
+    def test_owner_private_exception_diagnostic_is_fixed_enum_and_redacted(self):
+        runner._set_stage("RECOVERY_SOURCE_MONTH")
+        diagnostic=runner._sanitized_exception(
+            FileNotFoundError("E:/PRIVATE/SECRET/source.zip"))
+        self.assertEqual(diagnostic,{
+            "failure_stage":"RECOVERY_SOURCE_MONTH",
+            "failure_class":"FileNotFoundError"})
+        self.assertNotIn("PRIVATE",repr(diagnostic))
+        runner._set_stage("RECOVERY_MAPPING_VALIDATION")
+        self.assertEqual(runner._sanitized_exception(
+            ValueError("OHLCV SECRET"))["failure_class"],"ValueError")
+        self.assertNotIn("SECRET",repr(runner._sanitized_exception(
+            ValueError("OHLCV SECRET"))))
+        with self.assertRaisesRegex(ValueError,"AQL_DIAG_UNRECOGNIZED_STAGE"):
+            runner._set_stage("USER_PRIVATE_PATH")
+        self.assertEqual(runner.CURRENT_STAGE,"RECOVERY_MAPPING_VALIDATION")
+        runner._set_stage("MANIFEST_INPUTS")
+
+    def test_phase_callback_cannot_change_source_verifier_code(self):
+        stages=[]
+        with self.assertRaisesRegex(ValueError,"CORE_F2_RECOVERY_"):
+            collector.collect_recovery_source(
+                "/missing-warehouse","/missing-vault","/missing-recovery.json",
+                stage_callback=stages.append)
+        self.assertEqual(stages,["RECOVERY_REPORT_PIN"])
+
     def test_source_only_receipt_schema_import_is_explicit_and_core_owned(self):
         # Regression: source derivation emitted schema=SCHEMA without importing
         # that Core constant. Only private E: runs reached the code path.
