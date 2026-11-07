@@ -40,7 +40,7 @@ $output=Join-Path $root 'private-output'
 New-Item -ItemType Directory -Path $output -ErrorAction Stop | Out-Null
 $refs=[ordered]@{
     'integration'=$IntegrationCommit
-    'factory_e'='a82c611b23705898304270ef8d343d6a185913fa'
+    'factory_e'='0ec35238de6cf48db07c5c977e1f0d04bc299f58'
     'factory_d'='a695e262da6787f752a13820f02dd00eef8ef1cd'
     'core_f'='6cf7acd3d038f8147c55a6d503ffdfea5e6d6f2d'
     'core_e'='3af5b66d2b381b853a6b5be32c38b3d3d02e1ea7'
