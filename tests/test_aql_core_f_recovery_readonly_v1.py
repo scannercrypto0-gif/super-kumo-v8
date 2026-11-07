@@ -58,36 +58,113 @@ class RecoveryNoWriteContract(unittest.TestCase):
                 read_recovery_diagnostic(temp,temp,p,build_mapping([]))
         self.assertEqual(len(EXPECTED_RECOVERY_BYTES_SHA256),64)
 
+    @staticmethod
+    def _genuine_structure_fixture():
+        # This is ONLY a synthetic structure: it is not the owner's file and
+        # cannot pass the genuine immutable FILE BYTES SHA without a test patch.
+        import calendar
+        from research_wp_r0.aql_core_f_research_diagnostic_query_v1 import (
+            ADMITTED_MONTHS,
+        )
+        entries = []
+        for month in ADMITTED_MONTHS:
+            y, m = map(int, month.split("-"))
+            bars = calendar.monthrange(y, m)[1] * 96
+            entries.append({
+                "bars": bars,
+                "core245_native_query_sha256": "b" * 64,
+                "core253_local_query_sha256": "c" * 64,
+                "dataset_id": f"BINANCE-SPOT-BTCUSDT-15M-{month}-F-v1",
+                "manifest_sha256": "d" * 64,
+                "month": month,
+                "source_sha256": "e" * 64,
+                "state": "RAW_AND_DUAL_QUERY_READBACK",
+            })
+        return {
+            "schema": OWNER_REPORT_SCHEMA,
+            "recovery_sha256": EXPECTED_RECOVERY_INTERNAL_SHA256,
+            "disposition": "OWNER_LOCAL_DUAL_READBACK_PASS",
+            "verified_months": 10,
+            "verified_bars": 29376,
+            "entries": entries,
+            "historical_pit": "NOT_ATTESTED",
+            "trading_authority": "NONE",
+            "signed_f5_approval": False,
+            "original_f2_report_restored": False,
+        }
+
+    def _structure_checked(self, report):
+        """Isolate schema checks; production still requires fixed actual bytes."""
+        import json
+        raw = json.dumps(report, sort_keys=True, separators=(",", ":")).encode()
+        with patch(
+            "research_wp_r0.aql_core_f_recovery_readonly_v1.EXPECTED_RECOVERY_BYTES_SHA256",
+            SHA(raw),
+        ):
+            return _owner_report_pins(raw)
+
     def test_real_owner_schema_two_hash_contract(self):
-        # Fixture mirrors the reported genuine schema, not genuine bytes.
         import json
         self.assertNotEqual(EXPECTED_RECOVERY_INTERNAL_SHA256,
                             EXPECTED_RECOVERY_BYTES_SHA256)
         self.assertEqual(OWNER_REPORT_SCHEMA,
                          "aql.owner-local.f2-recovery-evidence.v1")
-        shape = {
-            "schema": OWNER_REPORT_SCHEMA,
-            "recovery_sha256": EXPECTED_RECOVERY_INTERNAL_SHA256,
-            "disposition": "OWNER_LOCAL_DUAL_READBACK_PASS",
-            "verified_months": [{} for _ in range(10)],
-        }
-        raw = json.dumps(shape, sort_keys=True).encode()
-        # Even an apparently correct internal field MUST fail file-byte pin.
+        fixture = self._genuine_structure_fixture()
+        self.assertEqual(self._structure_checked(fixture), fixture)
+        raw = json.dumps(fixture, sort_keys=True).encode()
+        # No test-only file bypass is ever permitted on the public route.
         with self.assertRaisesRegex(ValueError,
                                     "OPAQUE_RECOVERY_FILE_SHA_MISMATCH"):
             _owner_report_pins(raw)
-        wrong_internal = {**shape, "recovery_sha256": "f" * 64}
-        with self.assertRaisesRegex(ValueError,
-                                    "OPAQUE_RECOVERY_FILE_SHA_MISMATCH"):
-            _owner_report_pins(json.dumps(wrong_internal).encode())
-        self.assertEqual(len(EXPECTED_RECOVERY_BYTES_SHA256), 64)
-        self.assertEqual(len(EXPECTED_RECOVERY_INTERNAL_SHA256), 64)
+
+    def test_report_rejects_count_rows_month_census_and_sha_tampering(self):
+        cases = [
+            ("months_list", ("verified_months", [{}] * 10),
+             "OWNER_REPORT_SCHEMA_OR_INTERNAL_PIN_DRIFT"),
+            ("months_bool", ("verified_months", True),
+             "OWNER_REPORT_SCHEMA_OR_INTERNAL_PIN_DRIFT"),
+            ("months_nine", ("verified_months", 9),
+             "OWNER_REPORT_SCHEMA_OR_INTERNAL_PIN_DRIFT"),
+            ("bars_wrong", ("verified_bars", 29375),
+             "OWNER_REPORT_SCHEMA_OR_INTERNAL_PIN_DRIFT"),
+            ("bars_bool", ("verified_bars", True),
+             "OWNER_REPORT_SCHEMA_OR_INTERNAL_PIN_DRIFT"),
+            ("report_internal", ("recovery_sha256", "f"*64),
+             "OWNER_REPORT_SCHEMA_OR_INTERNAL_PIN_DRIFT"),
+            ("pit_promote", ("historical_pit", "ATTESTED"),
+             "OWNER_REPORT_AUTHORITY_PROMOTION_DENIED"),
+            ("f5_promote", ("signed_f5_approval", True),
+             "OWNER_REPORT_AUTHORITY_PROMOTION_DENIED"),
+            ("restored_original", ("original_f2_report_restored", True),
+             "OWNER_REPORT_AUTHORITY_PROMOTION_DENIED"),
+            ("trade_promote", ("trading_authority", "LIVE"),
+             "OWNER_REPORT_AUTHORITY_PROMOTION_DENIED"),
+        ]
+        for name, (field, value), reason in cases:
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, reason):
+                self._structure_checked({
+                    **self._genuine_structure_fixture(), field:value})
+        for name, mutate in [
+            ("duplicate_month",lambda rows:rows.__setitem__(
+                1, {**rows[1],"month":rows[0]["month"]})),
+            ("missing_month",lambda rows:rows.pop()),
+            ("extra_month",lambda rows:rows.append(dict(rows[-1]))),
+            ("bar_count",lambda rows:rows[0].__setitem__("bars", 1)),
+            ("wrong_dataset",lambda rows:rows[0].__setitem__(
+                "dataset_id","INVENTORY_ONLY")),
+            ("wrong_query_sha",lambda rows:rows[0].__setitem__(
+                "core253_local_query_sha256","not-sha")),
+            ("extra_entry_key",lambda rows:rows[0].__setitem__(
+                "warehouse_receipt_sha256","a"*64)),
+        ]:
+            fixture = self._genuine_structure_fixture()
+            mutate(fixture["entries"])
+            with self.subTest(name=name),self.assertRaisesRegex(
+                ValueError,"OWNER_REPORT_ENTRY_FIELDS_DRIFT|OWNER_REPORT_MONTH_CENSUS_OR_IDENTITY_DRIFT"
+            ):
+                self._structure_checked(fixture)
 
     def test_real_schema_parser_rejects_duplicate_or_nonfinite_after_byte_pin(self):
-        # Patch only the outer pin in this isolated negative test. This does
-        # NOT create any genuine owner report, authority or positive readback.
-        from unittest.mock import patch
-        import hashlib
         import json
         cases = [
             (b'{"schema":"a","schema":"b"}', "REPORT_DUPLICATE_KEY"),
@@ -95,7 +172,10 @@ class RecoveryNoWriteContract(unittest.TestCase):
             (json.dumps({"schema":OWNER_REPORT_SCHEMA,
                          "recovery_sha256":"f"*64,
                          "disposition":"OWNER_LOCAL_DUAL_READBACK_PASS",
-                         "verified_months":[{}]*10}).encode(),
+                         "verified_months":10,
+                         "verified_bars":29376,
+                         "entries":self._genuine_structure_fixture()["entries"]
+                         }).encode(),
              "OWNER_REPORT_SCHEMA_OR_INTERNAL_PIN_DRIFT"),
         ]
         for raw, reason in cases:
