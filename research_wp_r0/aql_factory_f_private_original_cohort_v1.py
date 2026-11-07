@@ -330,31 +330,9 @@ def run_private_cohort(packet,witness,witness_sha,store_path):
         "trading_authority":"NONE","holdout":"SEALED_UNOPENED",
         "scientific_acceptance":"INSUFFICIENT_EVIDENCE"}
     result_sha=digest(body)
-    immutable=build_experiment(
-        experiment_id=packet["experiment_id"],lane="SCANNER",
-        source_status="RETROSPECTIVE_SOURCE_ADMITTED_NOT_PIT",
-        source_sha256=selected["source_receipt_sha256"],
-        source_query_245_sha256=entries[selected["month"]][
-            "core_245_native_price_query_sha256"],
-        source_query_253_sha256=entries[selected["month"]][
-            "core_253_local_query_sha256"],
-        strategy_definition_sha256=definition.digest,
-        config_sha256=packet["config_sha256"],
-        code_sha256=packet["code_sha256"],
-        environment_sha256=packet["environment_sha256"],
-        parent_receipt_sha256=packet["strategy_approval_sha256"],
-        attempts=[{"attempt_id":x["attempt_id"],
-                   "candidate_id":x["candidate_id"],
-                   "state":x["state"],
-                   "source_receipt_sha256":x["source_receipt_sha256"]}
-                  for x in packet["attempts"]],
-        lab_receipt_sha256=lab_sha,
-        result_sha256=result_sha,
-        evidence_class="RETROSPECTIVE_NON_PIT")
     # Preserve Feb/Aug as four immutable UNKNOWN rows in the same final
     # experiment; the evaluated census remains the original full 24 attempts.
     # These source-month rows explicitly have no authentic source receipt.
-    from research_wp_r0.aql_factory_e_research_results_store_v1 import _seal
     retained=[]
     for month in ("2024-02","2024-08"):
         for candidate in sorted({x["candidate_id"] for x in packet["attempts"]}):
