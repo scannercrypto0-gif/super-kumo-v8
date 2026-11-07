@@ -5,7 +5,9 @@ on:
       - factory/package-e-historical-research-results-20261105
     paths:
       - 'research_wp_r0/aql_factory_f_private_original_cohort_v1.py'
+      - 'research_wp_r0/aql_factory_f_role_authority_v1.py'
       - 'tests/test_aql_factory_f_private_original_cohort_v1.py'
+      - 'tests/test_aql_factory_f_role_authority_v1.py'
       - '.github/workflows/atlas-factory-f-private-e2e.yml'
   workflow_dispatch:
 permissions:
@@ -24,6 +26,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Public CI only confirms missing genuine source/approval is blocked
+      - name: Install Ed25519 verifier (test-only key fixture)
+        run: python -m pip install cryptography
+      - name: Public CI checks independent authority graph and missing genuine source blocker
         run: |
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_factory_f_private_original_cohort_v1.py' -v
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_factory_f_role_authority_v1.py' -v
