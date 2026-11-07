@@ -279,9 +279,16 @@ def validate_input(packet,witness,witness_sha):
     return definition,sel,entries_by_month
 
 
-def run_private_cohort(packet,witness,witness_sha,store_path):
+def run_private_cohort(packet,witness,witness_sha,store_path,*,
+                       authority_attestations=None,independent_keyring=None,
+                       trusted_now_utc=None):
     definition,selected,entries=validate_input(
         packet,witness,witness_sha)
+    from research_wp_r0.aql_factory_f_role_authority_v1 import verify_role_attestations
+    authority_graph=verify_role_attestations(
+        packet,authority_attestations,independent_keyring,trusted_now_utc)
+    need(authority_graph["trading_authority"]=="NONE",
+         "AUTHORITY_GRAPH_NOT_RESEARCH_ONLY")
     # Factory consumer ACK is distinct from Source ACK and StrategyApproval;
     # it binds exactly the independently approved source/policy/strategy/input
     # graph *before* the Lab executes. Lab result SHA is a separate child.
@@ -319,6 +326,7 @@ def run_private_cohort(packet,witness,witness_sha,store_path):
         "strategy_approval_sha256":packet["strategy_approval_sha256"],
         "factory_consumer_ack_sha256":factory_consumer_ack,
         "core_f2_report_sha256":packet["core_f2_report_sha256"],
+        "independent_authority_graph_sha256":digest(authority_graph),
         "lab_receipt_sha256":lab_sha,
         "unknown_outcomes":lab["unknown_outcomes"],
         "modeled_outcomes_count":len(lab["modeled_outcomes"]),
@@ -391,12 +399,20 @@ def main():
     parser.add_argument("--trusted-witness-sha256",required=True)
     parser.add_argument("--results-store",required=True)
     parser.add_argument("--sanitized-out",required=True)
+    parser.add_argument("--role-attestations-json",required=True)
+    parser.add_argument("--independent-trust-registry-json",required=True)
+    parser.add_argument("--trusted-now-utc",required=True)
     args=parser.parse_args()
     try:
         packet=_load(args.input_json,MAX_INPUT_BYTES)
         witness=_load(args.trusted_witness_json,50_000)
+        attestations=_load(args.role_attestations_json,100_000)
+        independent_registry=_load(args.independent_trust_registry_json,100_000)
         out=run_private_cohort(packet,witness,args.trusted_witness_sha256,
-                               args.results_store)
+                               args.results_store,
+                               authority_attestations=attestations,
+                               independent_keyring=independent_registry,
+                               trusted_now_utc=args.trusted_now_utc)
         destination=Path(args.sanitized_out)
         need(destination.parent.is_dir() and not destination.is_symlink(),
              "SANITIZED_OUTPUT_PATH")
