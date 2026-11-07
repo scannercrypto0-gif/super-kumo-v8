@@ -59,7 +59,8 @@ FOCUS_FIELDS = {"schema", "diagnostic_month", "strategy_id", "strategy",
                 "dataset_id", "dataset_version", "availability", "market",
                 "width_ms", "bars"}
 POLICY_FIELDS = {"schema", "owner_operator_authorized", "costs",
-                 "research_window", "direction", "ambiguity_policy"}
+                 "research_window", "direction", "ambiguity_policy",
+                 "focus_month", "focus_strategy_id"}
 WINDOW_FIELDS = {"train_end_exclusive_ms", "embargo_ms",
                  "holdout_start_ms", "holdout_end_exclusive_ms"}
 COVERAGE_FIELDS = {"new_admitted_months", "new_admitted_bars",
@@ -101,6 +102,8 @@ def _policy(policy):
          policy["owner_operator_authorized"] is True and
          policy["ambiguity_policy"] == "UNKNOWN_ON_INTRABAR_TOUCH" and
          policy["direction"] == "LONG" and
+         policy["focus_month"] in MONTHS and
+         policy["focus_strategy_id"] in STRATEGY_IDS and
          type(policy["costs"]) is dict and
          set(policy["costs"]) == set(COST_KEYS) and
          all(type(v) is str for v in policy["costs"].values()),
@@ -254,6 +257,9 @@ def validate_recovery_research_input(packet):
     window=packet["operator_policy"]
     # Must stop before any mutable store creation if policy is unavailable.
     _policy(window)
+    need(window["focus_month"] == month and
+         window["focus_strategy_id"] == trial["strategy_id"],
+         "V2_OPERATOR_FOCUS_BINDING")
     # Existing per-bar seal/grid/closed-candle/future-window protections,
     # without calling the legacy 53-trial population validator.
     old={"bars":bars,"width_ms":900000,
