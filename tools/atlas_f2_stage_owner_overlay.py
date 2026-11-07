@@ -8,7 +8,7 @@ import argparse
 from hashlib import sha1,sha256
 import json
 from pathlib import Path
-from shutil import copyfile,copytree
+from shutil import copyfile
 import subprocess
 
 from tools.atlas_e_combined_gate_manifest import PINS
@@ -149,15 +149,29 @@ def stage(root):
             "trading_authority":"NONE"}
 
 
+def _bounded_stage_code(exc):
+    # Never print exception text, private paths or source bytes.
+    message=str(exc)
+    if message.startswith("AQL_OWNER_STAGE_"):
+        return message
+    if message.startswith("AQL_DIAG_"):
+        return "PINNED_F2_OPERATOR_MODULE_SHA_MISMATCH"
+    if isinstance(exc, (ImportError, ModuleNotFoundError)):
+        return "PINNED_OVERLAY_MODULE_IMPORT_MISSING"
+    if isinstance(exc, FileNotFoundError):
+        return "PINNED_OVERLAY_REQUIRED_MODULE_MISSING"
+    return "PINNED_OVERLAY_ASSEMBLY_FAILED"
+
+
 def main():
     a=argparse.ArgumentParser()
     a.add_argument("--root",required=True)
     args=a.parse_args()
     try:
         print(json.dumps(stage(args.root),sort_keys=True))
-    except Exception:
+    except Exception as exc:
         print(json.dumps({"status":"PRIVATE_WAIT",
-                          "code":"PINNED_OVERLAY_ASSEMBLY_FAILED",
+                          "code":_bounded_stage_code(exc),
                           "trading_authority":"NONE"},sort_keys=True))
         raise SystemExit(2)
 
