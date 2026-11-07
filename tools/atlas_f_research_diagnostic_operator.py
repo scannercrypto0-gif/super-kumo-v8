@@ -76,6 +76,15 @@ def require_scope(m):
                "NO_WRITES_UNDER_ORIGINAL_SOURCE")
     # One new bounded experiment; no previous database is quietly reused.
     demand(not store.exists() and not out.exists(), "FRESH_RUN_OUTPUT_REQUIRED")
+    # Exact private inputs are required before any Store side effect.
+    for key in ("core_f2_report_path","scanner_policy_draft_path",
+                "scanner_proposal_path","scanner_approval_request_path",
+                "frozen_work_specs_path","factory_diagnostic_input_path"):
+        src = Path(m[key])
+        demand(src.is_file() and not src.is_symlink()
+               and 0 < src.stat().st_size <= 50_000_000,
+               "MISSING_OPERATOR_INPUT_" + key.upper())
+
     return vault, warehouse, store, out
 
 
@@ -203,6 +212,9 @@ def run(m):
     from research_wp_r0.aql_factory_f_research_e2e_diagnostic_v1 import (
         run_diagnostic,
     )
+    from research_wp_r0.aql_factory_e_research_results_store_v1 import (
+        migrate_store_v2, audit_store_layout,
+    )
     original_report = read_json(m["core_f2_report_path"])
     original = {}
     queries = {}
@@ -230,6 +242,9 @@ def run(m):
     factory = read_json(m["factory_diagnostic_input_path"])
     month,focus,focus_bars = compare_trial_with_original(factory, original, scanner)
     negative_cases = check_fail_closed_negatives(factory)
+    migrated = migrate_store_v2(store)
+    demand(migrated["status"] == "UPGRADED_V2",
+           "NEW_IMMUTABLE_V2_DIAGNOSTIC_STORE")
     first = run_diagnostic(factory, store)
     second = run_diagnostic(factory, store)
     demand(first["store_status"] == "STORED_IMMUTABLE"
@@ -237,6 +252,8 @@ def run(m):
            and all(first[key] == second[key] for key in
                    ("experiment_sha256","lab_sha256","result_sha256",
                     "input_sha256","receipt_sha256"))
+           and first["layout_version"] == 2
+           and audit_store_layout(store)["layout_version"] == 2
            and first["attempt_count"] == 24
            and first["feb_aug_inventory_unknown"] == 4
            and first["historical_pit"] == "NOT_ATTESTED"
