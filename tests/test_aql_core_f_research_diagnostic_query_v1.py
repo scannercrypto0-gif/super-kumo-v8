@@ -128,6 +128,8 @@ class DiagnosticOriginalCausality(unittest.TestCase):
             self.assertEqual(first["receipt"]["core253_local_query_sha256"],
                              local["query_sha256"])
             self.assertIsNone(first["receipt"]["source_ack_sha256"])
+            self.assertFalse(first["receipt"]["owner_f2_report_pin_verified"])
+            self.assertIsNone(first["receipt"]["owner_f2_report_sha256"])
             self.assertEqual(first["receipt"]["secretary_state"],"NOT_ENQUEUED")
             self.assertEqual(first["receipt"]["trading_authority"],"NONE")
             self.assertEqual(len(first["local_bars"]),N)
@@ -150,6 +152,20 @@ class DiagnosticOriginalCausality(unittest.TestCase):
                 _one_read_only(
                     warehouse,vault_root,month=MONTH,source_entry=entry,
                     start_ms=START,end_exclusive_ms=end,cutoff_ms=START)
+            original_object = (vault_root/"objects"/SHA(original_zip)[:2]/
+                               SHA(original_zip)[2:])
+            backup = original_object.with_suffix(".fixture-backup")
+            original_object.rename(backup)
+            try:
+                original_object.symlink_to(backup)
+                with self.assertRaisesRegex(ValueError,
+                                            "DIAGNOSTIC_RAW_OBJECT_LINK_OR_MISSING"):
+                    _one_read_only(
+                        warehouse,vault_root,month=MONTH,source_entry=entry,
+                        start_ms=START,end_exclusive_ms=end,cutoff_ms=cutoff)
+            finally:
+                original_object.unlink(missing_ok=True)
+                backup.rename(original_object)
 
     def test_public_diagnostic_denies_unpinned_original_source(self):
         with self.assertRaisesRegex(ValueError,
