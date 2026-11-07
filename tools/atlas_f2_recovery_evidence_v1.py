@@ -45,6 +45,28 @@ def _hex(value):
     return type(value) is str and len(value) == 64 and all(c in HEX for c in value)
 
 
+def _owner_report_matches_reconstructed_mapping(parent, row):
+    """Producer verification is distinct from the reconstructed Core mapping.
+
+    The genuine byte-pinned owner report says DUAL_READBACK_VERIFIED;
+    Core's independently derived mapping says RAW_AND_DUAL_QUERY_READBACK.
+    Neither state implies original F2 restoration, PIT, F5, or approval.
+    """
+    return (type(parent) is dict and type(row) is dict and
+            parent.get("state") == "DUAL_READBACK_VERIFIED" and
+            row.get("state") == "RAW_AND_DUAL_QUERY_READBACK" and
+            parent.get("dataset_id") ==
+                "BINANCE-SPOT-BTCUSDT-15M-" + row.get("month", "") + "-F-v1" and
+            parent.get("month") == row.get("month") and
+            parent.get("bars") == row.get("bars") and
+            parent.get("source_sha256") == row.get("source_sha256") and
+            parent.get("core245_native_query_sha256") ==
+                row.get("core_245_native_price_query_sha256") and
+            parent.get("core253_local_query_sha256") ==
+                row.get("core_253_local_query_sha256") and
+            _hex(parent.get("manifest_sha256")))
+
+
 def load_recovery_evidence(path, mapping):
     """Pin actual original recovery bytes; mapping is untrusted and re-read."""
     p = Path(path)
@@ -125,16 +147,7 @@ def load_recovery_evidence(path, mapping):
     reported = {x["month"]:x for x in report["entries"]}
     for row in rows:
         parent = reported[row["month"]]
-        require(parent["state"] == "RAW_AND_DUAL_QUERY_READBACK" and
-                parent["dataset_id"] ==
-                    "BINANCE-SPOT-BTCUSDT-15M-" + row["month"] + "-F-v1" and
-                parent["bars"] == row["bars"] and
-                parent["source_sha256"] == row["source_sha256"] and
-                parent["core245_native_query_sha256"] ==
-                    row["core_245_native_price_query_sha256"] and
-                parent["core253_local_query_sha256"] ==
-                    row["core_253_local_query_sha256"] and
-                _hex(parent["manifest_sha256"]),
+        require(_owner_report_matches_reconstructed_mapping(parent, row),
                 "OWNER_REPORT_VS_UNTRUSTED_MAPPING_DRIFT")
     return {x["month"]: x for x in rows}
 
