@@ -149,6 +149,7 @@ def fixture_packet():
             },
             "research_window":window,
             "direction":"LONG","ambiguity_policy":"UNKNOWN_ON_INTRABAR_TOUCH",
+            "focus_month":focus,"focus_strategy_id":"test_momentum@v1",
         },
         "source_coverage":{
             "new_admitted_months":10,"new_admitted_bars":29376,
@@ -218,7 +219,7 @@ class FactoryRecoveryResearchV2(unittest.TestCase):
                          "wrong_month","fifty_three","tampered_parent",
                          "f5_escalation","selected","policy_cost",
                          "future","unclosed","missing_cost",
-                         "unapproved_policy","bad_raw_pin"):
+                         "unapproved_policy","policy_focus_swap","bad_raw_pin"):
             with self.subTest(mutation=mutation):
                 p=fixture_packet()
                 if mutation=="feb_sha":
@@ -268,6 +269,8 @@ class FactoryRecoveryResearchV2(unittest.TestCase):
                     del p["operator_policy"]["costs"]["spread_exit_bps"]
                 elif mutation=="unapproved_policy":
                     p["operator_policy"]["owner_operator_authorized"]=False
+                elif mutation=="policy_focus_swap":
+                    p["operator_policy"]["focus_month"]="2024-03"
                 elif mutation=="bad_raw_pin":
                     p["recovery_raw_bytes_sha256"]="f"*64
                 reseal(p)
