@@ -7,6 +7,7 @@ on:
       - 'research_wp_r0/aql_factory_f_f2_recovery_research_v2.py'
       - 'tests/test_aql_factory_f_f2_recovery_research_v2.py'
       - '.github/workflows/atlas-factory-f-recovery-v2.yml'
+      - 'docs/research/factory-f2-recovery-research-v2-contract-20261107.md'
   workflow_dispatch:
 permissions:
   contents: read
