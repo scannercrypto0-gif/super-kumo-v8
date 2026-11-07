@@ -35,6 +35,28 @@ CORE_FIELDS=frozenset((
     "source_availability","historical_pit","universe","query_sha256",
 ))
 MAX_BARS=4096
+PLUGIN_FIELDS=frozenset((
+    "schema","strategy_id","strategy_version","config_digest",
+    "definition","definition_digest","parameters","evaluator_code_sha256",
+    "source_spec_sha256","config_identity_class","input_origin",
+    "candidate_sha256","timing","policy_status","historical_pit",
+    "source_ack_sha256","strategy_approval_sha256",
+    "factory_consumer_ack_sha256","trading_authority",
+))
+BATCH_FIELDS=frozenset((
+    "schema","source_class","strategy_id","strategy_version",
+    "strategy_plugin_sha256","strategy_definition_digest","config_digest",
+    "evaluator_code_sha256","source_query_sha256","source_bytes_sha256",
+    "manifest_integrity_sha256","dataset_id","policy_sha256",
+    "decision_cutoff_ms","start_ms","end_exclusive_ms","coverage",
+    "expected_bar_count","observed_bar_count","missing_bar_count",
+    "signal_counts","event_count","events","quarantine",
+    "research_asof_basis","factory_interface","cost_or_pnl_computed",
+    "economic_attestation","historical_pit",
+    "independent_policy_approval_sha256","source_ack_sha256",
+    "strategy_approval_sha256","factory_consumer_ack_sha256",
+    "selected","holdout","paper","trading_authority",
+))
 EVENT_FIELDS=frozenset((
     "schema","sequence","bar_open_ms","bar_close_ms","research_asof_ms",
     "historical_known_at_ms","historical_pit","signal_state",
@@ -276,7 +298,14 @@ def evaluate_strategy_plugin(
     """
     obj=Frozen.restore(plugin)
     data=obj.data
-    require(data.get("schema")==PLUGIN_SCHEMA
+    require(set(data)==PLUGIN_FIELDS
+            and data.get("schema")==PLUGIN_SCHEMA
+            and ((data.get("input_origin")=="MANUAL"
+                  and data.get("candidate_sha256") is None)
+                 or (data.get("input_origin")=="DISCOVERER_CANDIDATE"
+                     and _hex(data.get("candidate_sha256"))))
+            and _hex(data.get("config_digest"))
+            and _hex(data.get("definition_digest"))
             and data.get("policy_status")=="RESEARCH_ONLY_NO_INDEPENDENT_APPROVAL"
             and data.get("trading_authority")=="NONE"
             and data.get("historical_pit")=="NOT_ATTESTED"
@@ -389,7 +418,13 @@ def verify_factory_signal_batch(batch):
     """Verify deterministic event identity and invariants; NOT price replay."""
     obj=Frozen.restore(batch)
     x=obj.data
-    require(x.get("schema")==BATCH_SCHEMA
+    require(set(x)==BATCH_FIELDS
+            and x.get("schema")==BATCH_SCHEMA
+            and x.get("source_class") in
+                ("TEST_ONLY","OWNER_LOCAL_RECOVERY_DIAGNOSTIC")
+            and x.get("coverage") in ("COMPLETE","PARTIAL","UNKNOWN")
+            and x.get("research_asof_basis")==
+                "HYPOTHETICAL_CLOSED_BAR_NOT_HISTORICAL_PIT"
             and x.get("factory_interface")=="SIGNAL_ONLY_NEXT_ELIGIBLE_OPEN_NO_FILLS"
             and x.get("cost_or_pnl_computed") is False
             and x.get("historical_pit")=="NOT_ATTESTED"
