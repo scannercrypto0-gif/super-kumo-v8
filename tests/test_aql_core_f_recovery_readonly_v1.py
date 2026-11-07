@@ -18,7 +18,9 @@ from unittest.mock import patch
 from zipfile import ZipFile, ZIP_DEFLATED
 
 from research_wp_r0.aql_core_f_recovery_readonly_v1 import (
-    SCHEMA, EXPECTED_RECOVERY_BYTES_SHA256, _month_bounds,
+    SCHEMA, EXPECTED_RECOVERY_BYTES_SHA256,
+    EXPECTED_RECOVERY_INTERNAL_SHA256, OWNER_REPORT_SCHEMA,
+    _owner_report_pins, _month_bounds,
     _verify_mapping, _read_existing_month, read_recovery_diagnostic,
 )
 from research_wp_r0.aql_core_backbone_local_v1 import admit_local_original, query_local
@@ -55,6 +57,55 @@ class RecoveryNoWriteContract(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"OPAQUE_RECOVERY_FILE_SHA_MISMATCH"):
                 read_recovery_diagnostic(temp,temp,p,build_mapping([]))
         self.assertEqual(len(EXPECTED_RECOVERY_BYTES_SHA256),64)
+
+    def test_real_owner_schema_two_hash_contract(self):
+        # Fixture mirrors the reported genuine schema, not genuine bytes.
+        import json
+        self.assertNotEqual(EXPECTED_RECOVERY_INTERNAL_SHA256,
+                            EXPECTED_RECOVERY_BYTES_SHA256)
+        self.assertEqual(OWNER_REPORT_SCHEMA,
+                         "aql.owner-local.f2-recovery-evidence.v1")
+        shape = {
+            "schema": OWNER_REPORT_SCHEMA,
+            "recovery_sha256": EXPECTED_RECOVERY_INTERNAL_SHA256,
+            "disposition": "OWNER_LOCAL_DUAL_READBACK_PASS",
+            "verified_months": [{} for _ in range(10)],
+        }
+        raw = json.dumps(shape, sort_keys=True).encode()
+        # Even an apparently correct internal field MUST fail file-byte pin.
+        with self.assertRaisesRegex(ValueError,
+                                    "OPAQUE_RECOVERY_FILE_SHA_MISMATCH"):
+            _owner_report_pins(raw)
+        wrong_internal = {**shape, "recovery_sha256": "f" * 64}
+        with self.assertRaisesRegex(ValueError,
+                                    "OPAQUE_RECOVERY_FILE_SHA_MISMATCH"):
+            _owner_report_pins(json.dumps(wrong_internal).encode())
+        self.assertEqual(len(EXPECTED_RECOVERY_BYTES_SHA256), 64)
+        self.assertEqual(len(EXPECTED_RECOVERY_INTERNAL_SHA256), 64)
+
+    def test_real_schema_parser_rejects_duplicate_or_nonfinite_after_byte_pin(self):
+        # Patch only the outer pin in this isolated negative test. This does
+        # NOT create any genuine owner report, authority or positive readback.
+        from unittest.mock import patch
+        import hashlib
+        import json
+        cases = [
+            (b'{"schema":"a","schema":"b"}', "REPORT_DUPLICATE_KEY"),
+            (b'{"a":NaN}', "REPORT_NONFINITE"),
+            (json.dumps({"schema":OWNER_REPORT_SCHEMA,
+                         "recovery_sha256":"f"*64,
+                         "disposition":"OWNER_LOCAL_DUAL_READBACK_PASS",
+                         "verified_months":[{}]*10}).encode(),
+             "OWNER_REPORT_SCHEMA_OR_INTERNAL_PIN_DRIFT"),
+        ]
+        for raw, reason in cases:
+            with self.subTest(reason=reason):
+                with patch(
+                    "research_wp_r0.aql_core_f_recovery_readonly_v1.EXPECTED_RECOVERY_BYTES_SHA256",
+                    SHA(raw),
+                ):
+                    with self.assertRaisesRegex(ValueError, reason):
+                        _owner_report_pins(raw)
 
     def test_untrusted_mapping_is_only_shape_preflight(self):
         with self.assertRaisesRegex(ValueError,"EXACT_TEN_ADMITTED_MONTHS_REQUIRED"):
