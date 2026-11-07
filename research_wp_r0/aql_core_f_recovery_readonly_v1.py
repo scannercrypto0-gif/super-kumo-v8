@@ -100,22 +100,25 @@ def _tree_fingerprint(roots):
 
 
 def _owner_report_pins(raw):
-    """Verify genuine owner-observed bytes AND internal identity separately.
+    """Require both real owner SHA pins and the observed producer report shape.
 
-    The full producer's internal digest algorithm is not known; we verify
-    its explicitly recorded value inside a byte-pinned owner report, but
-    MUST NOT falsely claim independent canonical recomputation.
+    Source rows are inside entries[]; verified_months is an INTEGER count.
+    Producer's canonical internal digest algorithm remains unavailable; the
+    byte-pinned internal digest field is checked but never re-computed here.
     """
     need(hashlib.sha256(raw).hexdigest() == EXPECTED_RECOVERY_BYTES_SHA256,
          "OPAQUE_RECOVERY_FILE_SHA_MISMATCH")
+
     def _pairs(items):
         data = {}
-        for k, v in items:
-            need(k not in data, "REPORT_DUPLICATE_KEY")
-            data[k] = v
+        for key, value in items:
+            need(key not in data, "REPORT_DUPLICATE_KEY")
+            data[key] = value
         return data
+
     def _reject_nonfinite(_):
         raise ValueError("CORE_F2_RECOVERY_REPORT_NONFINITE")
+
     try:
         report = json.loads(raw, object_pairs_hook=_pairs,
                             parse_constant=_reject_nonfinite)
@@ -125,9 +128,47 @@ def _owner_report_pins(raw):
          report.get("schema") == OWNER_REPORT_SCHEMA and
          report.get("recovery_sha256") == EXPECTED_RECOVERY_INTERNAL_SHA256 and
          report.get("disposition") == OWNER_REPORT_DISPOSITION and
-         type(report.get("verified_months")) in (list, dict) and
-         len(report["verified_months"]) == len(ADMITTED_MONTHS),
+         type(report.get("verified_months")) is int and
+         report["verified_months"] == len(ADMITTED_MONTHS) and
+         type(report.get("verified_bars")) is int and
+         report["verified_bars"] == 29376,
          "OWNER_REPORT_SCHEMA_OR_INTERNAL_PIN_DRIFT")
+
+    # The real owner's PowerShell dump established exact entry names; do not
+    # silently interpret verified_months as an array or fill missing parents.
+    fields = frozenset((
+        "bars", "core245_native_query_sha256",
+        "core253_local_query_sha256", "dataset_id", "manifest_sha256",
+        "month", "source_sha256", "state",
+    ))
+    entries = report.get("entries")
+    need(type(entries) is list and len(entries) == len(ADMITTED_MONTHS) and
+         all(type(row) is dict and set(row) == fields for row in entries),
+         "OWNER_REPORT_ENTRY_FIELDS_DRIFT")
+    months = [row["month"] for row in entries]
+    need(set(months) == set(ADMITTED_MONTHS) and
+         len(months) == len(set(months)) and
+         all(type(row["bars"]) is int and
+             row["bars"] ==
+             (_month_bounds(row["month"])[1]-_month_bounds(row["month"])[0]) //
+             WIDTH_MS and
+             row["dataset_id"] ==
+             "BINANCE-SPOT-BTCUSDT-15M-" + row["month"] + "-F-v1" and
+             row["state"] == "RAW_AND_DUAL_QUERY_READBACK" and
+             all(hexsha(row[k]) for k in (
+                 "source_sha256", "manifest_sha256",
+                 "core245_native_query_sha256",
+                 "core253_local_query_sha256",
+             )) for row in entries) and
+         sum(row["bars"] for row in entries) == 29376,
+         "OWNER_REPORT_MONTH_CENSUS_OR_IDENTITY_DRIFT")
+
+    # Explicit no-PIT/no-approval constraints from the observed report.
+    need(report.get("historical_pit") == "NOT_ATTESTED" and
+         report.get("trading_authority") == "NONE" and
+         report.get("signed_f5_approval") in (None, False) and
+         report.get("original_f2_report_restored") is False,
+         "OWNER_REPORT_AUTHORITY_PROMOTION_DENIED")
     return report
 
 
