@@ -18,6 +18,9 @@ on:
       - 'tests/test_aql_core_f5_secretary_authority_v1.py'
       - 'research_wp_r0/aql_core_f_research_diagnostic_query_v1.py'
       - 'tests/test_aql_core_f_research_diagnostic_query_v1.py'
+      - 'research_wp_r0/aql_core_f_recovery_readonly_v1.py'
+      - 'tests/test_aql_core_f_recovery_readonly_v1.py'
+      - 'research_wp_r0/aql_core_backbone_local_v1.py'
 jobs:
   core-f-source-plan:
     runs-on: ubuntu-latest
@@ -40,6 +43,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_aql_core_f5_windows_rawvault_release_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_core_f5_secretary_authority_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_core_f_research_diagnostic_query_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_core_f_recovery_readonly_v1.py' -v
   windows-ntfs-guard:
     runs-on: windows-latest
     steps:
@@ -65,4 +69,6 @@ jobs:
           python -m unittest discover -s tests -p 'test_aql_core_f5_secretary_authority_v1.py' -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m unittest discover -s tests -p 'test_aql_core_f_research_diagnostic_query_v1.py' -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s tests -p 'test_aql_core_f_recovery_readonly_v1.py' -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
