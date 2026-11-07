@@ -87,12 +87,6 @@ class CoreF5WindowsRawVaultRelease(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr[-2000:])
             self.assertTrue(require_private_windows_directory(base))
             # Another process holds byte zero; parent must fail closed on timeout.
-            childcode = (
-                "from pathlib import Path; import sys,time; "
-                "from tools.raw_vault_offline.vault import _vault_lock; "
-                "root=Path(sys.argv[1]); "
-                "with _vault_lock(root):\n print('LOCKED',flush=True); time.sleep(60)"
-            )
             # Compound statement needs real newline, not a semicolon before with.
             childcode = (
                 "from pathlib import Path\n"
