@@ -104,3 +104,60 @@ def read_recovered_diagnostic(warehouse_root, vault_root, recovery_path, mapping
                 "SOURCE_QUERY_OR_F2_BOUNDARY_DRIFT")
         result[month] = readback
     return result
+
+def main():
+    """Standalone source gate only; NOT the full Scanner/Factory diagnostic."""
+    import argparse
+    import sys
+    parser = argparse.ArgumentParser(description="Owner-private F2 recovery source verification only")
+    parser.add_argument("--recovery-file", required=True)
+    parser.add_argument("--mapping-file", required=True)
+    parser.add_argument("--warehouse-root", required=True)
+    parser.add_argument("--vault-root", required=True)
+    parser.add_argument("--owner-private-authorized", action="store_true")
+    a = parser.parse_args()
+    try:
+        require(a.owner_private_authorized, "OWNER_PRIVATE_AUTHORIZATION_REQUIRED")
+        p = Path(a.mapping_file)
+        require(p.is_file() and not p.is_symlink(), "MAPPING_REQUIRED")
+        mapping = json.loads(p.read_text(encoding="utf-8"))
+        result = read_recovered_diagnostic(
+            a.warehouse_root, a.vault_root, a.recovery_file, mapping)
+        counts = {m: result[m]["receipt"]["readback_bar_count"]
+                  for m in ADMITTED_MONTHS}
+        require(len(counts) == 10 and sum(counts.values()) == 29376,
+                "RECOMPUTED_BAR_CENSUS")
+        packet = {
+            "schema": "aql.integration.f2-recovery-source-gate.v1",
+            "status": "SOURCE_READBACK_PASS_DIAGNOSTIC_NOT_RUN",
+            "recovery_file_sha256": EXPECTED_RECOVERY_FILE_SHA256,
+            "original_f2_report_sha256": None,
+            "source_rights": "OWNER_LOCAL_NOT_INDEPENDENT",
+            "historical_pit": "NOT_ATTESTED",
+            "trading_authority": "NONE",
+            "months": counts,
+            "source_query_parents": {
+                m: {
+                    "raw": result[m]["receipt"]["source_zip_sha256"],
+                    "native245": result[m]["receipt"]["core245_native_query_sha256"],
+                    "local253": result[m]["receipt"]["core253_local_query_sha256"],
+                    "warehouse_receipt": result[m]["receipt"]["warehouse_receipt_sha256"],
+                    "manifest": result[m]["receipt"]["manifest_integrity_sha256"],
+                } for m in ADMITTED_MONTHS
+            },
+            "scanner_factory": "PRIVATE_WAIT",
+            "signed_f5": "BLOCKED_EXTERNAL_INPUT",
+        }
+        print(json.dumps({**packet, "sha256": sha256(
+            json.dumps(packet, sort_keys=True, separators=(",",":")).encode()
+        ).hexdigest()}, sort_keys=True))
+    except Exception as exc:
+        code = str(exc)
+        if not code.startswith("F2_RECOVERY_"):
+            code = "F2_RECOVERY_PRIVATE_INPUT_OR_READBACK_FAILED"
+        print("PRIVATE_WAIT " + code, file=sys.stderr)
+        raise SystemExit(2)
+
+
+if __name__ == "__main__":
+    main()
