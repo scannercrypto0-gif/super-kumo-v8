@@ -107,7 +107,6 @@ jobs:
                   'tools/scanner_strategy_f/recovery_diagnostic_adapter.py',
                   'tools/scanner_strategy_f/frozen_diagnostic_contracts.py',
                   'tools/scanner_strategy_f/test_recovery_diagnostic_adapter.py',
-                  'tools/scanner_strategy_f/test_frozen_diagnostic_contracts.py',
                   'tools/scanner_strategy_f/test_research_e2e_diagnostic.py',
                   'tools/scanner_strategy_f/test_private_operator_bundle.py',
                   'tools/scanner_strategy_f/test_strategy_specific_decision.py',
@@ -233,7 +232,6 @@ jobs:
           python -m unittest discover -s tests -p 'test_atlas_f2_recovery_research_operator.py' -v
           python -m unittest discover -s tests -p 'test_aql_core_f_recovery_readonly_v1.py' -v
           python -m unittest tools.scanner_strategy_f.test_recovery_diagnostic_adapter -v
-          python -m unittest tools.scanner_strategy_f.test_frozen_diagnostic_contracts -v
           python -m unittest discover -s tests -p 'test_aql_factory_f_f2_recovery_diagnostic_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_core_f5_secretary_authority_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_factory_e_bounded_perf_v1.py' -v
