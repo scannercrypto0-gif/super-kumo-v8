@@ -123,7 +123,7 @@ def build_trade_event_ledger(packet):
     _need(counts["MODEL_ONLY"]==baseline["modeled_count"] and
           sum(counts[s] for s in OUTCOMES if s!="MODEL_ONLY")
           ==baseline["unknown_count"] and
-          len(events)>=baseline["decision_count"],
+          sum(decisions.values())==baseline["decision_count"],
           "CAUSAL_KERNEL_DIVERGENCE")
     body={
         "schema":SCHEMA,"input_sha256":packet["sha256"],
