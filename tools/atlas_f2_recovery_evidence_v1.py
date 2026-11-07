@@ -39,18 +39,19 @@ def _hex(value):
     return type(value) is str and len(value) == 64 and all(c in HEX for c in value)
 
 
-def load_recovery_evidence(path):
-    """Require the actual pinned file bytes; do not trust an embedded digest."""
+def load_recovery_evidence(path, mapping):
+    """Pin actual original recovery bytes; mapping is untrusted and re-read."""
     p = Path(path)
     require(p.is_file() and not p.is_symlink() and
             0 < p.stat().st_size <= 5_000_000, "ORIGINAL_FILE_REQUIRED")
     raw = p.read_bytes()
     require(sha256(raw).hexdigest() == EXPECTED_RECOVERY_FILE_SHA256,
             "FILE_BYTES_DIGEST_MISMATCH")
-    try:
-        value = json.loads(raw)
-    except (ValueError, UnicodeError) as exc:
-        raise ValueError("F2_RECOVERY_INVALID_JSON") from exc
+    # Recovery report is an existing owner-local artifact of unknown
+    # serialization. Its exact bytes are pinned independently. The separately
+    # provided versioned mapping is NEVER treated as authority: each parent
+    # is checked against a new read of original vault/warehouse/query bytes.
+    value = mapping
     require(type(value) is dict and set(value) == ROOT_FIELDS and
             value["schema"] == SCHEMA and
             value["source_class"] == "OWNER_LOCAL_RECOVERY_NOT_ORIGINAL_F2" and
@@ -74,14 +75,14 @@ def load_recovery_evidence(path):
     return {x["month"]: x for x in rows}
 
 
-def read_recovered_diagnostic(warehouse_root, vault_root, recovery_path):
+def read_recovered_diagnostic(warehouse_root, vault_root, recovery_path, mapping):
     """Read existing source 10 times, with no admission or original F2 alias.
 
     The underlying Core read-only primitive re-reads vault, stage, native245,
     local253, compares 15m bar identity and enforces cutoff. Here we ALSO
     recompute SHA256 of actual RawVault bytes instead of trusting the entry.
     """
-    entries = load_recovery_evidence(recovery_path)
+    entries = load_recovery_evidence(recovery_path, mapping)
     result = {}
     for month in ADMITTED_MONTHS:
         entry = entries[month]
