@@ -14,9 +14,16 @@ from research_wp_r0.aql_core_f_research_diagnostic_query_v1 import (
 )
 
 SCHEMA = "aql.integration.f2-recovery-evidence.v1"
+OWNER_REPORT_SCHEMA = "aql.owner-local.f2-recovery-evidence.v1"
 EXPECTED_RECOVERY_FILE_SHA256 = (
     "0428e7b02b7b57bded9906c49f956b76816c179cd8659d61e1c7f1af1df68220"
-)
+)  # Report's internal recovery identity, NOT a hash of raw JSON bytes.
+EXPECTED_RECOVERY_RAW_BYTES_SHA256 = (
+    "52b47d7d93f5966fffe41ae16cb21486fb14a0753a2821dccc35f4f09e4903d2"
+)  # Independently observed by owner PowerShell SHA256.
+OWNER_REPORT_REQUIRED_FIELDS = frozenset((
+    "schema", "recovery_sha256", "disposition", "verified_months",
+))
 HEX = frozenset("0123456789abcdef")
 ENTRY_FIELDS = frozenset((
     "month", "state", "bars", "source_sha256",
@@ -44,12 +51,38 @@ def load_recovery_evidence(path, mapping):
     require(p.is_file() and not p.is_symlink() and
             0 < p.stat().st_size <= 5_000_000, "ORIGINAL_FILE_REQUIRED")
     raw = p.read_bytes()
-    require(sha256(raw).hexdigest() == EXPECTED_RECOVERY_FILE_SHA256,
+    require(sha256(raw).hexdigest() == EXPECTED_RECOVERY_RAW_BYTES_SHA256,
             "FILE_BYTES_DIGEST_MISMATCH")
-    # Recovery report is an existing owner-local artifact of unknown
-    # serialization. Its exact bytes are pinned independently. The separately
-    # provided versioned mapping is NEVER treated as authority: each parent
-    # is checked against a new read of original vault/warehouse/query bytes.
+    # Two distinct identities: genuine raw file bytes, and the producer's
+    # internal recovery_sha256. The canonical *producer computation* is not
+    # available in this repo; never pretend that hashing the file verifies it.
+    def no_duplicate_keys(pairs):
+        value = {}
+        for key, item in pairs:
+            require(key not in value, "REPORT_DUPLICATE_JSON_KEY")
+            value[key] = item
+        return value
+
+    def no_nonfinite(value):
+        raise ValueError("F2_RECOVERY_REPORT_NONFINITE_NUMBER")
+
+    try:
+        report = json.loads(raw, object_pairs_hook=no_duplicate_keys,
+                            parse_constant=no_nonfinite)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError("F2_RECOVERY_OWNER_REPORT_INVALID_JSON") from exc
+    require(type(report) is dict and
+            OWNER_REPORT_REQUIRED_FIELDS.issubset(report) and
+            report["schema"] == OWNER_REPORT_SCHEMA and
+            report["recovery_sha256"] == EXPECTED_RECOVERY_FILE_SHA256 and
+            report["disposition"] == "OWNER_LOCAL_DUAL_READBACK_PASS" and
+            type(report["verified_months"]) in (list, dict) and
+            len(report["verified_months"]) == len(ADMITTED_MONTHS),
+            "OWNER_REPORT_IDENTITY_OR_CENSUS_DRIFT")
+    # Report shape beyond the verified owner fields was not made available.
+    # Do not fabricate canonical producer hashing or inferred month mappings.
+    # A strictly checked untrusted mapping must still be independently
+    # verified against original RAW, Warehouse, Core245 and Core253.
     value = mapping
     require(type(value) is dict and set(value) == ROOT_FIELDS and
             value["schema"] == SCHEMA and
