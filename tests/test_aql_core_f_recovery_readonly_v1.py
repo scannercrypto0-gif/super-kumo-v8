@@ -91,7 +91,7 @@ class RecoveryNoWriteContract(unittest.TestCase):
             "entries": entries,
             "historical_pit": "NOT_ATTESTED",
             "trading_authority": "NONE",
-            "signed_f5_approval": False,
+            "signed_f5_approval": "NOT_GRANTED",
             "original_f2_report_restored": False,
         }
 
@@ -117,6 +117,32 @@ class RecoveryNoWriteContract(unittest.TestCase):
         # No test-only file bypass is ever permitted on the public route.
         with self.assertRaisesRegex(ValueError,
                                     "OPAQUE_RECOVERY_FILE_SHA_MISMATCH"):
+            _owner_report_pins(raw)
+
+    def test_owner_producer_f5_denial_literal_is_strict_and_fail_closed(self):
+        # Owner-confirmed report representation, NOT an F5 approval.
+        genuine = self._genuine_structure_fixture()
+        self.assertEqual(genuine["signed_f5_approval"], "NOT_GRANTED")
+        self.assertEqual(self._structure_checked(genuine), genuine)
+        # Compatibility with historical explicitly denied/absent values.
+        for accepted in (None, False):
+            with self.subTest(accepted=repr(accepted)):
+                report = deepcopy(genuine)
+                report["signed_f5_approval"] = accepted
+                self.assertEqual(self._structure_checked(report), report)
+        # Equality alone is unsafe: Python 1 == True, so reject int 1.
+        for denied in ("GRANTED", True, 1, "False", "True",
+                       "NOT_GRANTED ", "", 0, [], {}, "UNKNOWN"):
+            with self.subTest(denied=repr(denied)):
+                report = deepcopy(genuine)
+                report["signed_f5_approval"] = denied
+                with self.assertRaisesRegex(
+                    ValueError, "OWNER_REPORT_AUTHORITY_PROMOTION_DENIED"
+                ):
+                    self._structure_checked(report)
+        # No test fixture is allowed to pass the immutable original file pin.
+        raw = json.dumps(genuine, sort_keys=True).encode()
+        with self.assertRaisesRegex(ValueError, "OPAQUE_RECOVERY_FILE_SHA_MISMATCH"):
             _owner_report_pins(raw)
 
     def test_owner_confirmed_recovery_state_is_distinct_from_original_f2(self):
