@@ -70,6 +70,8 @@ jobs:
         with: {ref: b9c9ff8602e79c534402f44bce83c56ec2fa6bb9, path: _pinned_scanner227, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: e368dd491a0d80618bdc6c6e8f731a195d763dda, path: _pinned_raw_windows_lock, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8, path: _pinned_work235, persist-credentials: false}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -310,6 +312,7 @@ jobs:
             '_pinned_core_f':'6cf7acd3d038f8147c55a6d503ffdfea5e6d6f2d',
             '_pinned_raw211':'7d97b09c0c6ee2650a61d523acb8d8c771a99c46',
             '_pinned_raw_windows_lock':'e368dd491a0d80618bdc6c6e8f731a195d763dda',
+            '_pinned_work235':'6acbcc7fc243b132f58170df4c6469bbf7f4eff8',
           }
           for owner,expected in owners.items():
               actual=subprocess.check_output(['git','-C',owner,'rev-parse','HEAD'],text=True).strip()
@@ -327,6 +330,21 @@ jobs:
                       dest.parent.mkdir(parents=True,exist_ok=True)
                       shutil.copyfile(source,dest)
                       assert source.read_bytes()==dest.read_bytes(), ('PINNED_CORE_DEP_BYTES',str(dest))
+          # Work235 owns the frozen strategy engine API and fixtures.
+          # Only fill missing code from exact pin; never override Integration.
+          strategy_root=Path('_pinned_work235/tools/strategy_service_offline')
+          assert strategy_root.is_dir(), 'PINNED_WORK235_STRATEGY_SERVICE_MISSING'
+          for source in strategy_root.rglob('*.py'):
+              dest=Path('tools/strategy_service_offline')/source.relative_to(strategy_root)
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copyfile(source,dest)
+              assert dest.read_bytes()==source.read_bytes(), ('PINNED_WORK235_MODULE_BYTES',str(dest))
+          for source in (strategy_root/'fixtures').rglob('*'):
+              if source.is_file():
+                  dest=Path('tools/strategy_service_offline/fixtures')/source.relative_to(strategy_root/'fixtures')
+                  dest.parent.mkdir(parents=True,exist_ok=True)
+                  shutil.copyfile(source,dest)
+                  assert dest.read_bytes()==source.read_bytes(), ('PINNED_WORK235_FIXTURE_BYTES',str(dest))
           # RawVault Windows blob is a verified distinct locked dependency.
           rawbase=Path('_pinned_raw211/tools/raw_vault_offline')
           rawfixed=Path('_pinned_raw_windows_lock/tools/raw_vault_offline')
