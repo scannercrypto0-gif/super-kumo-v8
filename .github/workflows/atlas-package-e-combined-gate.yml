@@ -8,6 +8,12 @@ on:
       - 'tools/atlas_f_research_diagnostic_operator.py'
       - 'tools/atlas_f2_recovery_evidence_v1.py'
       - 'tools/atlas_f2_owner_private_preflight.ps1'
+      - 'tools/atlas_f2_owner_provenance_v1.py'
+      - 'tools/atlas_f2_owner_factory_packet_v1.py'
+      - 'tools/atlas_f2_owner_execute.py'
+      - 'tools/atlas_f2_stage_owner_overlay.py'
+      - 'tools/atlas_f2_owner_run.ps1'
+      - 'tests/test_atlas_f2_owner_execute_v1.py'
       - 'tools/atlas_f2_recovery_research_operator.py'
       - 'tests/test_atlas_f2_recovery_evidence_v1.py'
       - 'tests/test_atlas_f2_recovery_research_operator.py'
@@ -235,6 +241,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_atlas_f_research_diagnostic_operator.py' -v
           python -m unittest discover -s tests -p 'test_atlas_f2_recovery_evidence_v1.py' -v
           python -m unittest discover -s tests -p 'test_atlas_f2_recovery_research_operator.py' -v
+          python -m unittest discover -s tests -p 'test_atlas_f2_owner_execute_v1.py' -v
+          python -m compileall -q tools/atlas_f2_owner_provenance_v1.py tools/atlas_f2_owner_factory_packet_v1.py tools/atlas_f2_owner_execute.py tools/atlas_f2_stage_owner_overlay.py
           python -m unittest discover -s tests -p 'test_aql_core_f_recovery_readonly_v1.py' -v
           python -m unittest tools.scanner_strategy_f.test_recovery_diagnostic_adapter -v
           python -m unittest discover -s tests -p 'test_aql_factory_f_f2_recovery_diagnostic_v1.py' -v
