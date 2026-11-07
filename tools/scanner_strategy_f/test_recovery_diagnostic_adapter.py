@@ -130,16 +130,45 @@ class TestRecoveryDiagnostic(unittest.TestCase):
             "strategy_approval_sha256":None,"factory_consumer_ack_sha256":None,
             "trading_authority":"NONE",
         }).receipt()
+        phases=[]
         with patch.object(adapter,"query_local",side_effect=list(queries.values())) as replay, \
              patch.object(adapter,"diagnostic_original_cohort",return_value=fake):
             output=adapter.diagnostic_from_verified_recovery(
                 warehouse_root="/unused",verified_recovery_readbacks=rows,
-                recovery_file_sha256=EXPECTED_RECOVERY,work_specs=self.original)
+                recovery_file_sha256=EXPECTED_RECOVERY,work_specs=self.original,
+                phase_callback=phases.append)
         self.assertEqual(replay.call_count,10)
         self.assertTrue(all(c.kwargs["sqlite_immutable"] is True
                             for c in replay.call_args_list))
         self.assertEqual(output["payload"]["original_f2_report_sha256"],None)
         self.assertEqual(output["payload"]["selected"],0)
+        self.assertEqual(set(phases),adapter.SAFE_SCANNER_PHASES)
+        self.assertEqual(phases[-1],"SCANNER_OUTPUT_EMIT")
+        self.assertEqual(phases.count("SCANNER_CORE253_IMMUTABLE_QUERY"),10)
+        self.assertEqual(phases.count("SCANNER_CORE253_PARENT_COMPARISON"),10)
+        self.assertEqual(phases.count("SCANNER_NATIVE_LOCAL_COMPARISON"),10)
+        # Failures are located by fixed enum; never export exception messages.
+        failed=[]
+        with patch.object(adapter,"query_local",
+                          side_effect=ValueError("private/path/do-not-log")), \
+             self.assertRaises(ValueError):
+            adapter.diagnostic_from_verified_recovery(
+                warehouse_root="/unused",verified_recovery_readbacks=rows,
+                recovery_file_sha256=EXPECTED_RECOVERY,work_specs=self.original,
+                phase_callback=failed.append)
+        self.assertEqual(failed[-1],"SCANNER_CORE253_IMMUTABLE_QUERY")
+        self.assertTrue(set(failed).issubset(adapter.SAFE_SCANNER_PHASES))
+        evaluator_failed=[]
+        with patch.object(adapter,"query_local",
+                          side_effect=list(queries.values())), \
+             patch.object(adapter,"diagnostic_original_cohort",
+                          side_effect=ValueError("private/cost/do-not-log")), \
+             self.assertRaises(ValueError):
+            adapter.diagnostic_from_verified_recovery(
+                warehouse_root="/unused",verified_recovery_readbacks=rows,
+                recovery_file_sha256=EXPECTED_RECOVERY,work_specs=self.original,
+                phase_callback=evaluator_failed.append)
+        self.assertEqual(evaluator_failed[-1],"SCANNER_COHORT_DIAGNOSTIC")
         for key,value in (("original_f2_report_sha256","f"*64),
                           ("status","F5_APPROVED"),
                           ("core253_local_query_sha256","0"*64)):
