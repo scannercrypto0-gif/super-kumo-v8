@@ -280,7 +280,9 @@ def _owner_report_pins(raw):
     # Explicit no-PIT/no-approval constraints from the observed report.
     need(report.get("historical_pit") == "NOT_ATTESTED" and
          report.get("trading_authority") == "NONE" and
-         report.get("signed_f5_approval") in (None, False) and
+         (report.get("signed_f5_approval") == "NOT_GRANTED" or
+          report.get("signed_f5_approval") is None or
+          report.get("signed_f5_approval") is False) and
          report.get("original_f2_report_restored") is False,
          "OWNER_REPORT_AUTHORITY_PROMOTION_DENIED")
     return report
