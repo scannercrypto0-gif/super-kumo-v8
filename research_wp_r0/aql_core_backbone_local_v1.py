@@ -344,7 +344,14 @@ def query_local(root, dataset_id, version, start_ms, end_exclusive_ms,
                 and original["manifest_integrity_sha256"]==g[1],
                 "WAREHOUSE_SOURCE_DRIFT")
         # Verify immutable source and Bridge packet independently of the index.
-        stage=OfflineBridgeStager(root/"stage")
+        if sqlite_immutable:
+            # Bypass the legacy stager constructor, which calls mkdir even
+            # on existing paths. Recovery has a strict NO-WRITES contract.
+            stage=object.__new__(OfflineBridgeStager)
+            stage.root=_safe_root(root/"stage")
+            require(stage.root.is_dir(),"WAREHOUSE_STAGE_NOT_AVAILABLE")
+        else:
+            stage=OfflineBridgeStager(root/"stage")
         packet,raw=stage._load(original["packet_sha256"])
         require(packet["source_bytes_sha256"]==g[0]
                 and raw_sha(raw)==g[0]
