@@ -125,7 +125,7 @@ class ResearchStrategyPlugin(unittest.TestCase):
                             and e["historical_known_at_ms"] is None
                             for e in a["events"]))
         future=synthetic_query(n=65)
-        future["bars"][-1]["close"]=99.0
+        future["bars"][-1]["close"]=future["bars"][-1]["open"]+0.5
         future=reseal_query(future)
         b=h.verify_factory_signal_batch(
             self.evaluate(query=future)).data
@@ -205,7 +205,7 @@ class ResearchStrategyPlugin(unittest.TestCase):
             with self.subTest(label=label),self.assertRaises(ValueError):
                 self.evaluate(query=q)
         forged=synthetic_query()
-        forged["bars"][4]["close"]=199.0
+        forged["bars"][4]["close"]=forged["bars"][4]["open"]+0.5
         reseal_query(forged)
         with self.assertRaises(ValueError):
             self.evaluate(query=forged,replay=self.original)
@@ -228,7 +228,7 @@ class ResearchStrategyPlugin(unittest.TestCase):
             elif change=="future":
                 bad["events"][-1]["bar_close_ms"]=bad["decision_cutoff_ms"]
             else:
-                bad["events"][0]["signal_state"]="NO_SIGNAL"
+                bad["events"][0]["signal_state"]="ENTRY_SIGNAL"
             with self.subTest(change=change),self.assertRaises(ValueError):
                 h.verify_factory_signal_batch(Frozen.build(bad).receipt())
 
