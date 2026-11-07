@@ -219,7 +219,10 @@ def _one_read_only(warehouse_root, vault_root, *, month, source_entry,
         "start_ms": start_ms, "end_exclusive_ms": end_exclusive_ms,
         "decision_cutoff_ms": cutoff_ms,
         "readback_bar_count": len(indexed),
-        "readback_evidence": "OWNER_SOURCE_READONLY_REPLAY_NOT_SIGNED_F5",
+        "readback_evidence": "SOURCE_BACKED_DUAL_QUERY_NO_F2_REPORT_AUTHORITY",
+        "owner_f2_report_sha256": None,
+        "owner_f2_report_pin_verified": False,
+        "warehouse_receipt_sha_status": "OWNER_F2_PARENT_PIN_NOT_RECOMPUTED",
         "historical_pit": "NOT_ATTESTED",
         "secretary_state": "NOT_ENQUEUED",
         "source_ack_sha256": None,
@@ -242,7 +245,16 @@ def read_original_diagnostic(warehouse_root, vault_root, original_f2_report,
     """
     entries = _validate_original_owner_report(original_f2_report)
     start, end = _month_bounds(month)
-    return _one_read_only(
+    result = _one_read_only(
         warehouse_root, vault_root, month=month,
         source_entry=entries[month], start_ms=start, end_exclusive_ms=end,
         cutoff_ms=end + 1000)
+    proof = {k: v for k, v in result["receipt"].items()
+             if k != "receipt_sha256"}
+    proof.update({
+        "readback_evidence": "OWNER_F2_SHA_PIN_VERIFIED_NOT_ISSUER_ATTESTED",
+        "owner_f2_report_sha256": EXPECTED_F2_REPORT,
+        "owner_f2_report_pin_verified": True,
+    })
+    return {**result, "receipt":
+            {**proof, "receipt_sha256": bridge_digest(proof)}}
