@@ -175,6 +175,43 @@ class RecoveryNoWriteContract(unittest.TestCase):
                 with self.subTest(field=field),self.assertRaises(ValueError):
                     _read_existing_month(warehouse,vault_root,MONTH,damaged)
             self.assertEqual(_tree_fingerprint((warehouse,vault_root)),baseline)
+            obj=vault_root/"objects"/SHA(raw)[:2]/SHA(raw)[2:]
+            backup=obj.with_suffix(".fixture-bak")
+            obj.rename(backup)
+            try:
+                obj.symlink_to(backup)
+                with self.assertRaisesRegex(ValueError,"SYMLINK_PATH_DENIED"):
+                    _read_existing_month(warehouse,vault_root,MONTH,entry)
+            finally:
+                obj.unlink(missing_ok=True)
+                backup.rename(obj)
+            original_manifest=(vault_root/"manifest.jsonl").read_bytes()
+            try:
+                (vault_root/"manifest.jsonl").write_bytes(
+                    original_manifest + b'{"content_sha256":"0"}\\n')
+                with self.assertRaises(ValueError):
+                    _read_existing_month(warehouse,vault_root,MONTH,entry)
+            finally:
+                (vault_root/"manifest.jsonl").write_bytes(original_manifest)
+            self.assertEqual(_tree_fingerprint((warehouse,vault_root)),baseline)
+
+    def test_recovery_receipt_cannot_become_signed_f5_authority(self):
+        from research_wp_r0.aql_core_f5_secretary_authority_v1 import (
+            SOURCE_ROLE,STRATEGY_ROLE,_signed,
+        )
+        diagnostic={
+            "schema":SCHEMA,"recovery_file_sha256":None,
+            "original_f2_report_sha256":None,
+            "opaque_recovery_file_pin_verified":False,
+            "source_ack_sha256":None,
+            "strategy_approval_sha256":None,
+            "trading_authority":"NONE",
+        }
+        for role in (SOURCE_ROLE,STRATEGY_ROLE):
+            with self.subTest(role=role),self.assertRaisesRegex(
+                    ValueError,"CORE_F5_RECEIPT_FIELDS_DRIFT"):
+                _signed(role,diagnostic,trusted_registry={},
+                        trusted_now_utc="2026-11-07T07:00:00Z")
 
 
 if __name__=="__main__":
