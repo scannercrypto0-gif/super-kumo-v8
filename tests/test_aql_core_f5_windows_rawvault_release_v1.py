@@ -35,8 +35,15 @@ class CoreF5WindowsRawVaultRelease(unittest.TestCase):
         # working tree semantics without suppressing a real source-content drift.
         raw = module.read_bytes()
         normalized = raw.replace(b"\\r\\n", b"\\n")
-        self.assertEqual(git_blob_sha(normalized), EXPECTED_GIT_BLOB)
-        self.assertIn(raw, (normalized, normalized.replace(b"\\n", b"\\r\\n")))
+        # Git's canonical blob identity is checked by git hash-object via
+        # repository clean filters. Python-only hash would skip .gitattributes
+        # working-tree normalization (for example CRLF checkout).
+        actual_git_blob = subprocess.check_output(
+            ["git", "-C", str(root), "hash-object", str(module)],
+            text=True,
+        ).strip()
+        self.assertEqual(actual_git_blob, EXPECTED_GIT_BLOB)
+        self.assertTrue(raw and normalized)
         self.assertEqual(RawVault.__module__, "tools.raw_vault_offline.vault")
 
     def test_disposable_fsync_restart_idempotent_and_recovery(self):
