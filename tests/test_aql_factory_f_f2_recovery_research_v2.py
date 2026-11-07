@@ -206,9 +206,12 @@ class FactoryRecoveryResearchV2(unittest.TestCase):
             self.assertIsNone(row["original_f2_report_sha256"])
             self.assertFalse(row["selected"])
         self.assertNotEqual(first["receipt_sha256"],second["receipt_sha256"])
-        with sqlite3.connect(self.db) as con:
+        con=sqlite3.connect(self.db)
+        try:
             doc=json.loads(con.execute(
                 "SELECT document FROM recovery_research_v2").fetchone()[0])
+        finally:
+            con.close()
         self.assertEqual(sum(x["source_receipt_sha256"] is None
                              for x in doc["attempts"]),4)
 
@@ -315,9 +318,13 @@ class FactoryRecoveryResearchV2(unittest.TestCase):
             packet=fixture_packet()
             migrate_store_v2(db)
             run_recovery_research_v2(packet,db)
-            with sqlite3.connect(db) as con:
+            con=sqlite3.connect(db)
+            try:
                 con.execute(
                     "UPDATE recovery_research_v2 SET document='{}'")
+                con.commit()
+            finally:
+                con.close()
             with self.assertRaises(ResultsStoreError):
                 run_recovery_research_v2(packet,db)
             db.unlink()
@@ -332,8 +339,12 @@ class FactoryRecoveryResearchV2(unittest.TestCase):
         reseal(changed)
         with self.assertRaises(ResultsStoreError):
             run_recovery_research_v2(changed,self.db)
-        with sqlite3.connect(self.db) as con:
+        con=sqlite3.connect(self.db)
+        try:
             con.execute("UPDATE recovery_research_v2 SET document='{}'")
+            con.commit()
+        finally:
+            con.close()
         with self.assertRaises(ResultsStoreError):
             run_recovery_research_v2(p,self.db)
 
