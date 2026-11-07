@@ -122,7 +122,7 @@ jobs:
           # dependencies share the same Git blob, rather than merging branches.
           for relative in ('__init__.py','schema.py'):
               assert (raw_base/relative).read_bytes()==(raw_fixed/relative).read_bytes(), ('RAW_VAULT_API_DIVERGENCE',relative)
-          assert hashlib.sha1(b'blob '+str((raw_fixed/'vault.py').stat().st_size).encode()+b'\\0'+(raw_fixed/'vault.py').read_bytes()).hexdigest()=='6b5bcc1d684088934f5ed7110064380b8d2bc0cd', 'RAW_VAULT_BLOB_MISMATCH'
+          assert hashlib.sha1(b'blob '+str((raw_fixed/'vault.py').stat().st_size).encode()+bytes([0])+(raw_fixed/'vault.py').read_bytes()).hexdigest()=='6b5bcc1d684088934f5ed7110064380b8d2bc0cd', 'RAW_VAULT_BLOB_MISMATCH'
           # Exact Factory E owner HEAD is the source for its own modules/tests;
           # integration branch never changes the Factory owner branch.
           for name in ('aql_factory_e_research_results_store_v1.py',
