@@ -74,6 +74,29 @@ def main():
     if not work.is_file():
         subprocess.run(["git","fetch","--no-tags","--depth=1",
                         "origin",WORK235_SHA],check=True)
+        # The historical frozen strategy service is a distinct Work235
+        # commit; neither Scanner nor Core draft branches vendor its code.
+        frozen_tar=subprocess.check_output(
+            ["git","archive","--format=tar",WORK235_SHA])
+        frozen_count=0
+        with tarfile.open(fileobj=io.BytesIO(frozen_tar),mode="r:") as archive:
+            for item in archive:
+                path=PurePosixPath(item.name)
+                if (not item.isfile() or not path.parts or
+                    path.parts[0] not in ALLOWED_ROOTS or
+                    any(p in (".","..") for p in path.parts) or
+                    not str(path).endswith(".py")):
+                    continue
+                target=Path(str(path))
+                if target.exists():
+                    continue
+                handle=archive.extractfile(item)
+                if handle is None:
+                    continue
+                target.parent.mkdir(parents=True,exist_ok=True)
+                target.write_bytes(handle.read())
+                frozen_count+=1
+        print("STAGED_FROZEN_WORK235_PYTHON:",frozen_count,flush=True)
         found=subprocess.check_output([
             "git","rev-parse",WORK235_SHA+":"+ALLOWED_FIXTURE],
             text=True).strip()
