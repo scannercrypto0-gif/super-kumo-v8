@@ -70,8 +70,6 @@ jobs:
         with: {ref: b9c9ff8602e79c534402f44bce83c56ec2fa6bb9, path: _pinned_scanner227, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: e368dd491a0d80618bdc6c6e8f731a195d763dda, path: _pinned_raw_windows_lock, persist-credentials: false}
-      - uses: actions/checkout@v4
-        with: {ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8, path: _pinned_work235, persist-credentials: false}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -299,6 +297,8 @@ jobs:
         with: {ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46, path: _pinned_raw211, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: e368dd491a0d80618bdc6c6e8f731a195d763dda, path: _pinned_raw_windows_lock, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8, path: _pinned_work235, persist-credentials: false}
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - name: Stage SHA-verified Factory v2 and Core in isolated Windows CI
