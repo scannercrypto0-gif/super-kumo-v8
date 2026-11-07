@@ -141,6 +141,15 @@ def validate_recovery_input(packet):
          packet["core_253_query_sha256"]==local and native!=local
          and packet["source_manifest_sha256"]==manifest,
          "RECOVERY_ACTUAL_CORE_RECEIPT_GRAPH")
+    # Explicitly bind all source-derived census month rows to their own
+    # owner-local recomputed source parent before a diagnostic Lab is allowed.
+    need(type(packet["attempts"]) is list and
+         all(type(row) is dict and
+             (row.get("month") not in parents or
+              row.get("source_receipt_sha256")==
+                  parents[row["month"]]["source_sha256"])
+             for row in packet["attempts"]),
+         "RECOVERY_ATTEMPT_SOURCE_RECEIPT_SWAP")
     trial=packet["trial_packet"]
     need(type(trial) is dict and
          trial.get("diagnostic_month") in parents,
@@ -149,9 +158,6 @@ def validate_recovery_input(packet):
     # Every eligible original-month attempt must refer to exactly the
     # checked Core source object for its own month; inventory-only receipts
     # remain locally marked UNKNOWN and are never treated as source files.
-    need(all(row["source_receipt_sha256"]==parents[row["month"]]["source_sha256"]
-             for row in packet["attempts"] if row["month"] in parents),
-         "RECOVERY_ATTEMPT_SOURCE_RECEIPT_SWAP")
     need(trial.get("source_bytes_sha256")==parents[month]["source_sha256"]
          and packet["operator_local_source_readback_sha256"]==
              parents[month]["source_sha256"],
