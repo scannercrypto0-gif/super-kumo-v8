@@ -12,6 +12,8 @@ import subprocess
 import tarfile
 
 SCANNER_SHA="3c82448702c9ae35783716e4e2c3b640010db97c"
+WORK235_SHA="6acbcc7fc243b132f58170df4c6469bbf7f4eff8"
+WORK235_BLOB="c27eb5aa70a6d671791ba1e55e9b078a272b611f"
 ALLOWED_ROOTS={"tools","research_wp_r0","src","tests"}
 ALLOWED_FIXTURE="tools/strategy_service_offline/fixtures/strategies.json"
 
@@ -40,6 +42,18 @@ def main():
             target.parent.mkdir(parents=True,exist_ok=True)
             target.write_bytes(content.read())
             written.append(str(path))
+    work=Path(ALLOWED_FIXTURE)
+    if not work.is_file():
+        subprocess.run(["git","fetch","--no-tags","--depth=1",
+                        "origin",WORK235_SHA],check=True)
+        found=subprocess.check_output([
+            "git","rev-parse",WORK235_SHA+":"+ALLOWED_FIXTURE],
+            text=True).strip()
+        if found!=WORK235_BLOB:
+            raise RuntimeError("Frozen Work235 original blob mismatch")
+        work.parent.mkdir(parents=True,exist_ok=True)
+        work.write_bytes(subprocess.check_output([
+            "git","show",WORK235_SHA+":"+ALLOWED_FIXTURE]))
     required={
         "tools/scanner_strategy_f/research_strategy_plugin.py",
         "tools/scanner_strategy_f/test_research_strategy_plugin.py",
@@ -52,6 +66,7 @@ def main():
         raise RuntimeError("Scanner pinned staged contract incomplete")
     print("STAGED_SCANNER_EXACT_SHA:",SCANNER_SHA)
     print("STAGED_MISSING_RESEARCH_DEPENDENCIES:",len(written))
+    print("WORK235_EXACT_ORIGINAL_BLOB:",WORK235_BLOB,flush=True)
 
 
 if __name__=="__main__":
