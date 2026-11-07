@@ -31,7 +31,7 @@ from research_wp_r0.aql_native_price_custody_query_v1 import query_price_custody
 from research_wp_r0.aql_core_dual_query_identity_map_v1 import bind_dual_query_identities
 from research_wp_r0.historical_library import HistoricalLibrary
 from tools.raw_vault_offline.vault import RawVault
-from tools.atlas_f2_recovery_month_probe import categories as standalone_categories, probe as standalone_probe
+from tools.atlas_f2_recovery_month_probe import categories as standalone_categories, probe as standalone_probe, state_equality_classes, STATE_CANDIDATES
 
 SHA=lambda b:sha256(b).hexdigest()
 MONTH="2024-01"
@@ -225,6 +225,34 @@ class RecoveryNoWriteContract(unittest.TestCase):
         month_problem=next(x for x in mismatch if x["category"]=="MONTH_SET")
         self.assertIn("2024-01",month_problem["months"])
         self.assertIn("2024-03",month_problem["months"])
+
+    def test_state_equality_class_diagnostic_does_not_leak_unknown_literals(self):
+        import json
+        fixture=self._genuine_structure_fixture()
+        for row in fixture["entries"]:
+            row["state"]="PRIVATE_ORIGINAL_STATE_VALUE_NOT_DISCLOSED"
+        proof=state_equality_classes(fixture)
+        self.assertTrue(proof["uniform"])
+        self.assertFalse(proof["all_ten_matched"])
+        self.assertEqual(len(proof["matches"]),len(STATE_CANDIDATES))
+        self.assertTrue(all(m["all_ten_equal"] is False
+                            for m in proof["matches"]))
+        self.assertNotIn("PRIVATE_ORIGINAL_STATE_VALUE_NOT_DISCLOSED",
+                         json.dumps(proof))
+        self.assertEqual(
+            [m["candidate"] for m in proof["matches"]],
+            list(STATE_CANDIDATES))
+        for row in fixture["entries"]:
+            row["state"]="OWNER_LOCAL_DUAL_READBACK_PASS"
+        proof=state_equality_classes(fixture)
+        self.assertTrue(proof["uniform"])
+        self.assertTrue(proof["all_ten_matched"])
+        self.assertEqual([m["candidate"] for m in proof["matches"]
+                          if m["all_ten_equal"]],
+                         ["OWNER_LOCAL_DUAL_READBACK_PASS"])
+        fixture["entries"][-1]["state"]="REVERIFIED_PRIVATE_BYTES"
+        self.assertFalse(state_equality_classes(fixture)["uniform"])
+        self.assertFalse(state_equality_classes(fixture)["all_ten_matched"])
 
     def test_one_file_only_safe_probe_byte_pin_then_categorizes(self):
         import json
