@@ -62,6 +62,14 @@ try {
     # Git fetch always takes place in the NEW TEMP checkout.
     & git clone --quiet --filter=blob:none --no-checkout $repo $mirror *> $null
     if ($LASTEXITCODE -ne 0) { Deny 'GIT_CLONE_OR_AUTH_FAILED' }
+    # Windows Git may otherwise convert LF to CRLF on checkout. Every
+    # downstream Git-blob/raw-byte pin requires original exact bytes.
+    & git -C $mirror config core.autocrlf false
+    if ($LASTEXITCODE -ne 0) { Deny 'GIT_LF_CONFIG_FAILED' }
+    & git -C $mirror config core.eol lf
+    if ($LASTEXITCODE -ne 0) { Deny 'GIT_LF_CONFIG_FAILED' }
+    & git -C $mirror config core.safecrlf true
+    if ($LASTEXITCODE -ne 0) { Deny 'GIT_LF_CONFIG_FAILED' }
     foreach ($entry in $refs.GetEnumerator()) {
         $key=$entry.Key
         $sha=$entry.Value
