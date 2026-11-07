@@ -30,7 +30,13 @@ class CoreF5WindowsRawVaultRelease(unittest.TestCase):
         module = Path(sys.modules[RawVault.__module__].__file__).resolve()
         root = Path(__file__).resolve().parents[1]
         self.assertEqual(module, root / EXPECTED_MODULE_PATH)
-        self.assertEqual(git_blob_sha(module.read_bytes()), EXPECTED_GIT_BLOB)
+        # Git stores LF-normalized blob bytes; checkout on Windows may be CRLF.
+        # Verify the repository blob (deployable source identity) and byte-equivalent
+        # working tree semantics without suppressing a real source-content drift.
+        raw = module.read_bytes()
+        normalized = raw.replace(b"\\r\\n", b"\\n")
+        self.assertEqual(git_blob_sha(normalized), EXPECTED_GIT_BLOB)
+        self.assertIn(raw, (normalized, normalized.replace(b"\\n", b"\\r\\n")))
         self.assertEqual(RawVault.__module__, "tools.raw_vault_offline.vault")
 
     def test_disposable_fsync_restart_idempotent_and_recovery(self):
