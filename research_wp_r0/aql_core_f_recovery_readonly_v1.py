@@ -335,7 +335,8 @@ def _read_existing_month(warehouse_root, vault_root, month, untrusted):
     proof = {
         "schema":SCHEMA, "month":month, "dataset_id":dataset_id,
         "status":"SOURCE_BACKED_RECOVERY_READBACK_ONLY",
-        "recovery_file_sha256":EXPECTED_RECOVERY_BYTES_SHA256,
+        "recovery_file_sha256":None,
+        "opaque_recovery_file_pin_verified":False,
         "original_f2_report_sha256":None,
         "source_zip_sha256":source,
         "manifest_integrity_sha256":manifest_sha,
@@ -378,4 +379,10 @@ def read_recovery_diagnostic(warehouse_root, vault_root, recovery_file,
     }
     need(sum(x["receipt"]["bar_count"] for x in results.values()) == 29376,
          "RECOMPUTED_TEN_MONTH_CENSUS")
+    for result in results.values():
+        body = {k:v for k,v in result["receipt"].items()
+                if k != "receipt_sha256"}
+        body["recovery_file_sha256"] = EXPECTED_RECOVERY_BYTES_SHA256
+        body["opaque_recovery_file_pin_verified"] = True
+        result["receipt"] = {**body,"receipt_sha256":digest(body)}
     return results
