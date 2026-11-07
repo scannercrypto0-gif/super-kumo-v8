@@ -14,7 +14,7 @@ from tools.scanner_strategy_f.frozen_diagnostic_contracts import (
     identify_frozen_work235_contracts,
 )
 from tools.scanner_strategy_f.research_e2e_diagnostic import (
-    ADMITTED, diagnostic_original_cohort,
+    ADMITTED, diagnostic_original_cohort, SAFE_COHORT_PHASES,
 )
 
 SCHEMA="aql.scanner-f.recovery-source-research-e2e-diagnostic.v1"
@@ -35,7 +35,7 @@ SAFE_SCANNER_PHASES=frozenset((
 
 
 def _safe_phase_callback(callback, phase):
-    require(phase in SAFE_SCANNER_PHASES,
+    require(phase in SAFE_SCANNER_PHASES or phase in SAFE_COHORT_PHASES,
             "F_DIAG_RECOVERY_INVALID_PHASE")
     if callback is not None:
         callback(phase)
@@ -132,6 +132,8 @@ def diagnostic_from_verified_recovery(
         policy_draft=identities["policy_draft"],
         proposal=identities["proposal"],
         approval_request=identities["approval_request"],
+        phase_callback=(None if phase_callback is None else
+                        lambda phase: _safe_phase_callback(phase_callback,phase)),
     )
     _safe_phase_callback(phase_callback,"SCANNER_DIAGNOSTIC_RECEIPT_VERIFY")
     x=Frozen.restore(out)
