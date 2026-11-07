@@ -17,7 +17,7 @@ import sqlite3
 from research_wp_r0.aql_core_f_recovery_readonly_v1 import (
     need, hexsha, _existing, _json, _tree_fingerprint,
     private_directory_gate, ADMITTED_MONTHS, WIDTH_MS,
-    _month_bounds, MONTH_FIELDS, WAREHOUSE_SCHEMA,
+    _month_bounds, MONTH_FIELDS, WAREHOUSE_SCHEMA, SCHEMA,
     decode, verify_packet, digest, RawObjectMeta, logical_identity_key,
     HistoricalBar, BarQuality, SourceType, DataAvailabilityKind,
     validate_bars, HistoricalLibrary, _load_checkpoint, query_local,
