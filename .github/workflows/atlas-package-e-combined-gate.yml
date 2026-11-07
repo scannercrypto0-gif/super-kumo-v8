@@ -26,9 +26,9 @@ jobs:
       - uses: actions/checkout@v4
         with: {ref: e21d949a66f378a7bc6d4695599bbdd31ca992a5, path: _pinned_factory_e, persist-credentials: false}
       - uses: actions/checkout@v4
-        with: {ref: a640c7822794bd2a7fd510b77ae7eb3507cf463f, path: _pinned_core_f, persist-credentials: false}
+        with: {ref: 20a3efb3e4f0537f688e8b13094cba2e8c79e941, path: _pinned_core_f, persist-credentials: false}
       - uses: actions/checkout@v4
-        with: {ref: 012f9f19de2111ac4113a9f773fe3ef6baca9b02, path: _pinned_scanner_f, persist-credentials: false}
+        with: {ref: acd576b3eba78112e255f70417bdc2a836f1f817, path: _pinned_scanner_f, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: 1cb70f1212283fe34117882d18e0501fc6409fe7, path: _pinned_discoverer_f, persist-credentials: false}
       - uses: actions/checkout@v4
@@ -53,6 +53,8 @@ jobs:
         with: {ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46, path: _pinned_raw211, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: b9c9ff8602e79c534402f44bce83c56ec2fa6bb9, path: _pinned_scanner227, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: e368dd491a0d80618bdc6c6e8f731a195d763dda, path: _pinned_raw_windows_lock, persist-credentials: false}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -86,6 +88,8 @@ jobs:
                   'tools/scanner_strategy_f/secretary_factory_handoff.py',
                   'tools/scanner_strategy_f/strategy_specific_decision.py',
                   'tools/scanner_strategy_f/secretary_ack_requirements.py',
+                  'tools/scanner_strategy_f/independent_evaluator_nomination.py',
+                  'tools/scanner_strategy_f/test_independent_evaluator_nomination.py',
                   'tools/scanner_strategy_f/test_strategy_specific_decision.py',
               ),
               '_pinned_discoverer_f': (
@@ -102,6 +106,23 @@ jobs:
                   assert hashlib.sha256(target.read_bytes()).hexdigest() == digest, (
                       'STALE_F_OVERLAY', owner, relative)
                   print('PINNED_F_FILE_SHA256', owner, relative, digest)
+          # RawVault Windows fix is an explicitly separate, pinned dependency.
+          # Stage the entire canonical package (not a standalone vault.py).
+          raw_base=Path('_pinned_raw211/tools/raw_vault_offline')
+          raw_fixed=Path('_pinned_raw_windows_lock/tools/raw_vault_offline')
+          assert raw_base.is_dir() and raw_fixed.is_dir(), 'RAW_VAULT_PACKAGE_MISSING'
+          for relative in ('__init__.py','schema.py','vault.py'):
+              src=raw_fixed/relative
+              assert src.is_file(), ('RAW_VAULT_PIN_MISSING',relative)
+              dst=Path('tools/raw_vault_offline')/relative
+              dst.parent.mkdir(parents=True,exist_ok=True)
+              copyfile(src,dst)
+              assert hashlib.sha256(dst.read_bytes()).hexdigest()==hashlib.sha256(src.read_bytes()).hexdigest(), ('RAW_VAULT_BYTES_MISMATCH',relative)
+          # Historical #211 helpers stay from canonical parent; verify those
+          # dependencies share the same Git blob, rather than merging branches.
+          for relative in ('__init__.py','schema.py'):
+              assert (raw_base/relative).read_bytes()==(raw_fixed/relative).read_bytes(), ('RAW_VAULT_API_DIVERGENCE',relative)
+          assert hashlib.sha1(b'blob '+str((raw_fixed/'vault.py').stat().st_size).encode()+b'\\0'+(raw_fixed/'vault.py').read_bytes()).hexdigest()=='6b5bcc1d684088934f5ed7110064380b8d2bc0cd', 'RAW_VAULT_BLOB_MISMATCH'
           # Exact Factory E owner HEAD is the source for its own modules/tests;
           # integration branch never changes the Factory owner branch.
           for name in ('aql_factory_e_research_results_store_v1.py',
@@ -146,6 +167,13 @@ jobs:
           assert Path('tools/strategy_discoverer_offline/historical_f4_intake.py').is_file()
           assert Path('tools/scanner_strategy_e/test_historical_core_screening.py').is_file()
           assert Path('tools/strategy_discoverer_offline/tests/test_package_e_membership.py').is_file()
+          import importlib
+          imported=importlib.import_module('tools.raw_vault_offline.vault')
+          imported_path=Path(imported.__file__).resolve()
+          pinned_path=Path('tools/raw_vault_offline/vault.py').resolve()
+          assert imported_path==pinned_path, ('RAW_VAULT_IMPORT_SHADOW',str(imported_path))
+          assert hashlib.sha256(imported_path.read_bytes()).hexdigest()==hashlib.sha256((raw_fixed/'vault.py').read_bytes()).hexdigest(), 'RAW_VAULT_IMPORT_BYTES_MISMATCH'
+          print('RAW_VAULT_WINDOWS_FIX_PINNED',imported_path,hashlib.sha256(imported_path.read_bytes()).hexdigest())
           print('All E owner interfaces staged read-only from exact SHA heads')
           PY
       - name: Install test-only pytest and Scanner Ed25519 verifier dependency
@@ -171,6 +199,7 @@ jobs:
           python -m unittest tools.scanner_strategy_f.test_source_bound_intake -v
           python -m unittest tools.scanner_strategy_f.test_secretary_factory_handoff -v
           python -m unittest tools.scanner_strategy_f.test_strategy_specific_decision -v
+          python -m unittest tools.scanner_strategy_f.test_independent_evaluator_nomination -v
           python -m unittest discover -s tests -p 'test_aql_factory_e_bounded_perf_v1.py' -v
           python -m pytest tools/strategy_discoverer_offline/tests/test_package_e_durable_checkpoint.py -q
           python -m unittest discover -s tests -p 'test_aql_core_e_status_evidence_v1.py' -v
