@@ -131,7 +131,7 @@ def diagnostic_original_cohort(
         actual=query_local(warehouse_root,q["dataset_id"],q["version"],
             start,end,q["decision_cutoff_ms"],
             required_source_sha256=q["source_bytes_sha256"],
-            require_complete=True)
+            require_complete=True,sqlite_immutable=True)
         require(actual==q,"F_DIAGNOSTIC_REAL_CORE253_READBACK_MISMATCH")
         bars=q["bars"]
         require(type(bars) is list and
