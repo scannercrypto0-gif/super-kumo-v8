@@ -101,7 +101,7 @@ def diagnostic_original_cohort(
                 and s["config_digest"]==identities[key]["work235_config_digest"],
                 "F_DIAGNOSTIC_FROZEN_STRATEGY_PARENT")
         definition=StrategyDefinition.from_dict(
-            s["definition"]["definition"],registry=IndicatorRegistryV2())
+            s["definition"],registry=IndicatorRegistryV2())
         require(definition.digest==identities[key]["definition_digest"],
                 "F_DIAGNOSTIC_ORIGINAL_DEFINITION_DRIFT")
         specs[key]=definition
