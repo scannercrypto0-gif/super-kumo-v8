@@ -36,3 +36,7 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m unittest discover -s tests -p test_aql_factory_h_generic_signal_adapter_v1.py -v
+      - name: Preserve legacy F2 24-attempt H Lab and immutable contract
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p test_aql_factory_h_research_package_v1.py -v
