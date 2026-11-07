@@ -99,13 +99,20 @@ def diagnostic_original_cohort(
     frozen=verify_retrospective_policy_draft(
         policy_draft,proposal,approval_request,work_specs)
     p=frozen.data
+    # Every failure has a single fixed, privacy-safe reason. WindowsPath is a
+    # concrete subclass of Path on the actual Windows owner operator; exact
+    # type() comparison to Path wrongly rejects it after Core validation.
     _phase(phase_callback,"COHORT_SCOPE_VERIFY")
-    require(p["target_months"]==[f"2024-{i:02d}" for i in range(1,13)]
-            and len(p["strategy_identity"])==2
-            and type(month_queries) is dict
-            and set(month_queries)==set(ADMITTED)
-            and type(warehouse_root) in (str,Path),
-            "F_DIAGNOSTIC_SCOPE_AND_10_SOURCE_QUERY_REQUIREMENT")
+    require(p["target_months"]==[f"2024-{i:02d}" for i in range(1,13)],
+            "F_DIAGNOSTIC_SCOPE_TARGET_MONTHS")
+    require(type(p["strategy_identity"]) is list
+            and len(p["strategy_identity"])==2,
+            "F_DIAGNOSTIC_SCOPE_TWO_STRATEGIES")
+    require(type(month_queries) is dict
+            and set(month_queries)==set(ADMITTED),
+            "F_DIAGNOSTIC_SCOPE_TEN_MONTH_QUERIES")
+    require(type(warehouse_root) is str or isinstance(warehouse_root,Path),
+            "F_DIAGNOSTIC_SCOPE_WAREHOUSE_PATH")
     identities={(x["strategy_id"],x["strategy_version"]):x
                 for x in p["strategy_identity"]}
     _phase(phase_callback,"COHORT_AST_RECONSTRUCT")
