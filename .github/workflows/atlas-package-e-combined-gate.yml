@@ -24,11 +24,11 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/checkout@v4
-        with: {ref: e21d949a66f378a7bc6d4695599bbdd31ca992a5, path: _pinned_factory_e, persist-credentials: false}
+        with: {ref: ef8d41b6ff273e4228e6b90210f4610dccf54251, path: _pinned_factory_e, persist-credentials: false}
       - uses: actions/checkout@v4
-        with: {ref: 20a3efb3e4f0537f688e8b13094cba2e8c79e941, path: _pinned_core_f, persist-credentials: false}
+        with: {ref: e019c5f0199701bcd95d0f1d5cf551b1a1ae1c15, path: _pinned_core_f, persist-credentials: false}
       - uses: actions/checkout@v4
-        with: {ref: acd576b3eba78112e255f70417bdc2a836f1f817, path: _pinned_scanner_f, persist-credentials: false}
+        with: {ref: 73f31e7f3c65531c0d5b37ccb415242d843ade25, path: _pinned_scanner_f, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: 1cb70f1212283fe34117882d18e0501fc6409fe7, path: _pinned_discoverer_f, persist-credentials: false}
       - uses: actions/checkout@v4
@@ -81,7 +81,11 @@ jobs:
           # shadows the pinned F modules. Historical owners fill missing paths only.
           import hashlib
           authoritative = {
-              '_pinned_core_f': ('research_wp_r0/aql_core_f_bulk_source_v1.py',),
+              '_pinned_core_f': (
+                  'research_wp_r0/aql_core_f_bulk_source_v1.py',
+                  'research_wp_r0/aql_core_f5_secretary_authority_v1.py',
+                  'tests/test_aql_core_f5_secretary_authority_v1.py',
+              ),
               '_pinned_scanner_f': (
                   'tools/scanner_strategy_f/independent_policy_verification.py',
                   'tools/scanner_strategy_f/source_bound_intake.py',
@@ -90,6 +94,8 @@ jobs:
                   'tools/scanner_strategy_f/secretary_ack_requirements.py',
                   'tools/scanner_strategy_f/independent_evaluator_nomination.py',
                   'tools/scanner_strategy_f/test_independent_evaluator_nomination.py',
+                  'tools/scanner_strategy_f/private_operator_bundle.py',
+                  'tools/scanner_strategy_f/test_private_operator_bundle.py',
                   'tools/scanner_strategy_f/test_strategy_specific_decision.py',
               ),
               '_pinned_discoverer_f': (
@@ -200,6 +206,8 @@ jobs:
           python -m unittest tools.scanner_strategy_f.test_secretary_factory_handoff -v
           python -m unittest tools.scanner_strategy_f.test_strategy_specific_decision -v
           python -m unittest tools.scanner_strategy_f.test_independent_evaluator_nomination -v
+          python -m unittest tools.scanner_strategy_f.test_private_operator_bundle -v
+          python -m unittest discover -s tests -p 'test_aql_core_f5_secretary_authority_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_factory_e_bounded_perf_v1.py' -v
           python -m pytest tools/strategy_discoverer_offline/tests/test_package_e_durable_checkpoint.py -q
           python -m unittest discover -s tests -p 'test_aql_core_e_status_evidence_v1.py' -v
