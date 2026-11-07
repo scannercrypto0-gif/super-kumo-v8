@@ -1,267 +1,381 @@
-"""Core-owned, versioned F2_RECOVERY_EVIDENCE read-only verifier.
+"""Core-owned F2_RECOVERY_EVIDENCE.v1: original-byte READ ONLY diagnostic.
 
-Diagnostic-only and deliberately NOT the original F2 report, SourceACK,
-StrategyApproval, PIT witness, or Factory Consumer ACK. Never creates a
-stage/vault/sqlite object and never calls their mutating constructors.
+This is NOT the original F2 report or an independent custodian, PIT,
+SourceACK, StrategyApproval, ConsumerACK or any trading permission.
+The recovery file format is opaque: pin its real bytes independently,
+then distrust every mapping SHA until re-derived from existing source.
 """
 from __future__ import annotations
 
-import calendar
+from dataclasses import replace
 import hashlib
 import json
 import os
 from pathlib import Path
 import sqlite3
-import stat
 
 from research_wp_r0.aql_archive_custody_bridge_v1 import (
-    digest, decode, verify_packet, _load_checkpoint,
+    BarQuality, DataAvailabilityKind, HistoricalBar, HistoricalLibrary,
+    SourceType, _load_checkpoint, decode, digest, validate_bars, verify_packet,
 )
-from research_wp_r0.aql_core_backbone_local_v1 import query_local
+from research_wp_r0.aql_core_backbone_local_v1 import WAREHOUSE_SCHEMA, query_local
+from research_wp_r0.aql_core_dual_query_identity_map_v1 import bind_dual_query_identities
 from research_wp_r0.aql_core_f_private_f2_v1 import private_directory_gate
 from research_wp_r0.aql_core_f_research_diagnostic_query_v1 import (
-    _month_bounds, ADMITTED_MONTHS, WIDTH_MS,
+    ADMITTED_MONTHS, WIDTH_MS, _month_bounds,
 )
 from research_wp_r0.aql_core_research_query_seam_v1 import REQUEST_SCHEMA
 from research_wp_r0.aql_native_price_custody_query_v1 import query_price_custody
-from research_wp_r0.historical_library import HistoricalLibrary
-from research_wp_r0.aql_archive_custody_bridge_v1 import OfflineBridgeStager
+from tools.raw_vault_offline.schema import RawObjectMeta, logical_identity_key
 
 SCHEMA = "aql.core.f2-recovery-readonly-source.v1"
-RECOVERY_FILE_SHA = (
+MAPPING_SCHEMA = "aql.integration.f2-recovery-evidence.v1"
+EXPECTED_RECOVERY_BYTES_SHA256 = (
     "0428e7b02b7b57bded9906c49f956b76816c179cd8659d61e1c7f1af1df68220"
 )
-MAX_RECOVERY_FILE_BYTES = 5_000_000
-MONTH_FIELDS = frozenset({
+MONTH_FIELDS = frozenset((
     "month", "state", "bars", "source_sha256",
     "core_245_native_price_query_sha256", "core_253_local_query_sha256",
     "warehouse_receipt_sha256", "dual_query_map_sha256",
-})
-SHA_FIELDS = tuple(sorted(x for x in MONTH_FIELDS if x.endswith("sha256")))
+))
+ROOT_FIELDS = frozenset((
+    "schema", "source_class", "historical_pit", "trading_authority",
+    "owner_f2_report_sha256", "entries",
+))
 
 
-def need(ok, reason):
+def need(ok, code):
     if not ok:
-        raise ValueError("CORE_F2_RECOVERY_" + reason)
+        raise ValueError("CORE_F2_RECOVERY_" + code)
 
 
 def hexsha(value):
     return type(value) is str and len(value) == 64 and all(
-        x in "0123456789abcdef" for x in value
-    )
+        x in "0123456789abcdef" for x in value)
 
 
-def _safe_existing_file(path, *, max_bytes=None):
-    """Validate all ancestors; never resolve a symlink before testing it."""
+def _existing(path, *, directory=False, limit=None):
+    """No mkdir/resolve before symlink inspection, including every ancestor."""
     path = Path(path).absolute()
-    need(not any(x.is_symlink() for x in (path, *path.parents)),
+    need(not any(p.is_symlink() for p in (path, *path.parents)),
          "SYMLINK_PATH_DENIED")
-    need(path.is_file(), "FILE_MISSING")
-    size = path.stat().st_size
-    need(size > 0 and (max_bytes is None or size <= max_bytes),
-         "FILE_SIZE_OR_EMPTY")
+    need(path.is_dir() if directory else path.is_file(), "EXISTING_PATH_REQUIRED")
+    if not directory:
+        need(path.stat().st_size > 0 and
+             (limit is None or path.stat().st_size <= limit),
+             "FILE_SIZE_LIMIT_OR_EMPTY")
     return path
 
 
-def _safe_existing_dir(path):
-    path = Path(path).absolute()
-    need(not any(x.is_symlink() for x in (path, *path.parents)),
-         "SYMLINK_DIRECTORY_DENIED")
-    need(path.is_dir(), "DIRECTORY_MISSING")
-    return path
+def _json(path, limit):
+    return json.loads(_existing(path, limit=limit).read_bytes())
 
 
-def _read_json(path, *, max_bytes):
-    return json.loads(_safe_existing_file(path, max_bytes=max_bytes).read_bytes())
+def _tree_fingerprint(roots):
+    """No-write assertion: detect added, removed or modified files/dirs.
 
-
-def _canonical_warehouse_receipt(admission, packet, vault_meta, *, row_count):
-    """Reconstruct *actual* #253 warehouse receipt from immutable parents.
-
-    The persisted generation has immutable #226 custody admission JSON and a
-    pinned manifest/stage packet. Recompute the canonical #253 receipt exactly
-    with existing field definitions, NEVER from untrusted mapping input.
+    Snapshot metadata only, not private OHLCV; read atime is deliberately
+    excluded. This check is supplementary to never invoking write APIs.
     """
-    need(type(admission) is dict and
-         admission.get("schema") == "aql.core.historical-source-admission.v1",
-         "ACTUAL_ADMISSION_REQUIRED")
-    spec = packet["spec"]
-    vault_receipt = {
-        "vault": "EXISTING_PINNED_RAW_VAULT",
-        "sha256": admission["source_bytes_sha256"],
-        "correction_ledger": "PINNED_APPEND_ONLY",
-    }
-    # For legacy #211 metadata, the exact vault receipt is not stored by
-    # SQLite or stage. Do NOT fabricate a guessed receipt: the value must
-    # be reconstructed from verifiable fields or rejected by the caller.
-    return None
+    out = []
+    for root in roots:
+        root = _existing(root, directory=True)
+        for base, dirs, files in os.walk(root, followlinks=False):
+            base = Path(base)
+            for name in sorted(dirs + files):
+                p = base / name
+                need(not p.is_symlink(), "SYMLINK_TREE_DENIED")
+                st = p.stat()
+                out.append((str(p.relative_to(root)), p.is_dir(),
+                            st.st_size, st.st_mtime_ns, str(root)))
+    return digest(out)
 
 
-def _warehouse_receipt_from_actual(warehouse_root, vault_root, *,
-                                   dataset_id, source_sha, source_entry,
-                                   start_ms, end_exclusive_ms, cutoff_ms):
-    _safe_existing_dir(warehouse_root)
-    _safe_existing_dir(vault_root)
+def _verify_mapping(mapping):
+    need(type(mapping) is dict and set(mapping) == ROOT_FIELDS and
+         mapping["schema"] == MAPPING_SCHEMA and
+         mapping["source_class"] == "OWNER_LOCAL_RECOVERY_NOT_ORIGINAL_F2" and
+         mapping["historical_pit"] == "NOT_ATTESTED" and
+         mapping["trading_authority"] == "NONE" and
+         mapping["owner_f2_report_sha256"] is None,
+         "MAPPING_SCOPE_OR_F2_IMPERSONATION")
+    rows = mapping["entries"]
+    need(type(rows) is list and len(rows) == 10 and
+         all(type(row) is dict and set(row) == MONTH_FIELDS
+             for row in rows) and
+         {row["month"] for row in rows} == set(ADMITTED_MONTHS),
+         "EXACT_TEN_ADMITTED_MONTHS_REQUIRED")
+    need(all(row["state"] == "RAW_AND_DUAL_QUERY_READBACK" and
+             type(row["bars"]) is int and
+             row["bars"] == (_month_bounds(row["month"])[1] -
+                             _month_bounds(row["month"])[0]) // WIDTH_MS and
+             all(hexsha(row[k]) for k in MONTH_FIELDS if k.endswith("sha256"))
+             for row in rows) and
+         sum(row["bars"] for row in rows) == 29376,
+         "MONTH_CENSUS_OR_SHA_INVALID")
+    return {x["month"]: x for x in rows}
+
+
+def _read_existing_month(warehouse_root, vault_root, month, untrusted):
+    start, end = _month_bounds(month)
+    cutoff = end + 1000  # retrospective F2 original query, NOT PIT
+    need(type(untrusted) is dict and set(untrusted) == MONTH_FIELDS and
+         untrusted.get("month") == month and
+         untrusted.get("state") == "RAW_AND_DUAL_QUERY_READBACK" and
+         untrusted.get("bars") == (end - start)//WIDTH_MS and
+         all(hexsha(untrusted[k]) for k in MONTH_FIELDS if k.endswith("sha256")),
+         "UNTRUSTED_MONTH_FIELDS")
+    warehouse_root = _existing(warehouse_root, directory=True)
+    vault_root = _existing(vault_root, directory=True)
     private_directory_gate(warehouse_root)
     private_directory_gate(vault_root)
-    db = _safe_existing_file(Path(warehouse_root) / "warehouse.sqlite")
-    stage_root = _safe_existing_dir(Path(warehouse_root) / "stage")
-    vault_objects = _safe_existing_dir(Path(vault_root) / "objects")
-    _safe_existing_dir(Path(vault_root) / ".staging")
-    index_file = _safe_existing_file(Path(vault_root) / "index.json", max_bytes=15_000_000)
-    manifest_file = _safe_existing_file(Path(vault_root) / "manifest.jsonl",
-                                        max_bytes=40_000_000)
+    before = _tree_fingerprint((warehouse_root, vault_root))
+    db = _existing(warehouse_root/"warehouse.sqlite")
+    stage_root = _existing(warehouse_root/"stage", directory=True)
+    objects = _existing(vault_root/"objects", directory=True)
+    _existing(vault_root/".staging", directory=True)
+    index = _json(vault_root/"index.json", 15_000_000)
+    manifest_path = _existing(vault_root/"manifest.jsonl", limit=40_000_000)
 
-    con = sqlite3.connect(f"file:{db.as_posix()}?mode=ro&immutable=1",
-                          uri=True)
+    source = untrusted["source_sha256"]
+    dataset_id = "BINANCE-SPOT-BTCUSDT-15M-" + month + "-F-v1"
+    # immutable=1 guarantees that query/PRAGMA cannot create -wal/-shm files.
+    # If a live WAL is not checkpointed, the read MUST fail closed instead.
+    con = sqlite3.connect(db.as_uri()+"?mode=ro&immutable=1", uri=True)
     try:
         row = con.execute(
             "SELECT source_sha, manifest_sha, packet_sha, receipt_sha,"
-            " coverage, evidence_class, admission_json FROM generations"
-            " WHERE dataset_id=? AND generation=1", (dataset_id,)
+            " coverage, evidence_class, admission_json FROM generations "
+            "WHERE dataset_id=? AND generation=1", (dataset_id,),
         ).fetchone()
-        need(row is not None, "WAREHOUSE_GENERATION_MISSING")
-        rows = con.execute(
-            "SELECT COUNT(*), MIN(open_ms), MAX(open_ms) FROM price_bars"
-            " WHERE dataset_id=? AND generation=1", (dataset_id,)
+        census = con.execute(
+            "SELECT COUNT(*), MIN(open_ms), MAX(open_ms) FROM price_bars "
+            "WHERE dataset_id=? AND generation=1", (dataset_id,),
         ).fetchone()
     finally:
         con.close()
-    g_source, manifest_sha, packet_sha, custody_receipt_sha, coverage, evidence_class, admission_json = row
-    need(g_source == source_sha and
-         hexsha(manifest_sha) and hexsha(packet_sha) and
-         hexsha(custody_receipt_sha) and coverage == "COMPLETE",
-         "WAREHOUSE_GENERATION_SOURCE_OR_INTEGRITY")
-    need(rows[0] == source_entry["bars"] and rows[1] == start_ms and
-         rows[2] == end_exclusive_ms - WIDTH_MS,
-         "WAREHOUSE_GENERATION_BAR_GRID_DRIFT")
+    need(row is not None, "WAREHOUSE_GENERATION_NOT_FOUND")
+    source_sql, manifest_sha, packet_sha, custody_sha, coverage, evidence, admission_json = row
+    need(source_sql == source and all(hexsha(x) for x in
+         (manifest_sha, packet_sha, custody_sha)) and coverage == "COMPLETE"
+         and census == (untrusted["bars"], start, end - WIDTH_MS),
+         "SQL_GENERATION_OR_FULL_MONTH_DRIFT")
 
     admission = json.loads(admission_json)
-    need(type(admission) is dict and
-         admission.get("source_bytes_sha256") == source_sha and
+    seal = admission.get("manifest_record_sha256")
+    need(hexsha(seal) and digest({
+        k:v for k,v in admission.items() if k != "manifest_record_sha256"
+    }) == seal and
+         admission.get("source_bytes_sha256") == source and
          admission.get("manifest_integrity_sha256") == manifest_sha and
          admission.get("packet_sha256") == packet_sha and
-         admission.get("custody_receipt_sha256") == custody_receipt_sha,
-         "WAREHOUSE_ADMISSION_JSON_DRIFT")
-    # The canonical source admission is individually signed by its SHA.
-    seal = admission.get("manifest_record_sha256")
-    need(hexsha(seal) and
-         digest({k: v for k, v in admission.items()
-                 if k != "manifest_record_sha256"}) == seal,
-         "WAREHOUSE_ADMISSION_SEAL_DRIFT")
+         admission.get("custody_receipt_sha256") == custody_sha and
+         admission.get("dataset_id") == dataset_id and
+         admission.get("version") == 1 and
+         admission.get("available_bar_count") == untrusted["bars"] and
+         admission.get("coverage") == "COMPLETE" and
+         admission.get("decision_cutoff_ms") == cutoff and
+         admission.get("underlying_availability_class") == evidence and
+         admission.get("authenticated_source") == "NOT_ATTESTED" and
+         admission.get("confirmed_pit") == "NOT_ATTESTED" and
+         admission.get("paper_live_trading") == "DISABLED",
+         "SEALED_SQL_ADMISSION_DRIFT")
 
-    folder = _safe_existing_dir(stage_root / packet_sha)
-    packet_file = _safe_existing_file(folder / "packet.json", max_bytes=16_000_000)
-    source_file = _safe_existing_file(folder / "source.bin", max_bytes=8_000_000)
-    checkpoint = _safe_existing_file(folder / "checkpoint.json", max_bytes=200_000)
-    receipt_file = _safe_existing_file(folder / "receipt.json", max_bytes=200_000)
-    packet = decode(packet_file.read_bytes())
-    original_raw = source_file.read_bytes()
-    verify_packet(packet, original_raw)
+    folder = _existing(stage_root/packet_sha, directory=True)
+    packet = decode(_existing(folder/"packet.json",limit=8_000_000).read_bytes())
+    raw_stage = _existing(folder/"source.bin",limit=8_000_000).read_bytes()
+    verify_packet(packet, raw_stage)
+    spec = packet["spec"]
     need(packet.get("packet_sha256") == packet_sha and
-         packet.get("source_bytes_sha256") == source_sha and
-         packet["spec"].get("dataset_id") == dataset_id and
-         packet["spec"].get("version") == 1 and
-         packet["spec"].get("start_ms") == start_ms and
-         packet["spec"].get("end_exclusive_ms") == end_exclusive_ms and
-         packet["spec"].get("as_of_ms") == cutoff_ms and
-         _load_checkpoint(checkpoint, packet_sha, source_entry["bars"]) ==
-         source_entry["bars"],
-         "STAGE_SOURCE_OR_CHECKPOINT_DRIFT")
-    stage_receipt = decode(receipt_file.read_bytes())
-    stage_seal = stage_receipt.get("receipt_sha256")
-    need(hexsha(stage_seal) and digest(
-        {k: v for k, v in stage_receipt.items() if k != "receipt_sha256"
-         }) == stage_seal and
+         packet.get("source_bytes_sha256") == source and
+         spec.get("dataset_id") == dataset_id and
+         spec.get("version") == 1 and
+         spec.get("start_ms") == start and
+         spec.get("end_exclusive_ms") == end and
+         spec.get("as_of_ms") == cutoff and
+         spec.get("test_only") is False and
+         spec.get("interval") == "15m" and
+         _load_checkpoint(_existing(folder/"checkpoint.json",limit=200_000),
+                          packet_sha, untrusted["bars"]) == untrusted["bars"],
+         "COMMITTED_PACKET_OR_CHECKPOINT_DRIFT")
+    stage_receipt = decode(_existing(folder/"receipt.json", limit=200_000).read_bytes())
+    stage_sha = stage_receipt.get("receipt_sha256")
+    need(hexsha(stage_sha) and
+         digest({k:v for k,v in stage_receipt.items() if k != "receipt_sha256"}) ==
+         stage_sha and
+         stage_sha == custody_sha and
          stage_receipt.get("packet_sha256") == packet_sha and
-         stage_receipt.get("source_bytes_sha256") == source_sha and
+         stage_receipt.get("source_bytes_sha256") == source and
          stage_receipt.get("manifest_integrity_sha256") == manifest_sha and
-         stage_receipt.get("bar_count") == source_entry["bars"],
-         "STAGE_RECEIPT_DRIFT")
+         stage_receipt.get("bar_count") == untrusted["bars"],
+         "COMMITTED_STAGE_RECEIPT_DRIFT")
 
-    obj_file = _safe_existing_file(
-        vault_objects / source_sha[:2] / source_sha[2:],
-        max_bytes=8_000_000,
-    )
-    vault_raw = obj_file.read_bytes()
-    need(hashlib.sha256(vault_raw).hexdigest() == source_sha and
-         vault_raw == original_raw,
-         "RAW_OBJECT_CONTENT_OR_STAGE_DRIFT")
-
-    index = json.loads(index_file.read_bytes())
-    manifest = [
-        json.loads(line) for line in manifest_file.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
-    matches = [x for x in manifest if x.get("content_sha256") == source_sha]
+    # Verify direct RAW object, manifest and exact index association; no
+    # RawVault constructor, no lockfile creation, no directory repair.
+    vault_raw = _existing(objects/source[:2]/source[2:],limit=8_000_000).read_bytes()
+    need(hashlib.sha256(vault_raw).hexdigest() == source and
+         vault_raw == raw_stage, "RAW_BYTES_OR_STAGE_DRIFT")
+    manifest = [json.loads(line) for line in
+                manifest_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    matches = [x for x in manifest if x.get("content_sha256") == source]
     need(type(index) is dict and len(matches) == 1 and
-         type(matches[0]) is dict and
-         matches[0].get("correction_generation") == 0 and
-         matches[0].get("byte_length") == len(vault_raw) and
-         matches[0].get("instrument") == "BTCUSDT" and
-         matches[0].get("interval") == "15m" and
-         index.get(matches[0]["logical_identity_key"]) == source_sha,
-         "RAW_MANIFEST_INDEX_LINEAGE_DRIFT")
+         index.get(matches[0].get("logical_identity_key")) == source,
+         "RAW_MANIFEST_INDEX_MISMATCH")
+    meta = RawObjectMeta.from_dict(matches[0])
+    need(meta.content_sha256 == source and
+         meta.byte_length == len(vault_raw) and
+         meta.instrument == "BTCUSDT" and
+         meta.interval == "15m" and
+         meta.correction_generation == 0 and
+         meta.format_version == "BINANCE_NATIVE_MONTHLY_V1_G0",
+         "RAW_ORIGINAL_METADATA_DRIFT")
+    identity = {
+        "vendor":"BINANCE_SPOT", "instrument":"BTCUSDT",
+        "market":"SPOT", "interval":"15m",
+        "coverage_start_utc": __import__("datetime").datetime.fromtimestamp(
+            start/1000, __import__("datetime").timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "coverage_end_utc": __import__("datetime").datetime.fromtimestamp(
+            end/1000, __import__("datetime").timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "source_format":"ZIP_CSV", "format_version":"BINANCE_NATIVE_MONTHLY_V1",
+    }
+    base_family = logical_identity_key(**identity)
+    g0_identity = logical_identity_key(**{
+        **identity, "format_version":"BINANCE_NATIVE_MONTHLY_V1_G0",
+    })
+    need(meta.logical_identity_key == g0_identity and
+         meta.vendor == identity["vendor"] and
+         meta.market == identity["market"] and
+         meta.coverage_start_utc == identity["coverage_start_utc"] and
+         meta.coverage_end_utc == identity["coverage_end_utc"],
+         "RAW_LOGICAL_IDENTITY_DRIFT")
+    vault_receipt = {
+        "vault":"EXISTING_PINNED_RAW_VAULT",
+        "sha256":source, "logical_identity_key":g0_identity,
+        "correction_ledger":"NO_CORRECTIONS",
+        "base_family_identity":base_family,
+    }
+    body = {
+        "schema":WAREHOUSE_SCHEMA,
+        "status":"OFFLINE_LOCAL_WAREHOUSE_COMMITTED",
+        "dataset_id":dataset_id, "version":1,
+        "symbol":spec["symbol"], "market":spec["market"],
+        "exchange":spec["exchange"], "interval":spec["interval"],
+        "start_ms":start, "end_exclusive_ms":end,
+        "decision_cutoff_ms":cutoff, "test_only":spec["test_only"],
+        "source_evidence_class":admission["underlying_availability_class"],
+        "source_zip_sha256":source,
+        "csv_member_sha256":admission["native_csv_member_sha256"],
+        "checksum_file_sha256":admission["native_checksum_file_sha256"],
+        "manifest_integrity_sha256":manifest_sha,
+        "packet_sha256":packet_sha,
+        "custody_receipt_sha256":custody_sha,
+        "vault":vault_receipt,
+        "coverage":admission["coverage"],
+        "bar_count":admission["available_bar_count"],
+        "availability":"RETROSPECTIVE_NON_PIT",
+        "historical_known_at":"NOT_ATTESTED",
+        "universe":"NOT_ATTESTED", "scientific_result":"INSUFFICIENT_EVIDENCE",
+        "execution":"DISABLED",
+    }
+    warehouse_receipt = {**body, "receipt_sha256":digest(body)}
+    need(warehouse_receipt["receipt_sha256"] ==
+         untrusted["warehouse_receipt_sha256"],
+         "RECOMPUTED_WAREHOUSE_RECEIPT_MISMATCH")
 
+    # Rehydrate already sealed source packet IN MEMORY only. Unlike
+    # OfflineBridgeStager.commit() this has no implicit marker write path.
+    bars = [HistoricalBar(**{
+        **item, "quality":BarQuality(item["quality"]),
+        "source":SourceType(item["source"]),
+        "availability_kind":DataAvailabilityKind(item["availability_kind"]),
+    }) for item in packet["bars"]]
+    verified, regenerated = validate_bars(bars, spec["symbol"], spec["interval"])
+    regenerated = replace(
+        regenerated, dataset_id=dataset_id, version=1,
+        exchange=spec["exchange"], market=spec["market"],
+        source_label=spec["source_label"], created_at_ms=spec["as_of_ms"],
+        parent_version=None, lineage_reason=None, source_hash=source)
+    need(regenerated.manifest_integrity_hash == manifest_sha and
+         stage_receipt.get("manifest_hash") == regenerated.manifest_hash,
+         "REPLAYED_STAGE_MANIFEST_MISMATCH")
+    lib = HistoricalLibrary()
+    lib.register(dataset_id, verified, regenerated)
+    local = query_local(
+        warehouse_root,dataset_id,1,start,end,cutoff,
+        required_source_sha256=source,require_complete=True,
+        sqlite_immutable=True)
+    native = query_price_custody(lib,{
+        "schema":REQUEST_SCHEMA, "dataset_id":dataset_id, "version":1,
+        "start_ms":start, "end_exclusive_ms":end,
+        "decision_cutoff_ms":cutoff, "require_complete":False,
+        "confirmed_only":False,
+    }, expected_source_sha256=source,
+       expected_manifest_integrity_sha256=manifest_sha)
+    need(native.get("status") == "OK" and
+         local.get("coverage") == native.get("coverage") == "COMPLETE" and
+         native.get("price_query_sha256") ==
+         untrusted["core_245_native_price_query_sha256"] and
+         local.get("query_sha256") ==
+         untrusted["core_253_local_query_sha256"] and
+         len(native["bars"]) == len(local["bars"]) == untrusted["bars"] and
+         all(a["bar_open_ms"] == b["bar_open_ms"] and
+             a["bar_close_ms"] == b["bar_close_ms"] and
+             a["checksum"] == b["bar_checksum"] and
+             a["observation_lower_bound_ms"] == b["observation_lower_bound_ms"] and
+             a["bar_close_ms"] < cutoff and
+             a["historical_known_at_ms"] is None and
+             b["historical_known_at_ms"] is None
+             for a,b in zip(native["bars"],local["bars"])),
+         "RECOMPUTED_NATIVE_LOCAL_QUERY_DRIFT")
+    dual = bind_dual_query_identities(native,local,warehouse_receipt)
+    need(dual["identity_map_sha256"] == untrusted["dual_query_map_sha256"],
+         "RECOMPUTED_DUAL_MAP_DRIFT")
+    after = _tree_fingerprint((warehouse_root,vault_root))
+    need(before == after, "SOURCE_TREE_MUTATED_DURING_READ")
+    proof = {
+        "schema":SCHEMA, "month":month, "dataset_id":dataset_id,
+        "status":"SOURCE_BACKED_RECOVERY_READBACK_ONLY",
+        "recovery_file_sha256":EXPECTED_RECOVERY_BYTES_SHA256,
+        "original_f2_report_sha256":None,
+        "source_zip_sha256":source,
+        "manifest_integrity_sha256":manifest_sha,
+        "warehouse_receipt_sha256":warehouse_receipt["receipt_sha256"],
+        "core245_native_query_sha256":native["price_query_sha256"],
+        "core253_local_query_sha256":local["query_sha256"],
+        "dual_map_sha256":dual["identity_map_sha256"],
+        "bar_count":len(local["bars"]),
+        "start_ms":start, "end_exclusive_ms":end,
+        "decision_cutoff_ms":cutoff,
+        "no_write_tree_fingerprint_sha256":before,
+        "historical_pit":"NOT_ATTESTED",
+        "source_ack_sha256":None,
+        "strategy_approval_sha256":None,
+        "factory_consumer_ack_sha256":None,
+        "secretary_state":"NOT_ENQUEUED",
+        "trading_authority":"NONE",
+    }
     return {
-        "admission": admission,
-        "packet": packet,
-        "stage_receipt": stage_receipt,
-        "vault_meta": matches[0],
-        "stage_root": stage_root,
-        "manifest_sha256": manifest_sha,
-        "source_sha256": source_sha,
-        "row_count": source_entry["bars"],
-        "custody_receipt_sha256": custody_receipt_sha,
+        "receipt":{**proof,"receipt_sha256":digest(proof)},
+        "native_bars":native["bars"], "local_bars":local["bars"],
     }
 
 
-def _reconstruct_warehouse_receipt(evidence, *, cutoff_ms):
-    """Actual #253 receipt from the same observed admission + RAW metadata."""
-    admission = evidence["admission"]
-    packet = evidence["packet"]
-    v = evidence["vault_meta"]
-    version = packet["spec"]["version"]
-    # RawVault admission receipt is independent of time-varying replay.
-    # The exact original #253 warehouse receipt wasn't persisted by
-    # generations (it stores the #226 *custody* receipt SHA instead).
-    # Compute a SHA for the warehouse via its historical deterministic
-    # admission fields only when all original fields can be reconstructed;
-    # otherwise return a precise blocked result, never a guessed digest.
-    return None
+def read_recovery_diagnostic(warehouse_root, vault_root, recovery_file,
+                             untrusted_mapping):
+    """Public versioned 10-month source verifier; never accepts caller SHAs.
 
-
-def verify_recovered_month_readonly(warehouse_root, vault_root, *,
-                                   month, untrusted_source_entry):
-    """Return independent source/queries + evidence, with NO disk writes.
-
-    Caller-provided SHA must equal *recomputed* real source; a pinned
-    recovery report file is separately checked by Integration and is not
-    the original F2 report.
+    The owner operator must separately authorize using its private paths.
+    The opaque report *file bytes*, not any parsed/modeled report document,
+    are pinned. All 10 mapping rows are independently source-backed.
     """
-    need(type(untrusted_source_entry) is dict and
-         set(untrusted_source_entry) == MONTH_FIELDS and
-         untrusted_source_entry.get("month") == month and
-         untrusted_source_entry.get("state") ==
-         "RAW_AND_DUAL_QUERY_READBACK",
-         "RECOVERY_ENTRY_FIELDS_OR_STATE")
-    for field in SHA_FIELDS:
-        need(hexsha(untrusted_source_entry.get(field)),
-             "RECOVERY_PARENT_SHA_INVALID")
-    start, end = _month_bounds(month)
-    need(type(untrusted_source_entry.get("bars")) is int and
-         untrusted_source_entry["bars"] == (end-start)//WIDTH_MS,
-         "RECOVERY_BAR_COUNT")
-    source_sha = untrusted_source_entry["source_sha256"]
-    dataset_id = f"BINANCE-SPOT-BTCUSDT-15M-{month}-F-v1"
-    evidence = _warehouse_receipt_from_actual(
-        warehouse_root, vault_root, dataset_id=dataset_id,
-        source_sha=source_sha, source_entry=untrusted_source_entry,
-        start_ms=start, end_exclusive_ms=end, cutoff_ms=end + 1000)
-    # IMPORTANT: original warehouse receipt is not stored in SQLite.
-    # Do not label its upstream caller-provided SHA independently verified.
-    actual_warehouse_receipt = _reconstruct_warehouse_receipt(
-        evidence, cutoff_ms=end+1000)
-    need(actual_warehouse_receipt is not None,
-         "ORIGINAL_WAREHOUSE_RECEIPT_NOT_RECONSTRUCTIBLE")
-    return actual_warehouse_receipt
+    recovery = _existing(recovery_file,limit=5_000_000)
+    need(hashlib.sha256(recovery.read_bytes()).hexdigest() ==
+         EXPECTED_RECOVERY_BYTES_SHA256, "OPAQUE_RECOVERY_FILE_SHA_MISMATCH")
+    entries = _verify_mapping(untrusted_mapping)
+    results = {
+        m:_read_existing_month(warehouse_root,vault_root,m,entries[m])
+        for m in ADMITTED_MONTHS
+    }
+    need(sum(x["receipt"]["bar_count"] for x in results.values()) == 29376,
+         "RECOMPUTED_TEN_MONTH_CENSUS")
+    return results
