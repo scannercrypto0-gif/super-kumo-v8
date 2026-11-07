@@ -11,10 +11,12 @@ from __future__ import annotations
 from collections import Counter
 from decimal import Decimal
 from pathlib import Path
+import json
+import sqlite3
 
 from research_wp_r0.aql_factory_e_research_results_store_v1 import (
     digest, _sha, ResultsStoreError, build_experiment, register_experiment,
-    read_experiment, audit_store_layout,
+    audit_store_layout,
 )
 from research_wp_r0.aql_factory_f_f2_recovery_diagnostic_v1 import (
     MONTHS, RECOVERY_SHA, RECOVERY_RAW_BYTES_SHA, verified_core_receipts,
@@ -25,7 +27,6 @@ from research_wp_r0.aql_factory_f_research_e2e_diagnostic_v1 import (
 from research_wp_r0.aql_factory_historical_rule_projection import (
     _validate_bars, _vectors, _expression, _modeled_trade, _costs, COST_KEYS,
 )
-from research_wp_r0.aql_factory_authentic_research_admission import seal
 from research_wp_r0.strategy_definition import StrategyDefinition
 from research_wp_r0.indicator_library_v2 import IndicatorRegistryV2
 
@@ -332,13 +333,72 @@ def _causal_focus(trial, definition, policy):
     return {**body,"lab_sha256":digest(body)}
 
 
-def _record_attempts(attempts, parents):
-    """Store v2 currently accepts nonnull attempt parents; preserve NULL
-    inventory semantics in the separately sealed v2 packet and map ONLY the
-    private store index's ancestry to the signed v2 input digest. This is a
-    storage-metadata surrogate, explicitly NOT a February/Aug source SHA.
+def _register_recovery_v2(store, record):
+    """Separate immutable v2 recovery ledger: real NULL inventory stays NULL.
+
+    The legacy Factory E experiment serializer requires non-null parents for
+    every attempt. Rather than forge four source hashes or weaken its global
+    contract, keep the sealed 24-row recovery census in its own scoped table
+    within the SAME isolated SQLite layout-v2 database.
     """
-    raise ResultsStoreError("FACTORY_V2_STORAGE_NULL_ATTEMPTS_NOT_IMPLEMENTED")
+    need(type(record) is dict and
+         set(record) == {"schema","experiment_id","packet_sha256",
+                         "attempts","lab_sha256","result_sha256",
+                         "strategy_digest","sha256"}
+         and record["schema"] ==
+         "aql.factory.f.f2-recovery-immutable-record.v2"
+         and _sha(record["sha256"]) and
+         record["sha256"] == digest({k:v for k,v in record.items()
+                                    if k!="sha256"}) and
+         type(record["attempts"]) is list and
+         len(record["attempts"]) == 24 and
+         sum(a["source_receipt_sha256"] is None
+             for a in record["attempts"]) == 4,
+         "V2_STORE_RECORD_SEAL")
+    encoded=json.dumps(record,sort_keys=True,separators=(",",":"),
+                       ensure_ascii=True,allow_nan=False)
+    con=sqlite3.connect(store,timeout=15)
+    try:
+        con.execute("PRAGMA busy_timeout=15000")
+        need(con.execute("PRAGMA user_version").fetchone()[0] == 2,
+             "V2_STORE_LAYOUT_REQUIRED")
+        con.execute("BEGIN IMMEDIATE")
+        con.execute("""CREATE TABLE IF NOT EXISTS recovery_research_v2 (
+            experiment_id TEXT PRIMARY KEY,
+            canonical_sha256 TEXT NOT NULL,
+            document TEXT NOT NULL,
+            immutable INTEGER NOT NULL CHECK(immutable=1)
+        )""")
+        existing=con.execute(
+            "SELECT canonical_sha256,document,immutable "
+            "FROM recovery_research_v2 WHERE experiment_id=?",
+            (record["experiment_id"],)).fetchone()
+        need(existing is None or
+             existing==(record["sha256"],encoded,1),
+             "V2_IMMUTABLE_REPLAY_CONFLICT")
+        if existing is None:
+            con.execute(
+                "INSERT INTO recovery_research_v2 "
+                "(experiment_id,canonical_sha256,document,immutable) "
+                "VALUES(?,?,?,1)",
+                (record["experiment_id"],record["sha256"],encoded))
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+    # Independent readback; a second invocation must be bit-for-bit identical.
+    with sqlite3.connect(store,timeout=15) as reader:
+        stored=reader.execute(
+            "SELECT canonical_sha256,document,immutable "
+            "FROM recovery_research_v2 WHERE experiment_id=?",
+            (record["experiment_id"],)).fetchone()
+    need(stored==(record["sha256"],encoded,1) and
+         digest(json.loads(stored[1]) | {}) == digest(record),
+         "V2_STORE_MUTATED_READBACK")
+    return "STORED_IMMUTABLE" if existing is None else "REPLAY_IDENTICAL"
+
 
 
 def run_recovery_research_v2(packet, store_path):
@@ -368,28 +428,19 @@ def run_recovery_research_v2(packet, store_path):
         "trading_authority":"NONE",
     }
     result_sha=digest(evaluation)
-    attempts=_record_attempts(packet["attempts"],parents)
-    record=build_experiment(
-        experiment_id=packet["experiment_id"],lane="SCANNER",
-        source_status="RETROSPECTIVE_SOURCE_ADMITTED_NOT_PIT",
-        source_sha256=trial["source_bytes_sha256"],
-        source_query_245_sha256=packet["core_245_query_sha256"],
-        source_query_253_sha256=packet["core_253_query_sha256"],
-        strategy_definition_sha256=definitions[trial["strategy_id"]].digest,
-        config_sha256=packet["config_sha256"],
-        code_sha256=packet["code_sha256"],
-        environment_sha256=packet["environment_sha256"],
-        parent_receipt_sha256=packet["sha256"],
-        attempts=attempts,
-        lab_receipt_sha256=lab["lab_sha256"],
-        result_sha256=result_sha,
-        evidence_class="RETROSPECTIVE_NON_PIT",
-    )
-    save=register_experiment(store,record)
-    need(read_experiment(store,packet["experiment_id"])==record,
-         "V2_IMMUTABLE_READBACK")
+    record_body={
+        "schema":"aql.factory.f.f2-recovery-immutable-record.v2",
+        "experiment_id":packet["experiment_id"],
+        "packet_sha256":packet["sha256"],
+        "attempts":packet["attempts"],
+        "lab_sha256":lab["lab_sha256"],
+        "result_sha256":result_sha,
+        "strategy_digest":definitions[trial["strategy_id"]].digest,
+    }
+    record={**record_body,"sha256":digest(record_body)}
+    status=_register_recovery_v2(store,record)
     layout=audit_store_layout(store)
-    need(layout["layout_version"]==2, "V2_STORE_LAYOUT")
+    need(layout["layout_version"]==2,"V2_STORE_LAYOUT")
     body={
         "schema":REPORT,"status":"RECOVERY_RESEARCH_ONLY_NOT_F5",
         "experiment_id":packet["experiment_id"],
@@ -407,7 +458,7 @@ def run_recovery_research_v2(packet, store_path):
         "modeled_count":lab["modeled_count"],
         "unknown_count":lab["unknown_count"],
         "costs":lab["costs"],
-        "store_status":save["status"],
+        "store_status":status,
         "source_ack_sha256":None,"strategy_approval_sha256":None,
         "factory_consumer_ack_sha256":None,
         "historical_pit":"NOT_ATTESTED",
