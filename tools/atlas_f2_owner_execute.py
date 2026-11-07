@@ -93,8 +93,14 @@ def run(manifest):
     # Optional Factory-specific inputs are checked AFTER actual source
     # derivation. Even when policy is missing, the independently proven
     # 10-row mapping is collected and saved in this isolated workspace.
+    # Collect ALL unavailable policy/ledger/inventory fields in one batch,
+    # but still derive provenance when the genuine sources are accessible.
+    docs={key:_load_optional(manifest[key]) for key in MISSING_FIELDS}
+    optional_needed=policy_missing(
+        docs["policy_file"],docs["trial_ledger_file"],
+        docs["inventory_receipts_file"])
     if missing:
-        return _sanitized_wait(missing)
+        return _sanitized_wait(missing+optional_needed)
 
     warehouse=_resolved_input(manifest["warehouse_root"])
     vault=_resolved_input(manifest["vault_root"])
@@ -125,14 +131,12 @@ def run(manifest):
         verified_recovery_readbacks=original,
         recovery_file_sha256=EXPECTED_RECOVERY_FILE_SHA256,
         work_specs=frozen["work_specs"])
-    docs={key:_load_optional(manifest[key]) for key in MISSING_FIELDS}
     policy=docs["policy_file"]
     ledger=docs["trial_ledger_file"]
     inventory=docs["inventory_receipts_file"]
-    needed=policy_missing(policy,ledger,inventory)
-    if needed:
+    if optional_needed:
         # Mapping was already independently derived; do not invent cost/ledger.
-        return _sanitized_wait(needed)
+        return _sanitized_wait(optional_needed)
     factory=build_factory_packet(
         original=original, scanner_receipt=scanner,
         work_specs=frozen["work_specs"],policy=policy,
