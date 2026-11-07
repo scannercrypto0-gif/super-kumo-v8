@@ -182,13 +182,17 @@ def evaluate_immutable_ledger(ledger, *, comparison=None):
         "sensitivity":{"cost_extra_bps_round_trip":adjusted,
                        "parameter_change":"NOT_EVALUATED_NO_REOPTIMIZATION"},
         "uncertainty":{"unknown_outcomes":cohort["unknown_trades"],
-                       "incomplete_months":("SOURCE_GAP_BOUNDED_RANGE" if generic and cohort["coverage"]!="COMPLETE" else [] if generic else ["2024-02","2024-08"]),
+                       "incomplete_months":(
+                           (["SOURCE_GAP_BOUNDED_RANGE"]
+                            if cohort["coverage"]!="COMPLETE" else [])
+                           if generic else ["2024-02","2024-08"]),
                        "in_sample_only":True,
                        "holdout_opened":False,
                        "historical_pit":"NOT_ATTESTED",
                        "independent_source_rights":"NOT_ATTESTED",
                        "economic_claim":"NOT_ATTESTED",
-                       "signal_unknown_slots":cohort.get("signal_unknown",0)},
+                       **({"signal_unknown_slots":cohort["signal_unknown"]}
+                          if generic else {})},
         "economic_class":ledger["economic_policy_class"],
         "assessment":"DESCRIPTIVE_RESEARCH_ONLY_NO_ALPHA_CLAIM",
         "research_ready_for_review":True,
