@@ -22,8 +22,8 @@ PINS = {
  "discoverer_base":"f2006c0e431690ccea8b0532095bf4f2a2dc88ba",
  "work235":"6acbcc7fc243b132f58170df4c6469bbf7f4eff8",
  "raw211":"7d97b09c0c6ee2650a61d523acb8d8c771a99c46",
- "core_f":"c51bbfdca04a71ac59947ca10ffce046e84b28d8",
- "scanner_f":"6a14cf24575f8425d94db6eef5d7cd0a95ba90d4",
+ "core_f":"35b893b0d62d37006f7f0099596604f23d9f2378",
+ "scanner_f":"bb79d6d7610ed9a4cc83fd8e70cf2eaa28ad969a",
  "discoverer_f":"1cb70f1212283fe34117882d18e0501fc6409fe7",
 }
 # PASS is restricted to demonstrated bounded engineering subgate.
