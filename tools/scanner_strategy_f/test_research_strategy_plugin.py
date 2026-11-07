@@ -106,7 +106,7 @@ class ResearchStrategyPlugin(unittest.TestCase):
         changed["entry"]["right"]["value"]=99
         new=StrategyDefinition(changed,registry=IndicatorRegistryV2())
         manual=h.register_strategy_plugin(
-            new.to_dict(),config_digest=digest({"test_config":"variant"}),
+            new.to_dict(),config_digest=h.manual_config_digest(new.to_dict()),
             origin="MANUAL")
         self.assertNotIn(Frozen.restore(manual).sha256,loaded)
         self.assertIsNone(Frozen.restore(manual).data["source_spec_sha256"])
@@ -138,12 +138,9 @@ class ResearchStrategyPlugin(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.evaluate(plugin=altered)
         forged=Frozen.build(altered["payload"]).receipt()
-        # Changing only config digest changes plug-in identity; its source
-        # Work235 ancestry still does not issue approval or execution rights.
-        a=self.evaluate()
-        b=self.evaluate(plugin=forged)
-        self.assertNotEqual(a["payload"]["strategy_plugin_sha256"],
-                            b["payload"]["strategy_plugin_sha256"])
+        # Even a re-sealed Work235 config change must fail its frozen pin.
+        with self.assertRaises(ValueError):
+            self.evaluate(plugin=forged)
         altered=copy.deepcopy(self.plugin)
         altered["payload"]["definition_digest"]="0"*64
         forged=Frozen.build(altered["payload"]).receipt()
@@ -171,7 +168,9 @@ class ResearchStrategyPlugin(unittest.TestCase):
             h.register_strategy_plugin(self.receipt,
                 config_digest="f"*64,origin="DISCOVERER_CANDIDATE")
         candidate=h.register_strategy_plugin(
-            self.receipt,config_digest="f"*64,
+            self.receipt,
+            config_digest=self.work[0]["payload"]["config_digest"],
+            source_spec_receipt=self.work[0],
             origin="DISCOVERER_CANDIDATE",candidate_sha256="a"*64)
         self.assertEqual(Frozen.restore(candidate).data["policy_status"],
                          "RESEARCH_ONLY_NO_INDEPENDENT_APPROVAL")
