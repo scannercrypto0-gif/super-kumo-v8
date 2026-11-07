@@ -36,3 +36,34 @@ Paths are placeholders, not evidence of files. Run **only** after authorized own
 - Integration #271: once owner contracts are ready, wire the versioned recovery source gate into the complete one-command Scanner→Factory operator and run focused regressions. **Do not bypass the original F2 requirement in the old path.**
 
 **Current acceptance:** `RECOVERY_SOURCE_GATE_ENGINEERING_ONLY` pending focused CI, `PRIVATE_WAIT` actual original private readback and full research diagnostic, `F5_BLOCKED_EXTERNAL_INPUT`. No second warehouse, reingestion, original-F2 impersonation, G0, merge, trading or holdout opening.
+
+## Full integrated private diagnostic runner (prepared; contract integration pending)
+
+Integration has now added `tools/atlas_f2_recovery_research_operator.py`, a separate one-command owner-local orchestrator. **Do not run on original private data until the Scanner #277 receipt-shape mismatch is fixed and a latest-head focused assembled CI gate passes.** Core public source receipt is `aql.core.f2-recovery-readonly-source.v1`; the earlier Scanner adapter still expects the previous receipt fields. The complete runner is currently **ENGINEERING_INTEGRATION_PENDING**, not PASS.
+
+Create a local JSON operator manifest with exactly the following fields (replace every placeholder with the actual authorized existing path; do not post private paths or raw bars to GitHub):
+
+```json
+{
+  "schema": "aql.integration.f2-recovery-research-operator.v1",
+  "owner_operator_authorized": true,
+  "warehouse_root": "EXISTING_WAREHOUSE_DIRECTORY",
+  "vault_root": "EXISTING_RAWVAULT_DIRECTORY",
+  "recovery_file": "EXISTING_OWNER_RECOVERY_EVIDENCE_FILE",
+  "recovery_mapping_file": "UNTRUSTED_TEN_MONTH_MAPPING_JSON",
+  "frozen_work235_file": "PINNED_WORK235_STRATEGIES_JSON",
+  "factory_recovery_input_file": "ACTUAL_OWNER_PRIVATE_FACTORY_RECOVERY_INPUT_JSON",
+  "fresh_results_store": "NEW_SEPARATE_DIAGNOSTIC_SQLITE_V2_PATH",
+  "sanitized_output": "NEW_SEPARATE_SHA_ONLY_JSON_PATH"
+}
+```
+
+Once the focused exact-head cross-owner test is green and actual inputs exist, the operator command is:
+
+```powershell
+python -m tools.atlas_f2_recovery_research_operator --operator-manifest 'OWNER_PRIVATE_OPERATOR_MANIFEST.json' --owner-private-authorized
+```
+
+The frozen Work235 source is commit `6acbcc7fc243b132f58170df4c6469bbf7f4eff8` / `tools/strategy_service_offline/fixtures/strategies.json` blob `c27eb5aa70a6d671791ba1e55e9b078a272b611f` containing `test_momentum@v1` and `test_reversion@v1`, TEST_ONLY definitions (not independent source authority). Scanner policy/proposal/request are deterministic **review-only** DRAFT/REQUEST contracts; not independently approved.
+
+Factory recovery input is `aql.factory.f.f2-recovery-evidence-diagnostic-input.v1` and **must be built from actual Core private 10-month readback receipts and genuine original-month bars**; the operator will not invent it. It requires one real original-month causal focus, 24 attempt identities, 4 Feb/Aug UNKNOWN, original F2 SHA null, immutable SQLite v2 and independent negative checks. No signed F5 ACK/SELECTED/holdout/Paper/trading. Only a genuinely executed and replayed owner-private run can emit `RESEARCH_E2E_DIAGNOSTIC_PASS`; GitHub fixtures cannot.
