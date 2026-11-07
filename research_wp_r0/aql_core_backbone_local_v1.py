@@ -315,7 +315,8 @@ def admit_local_original(
 
 
 def query_local(root, dataset_id, version, start_ms, end_exclusive_ms,
-                cutoff_ms, *, required_source_sha256, require_complete=True):
+                cutoff_ms, *, required_source_sha256, require_complete=True,
+                sqlite_immutable=False):
     """Read only indexed derived price partition; no future-row repair."""
     require(type(dataset_id) is str and IDENTITY.fullmatch(dataset_id)
             and type(version) is int and version>0
@@ -323,11 +324,13 @@ def query_local(root, dataset_id, version, start_ms, end_exclusive_ms,
                     (start_ms,end_exclusive_ms,cutoff_ms))
             and start_ms<end_exclusive_ms
             and type(required_source_sha256) is str and HEX.fullmatch(required_source_sha256)
-            and type(require_complete) is bool,
+            and type(require_complete) is bool
+            and type(sqlite_immutable) is bool,
             "INVALID_HISTORICAL_QUERY")
     root=_safe_root(root)
     require((root/"warehouse.sqlite").is_file(),"WAREHOUSE_NOT_AVAILABLE")
-    con=sqlite3.connect((root/"warehouse.sqlite").as_uri()+"?mode=ro",
+    con=sqlite3.connect((root/"warehouse.sqlite").as_uri()+
+                        ("?mode=ro&immutable=1" if sqlite_immutable else "?mode=ro"),
                         uri=True)
     try:
         g=con.execute(
@@ -341,7 +344,14 @@ def query_local(root, dataset_id, version, start_ms, end_exclusive_ms,
                 and original["manifest_integrity_sha256"]==g[1],
                 "WAREHOUSE_SOURCE_DRIFT")
         # Verify immutable source and Bridge packet independently of the index.
-        stage=OfflineBridgeStager(root/"stage")
+        if sqlite_immutable:
+            # Bypass the legacy stager constructor, which calls mkdir even
+            # on existing paths. Recovery has a strict NO-WRITES contract.
+            stage=object.__new__(OfflineBridgeStager)
+            stage.root=_safe_root(root/"stage")
+            require(stage.root.is_dir(),"WAREHOUSE_STAGE_NOT_AVAILABLE")
+        else:
+            stage=OfflineBridgeStager(root/"stage")
         packet,raw=stage._load(original["packet_sha256"])
         require(packet["source_bytes_sha256"]==g[0]
                 and raw_sha(raw)==g[0]
