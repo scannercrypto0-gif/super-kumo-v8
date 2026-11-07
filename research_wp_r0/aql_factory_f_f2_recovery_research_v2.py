@@ -37,6 +37,12 @@ SCOPE = "RECOVERY_RESEARCH_ONLY_NOT_F5"
 INVENTORY = ("2024-02", "2024-08")
 ALL_MONTHS = set(MONTHS) | set(INVENTORY)
 STRATEGY_IDS = ("test_momentum@v1", "test_reversion@v1")
+# Exact frozen Work235 StrategyDefinition digests from commit 6acbcc7.
+# Their TEST_ONLY origin does not become independent strategy approval.
+FROZEN_DEFINITION_DIGESTS = {
+    "test_momentum@v1":"5d293f892fd829a9d1c1d2933612bbb4f2d57b4445deefce06436959824cb55b",
+    "test_reversion@v1":"d00ccc44f76785ffec3a17786b3f71303e6d6176809f8d96435c6f8e1c570a1e",
+}
 ROOT_FIELDS = {
     "schema", "sha256", "experiment_id", "purpose", "local_source_mode",
     "recovery_evidence_file_sha256", "recovery_raw_bytes_sha256",
@@ -124,6 +130,7 @@ def _definitions(raw):
             raw[identity], registry=IndicatorRegistryV2())
         spec = definition.spec
         need(identity == spec["strategy_id"] + "@" + spec["strategy_version"]
+             and definition.digest == FROZEN_DEFINITION_DIGESTS[identity]
              and spec["scope"] == "RESEARCH_ONLY"
              and spec["timing"] == {
                  "decision":"CONFIRMED_CLOSE",
@@ -395,7 +402,7 @@ def _register_recovery_v2(store, record):
             "FROM recovery_research_v2 WHERE experiment_id=?",
             (record["experiment_id"],)).fetchone()
     need(stored==(record["sha256"],encoded,1) and
-         digest(json.loads(stored[1]) | {}) == digest(record),
+         digest(json.loads(stored[1])) == digest(record),
          "V2_STORE_MUTATED_READBACK")
     return "STORED_IMMUTABLE" if existing is None else "REPLAY_IDENTICAL"
 
