@@ -404,15 +404,20 @@ def _register_recovery_v2(store, record):
         raise
     finally:
         con.close()
-    # Independent readback; a second invocation must be bit-for-bit identical.
-    with sqlite3.connect(store,timeout=15) as reader:
+    # Independent readback; the sqlite3 context manager does NOT close the
+    # connection. Always close explicitly (especially on Windows/NTFS) while
+    # preserving exact readback-seal rejection on tamper and replay.
+    reader=sqlite3.connect(store,timeout=15)
+    try:
         stored=reader.execute(
             "SELECT canonical_sha256,document,immutable "
             "FROM recovery_research_v2 WHERE experiment_id=?",
             (record["experiment_id"],)).fetchone()
-    need(stored==(record["sha256"],encoded,1) and
-         digest(json.loads(stored[1])) == digest(record),
-         "V2_STORE_MUTATED_READBACK")
+        need(stored==(record["sha256"],encoded,1) and
+             digest(json.loads(stored[1])) == digest(record),
+             "V2_STORE_MUTATED_READBACK")
+    finally:
+        reader.close()
     return "STORED_IMMUTABLE" if existing is None else "REPLAY_IDENTICAL"
 
 
