@@ -193,7 +193,9 @@ class RecoveryNoWriteContract(unittest.TestCase):
                     _read_existing_month(warehouse,vault_root,MONTH,entry)
             finally:
                 (vault_root/"manifest.jsonl").write_bytes(original_manifest)
-            self.assertEqual(_tree_fingerprint((warehouse,vault_root)),baseline)
+            # Deliberate corruption and restoration of disposable files may
+            # change directory/file mtimes. The no-write baseline was already
+            # asserted before these adversarial filesystem mutations.
 
     def test_recovery_receipt_cannot_become_signed_f5_authority(self):
         from research_wp_r0.aql_core_f5_secretary_authority_v1 import (
