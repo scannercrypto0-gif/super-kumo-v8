@@ -239,6 +239,17 @@ jobs:
           set -euo pipefail
           export PYTHONPATH="$PWD:$PWD/tests:$PWD/_pinned_raw211"
           python -m tools.atlas_integration_collect_all_gate
+          python tools/atlas_factory_e_bounded_perf.py --strategies 12 --symbols 8 --per-pair 4 --max-seconds 30 --max-peak-mib 96 --output e-factory-performance.json
+          python tools/atlas_e_combined_gate_manifest.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e-gate-${{ matrix.python-version }}
+          path: |
+            e-gate-evidence.json
+            e-factory-performance.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Upload combined bounded suite report even on failure
         if: always()
         uses: actions/upload-artifact@v4
