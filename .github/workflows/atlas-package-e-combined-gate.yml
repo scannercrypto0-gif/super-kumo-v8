@@ -293,6 +293,10 @@ jobs:
         with: {ref: 0ec35238de6cf48db07c5c977e1f0d04bc299f58, path: _pinned_factory_e, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: 6cf7acd3d038f8147c55a6d503ffdfea5e6d6f2d, path: _pinned_core_f, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46, path: _pinned_raw211, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: e368dd491a0d80618bdc6c6e8f731a195d763dda, path: _pinned_raw_windows_lock, persist-credentials: false}
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - name: Stage SHA-verified Factory v2 and Core in isolated Windows CI
@@ -304,10 +308,38 @@ jobs:
           owners={
             '_pinned_factory_e':'0ec35238de6cf48db07c5c977e1f0d04bc299f58',
             '_pinned_core_f':'6cf7acd3d038f8147c55a6d503ffdfea5e6d6f2d',
+            '_pinned_raw211':'7d97b09c0c6ee2650a61d523acb8d8c771a99c46',
+            '_pinned_raw_windows_lock':'e368dd491a0d80618bdc6c6e8f731a195d763dda',
           }
           for owner,expected in owners.items():
               actual=subprocess.check_output(['git','-C',owner,'rev-parse','HEAD'],text=True).strip()
               assert actual==expected, ('PINNED_HEAD_DRIFT',owner)
+          # Fill missing transitive Core dependencies from the SAME pinned
+          # exact source tree, never by loading loose PYTHONPATH wheels.
+          core=Path('_pinned_core_f')
+          for folder in ('research_wp_r0','tools','src'):
+              parent=core/folder
+              if not parent.is_dir():
+                  continue
+              for source in parent.rglob('*.py'):
+                  dest=Path(folder)/source.relative_to(parent)
+                  if not dest.exists():
+                      dest.parent.mkdir(parents=True,exist_ok=True)
+                      shutil.copyfile(source,dest)
+                      assert source.read_bytes()==dest.read_bytes(), ('PINNED_CORE_DEP_BYTES',str(dest))
+          # RawVault Windows blob is a verified distinct locked dependency.
+          rawbase=Path('_pinned_raw211/tools/raw_vault_offline')
+          rawfixed=Path('_pinned_raw_windows_lock/tools/raw_vault_offline')
+          for name in ('__init__.py','schema.py'):
+              assert (rawbase/name).read_bytes()==(rawfixed/name).read_bytes(), ('RAW_VAULT_API_DIVERGENCE',name)
+          for name in ('__init__.py','schema.py','vault.py'):
+              source=rawfixed/name
+              dest=Path('tools/raw_vault_offline')/name
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copyfile(source,dest)
+              assert source.read_bytes()==dest.read_bytes(), ('RAW_VAULT_WINDOWS_BYTES',name)
+          v=rawfixed/'vault.py'
+          assert hashlib.sha1(b'blob '+str(v.stat().st_size).encode()+b'\\0'+v.read_bytes()).hexdigest()=='6b5bcc1d684088934f5ed7110064380b8d2bc0cd', 'RAW_VAULT_WINDOWS_BLOB_DRIFT'
           names={
             '_pinned_factory_e':(
               'aql_factory_e_research_results_store_v1.py',
