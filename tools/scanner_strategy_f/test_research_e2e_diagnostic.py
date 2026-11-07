@@ -32,7 +32,7 @@ class LocalResearchDiagnostic(unittest.TestCase):
 
     def test_real_frozen_strategy_ast_over_closed_bars_no_future(self):
         # Three observed bars are enough for period 3 SMA: warmup is UNKNOWN.
-        spec=self.work[0]["payload"]["definition"]["definition"]
+        spec=self.work[0]["payload"]["definition"]
         definition=StrategyDefinition.from_dict(spec,registry=IndicatorRegistryV2())
         start=1735689600000
         bars=[
