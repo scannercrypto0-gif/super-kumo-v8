@@ -39,9 +39,9 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/checkout@v4
-        with: {ref: 243bb4d6e4c3c6f17392c2d606f9cec1e98304ae, path: _pinned_factory_e, persist-credentials: false}
+        with: {ref: a82c611b23705898304270ef8d343d6a185913fa, path: _pinned_factory_e, persist-credentials: false}
       - uses: actions/checkout@v4
-        with: {ref: df8b956878914e867754b009f7c4d2fc79605ad7, path: _pinned_core_f, persist-credentials: false}
+        with: {ref: 6cf7acd3d038f8147c55a6d503ffdfea5e6d6f2d, path: _pinned_core_f, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: 798d409cb3db36b4f519f2e18a1f6089ff8f8010, path: _pinned_scanner_f, persist-credentials: false}
       - uses: actions/checkout@v4
@@ -92,6 +92,12 @@ jobs:
                       if not target.exists():
                           target.parent.mkdir(parents=True,exist_ok=True)
                           copyfile(item,target)
+          # Exact pinned owner HEADs are mandatory before importing any operator.
+          from tools.atlas_e_combined_gate_manifest import PINS
+          for key in ('factory_e','core_f','scanner_f'):
+              import subprocess
+              actual=subprocess.check_output(['git','-C','_pinned_'+key,'rev-parse','HEAD'],text=True).strip()
+              assert actual==PINS[key], ('OWNER_HEAD_PIN_DRIFT',key,actual,PINS[key])
           # F HEAD precedence: fail closed if a stale base or historical overlay
           # shadows the pinned F modules. Historical owners fill missing paths only.
           import hashlib
@@ -166,9 +172,16 @@ jobs:
                        'aql_factory_f_private_original_cohort_v1.py',
                        'aql_factory_f_role_authority_v1.py',
                        'aql_factory_f_research_e2e_diagnostic_v1.py',
-                       'aql_factory_f_f2_recovery_diagnostic_v1.py'):
-              copyfile(Path('_pinned_factory_e')/'research_wp_r0'/name,
-                       Path('research_wp_r0')/name)
+                       'aql_factory_f_f2_recovery_diagnostic_v1.py',
+                       'aql_factory_f_f2_recovery_research_v2.py',
+                       'aql_factory_historical_rule_projection.py',
+                       'strategy_definition.py',
+                       'indicator_library_v2.py'):
+              source=Path('_pinned_factory_e')/'research_wp_r0'/name
+              target=Path('research_wp_r0')/name
+              assert source.is_file(), ('PINNED_FACTORY_MODULE_MISSING',name)
+              copyfile(source,target)
+              assert hashlib.sha256(source.read_bytes()).digest()==hashlib.sha256(target.read_bytes()).digest(), ('PINNED_FACTORY_BYTES_DRIFT',name)
           copyfile(Path('_pinned_scanner_e')/'tools/scanner_strategy_e/historical_policy_approval_request.py',
                    Path('tools/scanner_strategy_e/historical_policy_approval_request.py'))
           copyfile(Path('_pinned_factory_e')/'tools/atlas_factory_e_bounded_perf.py',
@@ -185,8 +198,13 @@ jobs:
                        'test_aql_factory_f_private_original_cohort_v1.py',
                        'test_aql_factory_f_role_authority_v1.py',
                        'test_aql_factory_f_research_e2e_diagnostic_v1.py',
-                       'test_aql_factory_f_f2_recovery_diagnostic_v1.py'):
-              copyfile(Path('_pinned_factory_e')/'tests'/name,Path('tests')/name)
+                       'test_aql_factory_f_f2_recovery_diagnostic_v1.py',
+                       'test_aql_factory_f_f2_recovery_research_v2.py'):
+              source=Path('_pinned_factory_e')/'tests'/name
+              target=Path('tests')/name
+              assert source.is_file(), ('PINNED_FACTORY_TEST_MISSING',name)
+              copyfile(source,target)
+              assert hashlib.sha256(source.read_bytes()).digest()==hashlib.sha256(target.read_bytes()).digest(), ('PINNED_FACTORY_TEST_BYTES_DRIFT',name)
           copytree(Path('_pinned_work235')/'tools/strategy_service_offline/fixtures',
                    Path('tools/strategy_service_offline/fixtures'),dirs_exist_ok=True)
           for name in ('test_aql_core_d_same_source_v1.py',
@@ -242,6 +260,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_atlas_f_research_diagnostic_operator.py' -v
           python -m unittest discover -s tests -p 'test_atlas_f2_recovery_evidence_v1.py' -v
           python -m unittest discover -s tests -p 'test_atlas_f2_recovery_research_operator.py' -v
+          python -m unittest discover -s tests -p 'test_aql_factory_f_f2_recovery_research_v2.py' -v
           python -m unittest discover -s tests -p 'test_atlas_f2_owner_execute_v1.py' -v
           python -m compileall -q tools/atlas_f2_owner_provenance_v1.py tools/atlas_f2_owner_factory_packet_v1.py tools/atlas_f2_owner_execute.py tools/atlas_f2_stage_owner_overlay.py
           python -m unittest discover -s tests -p 'test_aql_core_f_recovery_readonly_v1.py' -v
