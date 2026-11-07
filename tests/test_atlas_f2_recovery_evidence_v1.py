@@ -47,6 +47,52 @@ class F2RecoveryEvidenceNegatives(unittest.TestCase):
                                         "FILE_BYTES_DIGEST_MISMATCH"):
                 load_recovery_evidence(p, {})
 
+    def test_real_producer_state_distinct_from_core_mapping_state(self):
+        # Pure contract-level synthetic identities; never treated as E: evidence.
+        from tools.atlas_f2_recovery_evidence_v1 import (
+            _owner_report_matches_reconstructed_mapping as matches,
+        )
+        month="2024-01"
+        parent={
+            "month":month, "state":"DUAL_READBACK_VERIFIED",
+            "dataset_id":"BINANCE-SPOT-BTCUSDT-15M-"+month+"-F-v1",
+            "bars":2976, "source_sha256":"a"*64,
+            "core245_native_query_sha256":"b"*64,
+            "core253_local_query_sha256":"c"*64,
+            "manifest_sha256":"d"*64,
+        }
+        mapping={
+            "month":month, "state":"RAW_AND_DUAL_QUERY_READBACK",
+            "bars":2976, "source_sha256":"a"*64,
+            "core_245_native_price_query_sha256":"b"*64,
+            "core_253_local_query_sha256":"c"*64,
+        }
+        self.assertTrue(matches(parent,mapping))
+        self.assertEqual(parent["state"],"DUAL_READBACK_VERIFIED")
+        for field,value in (
+            ("state","SELECTED"),
+            ("state","RAW_AND_DUAL_QUERY_READBACK"),
+            ("dataset_id","UNKNOWN"),
+            ("bars",1),
+            ("source_sha256","e"*64),
+            ("core245_native_query_sha256","e"*64),
+            ("core253_local_query_sha256","e"*64),
+            ("manifest_sha256","x"*64),
+        ):
+            with self.subTest(field=field,value=value):
+                self.assertFalse(matches({**parent,field:value},mapping))
+        for field,value in (
+            ("state","F5_APPROVED"),
+            ("state","DUAL_READBACK_VERIFIED"),
+            ("month","2024-03"),
+            ("bars",0),
+            ("source_sha256","e"*64),
+            ("core_245_native_price_query_sha256","e"*64),
+            ("core_253_local_query_sha256","e"*64),
+        ):
+            with self.subTest(mapping_field=field,value=value):
+                self.assertFalse(matches(parent,{**mapping,field:value}))
+
     def test_no_silent_original_f2_fallback(self):
         with self.assertRaisesRegex(ValueError,"ORIGINAL_FILE_REQUIRED"):
             read_recovered_diagnostic("/absent-warehouse","/absent-vault",
