@@ -285,7 +285,7 @@ jobs:
           retention-days: 14
   windows-owner-operator-syntax:
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with: {persist-credentials: false}
@@ -303,6 +303,22 @@ jobs:
         with: {ref: 798d409cb3db36b4f519f2e18a1f6089ff8f8010, path: _pinned_scanner_f, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: a2aa9c195095bcfe852fdc760e385ccb2acf3d5d, path: _pinned_scanner_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: a91e370ae7e5197e9af71f8300eeaff4a7aff022, path: _pinned_scanner_d, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 1659713c80d1934f3c08af1af422b89cd5706360, path: _pinned_scanner_c, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 30c37ae56851488b882998c7fa0085ec51dbfc92, path: _pinned_scanner_b, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 1cb70f1212283fe34117882d18e0501fc6409fe7, path: _pinned_discoverer_f, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 149ca90c09b96abb45d3bc2839b657711c9826ac, path: _pinned_discoverer_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: f2006c0e431690ccea8b0532095bf4f2a2dc88ba, path: _pinned_discoverer_base, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 3af5b66d2b381b853a6b5be32c38b3d3d02e1ea7, path: _pinned_core_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: a86a590a5e2c32c18e03522f52896dbcf50c60ff, path: _pinned_core_d, persist-credentials: false}
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - name: Stage SHA-verified Factory v2 and Core in isolated Windows CI
@@ -319,6 +335,14 @@ jobs:
             '_pinned_work235':'6acbcc7fc243b132f58170df4c6469bbf7f4eff8',
             '_pinned_scanner_f':'798d409cb3db36b4f519f2e18a1f6089ff8f8010',
             '_pinned_scanner_e':'a2aa9c195095bcfe852fdc760e385ccb2acf3d5d',
+            '_pinned_scanner_d':'a91e370ae7e5197e9af71f8300eeaff4a7aff022',
+            '_pinned_scanner_c':'1659713c80d1934f3c08af1af422b89cd5706360',
+            '_pinned_scanner_b':'30c37ae56851488b882998c7fa0085ec51dbfc92',
+            '_pinned_discoverer_f':'1cb70f1212283fe34117882d18e0501fc6409fe7',
+            '_pinned_discoverer_e':'149ca90c09b96abb45d3bc2839b657711c9826ac',
+            '_pinned_discoverer_base':'f2006c0e431690ccea8b0532095bf4f2a2dc88ba',
+            '_pinned_core_e':'3af5b66d2b381b853a6b5be32c38b3d3d02e1ea7',
+            '_pinned_core_d':'a86a590a5e2c32c18e03522f52896dbcf50c60ff',
           }
           for owner,expected in owners.items():
               actual=subprocess.check_output(['git','-C',owner,'rev-parse','HEAD'],text=True).strip()
@@ -336,6 +360,21 @@ jobs:
                       dest.parent.mkdir(parents=True,exist_ok=True)
                       shutil.copyfile(source,dest)
                       assert source.read_bytes()==dest.read_bytes(), ('PINNED_CORE_DEP_BYTES',str(dest))
+          # Complete exact-SHA historical owner overlay for transitive imports.
+          # Never overwrite an already staged Integration or authoritative F file.
+          for key in ('scanner_d','scanner_c','scanner_b','discoverer_f',
+                      'discoverer_e','discoverer_base','core_e','core_d'):
+              owner=Path('_pinned_'+key)
+              for folder in ('research_wp_r0','tools','src'):
+                  parent=owner/folder
+                  if not parent.is_dir():
+                      continue
+                  for source in parent.rglob('*.py'):
+                      dest=Path(folder)/source.relative_to(parent)
+                      if not dest.exists():
+                          dest.parent.mkdir(parents=True,exist_ok=True)
+                          shutil.copyfile(source,dest)
+                          assert source.read_bytes()==dest.read_bytes(), ('PINNED_TRANSITIVE_OWNER_BYTES',key,str(dest))
           # Work235 owns the frozen strategy engine API and fixtures.
           # Only fill missing code from exact pin; never override Integration.
           strategy_root=Path('_pinned_work235/tools/strategy_service_offline')
