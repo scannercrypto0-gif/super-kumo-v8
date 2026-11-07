@@ -1,0 +1,44 @@
+# Core F2_RECOVERY_EVIDENCE.v1 — public no-write source verification contract
+
+**Project:** AQL-CRYPTO-RESEARCH-001 | **Date:** 2026-11-07  
+**Core owner:** existing Draft PR #275 | **Receiver:** Integration existing Draft PR #271  
+**Decision:** owner provisionally approved research diagnostic recovery B in [#271/6703821572](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/271#issuecomment-6703821572), Core implementation request [#275/6703859780](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/275#issuecomment-6703859780).
+
+## Purpose and strict separation
+
+Original F2 report canonical SHA remains **`daf1208bf824e58040858a817c709f7943c19668dc23ce3fd3b0368e01156f40`**. Its complete JSON is **not available** in this execution context. **Never reconstruct, forge or alias it.** The owner has reported a **different** local file `E:\ATLAS\diagnostic-runner\f2-recovery-evidence.json`, expected *raw file bytes SHA256* **`0428e7b02b7b57bded9906c49f956b76816c179cd8659d61e1c7f1af1df68220`**, which was **not read by GitHub CI**. Its serialization format is unknown; the verifier deliberately treats the report as **opaque bytes**.
+
+The only allowed purpose is **RESEARCH_E2E_DIAGNOSTIC** under ADR-F-DIAG-01, not a Source ACK, StrategyApproval, Factory Consumer ACK, original F2 replacement, PIT attestation, G0, Paper/live trading, or admission/rewrite of a populated vault/warehouse.
+
+## Public Core API and required operator inputs
+
+`research_wp_r0.aql_core_f_recovery_readonly_v1.read_recovery_diagnostic(warehouse_root, vault_root, recovery_file, untrusted_mapping)`
+
+- `warehouse_root`: existing, owner-authorized single canonical Core #226/#253 warehouse directory containing `warehouse.sqlite` and committed stage. **No new warehouse or repair operation.**
+- `vault_root`: existing, owner-authorized #211 RawVault path. **No new RawVault root, lockfile or admission.**
+- `recovery_file`: exact owner-local opaque recovery report **file**; reject if nonexistent, symlink, empty, greater than 5 MB or its raw SHA differs from the independently recorded expected SHA. The program never parses unknown report bytes or upgrades them into original F2 data.
+- `untrusted_mapping`: separately assembled `aql.integration.f2-recovery-evidence.v1` metadata mapping. This can be operator-supplied, but **no mapping SHA or receipt is trusted without recomputing it from private original bytes**. Exactly ten rows: `month,state,bars,source_sha256,core_245_native_price_query_sha256,core_253_local_query_sha256,warehouse_receipt_sha256,dual_query_map_sha256`. Root also has `schema,source_class=OWNER_LOCAL_RECOVERY_NOT_ORIGINAL_F2,historical_pit=NOT_ATTESTED,trading_authority=NONE,owner_f2_report_sha256=null,entries`. Feb/Aug 2024 are inventory-only and rejected, not silently queried.
+
+Owner-reported expected cohort: 2024 BTCUSDT Spot native 15m **Jan/Mar–Jul/Sep–Dec**, ten admitted months, **29,376** bars. The Core function rechecks the exact calendar bar count in **each** month; 4 Feb/Aug strategy-month attempts remain UNKNOWN in the separately owned 2×12=24 diagnostic attempt census.
+
+## Actual no-write verification, not trust-by-hash
+
+Per admitted month the public API independently:
+1. Opens existing SQLite in `mode=ro&immutable=1`, with no `-wal`/`-shm` creation or migration, and checks `generations` + full 15m indexed range and sealed original admission JSON. If a necessary DB commit still lives only in an uncheckpointed WAL, **fail closed**; do not checkpoint or mutate the owner's warehouse.
+2. Re-opens **already committed** source `stage/<packet_sha>/packet.json,source.bin,checkpoint.json,receipt.json`, verifies the original native ZIP/source and packet with Core #226 `verify_packet`, checks completion checkpoint/receipt and re-derived manifest integrity. It does **not** call `OfflineBridgeStager.__init__`, `commit` or `admit_original_bytes`.
+3. Reads the existing RawVault SHA-addressed object directly, recomputes SHA256 from actual bytes, compares byte-for-byte with source stage and validates the original #211 manifest, RawObjectMeta, index key, generation, publisher symbol/timeframe and immutable month identity. **No `RawVault.__init__`, `admit`, lockfile/dir creation or repair.**
+4. Reconstructs the exact original `aql.core.local-history-warehouse.v1` receipt body, **including its #211 RawVault receipt identity** from the original manifest/spec and sealed Core admission. Recomputes the SHA using canonical existing Core digest, and requires equality with the **untrusted** mapping's `warehouse_receipt_sha256`. This resolves the previous Core #275 seam limitation of merely repeating the caller-provided parent SHA. No second admission is performed.
+5. Re-registers validated price bars **in memory only**, reruns unchanged native Core #245 `query_price_custody` and indexed #253 `query_local(..., sqlite_immutable=True)` with original retrospective end-of-month cutoff `end_exclusive_ms+1000`, matches independent SHA, complete month grid and closed-bar lower bounds. `bind_dual_query_identities` recomputes the exact distinct native/local/warehouse dual-map SHA. Existing regular `query_local` callers are unchanged by the newly optional immutable flag.
+6. Asserts a tree fingerprint over **both source directory trees before and after** each query, rejecting any file creation, deletion, or mtime/size change. All private root/ancestor and relevant source paths reject symlinks. The no-write invariant is also proved in disposable CI fixtures under a `Path.mkdir` forbidden monkeypatch.
+
+Return type: dict `{month: {"receipt": sanitized_sha_only, "native_bars": private_in_memory_ohlcv, "local_bars": private_in_memory_ohlcv}}`. The per-month `receipt` is `aql.core.f2-recovery-readonly-source.v1`, with source/warehouse/query/dual SHA and identical bar census, `original_f2_report_sha256=null`, `recovery_file_sha256` verified only in **public** entry (internal fixture is explicitly `null`/`opaque_recovery_file_pin_verified=false`), Source ACK/StrategyApproval/Factory ACK all null, Secretary `NOT_ENQUEUED`, PIT `NOT_ATTESTED`, trading `NONE`.
+
+**Only sanitized SHA metadata is allowed into GitHub comments/logs**. The `native_bars` and `local_bars` arrays are **owner-private memory inputs** to Integration's isolated Scanner→Factory diagnostic only. No original ZIP, OHLCV rows, private path or signing key belongs in logs.
+
+## Tests and negative cases
+
+`tests/test_aql_core_f_recovery_readonly_v1.py` uses **new disposable synthetic** native 2024-01 ZIP with exactly 2,976 15m bars (does NOT attest any real 2024 market source). It calls the actual original Core `admit_local_original` **once on disposable fixtures only**, then compares the recovery verifier's reconstructed warehouse receipt/dual map to that known canonical generated receipt, reproduces readback without writes, and rejects source SHA, warehouse SHA, native245 SHA, local253 SHA, dual-map SHA, incorrect bar census, RAW object symlink, corrupt Vault manifest and attempts to turn the diagnostic receipt into signed F5 Source/Strategy ACK. Public entry denies fake opaque recovery report bytes, missing ten-month scope and original F2 impersonation.
+
+All original E: data and signer registry remain unavailable to this GitHub session. **No claim of authentic ten-month Recovery PASS or full research E2E** follows from CI. The correct current state until the owner runs the **real** private command with original recovery file and complete mapping is `ENGINEERING_PASS_PRIVATE_NOT_RUN`. The original signed F5 remains `BLOCKED_EXTERNAL_INPUT`.
+
+**Integration #271 action:** consume this Core exact HEAD as one source dependency, replace its temporary `tools/atlas_f2_recovery_evidence_v1.py` read path that repeats a caller warehouse SHA with the public Core `read_recovery_diagnostic` API, then run its single isolated operator diagnostic on original owner-local E: assets only after explicit source operator authorization. Keep #277 Scanner and #267 Factory separately scoped. DO NOT merge PRs or grant G0/trading.
