@@ -117,7 +117,7 @@ def diagnostic_original_cohort(
                 and type(q.get("source_bytes_sha256")) is str
                 and len(q["source_bytes_sha256"])==64
                 and q.get("historical_pit")=="NOT_ATTESTED"
-                and q.get("status")=="OK"
+                and q.get("coverage")=="COMPLETE"
                 and type(q.get("query_sha256")) is str
                 and len(q["query_sha256"])==64,
                 "F_DIAGNOSTIC_CORE_QUERY_SCOPE")
@@ -125,8 +125,8 @@ def diagnostic_original_cohort(
         require(q.get("start_ms")==start
                 and q.get("end_exclusive_ms")==end
                 and q.get("decision_cutoff_ms")>=end
-                and q.get("bar_count")==monthrange(2024,int(month[-2:]))[1]*96
-                and q.get("source_bytes_sha256")!=None,
+                and q.get("available_bar_count")==monthrange(2024,int(month[-2:]))[1]*96
+                and q.get("source_availability")=="RETROSPECTIVE_NON_PIT",
                 "F_DIAGNOSTIC_MONTH_GRID_OR_CUTOFF")
         actual=query_local(warehouse_root,q["dataset_id"],q["version"],
             start,end,q["decision_cutoff_ms"],
