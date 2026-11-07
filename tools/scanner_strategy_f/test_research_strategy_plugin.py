@@ -212,6 +212,25 @@ class ResearchStrategyPlugin(unittest.TestCase):
         self.assertEqual(out["quarantine"],"ALL_EVENTS_UNKNOWN_SOURCE_GAP")
         self.assertTrue(all(not e["source_observed"] for e in out["events"]))
 
+    def test_absent_policy_and_receipts_fail_closed(self):
+        with self.assertRaisesRegex(ValueError,"H_POLICY_REQUIRED"):
+            h.evaluate_strategy_plugin(
+                self.plugin,self.original,warehouse_root="/synthetic",
+                policy=None)
+        with self.assertRaisesRegex(ValueError,"H_PLUGIN_RECEIPT_REQUIRED"):
+            h.evaluate_strategy_plugin(
+                None,self.original,warehouse_root="/synthetic",
+                policy=self.policy)
+        with self.assertRaisesRegex(ValueError,
+                                    "H_FACTORY_BATCH_RECEIPT_REQUIRED"):
+            h.verify_factory_signal_batch(None)
+        owner_policy=h.research_signal_policy(
+            source_class="OWNER_LOCAL_RECOVERY_DIAGNOSTIC")
+        batch=self.evaluate(policy=owner_policy)
+        self.assertEqual(batch["payload"]["source_class"],
+                         "OWNER_LOCAL_RECOVERY_DIAGNOSTIC")
+        self.assertEqual(batch["payload"]["trading_authority"],"NONE")
+
     def test_adversarial_grid_source_future_and_replay_rejected(self):
         for label,mutate in (
             ("duplicate",lambda q: q["bars"].__setitem__(1,
