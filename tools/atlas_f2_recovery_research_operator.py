@@ -64,8 +64,7 @@ def run(manifest):
         verified_recovery_readbacks=original,
         recovery_file_sha256=EXPECTED_RECOVERY_FILE_SHA256,
         work_specs=frozen["work_specs"])
-    from tools.strategy_service_offline.common import Frozen
-    scanner_data=Frozen.restore(scanner).data
+    scanner_data=scanner["payload"]
     demand(scanner_data["attempts"]==24 and
            scanner_data["diagnostic_evaluated"]==20 and
            scanner_data["feb_aug_unknown"]==4 and
