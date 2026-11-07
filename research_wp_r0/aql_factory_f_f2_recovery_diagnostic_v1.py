@@ -20,17 +20,17 @@ from research_wp_r0.aql_factory_f_research_e2e_diagnostic_v1 import (
 SCHEMA="aql.factory.f.f2-recovery-evidence-diagnostic-input.v1"
 REPORT="aql.factory.f.f2-recovery-evidence-diagnostic-report.v1"
 RECOVERY_SHA="0428e7b02b7b57bded9906c49f956b76816c179cd8659d61e1c7f1af1df68220"
-CORE_SCHEMA="aql.core.f.research-e2e-diagnostic-readback.v1"
+CORE_SCHEMA="aql.core.f2-recovery-readonly-source.v1"
 RECEIPT_FIELDS={
-    "schema","dataset_id","month","version","source_zip_sha256",
+    "schema","month","dataset_id","status","recovery_file_sha256",
+    "original_f2_report_sha256","source_zip_sha256",
     "manifest_integrity_sha256","warehouse_receipt_sha256",
     "core245_native_query_sha256","core253_local_query_sha256",
-    "core253_dual_map_parent_sha256","start_ms","end_exclusive_ms",
-    "decision_cutoff_ms","readback_bar_count","readback_evidence",
-    "owner_f2_report_sha256","owner_f2_report_pin_verified",
-    "warehouse_receipt_sha_status","historical_pit","secretary_state",
-    "source_ack_sha256","strategy_approval_sha256",
-    "factory_consumer_ack_sha256","trading_authority","receipt_sha256"
+    "dual_map_sha256","bar_count","start_ms","end_exclusive_ms",
+    "decision_cutoff_ms","no_write_tree_fingerprint_sha256",
+    "historical_pit","source_ack_sha256","strategy_approval_sha256",
+    "factory_consumer_ack_sha256","secretary_state","trading_authority",
+    "receipt_sha256"
 }
 
 
@@ -65,22 +65,20 @@ def verified_core_receipts(recovery):
         local=receipt["core253_local_query_sha256"]
         manifest=receipt["manifest_integrity_sha256"]
         stage=receipt["warehouse_receipt_sha256"]
-        dual=receipt["core253_dual_map_parent_sha256"]
+        dual=receipt["dual_map_sha256"]
         need(receipt["schema"]==CORE_SCHEMA
-             and receipt["readback_evidence"]==
-               "SOURCE_BACKED_DUAL_QUERY_NO_F2_REPORT_AUTHORITY"
-             and receipt["owner_f2_report_sha256"] is None
-             and receipt["owner_f2_report_pin_verified"] is False
-             and receipt["warehouse_receipt_sha_status"]==
-               "OWNER_F2_PARENT_PIN_NOT_RECOMPUTED"
+             and receipt["status"]=="SOURCE_BACKED_RECOVERY_READBACK_ONLY"
+             and receipt["recovery_file_sha256"]==RECOVERY_SHA
+             and receipt["original_f2_report_sha256"] is None
              and receipt["historical_pit"]=="NOT_ATTESTED"
              and receipt["secretary_state"]=="NOT_ENQUEUED"
              and receipt["trading_authority"]=="NONE"
              and receipt["source_ack_sha256"] is None
              and receipt["strategy_approval_sha256"] is None
              and receipt["factory_consumer_ack_sha256"] is None
-             and type(receipt["version"]) is int and receipt["version"]==1
-             and all(_sha(v) for v in (source,native,local,manifest,stage,dual))
+             and all(_sha(v) for v in
+                     (source,native,local,manifest,stage,dual,
+                      receipt["no_write_tree_fingerprint_sha256"]))
              and native!=local and
              _sha(receipt["receipt_sha256"]) and
              digest({k:v for k,v in receipt.items()
@@ -95,9 +93,9 @@ def verified_core_receipts(recovery):
              and receipt["end_exclusive_ms"]==end
              and type(receipt["decision_cutoff_ms"]) is int
              and receipt["decision_cutoff_ms"]>=end
-             and receipt["readback_bar_count"]==(end-start)//900000,
+             and receipt["bar_count"]==(end-start)//900000,
              "RECOVERY_SOURCE_MONTH_AND_CUTOFF")
-        count+=receipt["readback_bar_count"]
+        count+=receipt["bar_count"]
         parents[month]={"source_sha256":source,"native_sha256":native,
                         "local_sha256":local,"manifest_sha256":manifest,
                         "warehouse_receipt_sha256":stage,
