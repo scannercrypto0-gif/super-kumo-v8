@@ -119,6 +119,27 @@ class RecoveryNoWriteContract(unittest.TestCase):
                                     "OPAQUE_RECOVERY_FILE_SHA_MISMATCH"):
             _owner_report_pins(raw)
 
+    def test_owner_confirmed_recovery_state_is_distinct_from_original_f2(self):
+        fixture=self._genuine_structure_fixture()
+        self.assertEqual(self._structure_checked(fixture),fixture)
+        for wrong in ("RAW_AND_DUAL_QUERY_READBACK",
+                      "OWNER_LOCAL_DUAL_READBACK_PASS",
+                      "REVERIFIED_PRIVATE_BYTES",
+                      "", None):
+            damaged=deepcopy(fixture)
+            for row in damaged["entries"]:
+                row["state"]=wrong
+            with self.subTest(wrong=wrong), self.assertRaisesRegex(
+                ValueError,"OWNER_REPORT_MONTH_CENSUS_OR_IDENTITY_DRIFT"
+            ):
+                self._structure_checked(damaged)
+            self.assertEqual(
+                standalone_categories(damaged),
+                owner_report_entry_mismatch_categories(damaged))
+            self.assertEqual(
+                {x["category"] for x in standalone_categories(damaged)},
+                {"STATE_LITERAL"})
+
     def test_report_rejects_count_rows_month_census_and_sha_tampering(self):
         cases = [
             ("months_list", ("verified_months", [{}] * 10),
