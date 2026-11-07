@@ -333,6 +333,11 @@ jobs:
                   shutil.copyfile(source,dest)
                   assert source.read_bytes()==dest.read_bytes(), ('PINNED_MODULE_BYTES',name)
                   print('PINNED_WINDOWS_MODULE_SHA256',name,hashlib.sha256(dest.read_bytes()).hexdigest())
+          source=Path('_pinned_factory_e/tests/test_aql_factory_f_f2_recovery_research_v2.py')
+          dest=Path('tests/test_aql_factory_f_f2_recovery_research_v2.py')
+          assert source.is_file(), 'PINNED_WINDOWS_FACTORY_V2_TEST_MISSING'
+          shutil.copyfile(source,dest)
+          assert source.read_bytes()==dest.read_bytes(), 'PINNED_WINDOWS_FACTORY_V2_TEST_BYTES'
           PY
       - name: Verify Windows one-command PowerShell syntax and Python import syntax
         shell: pwsh
