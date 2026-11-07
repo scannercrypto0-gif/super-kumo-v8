@@ -25,9 +25,12 @@ class F3OperatorInputBundle(F3ExternalEvaluatorNomination):
     def setup_bundle(self):
         activation=make_historical_activation_request(
             self.policy,self.e,self.er,self.specs)
+        decision_payload=copy.deepcopy(self.decision["payload"])
+        decision_payload["source_zip_sha256"]=self.record["original_source_sha256"]
+        full_decision=Frozen.build(decision_payload).receipt()
         kwargs=dict(
             source_bound_census=self.census,
-            strategy_decision=self.decision,
+            strategy_decision=full_decision,
             activation_request=activation,
             policy_draft=self.policy,
             original_e_proposal=self.e,
