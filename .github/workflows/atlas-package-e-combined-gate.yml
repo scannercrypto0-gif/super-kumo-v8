@@ -220,6 +220,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_aql_core_f_research_diagnostic_query_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_factory_f_research_e2e_diagnostic_v1.py' -v
           python -m unittest discover -s tests -p 'test_atlas_f_research_diagnostic_operator.py' -v
+          python -m unittest discover -s tests -p 'test_atlas_f2_recovery_evidence_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_core_f5_secretary_authority_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_factory_e_bounded_perf_v1.py' -v
           python -m pytest tools/strategy_discoverer_offline/tests/test_package_e_durable_checkpoint.py -q
