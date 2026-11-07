@@ -5,7 +5,9 @@ on:
       - factory/package-e-historical-research-results-20261105
     paths:
       - 'research_wp_r0/aql_factory_f_research_e2e_diagnostic_v1.py'
+      - 'research_wp_r0/aql_factory_f_f2_recovery_diagnostic_v1.py'
       - 'tests/test_aql_factory_f_research_e2e_diagnostic_v1.py'
+      - 'tests/test_aql_factory_f_f2_recovery_diagnostic_v1.py'
       - '.github/workflows/atlas-factory-f-research-diagnostic.yml'
   workflow_dispatch:
 permissions:
@@ -27,3 +29,4 @@ jobs:
       - name: Verify diagnostic-only input rejects missing local original data and forged F5 promotions
         run: |
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_factory_f_research_e2e_diagnostic_v1.py' -v
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_factory_f_f2_recovery_diagnostic_v1.py' -v
