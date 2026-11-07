@@ -24,11 +24,11 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/checkout@v4
-        with: {ref: ef8d41b6ff273e4228e6b90210f4610dccf54251, path: _pinned_factory_e, persist-credentials: false}
+        with: {ref: 7a0d26641f2a97b23aeaf5bfa5d2e6593ec74978, path: _pinned_factory_e, persist-credentials: false}
       - uses: actions/checkout@v4
-        with: {ref: fdfc9106260fe6e47232b8644dcd2d129a3994f0, path: _pinned_core_f, persist-credentials: false}
+        with: {ref: c51bbfdca04a71ac59947ca10ffce046e84b28d8, path: _pinned_core_f, persist-credentials: false}
       - uses: actions/checkout@v4
-        with: {ref: 73f31e7f3c65531c0d5b37ccb415242d843ade25, path: _pinned_scanner_f, persist-credentials: false}
+        with: {ref: 6a14cf24575f8425d94db6eef5d7cd0a95ba90d4, path: _pinned_scanner_f, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: 1cb70f1212283fe34117882d18e0501fc6409fe7, path: _pinned_discoverer_f, persist-credentials: false}
       - uses: actions/checkout@v4
@@ -84,6 +84,8 @@ jobs:
               '_pinned_core_f': (
                   'research_wp_r0/aql_core_f_bulk_source_v1.py',
                   'research_wp_r0/aql_core_f5_secretary_authority_v1.py',
+                  'research_wp_r0/aql_core_f_research_diagnostic_query_v1.py',
+                  'tests/test_aql_core_f_research_diagnostic_query_v1.py',
                   'tests/test_aql_core_f5_secretary_authority_v1.py',
               ),
               '_pinned_scanner_f': (
@@ -95,6 +97,8 @@ jobs:
                   'tools/scanner_strategy_f/independent_evaluator_nomination.py',
                   'tools/scanner_strategy_f/test_independent_evaluator_nomination.py',
                   'tools/scanner_strategy_f/private_operator_bundle.py',
+                  'tools/scanner_strategy_f/research_e2e_diagnostic.py',
+                  'tools/scanner_strategy_f/test_research_e2e_diagnostic.py',
                   'tools/scanner_strategy_f/test_private_operator_bundle.py',
                   'tools/scanner_strategy_f/test_strategy_specific_decision.py',
               ),
@@ -139,7 +143,8 @@ jobs:
                        'aql_factory_f_batch_ledger_v1.py',
                        'aql_factory_f_scanner_bulk_consumer_v1.py',
                        'aql_factory_f_private_original_cohort_v1.py',
-                       'aql_factory_f_role_authority_v1.py'):
+                       'aql_factory_f_role_authority_v1.py',
+                       'aql_factory_f_research_e2e_diagnostic_v1.py'):
               copyfile(Path('_pinned_factory_e')/'research_wp_r0'/name,
                        Path('research_wp_r0')/name)
           copyfile(Path('_pinned_scanner_e')/'tools/scanner_strategy_e/historical_policy_approval_request.py',
@@ -156,7 +161,8 @@ jobs:
                        'test_aql_factory_f_batch_ledger_v1.py',
                        'test_aql_factory_f_scanner_bulk_consumer_v1.py',
                        'test_aql_factory_f_private_original_cohort_v1.py',
-                       'test_aql_factory_f_role_authority_v1.py'):
+                       'test_aql_factory_f_role_authority_v1.py',
+                       'test_aql_factory_f_research_e2e_diagnostic_v1.py'):
               copyfile(Path('_pinned_factory_e')/'tests'/name,Path('tests')/name)
           copytree(Path('_pinned_work235')/'tools/strategy_service_offline/fixtures',
                    Path('tools/strategy_service_offline/fixtures'),dirs_exist_ok=True)
@@ -207,6 +213,9 @@ jobs:
           python -m unittest tools.scanner_strategy_f.test_strategy_specific_decision -v
           python -m unittest tools.scanner_strategy_f.test_independent_evaluator_nomination -v
           python -m unittest tools.scanner_strategy_f.test_private_operator_bundle -v
+          python -m unittest tools.scanner_strategy_f.test_research_e2e_diagnostic -v
+          python -m unittest discover -s tests -p 'test_aql_core_f_research_diagnostic_query_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_factory_f_research_e2e_diagnostic_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_core_f5_secretary_authority_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_factory_e_bounded_perf_v1.py' -v
           python -m pytest tools/strategy_discoverer_offline/tests/test_package_e_durable_checkpoint.py -q
