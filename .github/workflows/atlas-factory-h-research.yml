@@ -9,6 +9,7 @@ on:
       - 'research_wp_r0/aql_factory_h_research_package_v1.py'
       - 'research_wp_r0/aql_factory_h_scientific_lab_v1.py'
       - 'tests/test_aql_factory_h_research_package_v1.py'
+      - 'docs/research/factory-package-h-historical-lab-v1-20261107.md'
       - '.github/workflows/atlas-factory-h-research.yml'
   workflow_dispatch:
 permissions:
