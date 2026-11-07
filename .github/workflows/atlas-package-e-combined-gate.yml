@@ -31,7 +31,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/checkout@v4
-        with: {ref: 387ef6d506051d0ad24d1bea31b7667738b2afe0, path: _pinned_factory_e, persist-credentials: false}
+        with: {ref: 406460085bd8a1fd868bc77c3f9f28bf7d3d88a7, path: _pinned_factory_e, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: 9e28ed345ec209cf473c534d8a27253c0a6dca1c, path: _pinned_core_f, persist-credentials: false}
       - uses: actions/checkout@v4
