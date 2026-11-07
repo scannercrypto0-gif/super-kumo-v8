@@ -6,6 +6,10 @@ on:
     paths:
       - 'tools/atlas_e_combined_gate_manifest.py'
       - 'tools/atlas_f_research_diagnostic_operator.py'
+      - 'tools/atlas_f2_recovery_evidence_v1.py'
+      - 'tools/atlas_f2_recovery_research_operator.py'
+      - 'tests/test_atlas_f2_recovery_evidence_v1.py'
+      - 'tests/test_atlas_f2_recovery_research_operator.py'
       - 'tests/test_atlas_f_research_diagnostic_operator.py'
       - 'docs/research/integration-f-research-diagnostic-one-command-20261107.md'
       - 'docs/research/package-e-combined-gate-evidence-scope.md'
