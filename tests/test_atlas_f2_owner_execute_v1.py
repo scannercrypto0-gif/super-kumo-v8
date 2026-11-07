@@ -74,6 +74,13 @@ class OwnerF2NegativeTests(unittest.TestCase):
         self.assertFalse(any("trial_ledger" in x or "inventory." in x
                              for x in missing))
 
+    def test_source_only_receipt_schema_import_is_explicit_and_core_owned(self):
+        # Regression: source derivation emitted schema=SCHEMA without importing
+        # that Core constant. Only private E: runs reached the code path.
+        self.assertEqual(collector.SCHEMA, core.SCHEMA)
+        self.assertEqual(collector.SCHEMA,
+                         "aql.core.f2-recovery-readonly-source.v1")
+
     def test_recovery_report_state_projects_only_to_strict_core_mapping(self):
         row = {
             "month": "2024-01", "state": "DUAL_READBACK_VERIFIED",
