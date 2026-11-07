@@ -12,6 +12,8 @@ on:
       - 'tests/test_aql_core_f_ntfs_acl_v1.py'
       - 'tests/test_aql_core_f_private_f2_v1.py'
       - '.github/workflows/aql-core-f-bulk-manifest.yml'
+      - 'tools/raw_vault_offline/**'
+      - 'tests/test_aql_core_f5_windows_rawvault_release_v1.py'
 jobs:
   core-f-source-plan:
     runs-on: ubuntu-latest
@@ -29,6 +31,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_aql_core_f_bulk_source_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_core_f_ntfs_acl_v1.py' -v
           python -m unittest discover -s tests -p 'test_aql_core_f_private_f2_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_core_f5_windows_rawvault_release_v1.py' -v
   windows-ntfs-guard:
     runs-on: windows-latest
     steps:
@@ -43,4 +46,6 @@ jobs:
           python -m unittest discover -s tests -p 'test_aql_core_f_ntfs_acl_v1.py' -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m unittest discover -s tests -p 'test_aql_core_f_private_f2_v1.py' -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s tests -p 'test_aql_core_f5_windows_rawvault_release_v1.py' -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
