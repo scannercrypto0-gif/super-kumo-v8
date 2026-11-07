@@ -80,7 +80,7 @@ class RecoveryNoWriteContract(unittest.TestCase):
                 "manifest_sha256": "d" * 64,
                 "month": month,
                 "source_sha256": "e" * 64,
-                "state": "RAW_AND_DUAL_QUERY_READBACK",
+                "state": "DUAL_READBACK_VERIFIED",
             })
         return {
             "schema": OWNER_REPORT_SCHEMA,
@@ -243,14 +243,14 @@ class RecoveryNoWriteContract(unittest.TestCase):
             [m["candidate"] for m in proof["matches"]],
             list(STATE_CANDIDATES))
         for row in fixture["entries"]:
-            row["state"]="OWNER_LOCAL_DUAL_READBACK_PASS"
+            row["state"]="DUAL_READBACK_VERIFIED"
         proof=state_equality_classes(fixture)
         self.assertTrue(proof["uniform"])
         self.assertTrue(proof["all_ten_matched"])
         self.assertEqual([m["candidate"] for m in proof["matches"]
                           if m["all_ten_equal"]],
-                         ["OWNER_LOCAL_DUAL_READBACK_PASS"])
-        fixture["entries"][-1]["state"]="REVERIFIED_PRIVATE_BYTES"
+                         ["DUAL_READBACK_VERIFIED"])
+        fixture["entries"][-1]["state"]="RAW_AND_DUAL_QUERY_READBACK"
         self.assertFalse(state_equality_classes(fixture)["uniform"])
         self.assertFalse(state_equality_classes(fixture)["all_ten_matched"])
 
