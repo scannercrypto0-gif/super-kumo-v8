@@ -22,7 +22,7 @@ PINS = {
  "discoverer_base":"f2006c0e431690ccea8b0532095bf4f2a2dc88ba",
  "work235":"6acbcc7fc243b132f58170df4c6469bbf7f4eff8",
  "raw211":"7d97b09c0c6ee2650a61d523acb8d8c771a99c46",
- "core_f":"6cf7acd3d038f8147c55a6d503ffdfea5e6d6f2d",
+ "core_f":"998e3bcca8ca6f1150964dfa9d94726fec96b846",
  "scanner_f":"798d409cb3db36b4f519f2e18a1f6089ff8f8010",
  "discoverer_f":"1cb70f1212283fe34117882d18e0501fc6409fe7",
 }
