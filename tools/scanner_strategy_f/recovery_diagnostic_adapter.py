@@ -20,10 +20,30 @@ from tools.scanner_strategy_f.research_e2e_diagnostic import (
 SCHEMA="aql.scanner-f.recovery-source-research-e2e-diagnostic.v1"
 EXPECTED_RECOVERY="0428e7b02b7b57bded9906c49f956b76816c179cd8659d61e1c7f1af1df68220"
 
+# Fixed public phase identifiers only; no owner-local paths, bar content,
+# dates, exception strings or source identifiers ever cross this boundary.
+SAFE_SCANNER_PHASES=frozenset((
+    "SCANNER_RECEIPT_SCOPE",
+    "SCANNER_CORE253_IMMUTABLE_QUERY",
+    "SCANNER_CORE253_PARENT_COMPARISON",
+    "SCANNER_NATIVE_LOCAL_COMPARISON",
+    "SCANNER_FROZEN_WORK235_IDENTITIES",
+    "SCANNER_COHORT_DIAGNOSTIC",
+    "SCANNER_DIAGNOSTIC_RECEIPT_VERIFY",
+    "SCANNER_OUTPUT_EMIT",
+))
+
+
+def _safe_phase_callback(callback, phase):
+    require(phase in SAFE_SCANNER_PHASES,
+            "F_DIAG_RECOVERY_INVALID_PHASE")
+    if callback is not None:
+        callback(phase)
+
 
 def diagnostic_from_verified_recovery(
     *,warehouse_root,verified_recovery_readbacks,
-    recovery_file_sha256,work_specs,
+    recovery_file_sha256,work_specs,phase_callback=None,
 ):
     """Scanner contract receiver for Integration's read_recovered_diagnostic.
 
@@ -31,6 +51,9 @@ def diagnostic_from_verified_recovery(
     Local Core query_local replays every original #253 receipt again; no
     external source-rights or historical PIT proof is implied by this.
     """
+    require(phase_callback is None or callable(phase_callback),
+            "F_DIAG_RECOVERY_PHASE_CALLBACK_INVALID")
+    _safe_phase_callback(phase_callback,"SCANNER_RECEIPT_SCOPE")
     require(recovery_file_sha256==EXPECTED_RECOVERY
             and type(verified_recovery_readbacks) is dict
             and set(verified_recovery_readbacks)==set(ADMITTED),
@@ -66,6 +89,7 @@ def diagnostic_from_verified_recovery(
                 "F_DIAG_RECOVERY_CANNOT_IMPERSONATE_F2_OR_SIGNED_F5")
         # Recompute Core #253 from the actual immutable warehouse. Neither
         # caller-authored query objects nor receipt-only SHA claims are trusted.
+        _safe_phase_callback(phase_callback,"SCANNER_CORE253_IMMUTABLE_QUERY")
         q=query_local(
             warehouse_root,receipt["dataset_id"],1,
             receipt["start_ms"],receipt["end_exclusive_ms"],
@@ -73,6 +97,7 @@ def diagnostic_from_verified_recovery(
             required_source_sha256=receipt["source_zip_sha256"],
             require_complete=True,sqlite_immutable=True,
         )
+        _safe_phase_callback(phase_callback,"SCANNER_CORE253_PARENT_COMPARISON")
         require(q["query_sha256"]==receipt.get("core253_local_query_sha256")
                 and q["bars"]==result["local_bars"]
                 and q["available_bar_count"]==receipt["bar_count"]
@@ -90,6 +115,7 @@ def diagnostic_from_verified_recovery(
                     and len(receipt[key])==64
                     and all(c in "0123456789abcdef" for c in receipt[key]),
                     "F_DIAG_RECOVERY_CORE_PARENT_MISSING")
+        _safe_phase_callback(phase_callback,"SCANNER_NATIVE_LOCAL_COMPARISON")
         require(all(a["bar_open_ms"]==b["bar_open_ms"]
                     and a["bar_close_ms"]==b["bar_close_ms"]
                     and a["checksum"]==b["bar_checksum"]
@@ -97,7 +123,9 @@ def diagnostic_from_verified_recovery(
                     for a,b in zip(result["native_bars"],q["bars"])),
                 "F_DIAG_RECOVERY_NATIVE_LOCAL_BAR_DRIFT")
         originals[month]=q
+    _safe_phase_callback(phase_callback,"SCANNER_FROZEN_WORK235_IDENTITIES")
     identities=identify_frozen_work235_contracts(work_specs)
+    _safe_phase_callback(phase_callback,"SCANNER_COHORT_DIAGNOSTIC")
     out=diagnostic_original_cohort(
         warehouse_root=warehouse_root,month_queries=originals,
         work_specs=identities["work_specs"],
@@ -105,6 +133,7 @@ def diagnostic_from_verified_recovery(
         proposal=identities["proposal"],
         approval_request=identities["approval_request"],
     )
+    _safe_phase_callback(phase_callback,"SCANNER_DIAGNOSTIC_RECEIPT_VERIFY")
     x=Frozen.restore(out)
     d=x.data
     require(d["decision"]=="DIAGNOSTIC_ONLY_NOT_F5"
@@ -117,6 +146,7 @@ def diagnostic_from_verified_recovery(
             and d["factory_consumer_ack_sha256"] is None
             and d["trading_authority"]=="NONE",
             "F_DIAG_RECOVERY_CANNOT_PROMOTE_AUTHORITY")
+    _safe_phase_callback(phase_callback,"SCANNER_OUTPUT_EMIT")
     return Frozen.build({
         "schema":SCHEMA,
         "source_class":"F2_RECOVERY_EVIDENCE.v1_OWNER_LOCAL",
