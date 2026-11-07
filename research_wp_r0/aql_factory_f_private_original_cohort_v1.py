@@ -179,8 +179,8 @@ def validate_input(packet,witness,witness_sha):
     need(packet["core_245_query_sha256"]==native
          and packet["core_253_query_sha256"]==local
          and native!=local,"BULK_DUAL_QUERY_GRAPH")
-    need(len(packet["attempts"])>0 and
-         len(packet["attempts"])<=MAX_ATTEMPTS,"ATTEMPT_DENOMINATOR")
+    need(type(packet["attempts"]) is list and len(packet["attempts"])==20,
+         "ATTEMPT_DENOMINATOR")
     expected=set()
     states={"SELECTED","REJECTED","UNKNOWN","QUARANTINED","INELIGIBLE"}
     for trial in packet["attempts"]:
