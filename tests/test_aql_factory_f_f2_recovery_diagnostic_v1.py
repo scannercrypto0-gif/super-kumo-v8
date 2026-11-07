@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from research_wp_r0.aql_factory_f_f2_recovery_diagnostic_v1 import (
     validate_recovery_input,verified_core_receipts,run_recovery_diagnostic,
-    SCHEMA,RECOVERY_SHA,RECEIPT_FIELDS
+    SCHEMA,RECOVERY_SHA,RECOVERY_RAW_BYTES_SHA,RECEIPT_FIELDS
 )
 from research_wp_r0.aql_factory_e_research_results_store_v1 import (
     ResultsStoreError,digest
@@ -72,6 +72,8 @@ class FactoryRecoveryDiagnosticSafety(unittest.TestCase):
                 "status":"SOURCE_BACKED_RECOVERY_READBACK_ONLY",
                 "recovery_file_sha256":RECOVERY_SHA,
                 "opaque_recovery_file_pin_verified":True,
+                "recovery_raw_bytes_sha256":RECOVERY_RAW_BYTES_SHA,
+                "recovery_internal_canonical_recomputed":False,
                 "original_f2_report_sha256":None,
                 "source_zip_sha256":f"{i+1:064x}",
                 "manifest_integrity_sha256":f"{i+21:064x}",
@@ -111,7 +113,10 @@ class FactoryRecoveryDiagnosticSafety(unittest.TestCase):
         self.assertFalse(self.db.exists())
 
     def test_core_proof_false_missing_extra_and_resealed_tamper_denied(self):
-        for mutation in ("false","missing","extra","tamper","swapped_month",
+        for mutation in ("false","missing","extra","tamper","raw_missing",
+                         "raw_tampered","raw_wrong_type","canonical_missing",
+                         "canonical_true","canonical_null","canonical_extra",
+                         "swapped_month",
                          "swapped_source","swapped_query","swapped_manifest",
                          "swapped_warehouse","no_write_removed"):
             with self.subTest(mutation=mutation):
@@ -123,6 +128,20 @@ class FactoryRecoveryDiagnosticSafety(unittest.TestCase):
                     del a["opaque_recovery_file_pin_verified"]
                 elif mutation=="extra":
                     a["untrusted_field"]="x"
+                elif mutation=="raw_missing":
+                    del a["recovery_raw_bytes_sha256"]
+                elif mutation=="raw_tampered":
+                    a["recovery_raw_bytes_sha256"]="f"*64
+                elif mutation=="raw_wrong_type":
+                    a["recovery_raw_bytes_sha256"]=False
+                elif mutation=="canonical_missing":
+                    del a["recovery_internal_canonical_recomputed"]
+                elif mutation=="canonical_true":
+                    a["recovery_internal_canonical_recomputed"]=True
+                elif mutation=="canonical_null":
+                    a["recovery_internal_canonical_recomputed"]=None
+                elif mutation=="canonical_extra":
+                    a["extra_canonical_claim"]=True
                 elif mutation=="tamper":
                     a["source_zip_sha256"]="f"*64
                 elif mutation=="swapped_month":
@@ -141,6 +160,25 @@ class FactoryRecoveryDiagnosticSafety(unittest.TestCase):
                 # For source/month/parent swaps, stale seal must be rejected.
                 # A caller-resealed fake remains structurally indistinguishable
                 # from Core; only Core's private readback proves authenticity.
+                with self.assertRaises(ResultsStoreError):
+                    verified_core_receipts(doc)
+                self.assertFalse(self.db.exists())
+
+    def test_core_raw_pin_and_unrecomputed_internal_identity_resealed_fail(self):
+        """Even if a forged caller reseals a receipt, pinned values must fail."""
+        for key,value in (
+            ("recovery_raw_bytes_sha256","f"*64),
+            ("recovery_raw_bytes_sha256",None),
+            ("recovery_internal_canonical_recomputed",True),
+            ("recovery_internal_canonical_recomputed",0),
+            ("recovery_internal_canonical_recomputed","False")
+        ):
+            with self.subTest(key=key,value=value):
+                doc=self._core_shaped_receipts()
+                receipt=doc["readback_receipts"][0]
+                receipt[key]=value
+                receipt["receipt_sha256"]=digest(
+                    {k:v for k,v in receipt.items() if k!="receipt_sha256"})
                 with self.assertRaises(ResultsStoreError):
                     verified_core_receipts(doc)
                 self.assertFalse(self.db.exists())
