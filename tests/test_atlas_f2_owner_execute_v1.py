@@ -109,6 +109,21 @@ class OwnerF2NegativeTests(unittest.TestCase):
         self.assertNotIn("SECRET",repr(private))
         runner._set_stage("MANIFEST_INPUTS")
 
+    def test_pinned_scanner_subphase_callback_is_wired_and_redacted(self):
+        from tools.scanner_strategy_f import recovery_diagnostic_adapter as adapter
+        self.assertTrue(adapter.SAFE_SCANNER_PHASES.issubset(runner.SAFE_STAGES))
+        for phase in sorted(adapter.SAFE_SCANNER_PHASES):
+            with self.subTest(phase=phase):
+                runner._set_stage("SCANNER_RECOVERY_DIAGNOSTIC")
+                adapter._safe_phase_callback(runner._set_stage,phase)
+                self.assertEqual(runner.CURRENT_STAGE,phase)
+                safe=runner._sanitized_exception(
+                    ValueError("OWNER_PRIVATE_SOURCE:SECRET"))
+                self.assertEqual(safe["failure_stage"],phase)
+                self.assertEqual(safe["failure_class"],"ValueError")
+                self.assertNotIn("SECRET",repr(safe))
+        runner._set_stage("MANIFEST_INPUTS")
+
     def test_phase_callback_cannot_change_source_verifier_code(self):
         stages=[]
         with self.assertRaisesRegex(ValueError,"CORE_F2_RECOVERY_"):
