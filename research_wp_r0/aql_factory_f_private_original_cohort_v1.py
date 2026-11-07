@@ -364,12 +364,22 @@ def run_private_cohort(packet,witness,witness_sha,store_path):
     immutable=build_experiment(**kwargs)
     need(immutable["attempt_count"]==24 and
          immutable["attempt_states"]["UNKNOWN"]>=4, "FULL_24_ATTEMPT_CENSUS")
+    # Missing-month placeholders must not resemble source receipts.
+    # A 24-row final census is a metadata audit record, not 12 admitted months.
+    full_census=digest({"schema":"aql.factory.f.full-2024-attempt-census.v1",
+                        "core_f2_report_sha256":packet["core_f2_report_sha256"],
+                        "attempts":immutable["attempts"],
+                        "admitted_months":packet["admitted_months"],
+                        "retained_inventory_only_months":["2024-02","2024-08"]})
     registered=register_experiment(store_path,immutable)
     reread=read_experiment(store_path,packet["experiment_id"])
     need(reread==immutable,"RESULT_REPLAY_DRIFT")
     output={**body,
             "result_sha256":result_sha,
             "experiment_sha256":immutable["sha256"],
+            "full_attempt_count":immutable["attempt_count"],
+            "full_attempt_census_sha256":full_census,
+            "feb_aug_inventory_only_unknown":4,
             "store_status":registered["status"]}
     return {**output,"receipt_sha256":digest(output)}
 
