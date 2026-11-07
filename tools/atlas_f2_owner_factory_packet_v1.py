@@ -137,9 +137,11 @@ def build_factory_packet(*, original, scanner_receipt, work_specs,
              x.get("plan_digest")==ledger["plan_digest"]
              for x in ledger["trials"]),
          "TRIAL_LEDGER_NOT_FOCUS_DEFINITION")
-    focus_attempt = "RECOVERY-" + month + "-" + policy["focus_strategy_id"]
-    need(ledger["selected_attempt_id"]==focus_attempt,
-         "TRIAL_LEDGER_FOCUS_ATTEMPT_MISMATCH")
+    # Never require the owner to rename or fabricate a 53-trial record.
+    # Reuse its REAL preexisting selected attempt ID for the diagnostic focus;
+    # all other 23 attempt IDs are fresh scoped accounting IDs.
+    focus_attempt=ledger["selected_attempt_id"]
+    need(0 < len(focus_attempt) <= 160,"TRIAL_LEDGER_FOCUS_ID_INVALID")
 
     receipts=[original[m]["receipt"] for m in MONTHS]
     need(all(v["opaque_recovery_file_pin_verified"] is True and
@@ -150,7 +152,9 @@ def build_factory_packet(*, original, scanner_receipt, work_specs,
     attempts=[]
     for m in list(MONTHS)+["2024-02","2024-08"]:
         for ident_name in sorted(specs):
-            attempt_id="RECOVERY-"+m+"-"+ident_name
+            attempt_id=(focus_attempt if
+                m==month and ident_name==policy["focus_strategy_id"]
+                else "RECOVERY-"+m+"-"+ident_name)
             attempts.append({
                 "attempt_id":attempt_id,
                 "candidate_id":ident_name,
@@ -162,6 +166,7 @@ def build_factory_packet(*, original, scanner_receipt, work_specs,
                     inventory[m],
             })
     need(len(attempts)==24 and
+         len({x["attempt_id"] for x in attempts})==24 and
          ledger["selected_attempt_id"] in {x["attempt_id"] for x in attempts},
          "FACTORY_24_ATTEMPTS")
     real=original[month]["local_bars"]
