@@ -29,6 +29,19 @@ ATTEMPT="aql.scanner-f.research-e2e-local-diagnostic-attempt.v1"
 STEP=900_000
 ADMITTED=tuple(f"2024-{i:02d}" for i in range(1,13) if i not in (2,8))
 RETAINED=("2024-02","2024-08")
+SAFE_COHORT_PHASES=frozenset((
+    "COHORT_POLICY_VERIFY","COHORT_SCOPE_VERIFY","COHORT_AST_RECONSTRUCT",
+    "COHORT_CODE_FINGERPRINT","COHORT_CORE253_REPLAY",
+    "COHORT_MONTH_GRID_VERIFY","COHORT_FACTORY_KERNEL",
+    "COHORT_ATTEMPT_RECEIPTS","COHORT_RETAINED_UNKNOWN",
+    "COHORT_FINAL_RECEIPT",
+))
+
+def _phase(callback, name):
+    require(name in SAFE_COHORT_PHASES,"F_DIAGNOSTIC_INVALID_PHASE")
+    if callback is not None:
+        callback(name)
+
 
 
 def _month_ms(month):
@@ -71,7 +84,7 @@ def _eval_strategy(definition,bars):
 
 def diagnostic_original_cohort(
     *, warehouse_root,month_queries,policy_draft,proposal,
-    approval_request,work_specs,
+    approval_request,work_specs,phase_callback=None,
 ):
     """Complete 2 × 12 strategy/month census from read-only original Core DB.
 
@@ -80,9 +93,13 @@ def diagnostic_original_cohort(
     pin/inspect these against Core F2; SHA-only inputs do NOT prove issuer rights.
     No new ZIP acquisition, RAW/warehouse write or synthetic OHLCV is performed.
     """
+    require(phase_callback is None or callable(phase_callback),
+            "F_DIAGNOSTIC_INVALID_PHASE_CALLBACK")
+    _phase(phase_callback,"COHORT_POLICY_VERIFY")
     frozen=verify_retrospective_policy_draft(
         policy_draft,proposal,approval_request,work_specs)
     p=frozen.data
+    _phase(phase_callback,"COHORT_SCOPE_VERIFY")
     require(p["target_months"]==[f"2024-{i:02d}" for i in range(1,13)]
             and len(p["strategy_identity"])==2
             and type(month_queries) is dict
@@ -91,6 +108,7 @@ def diagnostic_original_cohort(
             "F_DIAGNOSTIC_SCOPE_AND_10_SOURCE_QUERY_REQUIREMENT")
     identities={(x["strategy_id"],x["strategy_version"]):x
                 for x in p["strategy_identity"]}
+    _phase(phase_callback,"COHORT_AST_RECONSTRUCT")
     specs={}
     for raw in work_specs:
         s=Frozen.restore(raw).data
@@ -106,6 +124,7 @@ def diagnostic_original_cohort(
                 "F_DIAGNOSTIC_ORIGINAL_DEFINITION_DRIFT")
         specs[key]=definition
     require(len(specs)==2,"F_DIAGNOSTIC_TWO_FROZEN_STRATEGIES")
+    _phase(phase_callback,"COHORT_CODE_FINGERPRINT")
     code_sha=_code_sha()
     trials=[]
     total_bars=0
@@ -128,11 +147,13 @@ def diagnostic_original_cohort(
                 and q.get("available_bar_count")==monthrange(2024,int(month[-2:]))[1]*96
                 and q.get("source_availability")=="RETROSPECTIVE_NON_PIT",
                 "F_DIAGNOSTIC_MONTH_GRID_OR_CUTOFF")
+        _phase(phase_callback,"COHORT_CORE253_REPLAY")
         actual=query_local(warehouse_root,q["dataset_id"],q["version"],
             start,end,q["decision_cutoff_ms"],
             required_source_sha256=q["source_bytes_sha256"],
             require_complete=True,sqlite_immutable=True)
         require(actual==q,"F_DIAGNOSTIC_REAL_CORE253_READBACK_MISMATCH")
+        _phase(phase_callback,"COHORT_MONTH_GRID_VERIFY")
         bars=q["bars"]
         require(type(bars) is list and
                 len(bars)==monthrange(2024,int(month[-2:]))[1]*96
@@ -148,11 +169,13 @@ def diagnostic_original_cohort(
         queried[month]=q["query_sha256"]
         for raw in p["strategy_identity"]:
             key=(raw["strategy_id"],raw["strategy_version"])
+            _phase(phase_callback,"COHORT_FACTORY_KERNEL")
             signals=_eval_strategy(specs[key],bars)
             counts={v:sum(item[1]==v for item in signals) for v in
                     ("ENTRY_SIGNAL","EXIT_SIGNAL","NO_SIGNAL","UNKNOWN")}
             require(sum(counts.values())==len(bars),
                     "F_DIAGNOSTIC_INDICATOR_CENSUS")
+            _phase(phase_callback,"COHORT_ATTEMPT_RECEIPTS")
             trials.append(Frozen.build({
                 "schema":ATTEMPT,
                 "month":month,"strategy_id":key[0],
@@ -176,6 +199,7 @@ def diagnostic_original_cohort(
             }).receipt())
     require(total_bars==29376 and len(trials)==20,
             "F_DIAGNOSTIC_TOTAL_10_MONTH_BAR_CENSUS")
+    _phase(phase_callback,"COHORT_RETAINED_UNKNOWN")
     for month in RETAINED:
         for x in p["strategy_identity"]:
             trials.append(Frozen.build({
@@ -200,6 +224,7 @@ def diagnostic_original_cohort(
                 "trading_authority":"NONE",
             }).receipt())
     require(len(trials)==24,"F_DIAGNOSTIC_ALL_ATTEMPTS_REQUIRED")
+    _phase(phase_callback,"COHORT_FINAL_RECEIPT")
     return Frozen.build({
         "schema":SCHEMA,
         "execution_lane":"RESEARCH_E2E_DIAGNOSTIC",
