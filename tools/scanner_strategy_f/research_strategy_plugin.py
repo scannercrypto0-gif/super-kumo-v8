@@ -415,15 +415,23 @@ def verify_factory_signal_batch(batch):
         and x["event_count"]<=MAX_BARS
         and type(x.get("signal_counts")) is dict
         and set(x["signal_counts"])==STATES
-        and sum(x["signal_counts"].values())==x["event_count"],
+        and all(type(v) is int and v>=0
+                for v in x["signal_counts"].values())
+        and sum(x["signal_counts"].values())==x["event_count"]
+        and type(x.get("start_ms")) is int
+        and type(x.get("end_exclusive_ms")) is int
+        and x["end_exclusive_ms"]-x["start_ms"]==
+            x["event_count"]*STEP
+        and x["end_exclusive_ms"]<=x["decision_cutoff_ms"],
         "H_FACTORY_DENOMINATOR")
     seen=set()
     counts=Counter()
     for i,e in enumerate(x["events"]):
-        require(type(e) is dict and e.get("schema")==EVENT_SCHEMA
+        require(type(e) is dict and set(e)==EVENT_FIELDS
+                and e.get("schema")==EVENT_SCHEMA
                 and e.get("sequence")==i
                 and type(e.get("bar_open_ms")) is int
-                and e["bar_open_ms"]%STEP==0
+                and e["bar_open_ms"]==x["start_ms"]+i*STEP
                 and e["bar_open_ms"] not in seen
                 and e.get("bar_close_ms")==e["bar_open_ms"]+STEP-1
                 and e.get("research_asof_ms")==e["bar_close_ms"]+1
