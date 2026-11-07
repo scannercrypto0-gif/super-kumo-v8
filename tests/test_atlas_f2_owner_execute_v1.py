@@ -74,6 +74,30 @@ class OwnerF2NegativeTests(unittest.TestCase):
         self.assertFalse(any("trial_ledger" in x or "inventory." in x
                              for x in missing))
 
+    def test_recovery_report_state_projects_only_to_strict_core_mapping(self):
+        row = {
+            "month": "2024-01", "state": "DUAL_READBACK_VERIFIED",
+            "bars": 2976, "source_sha256": "a"*64,
+            "core245_native_query_sha256": "b"*64,
+            "core253_local_query_sha256": "c"*64,
+        }
+        projected = collector._project_verified_recovery_entry(row)
+        self.assertEqual(row["state"], "DUAL_READBACK_VERIFIED")
+        self.assertEqual(projected["state"], "RAW_AND_DUAL_QUERY_READBACK")
+        self.assertEqual(set(projected), core.MONTH_FIELDS - {
+            "warehouse_receipt_sha256", "dual_query_map_sha256"})
+        self.assertEqual(projected["source_sha256"], row["source_sha256"])
+        self.assertEqual(projected["core_245_native_price_query_sha256"],
+                         row["core245_native_query_sha256"])
+        for forged in ("RAW_AND_DUAL_QUERY_READBACK", "SELECTED",
+                       "F5_APPROVED", None, False):
+            with self.subTest(forged=forged):
+                bad = {**row, "state": forged}
+                with self.assertRaisesRegex(
+                    ValueError, "CORE_F2_RECOVERY_RECOVERY_ENTRY_STATE_DRIFT"):
+                    collector._project_verified_recovery_entry(bad)
+        self.assertEqual(row["state"], "DUAL_READBACK_VERIFIED")
+
     def test_private_derived_bar_hash_is_factory_canonical(self):
         synthetic_test_only={
             "bar_open_ms":1704067200000,"bar_close_ms":1704068099999,
