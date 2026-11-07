@@ -146,6 +146,12 @@ def validate_recovery_input(packet):
          trial.get("diagnostic_month") in parents,
          "RECOVERY_FOCUS_MONTH")
     month=trial["diagnostic_month"]
+    # Every eligible original-month attempt must refer to exactly the
+    # checked Core source object for its own month; inventory-only receipts
+    # remain locally marked UNKNOWN and are never treated as source files.
+    need(all(row["source_receipt_sha256"]==parents[row["month"]]["source_sha256"]
+             for row in packet["attempts"] if row["month"] in parents),
+         "RECOVERY_ATTEMPT_SOURCE_RECEIPT_SWAP")
     need(trial.get("source_bytes_sha256")==parents[month]["source_sha256"]
          and packet["operator_local_source_readback_sha256"]==
              parents[month]["source_sha256"],
