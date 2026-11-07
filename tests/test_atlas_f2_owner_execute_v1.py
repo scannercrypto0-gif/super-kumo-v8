@@ -92,6 +92,23 @@ class OwnerF2NegativeTests(unittest.TestCase):
         self.assertEqual(runner.CURRENT_STAGE,"RECOVERY_MAPPING_VALIDATION")
         runner._set_stage("MANIFEST_INPUTS")
 
+    def test_scanner_boundary_error_is_classified_without_private_message(self):
+        from tools.strategy_service_offline.common import BoundaryError
+        runner._set_stage("SCANNER_RECOVERY_DIAGNOSTIC")
+        safe=runner._sanitized_exception(BoundaryError(
+            "F_DIAG_RECOVERY_LOCAL253_RECOMPUTED_SHA_DRIFT"))
+        self.assertEqual(safe,{
+            "failure_stage":"SCANNER_RECOVERY_DIAGNOSTIC",
+            "failure_class":"ValueError",
+            "failure_reason_code":"F_DIAG_RECOVERY_LOCAL253_RECOMPUTED_SHA_DRIFT"})
+        private=runner._sanitized_exception(BoundaryError(
+            "DEPENDENCY_REFUSED:SECRET_PRIVATE_E_DRIVE"))
+        self.assertEqual(private,{
+            "failure_stage":"SCANNER_RECOVERY_DIAGNOSTIC",
+            "failure_class":"ValueError"})
+        self.assertNotIn("SECRET",repr(private))
+        runner._set_stage("MANIFEST_INPUTS")
+
     def test_phase_callback_cannot_change_source_verifier_code(self):
         stages=[]
         with self.assertRaisesRegex(ValueError,"CORE_F2_RECOVERY_"):
