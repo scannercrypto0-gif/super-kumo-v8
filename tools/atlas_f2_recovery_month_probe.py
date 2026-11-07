@@ -65,7 +65,7 @@ def categories(report):
                 if row.get("dataset_id")!=(
                     "BINANCE-SPOT-BTCUSDT-15M-"+known+"-F-v1"):
                     mark("DATASET_ID_PATTERN",known)
-            if row.get("state")!="RAW_AND_DUAL_QUERY_READBACK":
+            if row.get("state")!="DUAL_READBACK_VERIFIED":
                 mark("STATE_LITERAL",known)
             if any(not _is_sha(row.get(k)) for k in DIGEST_KEYS):
                 mark("DIGEST_FORMAT",known)
@@ -106,6 +106,7 @@ def _reject_constant(_):
 # can be promoted into the Core research receipt contract. Never accept
 # any of these candidates automatically as source authority.
 STATE_CANDIDATES = (
+    "DUAL_READBACK_VERIFIED",               # owner-confirmed Recovery entries state
     "RAW_AND_DUAL_QUERY_READBACK",          # F2 original admission
     "OWNER_LOCAL_DUAL_READBACK_PASS",       # observed report disposition
     "REVERIFIED_PRIVATE_BYTES",             # F2 local byte recheck
