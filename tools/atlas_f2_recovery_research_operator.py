@@ -113,14 +113,23 @@ def run(manifest):
            "RECOVERY_FRESH_SQLITE_V2_REQUIRED")
     first=run_recovery_diagnostic(factory,store)
     second=run_recovery_diagnostic(factory,store)
+    from research_wp_r0.aql_factory_e_research_results_store_v1 import (
+        digest as factory_digest,
+    )
     demand(first["store_status"]=="STORED_IMMUTABLE"
            and second["store_status"]=="REPLAY_IDENTICAL"
            and all(first[k]==second[k] for k in
                    ("lab_sha256","experiment_sha256","result_sha256"))
-           and first["attempt_count"]==24
-           and first["feb_aug_inventory_unknown"]==4
+           and all(factory_digest({k:v for k,v in row.items()
+                                  if k!="receipt_sha256"})==
+                   row["receipt_sha256"] for row in (first,second))
+           and first["receipt_sha256"]!=second["receipt_sha256"]
+           and first["attempt_count"]==second["attempt_count"]==24
+           and first["feb_aug_inventory_unknown"]==
+               second["feb_aug_inventory_unknown"]==4
            and first["original_f2_report_sha256"] is None
-           and first["trading_authority"]=="NONE",
+           and second["original_f2_report_sha256"] is None
+           and first["trading_authority"]==second["trading_authority"]=="NONE",
            "RECOVERY_FACTORY_REPLAY_OR_AUTHORITY_FAILED")
     packet={
         "schema":"aql.research-e2e.diagnostic.v1",
