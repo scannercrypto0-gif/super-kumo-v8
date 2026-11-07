@@ -100,6 +100,93 @@ def _signed(role, receipt, *, trusted_registry, trusted_now_utc):
     return digest(receipt)
 
 
+
+FACTORY_ROLE_SCHEMA = "aql.factory.f.external-role-approval.v1"
+CUSTODIAN_ROLE = "SOURCE_CUSTODIAN"
+POLICY_ROLE = "RESEARCH_POLICY_APPROVER"
+EVALUATOR_ROLE = "INDEPENDENT_EVALUATOR"
+
+
+def _verify_external_role_attestation(receipt, *, role, subject_sha256,
+                                      trusted_role_registry, trusted_now_utc):
+    """Verify a Factory-compatible out-of-band Ed25519 role/subject witness.
+
+    The trusted registry and UTC clock must be pinned OUTSIDE any untrusted
+    receipt/Scanner candidate. Never infer trust from a supplied digest alone.
+    """
+    require(type(receipt) is dict and set(receipt) == {
+        "schema", "role", "key_id", "approver_id", "subject_sha256",
+        "issued_at_utc", "expires_at_utc", "signature_hex",
+    }, "CORE_F5_EXTERNAL_ROLE_FIELDS")
+    require(receipt["schema"] == FACTORY_ROLE_SCHEMA
+            and receipt["role"] == role
+            and valid_sha(subject_sha256)
+            and receipt["subject_sha256"] == subject_sha256
+            and type(receipt["signature_hex"]) is str
+            and SIG.fullmatch(receipt["signature_hex"]) is not None,
+            "CORE_F5_EXTERNAL_ROLE_SUBJECT_DRIFT")
+    require(type(trusted_role_registry) is dict
+            and role in trusted_role_registry,
+            "CORE_F5_EXTERNAL_ROLE_TRUST_ROOT_MISSING")
+    k = trusted_role_registry[role]
+    require(type(k) is dict and set(k) == {
+        "key_id", "approver_id", "public_key_hex", "enabled"
+    } and k["enabled"] is True
+            and k["key_id"] == receipt["key_id"]
+            and k["approver_id"] == receipt["approver_id"]
+            and valid_sha(k["public_key_hex"]),
+            "CORE_F5_EXTERNAL_ROLE_REGISTRY_DRIFT")
+    require(utc(receipt["issued_at_utc"]) <= utc(trusted_now_utc)
+            < utc(receipt["expires_at_utc"]),
+            "CORE_F5_EXTERNAL_ROLE_EXPIRED_OR_FUTURE")
+    try:
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+        from cryptography.exceptions import InvalidSignature
+    except ImportError as exc:
+        raise ValueError("CORE_F5_ED25519_REQUIRED") from exc
+    try:
+        Ed25519PublicKey.from_public_bytes(bytes.fromhex(k["public_key_hex"])).verify(
+            bytes.fromhex(receipt["signature_hex"]),
+            canonical({a: b for a, b in receipt.items() if a != "signature_hex"}))
+    except (InvalidSignature, ValueError) as exc:
+        raise ValueError("CORE_F5_EXTERNAL_ROLE_BAD_SIGNATURE") from exc
+    return digest(receipt)
+
+
+def _require_distinct_signers(pairs):
+    """Prohibit role aliasing through the same key or human approver."""
+    identities = [p[0] for p in pairs]
+    public_keys = [p[1] for p in pairs]
+    require(len(set(identities)) == len(identities)
+            and len(set(public_keys)) == len(public_keys),
+            "CORE_F5_SIGNER_ROLE_ALIAS")
+
+
+def _verified_authorization_document(document, month):
+    """Owner's local document integrity; legal authority is separate witness."""
+    require(type(document) is dict and set(document) == {
+        "schema", "owner_permission", "rights_evidence_reference",
+        "issuer_provenance_reference", "publisher_checksum_issued_via",
+        "authorized_months", "source_class", "historical_pit",
+        "trading_authority",
+    }, "CORE_F5_CUSTODY_DOCUMENT_REQUIRED")
+    require(digest(document) == EXPECTED_AUTH
+            and document["schema"] == "aql.core.f.private-custody-authorization.v1"
+            and document["owner_permission"] is True
+            and document["source_class"] == "ORIGINAL_PUBLISHER_RETROSPECTIVE_NON_PIT"
+            and document["publisher_checksum_issued_via"] == "SEPARATE_PUBLISHER_HTTPS"
+            and document["historical_pit"] == "NOT_ATTESTED"
+            and document["trading_authority"] == "NONE"
+            and type(document["rights_evidence_reference"]) is str
+            and len(document["rights_evidence_reference"]) >= 8
+            and type(document["issuer_provenance_reference"]) is str
+            and len(document["issuer_provenance_reference"]) >= 8
+            and type(document["authorized_months"]) is list
+            and month in document["authorized_months"],
+            "CORE_F5_CUSTODY_RIGHTS_OR_SCOPE_DRIFT")
+    return True
+
+
 def expected_source_payload(*, f2_report, source_zip_sha256,
                             warehouse_receipt_sha256, native245_sha256,
                             local253_sha256, month):
@@ -149,61 +236,106 @@ def expected_source_payload(*, f2_report, source_zip_sha256,
     })
 
 
-def verify_source_ack(receipt, *, trusted_registry, trusted_now_utc,
+def verify_source_ack(receipt, *, custodian_attestation, authorization_document,
+                      trusted_registry, trusted_role_registry, trusted_now_utc,
                       f2_report, source_zip_sha256, warehouse_receipt_sha256,
-                      native245_sha256, local253_sha256, month,
-                      independently_witnessed_source: bool = False):
-    """Verify genuine issuer-signature and exact source lineage, never issue ACK.
+                      native245_sha256, local253_sha256, month):
+    """Verify independently issued Source ACK with external custodian role proof.
 
-    independently_witnessed_source must come from separately authorized read-only
-    witness. Boolean alone is insufficient to prove authenticity: require the
-    independently pinned and signed receipt via trusted_registry too.
+    Signature keys MUST be independently provisioned, not copied from the
+    authorization document, a GitHub comment or the ACK. A caller boolean
+    never substitutes for custody evidence.
     """
-    require(independently_witnessed_source is True,
-            "CORE_F5_EXTERNAL_SOURCE_WITNESS_MISSING")
-    expected=expected_source_payload(
+    expected = expected_source_payload(
         f2_report=f2_report, source_zip_sha256=source_zip_sha256,
         warehouse_receipt_sha256=warehouse_receipt_sha256,
-        native245_sha256=native245_sha256,local253_sha256=local253_sha256,
+        native245_sha256=native245_sha256, local253_sha256=local253_sha256,
         month=month)
-    require(receipt.get("payload_sha256")==expected,
+    _verified_authorization_document(authorization_document, month)
+    _verify_external_role_attestation(
+        custodian_attestation, role=CUSTODIAN_ROLE,
+        subject_sha256=expected, trusted_role_registry=trusted_role_registry,
+        trusted_now_utc=trusted_now_utc)
+    require(type(receipt) is dict and receipt.get("payload_sha256") == expected,
             "CORE_F5_SOURCE_ACK_PARENT_DRIFT")
-    return _signed(SOURCE_ROLE,receipt,trusted_registry=trusted_registry,
-                   trusted_now_utc=trusted_now_utc)
+    _signed(SOURCE_ROLE, receipt, trusted_registry=trusted_registry,
+            trusted_now_utc=trusted_now_utc)
+    root = trusted_registry[receipt["key_id"]]
+    custodian_root = trusted_role_registry[CUSTODIAN_ROLE]
+    _require_distinct_signers([
+        (root["approver_identity"], root["public_key_hex"]),
+        (custodian_root["approver_id"], custodian_root["public_key_hex"]),
+    ])
+    return digest(receipt)
 
 
-def verify_strategy_approval(receipt, *, source_receipt, source_ack_sha256,
+def verify_strategy_approval(receipt, *, source_receipt, source_attestation,
+                             authorization_document, f2_report,
+                             source_zip_sha256, warehouse_receipt_sha256,
+                             native245_sha256, local253_sha256, month,
                              strategy_nomination_sha256,
                              independent_policy_sha256,
                              evaluator_receipt_sha256,
                              strategy_definition_sha256,
-                             trusted_registry, trusted_now_utc,
-                             authenticated_nomination: bool = False):
-    require(authenticated_nomination is True,
-            "CORE_F5_AUTHENTIC_EVALUATOR_NOMINATION_REQUIRED")
+                             policy_attestation, evaluator_attestation,
+                             trusted_registry, trusted_role_registry,
+                             trusted_now_utc):
+    """Verify separately signed Secretary StrategyApproval and all parents.
+
+    This does NOT infer genuine historical evaluator execution merely from
+    a signed SHA. The independent evaluator must have witnessed the original
+    source-bound Core query run and the externally trusted policy owner must
+    have signed the exact research policy; external integration checks these.
+    """
+    source_ack_sha256 = verify_source_ack(
+        source_receipt, custodian_attestation=source_attestation,
+        authorization_document=authorization_document,
+        trusted_registry=trusted_registry,
+        trusted_role_registry=trusted_role_registry,
+        trusted_now_utc=trusted_now_utc, f2_report=f2_report,
+        source_zip_sha256=source_zip_sha256,
+        warehouse_receipt_sha256=warehouse_receipt_sha256,
+        native245_sha256=native245_sha256, local253_sha256=local253_sha256,
+        month=month)
     require(all(valid_sha(x) for x in (
-        source_ack_sha256,strategy_nomination_sha256,
-        independent_policy_sha256,evaluator_receipt_sha256,
+        source_ack_sha256, strategy_nomination_sha256,
+        independent_policy_sha256, evaluator_receipt_sha256,
         strategy_definition_sha256)), "CORE_F5_STRATEGY_PARENTS_INVALID")
-    require(type(source_receipt) is dict
-            and digest(source_receipt)==source_ack_sha256
-            and source_receipt.get("issuer_role")==SOURCE_ROLE
-            and receipt.get("source_ack_sha256")==source_ack_sha256,
+    require(type(receipt) is dict and
+            receipt.get("source_ack_sha256") == source_ack_sha256,
             "CORE_F5_SOURCE_ACK_NOT_VERIFIED")
-    _signed(SOURCE_ROLE,source_receipt,trusted_registry=trusted_registry,
-            trusted_now_utc=trusted_now_utc)
-    expected=digest({
-        "schema":"aql.core.f.historical-strategy-proof.v1",
-        "source_ack_sha256":source_ack_sha256,
-        "strategy_nomination_sha256":strategy_nomination_sha256,
-        "independent_policy_sha256":independent_policy_sha256,
-        "evaluator_receipt_sha256":evaluator_receipt_sha256,
-        "strategy_definition_sha256":strategy_definition_sha256,
+    _verify_external_role_attestation(
+        policy_attestation, role=POLICY_ROLE,
+        subject_sha256=independent_policy_sha256,
+        trusted_role_registry=trusted_role_registry,
+        trusted_now_utc=trusted_now_utc)
+    _verify_external_role_attestation(
+        evaluator_attestation, role=EVALUATOR_ROLE,
+        subject_sha256=evaluator_receipt_sha256,
+        trusted_role_registry=trusted_role_registry,
+        trusted_now_utc=trusted_now_utc)
+    expected = digest({
+        "schema": "aql.core.f.historical-strategy-proof.v1",
+        "source_ack_sha256": source_ack_sha256,
+        "strategy_nomination_sha256": strategy_nomination_sha256,
+        "independent_policy_sha256": independent_policy_sha256,
+        "evaluator_receipt_sha256": evaluator_receipt_sha256,
+        "strategy_definition_sha256": strategy_definition_sha256,
     })
-    require(receipt.get("payload_sha256")==expected,
+    require(receipt.get("payload_sha256") == expected,
             "CORE_F5_STRATEGY_APPROVAL_PARENT_DRIFT")
-    return _signed(STRATEGY_ROLE,receipt,trusted_registry=trusted_registry,
-                   trusted_now_utc=trusted_now_utc)
+    _signed(STRATEGY_ROLE, receipt, trusted_registry=trusted_registry,
+            trusted_now_utc=trusted_now_utc)
+    roots = [
+        trusted_registry[source_receipt["key_id"]],
+        trusted_registry[receipt["key_id"]],
+    ]
+    _require_distinct_signers(
+        [(item["approver_identity"], item["public_key_hex"]) for item in roots]
+        + [(trusted_role_registry[role]["approver_id"],
+            trusted_role_registry[role]["public_key_hex"])
+           for role in (CUSTODIAN_ROLE, POLICY_ROLE, EVALUATOR_ROLE)])
+    return digest(receipt)
 
 
 def pending_authority():
