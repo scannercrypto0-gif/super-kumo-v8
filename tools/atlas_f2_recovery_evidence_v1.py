@@ -76,8 +76,23 @@ def load_recovery_evidence(path, mapping):
             report["schema"] == OWNER_REPORT_SCHEMA and
             report["recovery_sha256"] == EXPECTED_RECOVERY_FILE_SHA256 and
             report["disposition"] == "OWNER_LOCAL_DUAL_READBACK_PASS" and
-            type(report["verified_months"]) in (list, dict) and
-            len(report["verified_months"]) == len(ADMITTED_MONTHS),
+            type(report["verified_months"]) is int and
+            report["verified_months"] == len(ADMITTED_MONTHS) and
+            type(report.get("verified_bars")) is int and
+            report["verified_bars"] == 29376 and
+            type(report.get("entries")) is list and
+            len(report["entries"]) == len(ADMITTED_MONTHS) and
+            all(type(row) is dict and set(row) == {
+                "bars", "core245_native_query_sha256",
+                "core253_local_query_sha256", "dataset_id",
+                "manifest_sha256", "month", "source_sha256", "state",
+            } for row in report["entries"]) and
+            {row["month"] for row in report["entries"]} ==
+            set(ADMITTED_MONTHS) and
+            all(type(row["bars"]) is int and
+                row["bars"] == (_month_bounds(row["month"])[1] -
+                               _month_bounds(row["month"])[0]) // 900_000
+                for row in report["entries"]),
             "OWNER_REPORT_IDENTITY_OR_CENSUS_DRIFT")
     # Report shape beyond the verified owner fields was not made available.
     # Do not fabricate canonical producer hashing or inferred month mappings.
@@ -104,6 +119,23 @@ def load_recovery_evidence(path, mapping):
                 for x in rows) and
             sum(x["bars"] for x in rows) == 29376,
             "RECOVERY_CENSUS_OR_PARENT_SHAS")
+    # Real report's identities are not sufficient to invent missing warehouse
+    # and dual-map parents. Match every available source/native/local parent
+    # without ever silently turning report rows into a trusted mapping.
+    reported = {x["month"]:x for x in report["entries"]}
+    for row in rows:
+        parent = reported[row["month"]]
+        require(parent["state"] == "RAW_AND_DUAL_QUERY_READBACK" and
+                parent["dataset_id"] ==
+                    "BINANCE-SPOT-BTCUSDT-15M-" + row["month"] + "-F-v1" and
+                parent["bars"] == row["bars"] and
+                parent["source_sha256"] == row["source_sha256"] and
+                parent["core245_native_query_sha256"] ==
+                    row["core_245_native_price_query_sha256"] and
+                parent["core253_local_query_sha256"] ==
+                    row["core_253_local_query_sha256"] and
+                _hex(parent["manifest_sha256"]),
+                "OWNER_REPORT_VS_UNTRUSTED_MAPPING_DRIFT")
     return {x["month"]: x for x in rows}
 
 
