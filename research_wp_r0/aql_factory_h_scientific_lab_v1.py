@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from collections import Counter
 from decimal import Decimal, localcontext
-from math import sqrt
 from research_wp_r0.aql_factory_e_research_results_store_v1 import (
     digest,ResultsStoreError,
 )
@@ -91,7 +90,7 @@ def evaluate_immutable_ledger(ledger, *, comparison=None):
         for v in gross:
             gross_total*=Decimal(1)+v
         decision_slots=cohort["decision_slots"]
-        exposure=sum(holding)/decision_slots if decision_slots else None
+        exposure=Decimal(sum(holding))/Decimal(decision_slots) if decision_slots else None
         _need(exposure is None or exposure<=1,"EXPOSURE_OVERLAP")
         # Conservative: no annualization or observed-fill inference.
         if n>=MIN_RISK_N and not cohort["unknown_trades"]:
@@ -141,7 +140,6 @@ def evaluate_immutable_ledger(ledger, *, comparison=None):
         }
     # Sensitivity only on the SAME immutable outcomes; no optimization,
     # parameter re-evaluation or fake robustness inference.
-    baseline=Decimal(0)
     adjusted={}
     for extra_bps in ("0","5","10"):
         offset=Decimal(extra_bps)/Decimal(10000)
