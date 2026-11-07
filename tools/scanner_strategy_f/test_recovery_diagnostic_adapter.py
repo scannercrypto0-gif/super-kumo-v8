@@ -169,6 +169,24 @@ class TestRecoveryDiagnostic(unittest.TestCase):
                 recovery_file_sha256=EXPECTED_RECOVERY,work_specs=self.original,
                 phase_callback=evaluator_failed.append)
         self.assertEqual(evaluator_failed[-1],"SCANNER_COHORT_DIAGNOSTIC")
+        # Forward a fixed evaluator subphase through the adapter; no raw
+        # dependency exception message is supplied to the public callback.
+        nested=[]
+        def fake_cohort(**kwargs):
+            kwargs["phase_callback"]("COHORT_FACTORY_KERNEL")
+            raise ValueError("private-synthetic-error")
+        with patch.object(adapter,"query_local",
+                          side_effect=list(queries.values())), \
+             patch.object(adapter,"diagnostic_original_cohort",
+                          side_effect=fake_cohort), \
+             self.assertRaises(ValueError):
+            adapter.diagnostic_from_verified_recovery(
+                warehouse_root="/unused",verified_recovery_readbacks=rows,
+                recovery_file_sha256=EXPECTED_RECOVERY,work_specs=self.original,
+                phase_callback=nested.append)
+        self.assertEqual(nested[-1],"COHORT_FACTORY_KERNEL")
+        with self.assertRaises(ValueError):
+            adapter._safe_phase_callback(nested.append,"UNTRUSTED_PRIVATE_TEXT")
         for key,value in (("original_f2_report_sha256","f"*64),
                           ("status","F5_APPROVED"),
                           ("core253_local_query_sha256","0"*64)):
