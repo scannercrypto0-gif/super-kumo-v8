@@ -8,6 +8,7 @@ from __future__ import annotations
 import copy
 import json
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 from calendar import monthrange
 
@@ -173,6 +174,47 @@ class LocalResearchDiagnostic(unittest.TestCase):
                 phase_callback=blocked.append)
         self.assertEqual(blocked[-1],"COHORT_CORE253_REPLAY")
         self.assertNotIn("PRIVATE_DO_NOT_EXPOSE",str(blocked))
+
+    def test_exact_integration_windows_path_subclass_scope(self):
+        """Windows owner operator gives pathlib.WindowsPath, not type Path."""
+        from tools.scanner_strategy_f import research_e2e_diagnostic as diag
+        from tools.strategy_service_offline.common import Frozen
+        with patch.object(diag,"verify_retrospective_policy_draft",
+                          return_value=Frozen.restore(self.draft)):
+            phases=[]
+            # The real next gate checks AST after scope; injecting a failure
+            # there proves the Windows path made it through all scope checks.
+            with patch.object(diag.StrategyDefinition,"from_dict",
+                              side_effect=ValueError("TEST_AST_STOP")):
+                # On Linux, PosixPath is a concrete subclass of Path; on
+                # Windows, WindowsPath has the same relationship.
+                with self.assertRaises(ValueError) as ctx:
+                    diag.diagnostic_original_cohort(
+                        warehouse_root=Path("/synthetic-only"),
+                        month_queries={m:{} for m in diag.ADMITTED},
+                        policy_draft=self.draft,proposal=self.proposal,
+                        approval_request=self.request,work_specs=self.work,
+                        phase_callback=phases.append)
+            self.assertEqual(str(ctx.exception),"TEST_AST_STOP")
+            self.assertIn("COHORT_AST_RECONSTRUCT",phases)
+        self.assertTrue(issubclass(type(Path(".")),Path))
+
+    def test_scope_failures_distinguishable_without_private_values(self):
+        from tools.scanner_strategy_f import research_e2e_diagnostic as diag
+        cases=[
+            ({}, "F_DIAGNOSTIC_SCOPE_TEN_MONTH_QUERIES"),
+            ({m:{} for m in diag.ADMITTED}, None),
+        ]
+        for queries, expected in cases:
+            if expected is None:
+                continue
+            with self.subTest(expected=expected),self.assertRaises(ValueError) as ctx:
+                diag.diagnostic_original_cohort(
+                    warehouse_root=Path("/synthetic-only"),
+                    month_queries=queries,
+                    policy_draft=self.draft,proposal=self.proposal,
+                    approval_request=self.request,work_specs=self.work)
+            self.assertEqual(str(ctx.exception),expected)
 
 if __name__=="__main__":
     unittest.main()
