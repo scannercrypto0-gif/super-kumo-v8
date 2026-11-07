@@ -339,7 +339,7 @@ jobs:
               shutil.copyfile(source,dest)
               assert source.read_bytes()==dest.read_bytes(), ('RAW_VAULT_WINDOWS_BYTES',name)
           v=rawfixed/'vault.py'
-          assert hashlib.sha1(b'blob '+str(v.stat().st_size).encode()+b'\\0'+v.read_bytes()).hexdigest()=='6b5bcc1d684088934f5ed7110064380b8d2bc0cd', 'RAW_VAULT_WINDOWS_BLOB_DRIFT'
+          assert hashlib.sha1(b'blob '+str(v.stat().st_size).encode()+bytes([0])+v.read_bytes()).hexdigest()=='6b5bcc1d684088934f5ed7110064380b8d2bc0cd', 'RAW_VAULT_WINDOWS_BLOB_DRIFT'
           names={
             '_pinned_factory_e':(
               'aql_factory_e_research_results_store_v1.py',
