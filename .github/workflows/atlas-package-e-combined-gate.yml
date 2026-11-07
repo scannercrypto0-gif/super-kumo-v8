@@ -247,6 +247,45 @@ jobs:
           path: aql-comprehensive-suite-report.json
           if-no-files-found: warn
 
+
+  windows-owner-operator-syntax:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 0ec35238de6cf48db07c5c977e1f0d04bc299f58, path: _pinned_factory_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 998e3bcca8ca6f1150964dfa9d94726fec96b846, path: _pinned_core_f, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46, path: _pinned_raw211, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: e368dd491a0d80618bdc6c6e8f731a195d763dda, path: _pinned_raw_windows_lock, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8, path: _pinned_work235, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 7bf0107a321c3018700e0dc7a5c7a6f0ecbaaa8e, path: _pinned_scanner_f, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: a2aa9c195095bcfe852fdc760e385ccb2acf3d5d, path: _pinned_scanner_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: a91e370ae7e5197e9af71f8300eeaff4a7aff022, path: _pinned_scanner_d, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 1659713c80d1934f3c08af1af422b89cd5706360, path: _pinned_scanner_c, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 30c37ae56851488b882998c7fa0085ec51dbfc92, path: _pinned_scanner_b, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 1cb70f1212283fe34117882d18e0501fc6409fe7, path: _pinned_discoverer_f, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 149ca90c09b96abb45d3bc2839b657711c9826ac, path: _pinned_discoverer_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: f2006c0e431690ccea8b0532095bf4f2a2dc88ba, path: _pinned_discoverer_base, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 3af5b66d2b381b853a6b5be32c38b3d3d02e1ea7, path: _pinned_core_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: a86a590a5e2c32c18e03522f52896dbcf50c60ff, path: _pinned_core_d, persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
       - name: Stage SHA-verified Factory v2 and Core in isolated Windows CI
         shell: bash
         run: |
