@@ -289,8 +289,51 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: {persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: a82c611b23705898304270ef8d343d6a185913fa, path: _pinned_factory_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 6cf7acd3d038f8147c55a6d503ffdfea5e6d6f2d, path: _pinned_core_f, persist-credentials: false}
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
+      - name: Stage SHA-verified Factory v2 and Core in isolated Windows CI
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, subprocess, shutil
+          owners={
+            '_pinned_factory_e':'a82c611b23705898304270ef8d343d6a185913fa',
+            '_pinned_core_f':'6cf7acd3d038f8147c55a6d503ffdfea5e6d6f2d',
+          }
+          for owner,expected in owners.items():
+              actual=subprocess.check_output(['git','-C',owner,'rev-parse','HEAD'],text=True).strip()
+              assert actual==expected, ('PINNED_HEAD_DRIFT',owner)
+          names={
+            '_pinned_factory_e':(
+              'aql_factory_e_research_results_store_v1.py',
+              'aql_factory_f_research_e2e_diagnostic_v1.py',
+              'aql_factory_f_f2_recovery_diagnostic_v1.py',
+              'aql_factory_f_f2_recovery_research_v2.py',
+              'aql_factory_historical_rule_projection.py',
+              'strategy_definition.py','indicator_library_v2.py',
+            ),
+            '_pinned_core_f':(
+              'aql_core_f_bulk_source_v1.py',
+              'aql_core_f_research_diagnostic_query_v1.py',
+              'aql_core_f_recovery_readonly_v1.py',
+              'aql_core_backbone_local_v1.py',
+              'aql_core_dual_query_identity_map_v1.py',
+            ),
+          }
+          for owner,files in names.items():
+              for name in files:
+                  source=Path(owner)/'research_wp_r0'/name
+                  dest=Path('research_wp_r0')/name
+                  assert source.is_file(), ('PINNED_MODULE_MISSING',name)
+                  shutil.copyfile(source,dest)
+                  assert source.read_bytes()==dest.read_bytes(), ('PINNED_MODULE_BYTES',name)
+                  print('PINNED_WINDOWS_MODULE_SHA256',name,hashlib.sha256(dest.read_bytes()).hexdigest())
+          PY
       - name: Verify Windows one-command PowerShell syntax and Python import syntax
         shell: pwsh
         run: |
@@ -306,6 +349,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw 'OWNER_PYTHON_MODULE_SYNTAX_INVALID'
           }
+      - name: Execute Windows pinned Factory v2 SQLite first-replay and owner negative operator tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD:$PWD/tests"
+          python -m unittest discover -s tests -p 'test_aql_factory_f_f2_recovery_research_v2.py' -v
+          python -m unittest discover -s tests -p 'test_atlas_f2_owner_execute_v1.py' -v
   normalized-parity:
     needs: [bounded-e,windows-owner-operator-syntax]
     runs-on: ubuntu-latest
