@@ -153,7 +153,7 @@ def owner_report_entry_mismatch_categories(report):
                     if item.get("dataset_id") != (
                             "BINANCE-SPOT-BTCUSDT-15M-" + known + "-F-v1"):
                         flag("DATASET_ID_PATTERN", known)
-                if item.get("state") != "RAW_AND_DUAL_QUERY_READBACK":
+                if item.get("state") != "DUAL_READBACK_VERIFIED":
                     flag("STATE_LITERAL", known)
                 if any(not hexsha(item.get(k)) for k in (
                     "source_sha256", "manifest_sha256",
