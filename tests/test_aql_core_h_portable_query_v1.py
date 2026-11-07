@@ -77,17 +77,17 @@ class PortableResearchQueryTests(unittest.TestCase):
     def test_cutoff_partial_unknown_and_fail_closed(self):
         parent = fixture()
         a = adapt_verified_recovery_month(
-            parent, request(cutoff=START + STEP_MS, complete=False))
+            parent, request(cutoff=START + STEP_MS - 1, complete=False))
         self.assertEqual(a["receipt"]["status"], "UNKNOWN")
         self.assertEqual(a["receipt"]["available_bar_count"], 0)
         self.assertEqual(len(a["receipt"]["missing_bar_opens"]), 3)
         b = adapt_verified_recovery_month(
-            parent, request(cutoff=START + STEP_MS + 1, complete=False))
+            parent, request(cutoff=START + STEP_MS, complete=False))
         self.assertEqual(b["receipt"]["status"], "PARTIAL")
         self.assertEqual(b["receipt"]["available_bar_count"], 1)
         with self.assertRaisesRegex(ValueError, "INCOMPLETE_OR_FUTURE_RANGE"):
             adapt_verified_recovery_month(
-                parent, request(cutoff=START + STEP_MS, complete=True))
+                parent, request(cutoff=START + STEP_MS - 1, complete=True))
 
     def test_identity_seals_and_parent_mutation_rejected(self):
         for field, bad in [
