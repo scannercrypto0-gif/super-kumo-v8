@@ -29,6 +29,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Stage exact pre-existing pinned Core/Scanner/Work235 research modules
         run: python tools/atlas_factory_h_scanner_ci_stage.py
+      - name: Pin actual Core H generic Secretary module in disposable CI (no tracked branch modification)
+        shell: bash
+        run: |
+          git fetch --no-tags --depth=1 origin 99c27ea2c1a4d41aaae361141301a8a9ea3b33c3
+          git show 99c27ea2c1a4d41aaae361141301a8a9ea3b33c3:research_wp_r0/aql_core_h_research_secretary_v1.py > research_wp_r0/aql_core_h_research_secretary_v1.py
+          python -c "from research_wp_r0.aql_core_h_research_secretary_v1 import build_generic_research_result_route; print('PINNED_CORE_H_GENERIC_SECRETARY_PRESENT')"
       - name: F-LAB 1/2 real Scanner synthetic fixture to existing Factory E/H Lab/Core Secretary and P2
         env:
           PYTHONPATH: .
