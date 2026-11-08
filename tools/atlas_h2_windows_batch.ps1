@@ -18,7 +18,7 @@ $bootstrapCommit = 'aa0f21bfcbb07d36258c5dca552310bb36f452c8'
 $publicCommit = '5a976b8bf04f764b2822d49ff40cc5d60548494b'
 $operatorCommit = '9a4ed276913eac202e0c77778371c91dc482ff23'
 # Immutable owner-personal research-only route + early manual AST guard.
-$personalCommit = '59ff85028d660ce18e899c8b2e78006a9aca8ccf'
+$personalCommit = 'ea05cbf605e63477665ccb91d3a7a0babad988bc'
 $required = @(
   $bootstrapCommit,
   $publicCommit,
@@ -103,6 +103,7 @@ repo, target, sha = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.ar
 for rel in (
     'tools/atlas_h2_owner_personal_batch_v1.py',
     'tools/atlas_h2_owner_research_authority_v1.py',
+    'tools/atlas_h2_owner_identity_v2.py',
     'tools/atlas_h2_binance_public_lane_v1.py',
     'tools/atlas_h2_owner_local_one_shot_v1.py',
     'tools/atlas_h2_historical_policy_v2.py',
