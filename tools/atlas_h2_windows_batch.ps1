@@ -5,7 +5,7 @@
 param(
   [Parameter(Mandatory=$true)][string]$EvidenceDir,
   [string]$OutputDir = '',
-  [ValidateSet('strict-custodian','official-binance')][string]$Mode = 'strict-custodian',
+  [ValidateSet('strict-custodian','official-binance','owner-personal')][string]$Mode = 'strict-custodian',
   [string]$CustodianVerifierKey = '',
   [string]$LicenseReviewerKey = '',
   [string]$OwnerSigningKey = '',
@@ -17,6 +17,8 @@ $ErrorActionPreference = 'Stop'
 $bootstrapCommit = 'aa0f21bfcbb07d36258c5dca552310bb36f452c8'
 $publicCommit = '5a976b8bf04f764b2822d49ff40cc5d60548494b'
 $operatorCommit = '9a4ed276913eac202e0c77778371c91dc482ff23'
+# Immutable owner-personal research-only route + early manual AST guard.
+$personalCommit = '17b0d0216fcc3f76e36317def0a9751e3607c924'
 $required = @(
   $bootstrapCommit,
   $publicCommit,
@@ -27,6 +29,7 @@ $required = @(
   'a4b887fe7067b89febc339e466652a5fcb1c2bee',
   '6acbcc7fc243b132f58170df4c6469bbf7f4eff8'
 )
+if ($Mode -eq 'owner-personal') { $required += $personalCommit }
 # Default results to a private profile path, not the original E: source.
 $localData = [Environment]::GetFolderPath('LocalApplicationData')
 if ([string]::IsNullOrWhiteSpace($localData)) {
@@ -83,11 +86,33 @@ for sha,rel in (
 '@
   & $Python -I -c $stageCode $clone $driver $bootstrapCommit $operatorCommit $publicCommit
   if ($LASTEXITCODE -ne 0) { throw 'STAGING_FAILED' }
+  # Personal authority is a separate explicit, immutable 2026 research class.
+  # Original licensed branch remains on its prior independently reviewed freeze.
+  if ($Mode -eq 'owner-personal') {
+    $stagePersonal = @'
+import pathlib, subprocess, sys
+repo, target, sha = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3]
+for rel in (
+    'tools/atlas_h2_owner_personal_batch_v1.py',
+    'tools/atlas_h2_owner_research_authority_v1.py',
+    'tools/atlas_h2_binance_public_lane_v1.py'):
+    p=target/rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    r=subprocess.run(['git','-C',str(repo),'show',sha+':'+rel],
+                     stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    if r.returncode: raise SystemExit('PERSONAL_PINNED_CODE_NOT_AVAILABLE')
+    p.write_bytes(r.stdout)
+'@
+    & $Python -I -c $stagePersonal $clone $driver $personalCommit
+    if ($LASTEXITCODE -ne 0) { throw 'PERSONAL_STAGE_FAILED' }
+  }
   $runner = @'
 import sys
 sys.path.insert(0,sys.argv[1])
 if sys.argv[2] == 'official-binance':
     from tools.atlas_h2_binance_public_lane_v1 import main
+elif sys.argv[2] == 'owner-personal':
+    from tools.atlas_h2_owner_personal_batch_v1 import main
 else:
     from tools.atlas_h2_private_batch_bootstrap_v1 import main
 raise SystemExit(main(sys.argv[3:]))
@@ -101,9 +126,13 @@ raise SystemExit(main(sys.argv[3:]))
     if ($CustodianVerifierKey) {
       $argsForBatch += @('--trusted-custodian-key', $CustodianVerifierKey)
     }
-  } else {
+  } elseif ($Mode -eq 'official-binance') {
     if ($LicenseReviewerKey) {
       $argsForBatch += @('--license-reviewer-key', $LicenseReviewerKey)
+    }
+  } else {
+    if ($LicenseReviewerKey -or $CustodianVerifierKey) {
+      throw 'PERSONAL_LANE_CANNOT_IMPERSONATE_EXTERNAL_RIGHTS_OR_CUSTODIAN'
     }
   }
   if ($OwnerSigningKey) {
