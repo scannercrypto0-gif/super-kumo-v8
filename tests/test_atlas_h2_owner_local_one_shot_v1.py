@@ -140,6 +140,8 @@ class H2Operator(unittest.TestCase):
         db = original / "warehouse.sqlite"
         conn = sqlite3.connect(db)
         try:
+            self.assertEqual(conn.execute("PRAGMA journal_mode=WAL").fetchone()[0],
+                             "wal")
             conn.execute("CREATE TABLE t(x INTEGER)")
             conn.execute("INSERT INTO t VALUES (7)")
             conn.commit()
