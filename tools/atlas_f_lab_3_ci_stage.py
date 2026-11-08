@@ -11,7 +11,7 @@ import tarfile
 PINS={
  "work235":"6acbcc7fc243b132f58170df4c6469bbf7f4eff8",
  "scanner_b":"30c37ae56851488b882998c7fa0085ec51dbfc92",
- "scanner":"3c82448702c9ae35783716e4e2c3b640010db97c",
+ "scanner":"af3720b6be921444cb83d52f3e975a9c85475ec6",
  "core":"99c27ea2c1a4d41aaae361141301a8a9ea3b33c3",
  "factory":"04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
 }
