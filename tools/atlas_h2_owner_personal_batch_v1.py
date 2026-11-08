@@ -54,7 +54,7 @@ def _load_intake(folder):
         raise Blocked("PERSONAL_EVIDENCE_INVALID_JSON") from None
     fail(type(tech) is dict and set(tech) == TECH_FIELDS
          and tech["schema"] == LANE_SCHEMA
-         and tech["owner_authorization_ref"] == "#205/6718325330"
+         and tech["owner_authorization_ref"] == "#271/6720832849"
          and tech["one_time_scope_authorized"] is True,
          "PERSONAL_TECHNICAL_INTAKE_INVALID")
     for name,field in (("core245-native-receipt.json","native_receipt_file_sha256"),
@@ -194,6 +194,7 @@ def run_owner_personal_batch(evidence_dir, output_dir, *,
              and not output_claim.exists() and not output_claim.is_symlink(),
              "PERSONAL_ONE_RUN_ALREADY_CLAIMED")
         lease={"schema":SCHEMA,"scope_sha256":_digest(scope),
+               "one_use_nonce":scope["one_use_nonce"],
                "cost_sha256":_digest(policy),
                "publisher_zip_sha256":proof["zip_bytes_sha256"],
                "rights_status":"OWNER_ASSERTED_EXTERNAL_UNVERIFIED",
