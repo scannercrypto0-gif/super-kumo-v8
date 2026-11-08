@@ -291,6 +291,18 @@ class OfficialBinanceLane(unittest.TestCase):
         self.assertEqual(report["status"], "BLOCKED")
         self.assertFalse(report["source_read"])
 
+    def test_intake_must_not_reside_in_original_warehouse(self):
+        self._intake()
+        path = self.private / "technical-intake.json"
+        tech = json.loads(path.read_text())
+        tech["warehouse_root"] = str(self.root)
+        path.write_text(json.dumps(tech))
+        result = run_public_batch(self.private, self.output, fetcher=self.fetch)
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["reasons"],
+                         ["PRIVATE_INTAKE_MUST_BE_OUTSIDE_ORIGINAL_SOURCE"])
+        self.assertEqual(result["source_read_status"], "NOT_ATTEMPTED")
+
     def test_unknown_native_and_ast_are_required(self):
         self._intake()
         (self.private/"manual-third-ast.json").unlink()
