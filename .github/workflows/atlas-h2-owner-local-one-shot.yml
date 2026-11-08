@@ -12,6 +12,7 @@ on:
       - 'tests/test_atlas_h2_binance_public_lane_v1.py'
       - 'tests/test_atlas_h2_private_batch_bootstrap_v1.py'
       - '.github/workflows/atlas-h2-owner-local-one-shot.yml'
+      - 'docs/research/integration-r1-first-original-test-readiness-v1.md'
   workflow_dispatch:
 permissions:
   contents: read
