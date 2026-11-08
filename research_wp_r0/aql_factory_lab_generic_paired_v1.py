@@ -17,7 +17,10 @@ SCHEMA="aql.factory.lab.h.paired-observation.v1"
 RECEIPT="aql.factory.lab.h.paired-observation-report.v1"
 STEP=900000
 HOUR=3600000
-MAPPING={"ENTRY_SIGNAL":"TRIGGERED","EXIT_SIGNAL":"REJECTED",
+# A known EXIT is not a rejected *entry* opportunity. Legacy P2 has no
+# EXIT disposition: conservatively label it UNKNOWN, retaining the true
+# Scanner state separately so no fake REJECTED count is manufactured.
+MAPPING={"ENTRY_SIGNAL":"TRIGGERED","EXIT_SIGNAL":"UNKNOWN",
          "NO_SIGNAL":"NO_SIGNAL","UNKNOWN":"UNKNOWN"}
 
 
@@ -190,6 +193,8 @@ def build_generic_paired_lab(*,store_path,secretary_root,experiment_id,
             "decision_cutoff_ms":e["decision_cutoff_ms"],
             "decision_ms":e["decision_cutoff_ms"],
             "disposition":MAPPING[state],
+            "original_scanner_state":state,
+            "scanner_event_sha256":e["scanner_event_sha256"],
             "evidence_class":"RETROSPECTIVE_NON_PIT",
             "direction":None,"direction_evidence_ref":None,
             "regime":None,"regime_source_sha256":None,
@@ -242,6 +247,7 @@ def build_generic_paired_lab(*,store_path,secretary_root,experiment_id,
         "shadow_definition_sha256":comparison_definition_sha256,
         "cost_policy_sha256":link["cost_policy_sha256"],
         "decision_counts":expected,
+        "paired_disposition_counts":report["disposition_counts"],
         "paired_schedule_sha256":schedule["artifact_sha256"],
         "paired_lab_sha256":report["artifact_sha256"],
         "horizon_coverage":report["market_coverage_by_horizon"],
