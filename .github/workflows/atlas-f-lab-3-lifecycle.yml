@@ -6,6 +6,7 @@ on:
       - 'tools/atlas_f_lab_3_lifecycle_v1.py'
       - 'tools/atlas_f_lab_3_ci_stage.py'
       - 'tests/test_atlas_f_lab_3_lifecycle_v1.py'
+      - 'tests/test_atlas_f_lab_3_actual_warehouse_restart_v1.py'
       - '.github/workflows/atlas-f-lab-3-lifecycle.yml'
   workflow_dispatch:
 permissions:
@@ -33,3 +34,8 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m unittest discover -s tests -p test_atlas_f_lab_3_lifecycle_v1.py -v
+
+      - name: Actual disposable Core253 SQLite and real process death recovery
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p test_atlas_f_lab_3_actual_warehouse_restart_v1.py -v
