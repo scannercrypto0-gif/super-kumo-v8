@@ -4,6 +4,7 @@ import copy
 import hashlib
 import hmac
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,7 +12,7 @@ from unittest.mock import patch
 
 from tools.atlas_h2_owner_local_one_shot_v1 import (
     SCHEMA, PINS, Stop, boundaries, canonical, digest, execute,
-    fingerprint, native_receipt_check, verify_owner,
+    fingerprint, native_receipt_check, isolated_overlay, sha_file, verify_owner,
 )
 
 
@@ -144,6 +145,63 @@ class H2Operator(unittest.TestCase):
         (self.root / "native.json").write_text(json.dumps(native))
         with self.assertRaises(Stop):
             native_receipt_check(s, native)
+
+    def test_exact_archive_isolation_with_local_synthetic_commit(self):
+        repo = self.root / "synthetic-git"
+        repo.mkdir()
+        paths = (
+            "tools/scanner_strategy_f/research_strategy_plugin.py",
+            "research_wp_r0/aql_core_backbone_local_v1.py",
+            "research_wp_r0/aql_factory_h_generic_signal_adapter_v1.py",
+            "research_wp_r0/aql_core_h_research_secretary_v1.py",
+            "tools/atlas_h_generic_secretary_bridge.py",
+        )
+        for name in paths:
+            p = repo / name
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text("VALUE = 1\\n", encoding="utf-8")
+        commands = [
+            ["git", "init", "-q"],
+            ["git", "add", "."],
+            ["git", "-c", "user.name=atlas-test", "-c",
+             "user.email=atlas-test@example.invalid", "commit", "-qm", "fixture"],
+        ]
+        for cmd in commands:
+            subprocess.run(cmd, cwd=repo, check=True, capture_output=True)
+        sha = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+        overlay = self.root / "overlay"
+        with patch.dict(PINS, {k: sha for k in PINS}):
+            token = isolated_overlay(repo, overlay)
+        self.assertEqual(len(token), 64)
+        for name in paths:
+            self.assertTrue((overlay / name).exists())
+
+    def test_valid_native_range_receipt_is_verified_without_pit_claim(self):
+        s = scope(self.root)
+        rows = [{"bar_open_ms": s["start_ms"] + i * 900000,
+                 "bar_close_ms": s["start_ms"] + (i + 1) * 900000 - 1}
+                for i in range(4)]
+        native = {
+            "schema": "aql.core.historical-price-custody-query.v1",
+            "status": "OK",
+            "coverage": "COMPLETE",
+            "dataset_id": s["dataset_id"],
+            "version": s["version"],
+            "source_bytes_sha256": s["source_bytes_sha256"],
+            "manifest_integrity_sha256": s["manifest_integrity_sha256"],
+            "decision_cutoff_ms": s["decision_cutoff_ms"],
+            "required_bar_count": 4,
+            "available_bar_count": 4,
+            "missing_bar_opens": [],
+            "bars": rows,
+        }
+        native["price_query_sha256"] = digest(native)
+        f = self.root / "native.json"
+        f.write_text(json.dumps(native), encoding="utf-8")
+        s["native_receipt_sha256"] = sha_file(f)
+        self.assertEqual(native_receipt_check(s, native),
+                         native["price_query_sha256"])
 
     def test_receipt_chain_sanitized_and_sealed(self):
         r = execute({}, allow_local_run=False)
