@@ -57,7 +57,10 @@ def build_generic_paired_lab(*,store_path,secretary_root,experiment_id,
     link=index["link"]
     _sealed(packet)
     _sealed(package)
-    _sealed(base_result)
+    need(type(base_result) is dict and _sha(base_result.get("receipt_sha256")) and
+         digest({k:v for k,v in base_result.items()
+                 if k!="receipt_sha256"})==base_result["receipt_sha256"],
+         "RESULT_SEAL")
     need(packet["experiment_id"]==experiment_id and
          package["experiment_id"]==experiment_id and
          base_result["experiment_id"]==experiment_id and
