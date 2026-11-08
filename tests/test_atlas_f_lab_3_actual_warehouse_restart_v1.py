@@ -30,7 +30,6 @@ from research_wp_r0.aql_core_h_research_secretary_v1 import (
 )
 from tools.scanner_strategy_f import research_strategy_plugin as scanner
 from tools.atlas_f_lab_3_lifecycle_v1 import run_synthetic, LifecycleStop
-from research_wp_r0.strategy_definition import Frozen
 
 from test_aql_factory_h_generic_signal_adapter_v1 import case_for,reseal
 
