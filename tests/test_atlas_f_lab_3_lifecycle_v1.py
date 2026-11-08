@@ -41,7 +41,7 @@ class Lifecycle(unittest.TestCase):
         # Actual Scanner & Work235 unmocked; only synthetic query data.
         return self.factory.run_one(i,missing=missing,source=source,cost=cost)[0]
 
-    def run(self,packet,**kwargs):
+    def drive(self,packet,**kwargs):
         return run_synthetic(
             packet=packet,store_path=self.store,
             secretary_root=self.secretary,checkpoint_root=self.checkpoint,
@@ -52,12 +52,12 @@ class Lifecycle(unittest.TestCase):
         for index,source,cost in ((0,None,None),(2,"c"*64,"2")):
             packet=self.packet(index,source=source,cost=cost)
             with self.assertRaisesRegex(LifecycleStop,"SIMULATED_CRASH_AT_SCANNER_VERIFIED"):
-                self.run(packet,stop_after="SCANNER_VERIFIED")
+                self.drive(packet,stop_after="SCANNER_VERIFIED")
             with self.assertRaisesRegex(LifecycleStop,"SIMULATED_CRASH_AT_LAB_EVALUATED"):
-                self.run(packet,stop_after="LAB_EVALUATED")
-            receipt=self.run(packet)
+                self.drive(packet,stop_after="LAB_EVALUATED")
+            receipt=self.drive(packet)
             self.assertEqual(receipt["state"],"SECRETARY_WAIT")
-            self.assertEqual(receipt,self.run(packet))
+            self.assertEqual(receipt,self.drive(packet))
             self.assertEqual(verified(receipt)["sha256"],receipt["sha256"])
             ref=get_experiment_link(
                 self.store,packet["experiment_id"],
@@ -83,7 +83,7 @@ class Lifecycle(unittest.TestCase):
 
     def test_source_partial_unknown_and_missing_outcome_not_promoted(self):
         packet=self.packet(1,missing=4)
-        receipt=self.run(packet)
+        receipt=self.drive(packet)
         self.assertEqual(receipt["state"],"SECRETARY_WAIT")
         link=get_experiment_link(self.store,packet["experiment_id"],
                                  secretary_root=self.secretary)["link"]
@@ -114,7 +114,7 @@ class Lifecycle(unittest.TestCase):
 
     def test_existing_paired_bridge_real_unmodified_and_missing_72h(self):
         packet=self.packet(2)
-        self.run(packet)
+        self.drive(packet)
         with sqlite3.connect(self.store) as con:
             package=json.loads(con.execute(
                 f"SELECT document FROM {TABLE} WHERE experiment_id=?",
@@ -131,24 +131,24 @@ class Lifecycle(unittest.TestCase):
 
     def test_same_id_different_strategy_or_source_refused(self):
         packet=self.packet(0)
-        self.run(packet)
+        self.drive(packet)
         other=dict(packet)
         other["strategy_definition_sha256"]="f"*64
         other["sha256"]=digest({k:v for k,v in other.items() if k!="sha256"})
         with self.assertRaises(LifecycleStop):
-            self.run(other)
-        self.assertEqual(self.run(packet)["state"],"SECRETARY_WAIT")
+            self.drive(other)
+        self.assertEqual(self.drive(packet)["state"],"SECRETARY_WAIT")
 
     def test_checkpoint_bytes_tamper_refused_and_no_hidden_rerun(self):
         packet=self.packet(0)
-        self.run(packet)
+        self.drive(packet)
         checkpoint=self.checkpoint/(packet["experiment_id"]+".json")
         original=json.loads(checkpoint.read_text())
         forged=dict(original)
         forged["state"]="PLANNED"
         checkpoint.write_text(json.dumps(forged))
         with self.assertRaisesRegex(LifecycleStop,"CHECKPOINT_TAMPER"):
-            self.run(packet)
+            self.drive(packet)
 
     def test_checkpoint_original_source_overlap_refused(self):
         packet=self.packet(0)
@@ -162,7 +162,7 @@ class Lifecycle(unittest.TestCase):
         pending=self.checkpoint/(packet["experiment_id"]+".pending")
         pending.write_text('{"forged": true}')
         with self.assertRaisesRegex(LifecycleStop,"CHECKPOINT_TAMPER"):
-            self.run(packet)
+            self.drive(packet)
         self.assertFalse((self.checkpoint/(packet["experiment_id"]+".json")).exists())
 
     def test_unsealed_query_or_pit_claim_refused(self):
@@ -171,12 +171,12 @@ class Lifecycle(unittest.TestCase):
         forged["historical_pit"]="ATTESTED"
         forged["sha256"]=digest({k:v for k,v in forged.items() if k!="sha256"})
         with self.assertRaisesRegex(LifecycleStop,"RESEARCH_ONLY_SCOPE"):
-            self.run(forged)
+            self.drive(forged)
         tamper=dict(packet)
         tamper["source_query_sha256"]="c"*64
         tamper["sha256"]=digest({k:v for k,v in tamper.items() if k!="sha256"})
         with self.assertRaisesRegex(LifecycleStop,"CORE_QUERY_LINEAGE"):
-            self.run(tamper)
+            self.drive(tamper)
 
 if __name__=="__main__":
     unittest.main()
