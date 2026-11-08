@@ -24,9 +24,10 @@ def scope(root):
         "publisher_pit_attested": False,
         "owner_cost_authorized": True,
         "exact_heads": PINS.copy(),
-        "start_ms": 0,
-        "end_exclusive_ms": 4 * 900000,
-        "decision_cutoff_ms": 4 * 900000,
+        "month": "2024-03",
+        "start_ms": 1709251200000,
+        "end_exclusive_ms": 1709251200000 + 4 * 900000,
+        "decision_cutoff_ms": 1709251200000 + 4 * 900000,
         "dataset_id": "BINANCE-SPOT-BTCUSDT-15M-2024-03-F-v1",
         "version": 1,
         "strategy_id": "h_manual_distinct_test",
@@ -110,7 +111,7 @@ class H2Operator(unittest.TestCase):
         a["costs"] = {k: "0" for k in a["costs"]}
         variants.append(a)
         b = scope(self.root)
-        b["end_exclusive_ms"] = 900000 * 5000
+        b["end_exclusive_ms"] = b["start_ms"] + 900000 * 5000
         variants.append(b)
         c = scope(self.root)
         c["exact_heads"]["factory"] = "f" * 40
