@@ -132,7 +132,7 @@ def inspect_four(folder,findings):
     root=Path(folder)
     payload={}
     if findings.safe("EVIDENCE_DIR","EVIDENCE",(),
-        lambda:root.is_dir() and not root.is_symlink(),
+        lambda:root.is_dir() and not _is_link(root),
         "EVIDENCE_DIRECTORY_MISSING_OR_LINK"):
         pass
     for name in FILES:
@@ -206,7 +206,12 @@ def diagnose(evidence_dir,signed_output_dir,owner_key,repo,
     F.safe("TECH_SCHEMA","EVIDENCE",techdeps,
            lambda:type(tech) is dict and set(tech)==TECH_FIELDS
            and tech.get("schema")==LANE_SCHEMA
-           and tech.get("owner_authorization_ref")=="#271/6720832849",
+           and tech.get("owner_authorization_ref")=="#271/6720832849"
+           and tech.get("dataset_id","").startswith("BINANCE-SPOT-BTCUSDT-15M-2024-03")
+           and tech.get("month")=="2024-03"
+           and tech.get("start_ms")==1709251200000
+           and tech.get("end_exclusive_ms")==1711929600000
+           and tech.get("decision_cutoff_ms")==1711929600000,
            "TECHNICAL_INTAKE_SCHEMA_OR_OWNER_REF")
     F.safe("OWNER_KEY_FILE","OWNER",(),
            lambda:Path(owner_key).is_file()
@@ -382,7 +387,7 @@ def diagnose(evidence_dir,signed_output_dir,owner_key,repo,
                       regression="test_publisher_signed_zip_checksum")
         else:
             F.blocked("PUBLISHER_BYTE_IDENTITY","SOURCE",deps)
-        if F.states["PUBLISHER_BYTE_IDENTITY"]=="PASS":
+        if F.states["PUBLISHER_BYTE_IDENTITY"]=="PASS" and F.states["SIGNED_EXACT_ROOT"]=="PASS":
             try:
                 source=Path(tech["local_source_zip"])
                 assert source.is_file() and not _is_link(source)
@@ -394,7 +399,7 @@ def diagnose(evidence_dir,signed_output_dir,owner_key,repo,
                       "ORIGINAL_ZIP_SHA_MISMATCH_OR_UNSAFE:"+_code(exc))
         else:
             F.blocked("ORIGINAL_ZIP_IDENTITY","SOURCE",
-                      ("PUBLISHER_BYTE_IDENTITY",))
+                      ("PUBLISHER_BYTE_IDENTITY","SIGNED_EXACT_ROOT"))
         deps=("OUTPUT_EXACT_SCOPE","ORIGINAL_ZIP_IDENTITY")
         if all(F.states.get(x)=="PASS" for x in deps):
             try:
@@ -442,6 +447,16 @@ def diagnose(evidence_dir,signed_output_dir,owner_key,repo,
     else:
         F.blocked("SOURCE_POSTREAD_UNCHANGED","SOURCE",
                   ("SOURCE_DURABLE_FINGERPRINT",))
+    # Runtime-only durable receipt/ACK checks cannot truthfully PASS before
+    # first owner-authorized original H2. Import parity is checked above.
+    for item,area in (
+        ("FACTORY_REAL_CONSUMER","FACTORY"),
+        ("LAB_REAL_F_LAB_1_VERIFIED_WAIT","FACTORY"),
+        ("SECRETARY_REAL_WAIT_FOUR_NULL_ACK","FACTORY"),
+    ):
+        F.add(item,area,"NOT_RUN_REQUIRES_ORIGINAL_EXECUTION",
+              "ORIGINAL_EXECUTION_RECEIPT_NOT_AVAILABLE",
+              severity="P1")
     for item in ("ORIGINAL_H2_EXECUTION","G0_APPROVAL","TRADING_AUTHORITY"):
         F.add(item,"AUTHORITY","NOT_RUN_REQUIRES_ORIGINAL_EXECUTION",
               "EXPLICIT_SEPARATE_OWNER_APPROVAL_REQUIRED",severity="P1")
