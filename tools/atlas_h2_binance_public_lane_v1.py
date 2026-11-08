@@ -213,6 +213,40 @@ def verified_license(license_doc, download_year):
     return digest(license_doc)
 
 
+def validate_native_manual_third_ast(path, expected_definition_sha256,
+                                     expected_strategy_id):
+    """Pre-source reject Scanner plugin-as-AST and duplicate/foreign strategies.
+
+    An H2 manual-third-ast.json must be native StrategyDefinition.to_dict(),
+    NOT the separately sealed Scanner plugin {payload,sha256}. No source IO.
+    """
+    from research_wp_r0.strategy_definition import StrategyDefinition
+    from research_wp_r0.indicator_library_v2 import IndicatorRegistryV2
+    try:
+        source = Path(path)
+        fail(source.is_file() and not source.is_symlink()
+             and source.stat().st_size <= 100_000,
+             "H2_MANUAL_AST_SLOT_SCHEMA_MISMATCH")
+        from research_wp_r0.strategy_definition import load_json
+        document = load_json(source.read_text(encoding="utf-8"))
+        fail(type(document) is dict
+             and set(document) == {"definition", "digest"},
+             "H2_MANUAL_AST_SLOT_SCHEMA_MISMATCH")
+        definition = StrategyDefinition.from_dict(
+            document, registry=IndicatorRegistryV2())
+        fail(definition.digest == expected_definition_sha256
+             and definition.spec["strategy_id"] == expected_strategy_id
+             and expected_strategy_id == "h_manual_distinct_test"
+             and definition.spec["scope"] == "RESEARCH_ONLY",
+             "H2_MANUAL_AST_IDENTITY_OR_DIGEST_MISMATCH")
+    except Blocked:
+        raise
+    except (OSError, UnicodeError, ValueError, KeyError, TypeError,
+            RecursionError):
+        raise Blocked("H2_MANUAL_AST_SLOT_SCHEMA_MISMATCH") from None
+    return definition.digest
+
+
 def technical_intake(folder):
     root = Path(folder).resolve(strict=True)
     fail(root.is_dir() and not root.is_symlink(),
@@ -248,6 +282,9 @@ def technical_intake(folder):
         fail(type(tech[column]) is str
              and sha_file(root/name) == tech[column],
              "PRIVATE_EVIDENCE_HASH_DRIFT")
+    validate_native_manual_third_ast(
+        root / "manual-third-ast.json",
+        tech["strategy_definition_sha256"], tech["strategy_id"])
     return tech, lic, root
 
 
