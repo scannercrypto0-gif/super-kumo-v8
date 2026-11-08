@@ -95,7 +95,10 @@ repo, target, sha = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.ar
 for rel in (
     'tools/atlas_h2_owner_personal_batch_v1.py',
     'tools/atlas_h2_owner_research_authority_v1.py',
-    'tools/atlas_h2_binance_public_lane_v1.py'):
+    'tools/atlas_h2_binance_public_lane_v1.py',
+    'research_wp_r0/strategy_definition.py',
+    'research_wp_r0/indicator_library.py',
+    'research_wp_r0/historical_library.py'):
     p=target/rel
     p.parent.mkdir(parents=True, exist_ok=True)
     r=subprocess.run(['git','-C',str(repo),'show',sha+':'+rel],
