@@ -159,6 +159,9 @@ def build_scope(claim, directory, output):
     require(not contained(out, directory)
             and not contained(directory, out),
             "OUTPUT_OVERLAPS_PRIVATE_INTAKE")
+    require(not any(contained(directory, r) or contained(r, directory)
+                    for r in roots),
+            "PRIVATE_INTAKE_OVERLAPS_ORIGINAL_SOURCE")
     scope = {
         "single_use": True, "explicit_readonly_no_export": True,
         "source_rights_attested": True,
