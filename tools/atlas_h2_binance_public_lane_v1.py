@@ -53,7 +53,7 @@ LIC_FIELDS = {
 }
 PUBLIC_REQUIRED = {
     "technical-intake.json", "historical-license-evidence.json",
-    "historical-license-evidence.mac",
+    "historical-license-evidence.mac", "historical-terms.txt",
     "core245-native-receipt.json", "manual-third-ast.json",
 }
 
@@ -262,6 +262,13 @@ def check_license_signature(root, reviewer_key, owner_key, license_doc):
         hmac.new(key, raw, hashlib.sha256).hexdigest(), mac),
         "WAIT_LICENSE_INDEPENDENT_SIGNATURE")
     lic_digest = verified_license(license_doc, 2024)
+    # An external review must pin the actual retained terms bytes, not just
+    # display an arbitrary 64-character terms identifier in JSON.
+    terms_file = root / "historical-terms.txt"
+    fail(terms_file.is_file() and not terms_file.is_symlink()
+         and 0 < terms_file.stat().st_size <= 512 * 1024
+         and sha_file(terms_file) == license_doc["terms_sha256"],
+         "WAIT_HISTORICAL_TERMS_BYTES_AND_SHA")
     return lic_digest
 
 
@@ -328,6 +335,10 @@ def run_public_batch(evidence_dir, output_dir, *, fetcher=fetch_official,
         invoked = True
         operator_result = execute(
             manifest, key_file=owner_key, repo=git_repo, allow_local_run=True)
+        # Original local source archive is outside Warehouse/RawVault in some
+        # older owner downloads; explicitly recheck it after the experiment.
+        fail(sha_file(local) == proof["zip_bytes_sha256"],
+             "OWNER_ORIGINAL_ZIP_CHANGED_DURING_RESEARCH")
         details["operator_receipt_sha256"] = operator_result["sha256"]
         details["operator_status"] = operator_result["status"]
         fail(operator_result["status"] == "EXPERIMENT_ENGINEERING_PASS",
