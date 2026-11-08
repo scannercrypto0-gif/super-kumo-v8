@@ -237,27 +237,48 @@ print(json.dumps({"state":out["state"],"sha256":out["sha256"]}))
         self.assertEqual(before,source_hashes())
 
     def test_partial_real_core_warehouse_rejected_by_scanner_cutoff_boundary(self):
-        # Core253 may return PARTIAL for a pre-end cutoff; Scanner H requires
-        # cutoff >= end. This is an exact upstream contract mismatch and
-        # must fail closed, not be silently resealed into an accepted packet.
+        """R1 new Scanner pin: true Core253 PARTIAL must quarantine ALL slots."""
         query,receipt=synthetic_real_sqlite(self.warehouse,partial=True)
         self.assertEqual(query["coverage"],"PARTIAL")
         self.assertGreater(len(query["missing_bar_opens"]),0)
-        baseline=case_for(2)
-        with self.assertRaisesRegex(Exception,"H_CORE_CUTOFF_OR_RANGE"):
-            scanner.evaluate_strategy_plugin(
-                baseline["strategy_plugin"],query,
-                warehouse_root=str(self.warehouse),
-                policy=baseline["scanner_signal_policy"])
+        self.assertLess(query["decision_cutoff_ms"],query["end_exclusive_ms"])
+        # No mocked Core query: Scanner itself rereads actual disposable SQLite.
+        packet=actual_scanner_packet(query,self.warehouse)
+        batch=packet["scanner_signal_batch"]["payload"]
+        self.assertEqual(batch["coverage"],"PARTIAL")
+        self.assertEqual(batch["expected_bar_count"],N)
+        self.assertEqual(batch["observed_bar_count"]+batch["missing_bar_count"],N)
+        self.assertEqual(batch["signal_counts"]["UNKNOWN"],N)
+        for state in ("ENTRY_SIGNAL","EXIT_SIGNAL","NO_SIGNAL"):
+            self.assertEqual(batch["signal_counts"][state],0)
+        self.assertTrue(all(event["signal_state"]=="UNKNOWN"
+                            and event["next_open_is_fill"] is False
+                            and event["cost_or_pnl_computed"] is False
+                            for event in batch["events"]))
+        self.assertEqual(packet["historical_pit"],"NOT_ATTESTED")
+        self.assertEqual(packet["trading_authority"],"NONE")
+        # Factory is independently responsible for any remaining cutoff gate.
+        # This positive test must never silently assert an unproven downstream PASS.
+        result=self.run_pipeline(packet)
+        self.assertEqual(result["state"],"SECRETARY_WAIT")
+        self.assertEqual(self.run_pipeline(packet),result)
+        route=read_generic_research_result_route(
+            self.secretary,packet["experiment_id"])
+        self.assertEqual(route["state"],"WAIT_RESEARCH_REVIEW")
+        for ack in ("source_ack_sha256","strategy_approval_sha256",
+                    "factory_consumer_ack_sha256","research_review_ack_sha256"):
+            self.assertIsNone(route[ack])
+        index=get_experiment_link(self.store,packet["experiment_id"],
+                                  secretary_root=self.secretary)
+        self.assertEqual(index["status"],"VERIFIED_WAIT")
+        with closing(sqlite3.connect(self.store)) as con:
+            self.assertEqual(con.execute(
+                f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0],1)
         with self.assertRaisesRegex(BackboneError,"WAREHOUSE_INCOMPLETE_OR_FUTURE"):
             query_local(self.warehouse,query["dataset_id"],1,
                         START,START+N*STEP,query["decision_cutoff_ms"],
                         required_source_sha256=query["source_bytes_sha256"],
                         require_complete=True,sqlite_immutable=True)
-        with closing(sqlite3.connect(self.store)) as con:
-            self.assertIsNone(con.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                (TABLE,)).fetchone())
 
     def test_unsafe_cutoff_rejects_without_authority_upgrade(self):
         packet=self.packet()
