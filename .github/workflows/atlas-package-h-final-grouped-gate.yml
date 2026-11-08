@@ -68,11 +68,19 @@ jobs:
               target.parent.mkdir(parents=True,exist_ok=True)
               copyfile(item,target)
       - name: Full real Factory and Core SQLite grouped gate plus negatives
-        shell: bash
+        shell: python
         run: |
-          set -euo pipefail
-          PYTHONPATH=.:tests python -m unittest -v \
-            test_aql_factory_h_generic_signal_adapter_v1 \
-            test_aql_core_h_generic_research_secretary_v1 \
-            test_atlas_h_generic_secretary_bridge \
-            test_atlas_h_full_generic_pipeline
+          import sys,unittest
+          from pathlib import Path
+          sys.path.insert(0,str(Path.cwd()))
+          sys.path.insert(0,str(Path.cwd()/'tests'))
+          names=(
+              'test_aql_factory_h_generic_signal_adapter_v1',
+              'test_aql_core_h_generic_research_secretary_v1',
+              'test_atlas_h_generic_secretary_bridge',
+              'test_atlas_h_full_generic_pipeline',
+          )
+          suite=unittest.defaultTestLoader.loadTestsFromNames(names)
+          result=unittest.TextTestRunner(verbosity=2).run(suite)
+          if not result.wasSuccessful():
+              raise SystemExit(1)
