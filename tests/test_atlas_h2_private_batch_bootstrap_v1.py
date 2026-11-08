@@ -64,8 +64,8 @@ class PrivateBatch(unittest.TestCase):
             "dataset_id": "BINANCE-SPOT-BTCUSDT-15M-2024-03-F-v1",
             "version": 1, "month": "2024-03",
             "start_ms": start,
-            "end_exclusive_ms": start + 4*900000,
-            "decision_cutoff_ms": start + 4*900000,
+            "end_exclusive_ms": 1711929600000,
+            "decision_cutoff_ms": 1711929600000,
             "source_bytes_sha256": "a"*64,
             "manifest_integrity_sha256": "b"*64,
             "native_receipt_file_sha256": sha_file(
