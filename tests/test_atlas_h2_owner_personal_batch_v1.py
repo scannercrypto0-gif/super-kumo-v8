@@ -190,7 +190,7 @@ class OwnerPersonalBatchSynthetic(unittest.TestCase):
                    side_effect=AssertionError("no publisher needed")):
             r=self.call(key=None)
         self.assertEqual(r["status"],"BLOCKED")
-        self.assertFalse(r["operator_invoked"])
+        self.assertEqual(r["source_read_status"],"NOT_ATTEMPTED")
 
     def test_tampered_technical_source_even_with_owner_mac_is_rejected(self):
         self.tech["local_source_zip"]=str(self.root/"wrong.zip")
@@ -199,7 +199,7 @@ class OwnerPersonalBatchSynthetic(unittest.TestCase):
                    side_effect=AssertionError("must not reach provider")):
             result=self.call()
         self.assertIn("OWNER_PERSONAL_TECH_ROOT_OR_PIN_DRIFT",result["reasons"])
-        self.assertFalse(result["operator_invoked"])
+        self.assertEqual(result["source_read_status"],"NOT_ATTEMPTED")
 
     def test_unsigned_cost_edit_blocks_before_provider(self):
         packet_path=self.intake/"owner-personal-assertion.json"
@@ -233,7 +233,7 @@ class OwnerPersonalBatchSynthetic(unittest.TestCase):
                             self.fail("must not run"))
         self.assertIn("PERSONAL_PUBLISHER_SOURCE_OR_MONTH_MISMATCH",
                       result["reasons"])
-        self.assertFalse(result["operator_invoked"])
+        self.assertEqual(result["source_read_status"],"NOT_ATTEMPTED")
 
     def test_missing_real_core245_or_registration_substitution_rejected(self):
         native=self.intake/"core245-native-receipt.json"
@@ -247,7 +247,7 @@ class OwnerPersonalBatchSynthetic(unittest.TestCase):
                    side_effect=self.proof):
             result=self.call()
         self.assertEqual(result["status"],"BLOCKED")
-        self.assertFalse(result["operator_invoked"])
+        self.assertEqual(result["source_read_status"],"NOT_ATTEMPTED")
 
     def test_wrong_ast_plugin_shape_rejected_before_provider(self):
         p=self.intake/"manual-third-ast.json"
