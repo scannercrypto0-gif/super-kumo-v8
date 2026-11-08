@@ -11,17 +11,15 @@ import tarfile
 PINS={
  "work235":"6acbcc7fc243b132f58170df4c6469bbf7f4eff8",
  "scanner":"3c82448702c9ae35783716e4e2c3b640010db97c",
- "factory":"04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
  "core":"99c27ea2c1a4d41aaae361141301a8a9ea3b33c3",
+ "factory":"04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
 }
 ALLOWED={
  "work235":("research_wp_r0/","tools/strategy_service_offline/"),
  "scanner":("research_wp_r0/","tools/scanner_strategy_f/"),
  "factory":("research_wp_r0/","tests/test_aql_factory_h_generic_signal_adapter_v1.py",
             "tests/test_aql_factory_lab_generic_wiring_v1.py"),
- "core":("research_wp_r0/aql_core_h_research_secretary_v1.py",
-         "research_wp_r0/aql_archive_custody_bridge_v1.py",
-         "research_wp_r0/aql_core_backbone_local_v1.py",),
+ "core":("research_wp_r0/",),
 }
 
 def main():
@@ -54,6 +52,18 @@ def main():
         if not copied:
             raise RuntimeError("ROLE_EMPTY:"+role)
         print("F_LAB_3_ROLE_PIN",role,sha,"files",copied)
+    # Factory latest must own its new F-LAB-1/2 code; Core latest must own
+    # Secretary and Core253 even if Factory branch tracks older copies.
+    for rel in (
+        "research_wp_r0/aql_core_h_research_secretary_v1.py",
+        "research_wp_r0/aql_core_backbone_local_v1.py",
+        "research_wp_r0/aql_archive_custody_bridge_v1.py",
+    ):
+        source=subprocess.run(
+            ["git","show",PINS["core"]+":"+rel],check=True,
+            capture_output=True).stdout
+        (root/rel).parent.mkdir(parents=True,exist_ok=True)
+        (root/rel).write_bytes(source)
     for path in (
        "research_wp_r0/aql_factory_lab_experiment_index_v1.py",
        "research_wp_r0/aql_factory_lab_generic_paired_v1.py",
