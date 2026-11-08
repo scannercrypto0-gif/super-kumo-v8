@@ -96,3 +96,27 @@ do not repeat it to validate this additive synthetic API. Temporary zero-cost
 diagnostic policy is **not** real economic performance. No PIT certification,
 original F2 report reconstruction, holdout opening, signed F5, independent
 StrategyApproval, Paper/live or alpha claim.
+
+## Generic Scanner H → Factory H → Core H (additive, not F2 coercion)
+
+Factory #267 exact schema inspected at `52504ad59d75976ce45fb8f75c1b278c3d1b0975`. The generic path is **separate** from the immutable F2 24/20+4 route above, which stays unchanged. Core H consumes **three** SHA-sealed objects: actual Factory input `aql.factory.h.generic-signal-input.v1`, the immutable parent `aql.factory.h.generic-immutable-package.v1`, and outer result `aql.factory.h.generic-research-result.v1`. This is *not* an original-source authenticity attestation; Integration must independently call Scanner/Factory verifiers first.
+
+```python
+from research_wp_r0.aql_core_h_research_secretary_v1 import (
+    route_generic_research_result, read_generic_research_result_route,
+)
+route = route_generic_research_result(
+    existing_secretary_root, verified_factory_input,
+    immutable_factory_package, sealed_factory_result)
+assert route["state"] == "WAIT_RESEARCH_REVIEW"
+assert read_generic_research_result_route(
+    existing_secretary_root, verified_factory_input["experiment_id"]) == route
+```
+
+`build_generic_research_result_route` validates *actual Factory output field names*, and seals independently: Factory execution report `aql.factory.h.generic-execution-report.v1`, ledger `aql.factory.h.generic-trade-event-ledger.v1`, scientific Lab `aql.factory.h.scientific-lab-report.v1`, Factory review pointer `aql.factory.h.generic-secretary-review-receipt.v1` (not an ACK), and immutable package/result parents. It requires matching source ZIP / manifest / bounded Core #253 query SHA (which is **not** the distinct whole-month Core #245 native query SHA); Scanner policy/batch, strategy plugin/definition/config, Scanner and Factory code, cost policy, experiment/result, Lab/ledger/uncertainty SHA and decision cutoff. No SHA is silently renamed or reconstructed.
+
+The variable Generic H cohort requires `expected=observed+missing`, exact event grid and signal categories, `ENTRY_SIGNAL/EXIT_SIGNAL/NO_SIGNAL/UNKNOWN` and modeled/unknown outcome count. Partial/unknown cohorts must quarantine all signals and no modeled fills. Research review remains **WAIT** with four ACK fields null, explicit `NOT_ATTESTED` PIT/economics and `NOT_GRANTED` F5. First and replay outer `receipt_sha256` may legitimately differ due to `store_status`; the stored immutable parent SHA must match, so durable Secretary route identity stays stable. The generic table lives *in the same existing Secretary SQLite root* as legacy F2, never a separate warehouse or approval service. This root must be isolated from original owner RawVault / historical Warehouse.
+
+Focused real SQLite / Windows test:
+`python -m unittest discover -s tests -p 'test_aql_core_h_generic_research_secretary_v1.py' -v`.
+This is structural synthetic integration **inside Core**; Integration #271 still owns the one unmocked complete Scanner→Factory→Lab→Secretary pinned overlay, which is a different acceptance gate. Neither the tests nor self-sealing synthetic fixtures mean scientific/economic approval.
