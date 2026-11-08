@@ -124,11 +124,21 @@ def verify_owner(manifest, key_path):
           and start % STEP == 0 and end % STEP == 0,
           "BOUND_OR_CUTOFF")
     month = scope.get("month")
-    check(type(month) is str
-          and len(month) == 7
-          and datetime.fromtimestamp(start / 1000, timezone.utc).strftime("%Y-%m") == month
-          and datetime.fromtimestamp((end - 1) / 1000, timezone.utc).strftime("%Y-%m") == month,
-          "CROSS_MONTH_OR_MONTH_INVALID")
+    check(type(month) is str and len(month) == 7,
+          "MONTH_REQUIRED")
+    first = datetime.fromtimestamp(start / 1000, timezone.utc)
+    last = datetime.fromtimestamp((end - 1) / 1000, timezone.utc)
+    next_month = (datetime(first.year + 1, 1, 1, tzinfo=timezone.utc)
+                  if first.month == 12 else
+                  datetime(first.year, first.month + 1, 1, tzinfo=timezone.utc))
+    check(first.strftime("%Y-%m") == month
+          and last.strftime("%Y-%m") == month
+          and first.day == 1 and first.hour == 0
+          and first.minute == 0 and first.second == 0
+          and first.microsecond == 0
+          and end == int(next_month.timestamp() * 1000)
+          and cutoff == end,
+          "FULL_UTC_MONTH_AND_CUTOFF_REQUIRED")
     check(type(scope.get("dataset_id")) is str
           and scope["dataset_id"].startswith("BINANCE-SPOT-BTCUSDT-15M-")
           and type(scope.get("version")) is int and scope["version"] > 0
