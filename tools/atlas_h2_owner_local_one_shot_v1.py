@@ -195,7 +195,9 @@ def isolated_overlay(repo, destination):
                 check(not name.startswith("/") and ".." not in
                       Path(name).parts and (member.isfile() or member.isdir()),
                       "UNSAFE_CODE_ARCHIVE")
-                if not member.isfile() or not name.endswith(".py"):
+                if not member.isfile() or not (name.endswith(".py") or
+                    (role == "work235" and name ==
+                     "tools/strategy_service_offline/fixtures/strategies.json")):
                     continue
                 data = tf.extractfile(member).read()
                 dest = Path(destination) / name
@@ -421,6 +423,11 @@ def main(argv=None):
         check(a.local_audit_output is not None,
               "LOCAL_AUDIT_OUTPUT_REQUIRED")
         manifest = json.loads(Path(a.private_manifest).read_text("utf-8"))
+        # A caller cannot redirect evidence to a source path or unsigned location.
+        signed_scope = verify_owner(manifest, a.owner_hmac_key_file)
+        check(Path(a.local_audit_output).absolute() ==
+              Path(signed_scope["evidence_json"]).absolute(),
+              "AUDIT_OUTPUT_NOT_IN_OWNER_SCOPE")
         result = execute(manifest, key_file=a.owner_hmac_key_file,
                          repo=a.local_git_repo,
                          allow_local_run=True)
