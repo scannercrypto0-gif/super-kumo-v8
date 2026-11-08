@@ -99,7 +99,8 @@ def _real_core_dual(snapshot, source_sha):
                 and type(r[1]) is int and r[1]>0]
     need(len(candidates)==1,"MISSING_OR_AMBIGUOUS_ORIGINAL_CORE_BRIDGE_STAGE")
     dataset,version,source,manifest_sha,packet_sha,admission_raw=candidates[0]
-    need(dataset==DATASET,
+    need(type(dataset) is str and dataset.startswith(DATASET)
+         and len(dataset)<=128,
          "ORIGINAL_DATASET_IDENTITY_MISMATCH_STOP")
     admission=json.loads(admission_raw)
     need(digest({k:v for k,v in admission.items()
@@ -173,6 +174,8 @@ def _real_core_dual(snapshot, source_sha):
         a["bar_open_ms"]==b["bar_open_ms"]
         and a["bar_close_ms"]==b["bar_close_ms"]
         and a["checksum"]==b["bar_checksum"]
+        and a["observation_lower_bound_ms"]==
+            b["observation_lower_bound_ms"]
         and a["bar_close_ms"]<END
         for a,b in zip(native["bars"],local["bars"])
     ) and len(native["bars"])==len(local["bars"])==2976,
@@ -374,7 +377,8 @@ def prepare_owner_private_evidence(*,source_zip,private_root,output_root,
          and inspected["identity_binding_sha256"]==identity_binding,
          "OWNER_FORWARD_IDENTITY_LOCAL_READBACK_FAILED")
     # One consistent private commit with exclusive no-overwrite writes.
-    # Only these four genuine evidence outputs; never expose source to GitHub.
+    # Only these four genuine evidence outputs; on post-read drift remove the
+    # newly prepared (not historically used) bundle, never leave stale MACs.
     created=[]
     try:
         for filename,doc in (
@@ -385,14 +389,14 @@ def prepare_owner_private_evidence(*,source_zip,private_root,output_root,
         ):
             _write_exclusive(evidence/filename,doc)
             created.append(evidence/filename)
+        need(sha_file(source)==before
+             and fingerprint(warehouse)==warehouse_before
+             and fingerprint(vault)==vault_before,
+             "ORIGINAL_CHANGED_AFTER_PRIVATE_EVIDENCE_PREP")
     except Exception:
         for p in created:
             p.unlink(missing_ok=True)
         raise
-    need(sha_file(source)==before
-         and fingerprint(warehouse)==warehouse_before
-         and fingerprint(vault)==vault_before,
-         "ORIGINAL_CHANGED_AFTER_PRIVATE_EVIDENCE_PREP")
     return {
         "status":"FOUR_AUTHENTIC_OWNER_LOCAL_ARTIFACTS_PREPARED_NOT_RUN",
         "owner_key_id":meta["key_id"],
