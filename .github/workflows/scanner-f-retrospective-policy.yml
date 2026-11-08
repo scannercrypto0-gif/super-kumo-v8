@@ -96,6 +96,8 @@ jobs:
           for file in upstream/core-c/research_wp_r0/aql_*.py; do
             cp "$file" project/research_wp_r0/
           done
+          # Core-c overlay may supply an older Core253 API. Restore exact H head last.
+          cp upstream/core-h-current/research_wp_r0/aql_core_backbone_local_v1.py project/research_wp_r0/
           for file in upstream/core-d/research_wp_r0/aql_core_d_*.py; do
             cp "$file" project/research_wp_r0/
           done
