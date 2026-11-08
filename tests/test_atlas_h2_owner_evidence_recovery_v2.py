@@ -90,6 +90,9 @@ class OwnerRecoverySafeSynthetic(unittest.TestCase):
         ), patch(
             "tools.atlas_h2_owner_evidence_recovery_v2._manual_ast",
             return_value=(self.ast,"e"*64,"f"*64)
+        ), patch(
+            "tools.atlas_h2_owner_evidence_recovery_v2._factory_code_sha",
+            return_value="a"*64
         ):
             return prepare_owner_private_evidence(
                 source_zip=self.source,private_root=self.private,
