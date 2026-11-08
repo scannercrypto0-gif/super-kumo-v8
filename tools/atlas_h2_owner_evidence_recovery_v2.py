@@ -228,6 +228,12 @@ def _manual_ast():
     return receipt,config_sha,pd["evaluator_code_sha256"]
 
 
+def _factory_code_sha():
+    # Factory #267 overlay only; absent from default/main until PR merge.
+    from research_wp_r0 import aql_factory_h_generic_signal_adapter_v1
+    return sha_file(aql_factory_h_generic_signal_adapter_v1.__file__)
+
+
 def prepare_owner_private_evidence(*,source_zip,private_root,output_root,
                                    evidence_dir,identity_dir,confirm_sign,
                                    public_fetcher=None):
@@ -290,8 +296,7 @@ def prepare_owner_private_evidence(*,source_zip,private_root,output_root,
         native,local,dataset,version,manifest_sha=_real_core_dual(snapshot,before)
     ast,config_sha,evaluator_sha=_manual_ast()
     # Code hash is an immutable exact module hash for TEST_ONLY identity.
-    from research_wp_r0 import aql_factory_h_generic_signal_adapter_v1 as factory
-    factory_sha=sha_file(factory.__file__)
+    factory_sha=_factory_code_sha()
     need(sha_file(source)==before
          and fingerprint(warehouse)==warehouse_before
          and fingerprint(vault)==vault_before,
