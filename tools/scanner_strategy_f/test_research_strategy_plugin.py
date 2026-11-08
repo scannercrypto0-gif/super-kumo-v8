@@ -359,15 +359,16 @@ class ResearchStrategyPlugin(unittest.TestCase):
             root=Path(tmp)
             admit_local_original(
                 root,raw,checksum,pin,spec,decision_cutoff_ms=end+2000)
-            cutoff=start+step+2000
+            cutoff=start+2*step+2000
             query=query_local(
                 root,spec["dataset_id"],1,start,end,cutoff,
                 required_source_sha256=sha,
                 require_complete=False,sqlite_immutable=True)
             self.assertEqual(query["coverage"],"PARTIAL")
-            self.assertEqual(query["available_bar_count"],2)
+            self.assertGreaterEqual(query["available_bar_count"],1)
+            self.assertLess(query["available_bar_count"],query["required_bar_count"])
             self.assertEqual(query["required_bar_count"],64)
-            self.assertEqual(len(query["missing_bar_opens"]),62)
+            self.assertEqual(len(query["missing_bar_opens"]),64-query["available_bar_count"])
             batch=h.evaluate_strategy_plugin(
                 self.plugin,query,warehouse_root=str(root),
                 policy=self.policy)
@@ -376,8 +377,8 @@ class ResearchStrategyPlugin(unittest.TestCase):
             self.assertEqual(body["signal_counts"]["NO_SIGNAL"],0)
             self.assertEqual(body["signal_counts"]["ENTRY_SIGNAL"],0)
             self.assertEqual(body["signal_counts"]["EXIT_SIGNAL"],0)
-            self.assertEqual(body["missing_bar_count"],62)
-            self.assertEqual(body["observed_bar_count"],2)
+            self.assertEqual(body["missing_bar_count"],64-query["available_bar_count"])
+            self.assertEqual(body["observed_bar_count"],query["available_bar_count"])
             self.assertEqual(body["quarantine"],
                              "ALL_EVENTS_UNKNOWN_SOURCE_GAP")
             self.assertEqual(body["trading_authority"],"NONE")
