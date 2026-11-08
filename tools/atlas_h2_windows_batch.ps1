@@ -5,7 +5,9 @@
 param(
   [Parameter(Mandatory=$true)][string]$EvidenceDir,
   [string]$OutputDir = '',
+  [ValidateSet('strict-custodian','official-binance')][string]$Mode = 'strict-custodian',
   [string]$CustodianVerifierKey = '',
+  [string]$LicenseReviewerKey = '',
   [string]$OwnerSigningKey = '',
   [switch]$ConfirmOneRun,
   [string]$Python = 'python',
@@ -13,9 +15,11 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $bootstrapCommit = 'aa0f21bfcbb07d36258c5dca552310bb36f452c8'
+$publicCommit = '247b803f8cf343e5c1108b22760d477ac0e9e45b'
 $operatorCommit = '9a4ed276913eac202e0c77778371c91dc482ff23'
 $required = @(
   $bootstrapCommit,
+  $publicCommit,
   $operatorCommit,
   '51f3724213e836fa680f589435e418d4b0c4c20f',
   '99c27ea2c1a4d41aaae361141301a8a9ea3b33c3',
@@ -63,9 +67,10 @@ try {
   }
   $stageCode = @'
 import pathlib, subprocess, sys
-repo, target, bootstrap, operator = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3], sys.argv[4]
+repo, target, bootstrap, operator, public = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3], sys.argv[4], sys.argv[5]
 for sha,rel in (
     (bootstrap,'tools/atlas_h2_private_batch_bootstrap_v1.py'),
+    (public,'tools/atlas_h2_binance_public_lane_v1.py'),
     (operator,'tools/atlas_h2_owner_local_one_shot_v1.py'),
     (operator,'tools/atlas_h2_historical_policy_v2.py')):
     p=target/rel
@@ -76,21 +81,30 @@ for sha,rel in (
     p.write_bytes(r.stdout)
 (target/'tools/__init__.py').touch()
 '@
-  & $Python -I -c $stageCode $clone $driver $bootstrapCommit $operatorCommit
+  & $Python -I -c $stageCode $clone $driver $bootstrapCommit $operatorCommit $publicCommit
   if ($LASTEXITCODE -ne 0) { throw 'STAGING_FAILED' }
   $runner = @'
 import sys
 sys.path.insert(0,sys.argv[1])
-from tools.atlas_h2_private_batch_bootstrap_v1 import main
-raise SystemExit(main(sys.argv[2:]))
+if sys.argv[2] == 'official-binance':
+    from tools.atlas_h2_binance_public_lane_v1 import main
+else:
+    from tools.atlas_h2_private_batch_bootstrap_v1 import main
+raise SystemExit(main(sys.argv[3:]))
 '@
   $argsForBatch = @(
     '--private-evidence-dir', $EvidenceDir,
     '--isolated-output-dir', $OutputDir,
     '--pinned-git-repo', $clone
   )
-  if ($CustodianVerifierKey) {
-    $argsForBatch += @('--trusted-custodian-key', $CustodianVerifierKey)
+  if ($Mode -eq 'strict-custodian') {
+    if ($CustodianVerifierKey) {
+      $argsForBatch += @('--trusted-custodian-key', $CustodianVerifierKey)
+    }
+  } else {
+    if ($LicenseReviewerKey) {
+      $argsForBatch += @('--license-reviewer-key', $LicenseReviewerKey)
+    }
   }
   if ($OwnerSigningKey) {
     $argsForBatch += @('--owner-signing-key', $OwnerSigningKey)
@@ -98,7 +112,7 @@ raise SystemExit(main(sys.argv[2:]))
   if ($ConfirmOneRun.IsPresent) {
     $argsForBatch += '--confirm-one-run'
   }
-  & $Python -I -c $runner $driver @argsForBatch
+  & $Python -I -c $runner $driver $Mode @argsForBatch
   $exit = $LASTEXITCODE
   if ($exit -eq 0) {
     Write-Host 'H2 engineering-only completed. Inspect h2-batch-summary.json.'
