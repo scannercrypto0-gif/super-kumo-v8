@@ -31,7 +31,8 @@ jobs:
       - uses: actions/checkout@v4
         with: {ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8, path: _work235, persist-credentials: false}
       - uses: actions/setup-python@v5
-        with: {python-version: ${{ matrix.python-version }}}
+        with:
+          python-version: ${{ matrix.python-version }}
       - name: Overlay pinned owner code, no mutation of owner branches
         shell: python
         run: |
