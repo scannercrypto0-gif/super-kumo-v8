@@ -90,3 +90,4 @@ jobs:
             throw 'BATCH_MISSING_EXACT_EVIDENCE_REASON'
           }
           Write-Host 'PASS: one Windows command, exact pinned code, one BLOCKED receipt, no source read'
+          exit 0
