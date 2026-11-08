@@ -198,7 +198,7 @@ class OfficialBinanceLane(unittest.TestCase):
         blocked = run_public_batch(self.private, self.output, fetcher=self.fetch)
         self.assertEqual(blocked["reasons"], ["WAIT_LICENSE_REVIEWER_KEY"])
 
-    def test_signed_external_license_and_source_match_reaches_existing_operator(self):
+    def _synthetic_signed_rights(self):
         self._intake()
         source = self.root / "original-zip"
         source.mkdir()
@@ -228,6 +228,10 @@ class OfficialBinanceLane(unittest.TestCase):
         owner.write_bytes(b"o"*32)
         (self.private/"historical-license-evidence.mac").write_text(
             hmac.new(b"r"*32, raw, hashlib.sha256).hexdigest())
+        return reviewer, owner, archive
+
+    def test_signed_external_license_and_source_match_reaches_existing_operator(self):
+        reviewer, owner, archive = self._synthetic_signed_rights()
         with patch("tools.atlas_h2_binance_public_lane_v1.execute",
                    return_value={"status":"EXPERIMENT_ENGINEERING_PASS",
                                  "sha256":"f"*64,"reason":"SYNTHETIC_MOCK"}) as worker:
@@ -246,6 +250,35 @@ class OfficialBinanceLane(unittest.TestCase):
                 reviewer_key=reviewer, owner_key=owner,
                 git_repo=self.root/"other-output", confirm_one_run=True)
         self.assertEqual(retry["reasons"], ["ONE_RUN_ALREADY_RESERVED"])
+
+    def test_owner_archive_content_mismatch_blocks_without_operator(self):
+        reviewer, owner, archive = self._synthetic_signed_rights()
+        archive.write_bytes(self.zip + b"owner-original-drift")
+        with patch("tools.atlas_h2_binance_public_lane_v1.execute",
+                   side_effect=AssertionError("NOT_AUTHORIZED")):
+            report = run_public_batch(
+                self.private, self.output, fetcher=self.fetch,
+                reviewer_key=reviewer, owner_key=owner,
+                git_repo=self.root/"isolated-repo", confirm_one_run=True)
+        self.assertEqual(report["status"], "BLOCKED")
+        self.assertEqual(
+            report["reasons"],
+            ["OWNER_ORIGINAL_ZIP_DIFFERS_FROM_OFFICIAL_PUBLISHER"])
+        self.assertFalse((self.private/"h2-public-lane-one-use-claim.json").exists())
+
+    def test_license_terms_tampering_blocked_before_original_zip_read(self):
+        reviewer, owner, archive = self._synthetic_signed_rights()
+        (self.private/"historical-terms.txt").write_text("tampered")
+        with patch("tools.atlas_h2_binance_public_lane_v1.execute",
+                   side_effect=AssertionError("NOT_AUTHORIZED")):
+            report = run_public_batch(
+                self.private, self.output, fetcher=self.fetch,
+                reviewer_key=reviewer, owner_key=owner,
+                git_repo=self.root/"isolated-repo", confirm_one_run=True)
+        self.assertEqual(report["status"], "BLOCKED")
+        self.assertEqual(report["reasons"],
+                         ["WAIT_HISTORICAL_TERMS_BYTES_AND_SHA"])
+        self.assertFalse((self.private/"h2-public-lane-one-use-claim.json").exists())
 
     def test_local_zip_drift_never_calls_operator(self):
         self._intake()
