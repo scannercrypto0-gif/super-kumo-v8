@@ -149,6 +149,10 @@ def build_generic_paired_lab(*,store_path,secretary_root,experiment_id,
                bool(w["availability_reason"]))),
              "WINDOW_FUTURE_OR_NOT_OBSERVED")
         windows[key]=w
+    if link["coverage"]!="COMPLETE":
+        need(all(w["availability"]!="COMPLETE"
+                 for w in observation_windows),
+             "INCOMPLETE_SOURCE_NO_POSITIVE_OUTCOME")
     # The retrospective research evaluation asof is independent of initial
     # signal cutoff; later outcomes are not eligible before this timestamp.
     need(len(windows)==len(observation_windows),"WINDOW_DUPLICATION")
