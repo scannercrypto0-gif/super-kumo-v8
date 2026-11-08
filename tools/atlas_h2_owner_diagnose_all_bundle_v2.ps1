@@ -9,7 +9,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repoUrl='https://github.com/scannercrypto0-gif/super-kumo-v8.git'
-$personal='82c39963bea8f0a19b67efcfb4c0744dfb8f2d8e'
+$personal='4098cdde2c1f389e1c3b5821a156bd4acbd39534'
 $readiness='885904a5e1df06bee1e32152a43f0fda4d0a4188'
 $diagnostic='76479babaf1b05ee5ee4bc918a429d1c301e0d76'
 $pins=@(
