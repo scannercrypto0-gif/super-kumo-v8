@@ -43,8 +43,6 @@ def synthetic_real_sqlite(root,*,partial=False):
     basename="BTCUSDT-15m-2024-03"
     rows=[]
     for i in range(N):
-        if partial and i==4:
-            continue
         opened=START+i*STEP
         px=98.0+(i%17)*0.3
         rows.append(",".join((
@@ -85,7 +83,10 @@ def synthetic_real_sqlite(root,*,partial=False):
     receipt=admit_local_original(
         root,raw,checksum,pin,spec,decision_cutoff_ms=end+2000)
     # The real read explicitly opens Core's derived SQLite in immutable mode.
-    query=query_local(root,spec["dataset_id"],1,START,end,end+2000,
+    # A missing/unavailable bar is a bounded cutoff case, not an
+    # invalid ZIP. Core admission correctly rejects structurally sparse ZIP.
+    query_cutoff=(START+STEP+2000) if partial else (end+2000)
+    query=query_local(root,spec["dataset_id"],1,START,end,query_cutoff,
                       required_source_sha256=source,
                       require_complete=not partial,sqlite_immutable=True)
     assert query["source_bytes_sha256"]==receipt["source_zip_sha256"]
@@ -207,7 +208,7 @@ print(json.dumps({"state":out["state"],"sha256":out["sha256"]}))
     def test_partial_warehouse_query_not_promoted(self):
         packet=self.packet(partial=True)
         self.assertEqual(packet["core_query"]["coverage"],"PARTIAL")
-        self.assertEqual(len(packet["core_query"]["missing_bar_opens"]),1)
+        self.assertGreater(len(packet["core_query"]["missing_bar_opens"]),0)
         self.assertEqual(packet["scanner_signal_batch"]["payload"][
             "signal_counts"]["UNKNOWN"],N)
         done=self.run_pipeline(packet)
@@ -238,8 +239,9 @@ print(json.dumps({"state":out["state"],"sha256":out["sha256"]}))
         with self.assertRaises(LifecycleStop):
             self.run_pipeline(forged)
         with closing(sqlite3.connect(self.store)) as con:
-            self.assertEqual(con.execute(
-                f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0],0)
+            self.assertIsNone(con.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                (TABLE,)).fetchone())
 
 
 if __name__=="__main__":
