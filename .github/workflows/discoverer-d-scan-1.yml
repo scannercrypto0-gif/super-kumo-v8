@@ -45,6 +45,19 @@ jobs:
               "tools/scanner_strategy_e/historical_research_policy.py": "2d7720eb6cbbc5d40cd9914c97f28604c90cfc31",
               "tools/scanner_strategy_e/historical_policy_approval_request.py": "1b4fef75b415695b0e92cd9340e7ba96229edcbb",
           }
+          # Additive CI-only pinned owner-module overlay: no candidate branch merge.
+          overlays = [
+              "research_wp_r0/aql_archive_custody_bridge_v1.py",
+              "research_wp_r0/aql_core_backbone_local_v1.py",
+              "research_wp_r0/aql_factory_historical_rule_projection.py",
+              "research_wp_r0/indicator_library_v2.py",
+              "tools/scanner_strategy_b/native15m.py",
+              "tools/strategy_service_offline/screening.py",
+          ]
+          for name in overlays:
+              if not Path(name).exists():
+                  expected[name] = subprocess.check_output(
+                      ["git","rev-parse",ref+":"+name],text=True).strip()
           for name, blob in expected.items():
               got = subprocess.check_output(["git","rev-parse",ref+":"+name], text=True).strip()
               if got != blob:
