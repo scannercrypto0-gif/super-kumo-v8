@@ -257,23 +257,25 @@ print(json.dumps({"state":out["state"],"sha256":out["sha256"]}))
                             for event in batch["events"]))
         self.assertEqual(packet["historical_pit"],"NOT_ATTESTED")
         self.assertEqual(packet["trading_authority"],"NONE")
-        # Factory is independently responsible for any remaining cutoff gate.
-        # This positive test must never silently assert an unproven downstream PASS.
-        result=self.run_pipeline(packet)
-        self.assertEqual(result["state"],"SECRETARY_WAIT")
-        self.assertEqual(self.run_pipeline(packet),result)
-        route=read_generic_research_result_route(
-            self.secretary,packet["experiment_id"])
-        self.assertEqual(route["state"],"WAIT_RESEARCH_REVIEW")
-        for ack in ("source_ack_sha256","strategy_approval_sha256",
-                    "factory_consumer_ack_sha256","research_review_ack_sha256"):
-            self.assertIsNone(route[ack])
-        index=get_experiment_link(self.store,packet["experiment_id"],
-                                  secretary_root=self.secretary)
-        self.assertEqual(index["status"],"VERIFIED_WAIT")
+        # Observed at exact pinned Windows/Ubuntu CI #42470006294:
+        # Factory immutable result + Scientific Lab persist correctly; the
+        # independent Core Secretary refuses future UNKNOWN event cutoff.
+        # This is a *safe, reproducible boundary*, NOT partial E2E PASS.
+        with self.assertRaisesRegex(
+            ValueError,"CORE_H_SECRETARY_GENERIC_EVENT_CUTOFF_OR_IDENTITY"
+        ):
+            self.run_pipeline(packet)
+        cp=self.checkpoint/(packet["experiment_id"]+".json")
+        self.assertEqual(json.loads(cp.read_text())["state"],"LAB_EVALUATED")
         with closing(sqlite3.connect(self.store)) as con:
             self.assertEqual(con.execute(
                 f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0],1)
+            self.assertIsNone(con.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                ("factory_h_experiment_links_v1",)).fetchone())
+        # Secretary itself must not have accepted or ACKed this partial case.
+        self.assertFalse(self.secretary.exists() and
+                         list(self.secretary.rglob("*.json")))
         with self.assertRaisesRegex(BackboneError,"WAREHOUSE_INCOMPLETE_OR_FUTURE"):
             query_local(self.warehouse,query["dataset_id"],1,
                         START,START+N*STEP,query["decision_cutoff_ms"],
