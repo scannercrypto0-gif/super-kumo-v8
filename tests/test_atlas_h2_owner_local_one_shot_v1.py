@@ -29,8 +29,8 @@ def scope(root):
         "exact_heads": PINS.copy(),
         "month": "2024-03",
         "start_ms": 1709251200000,
-        "end_exclusive_ms": 1709251200000 + 4 * 900000,
-        "decision_cutoff_ms": 1709251200000 + 4 * 900000,
+        "end_exclusive_ms": 1711929600000,
+        "decision_cutoff_ms": 1711929600000,
         "dataset_id": "BINANCE-SPOT-BTCUSDT-15M-2024-03-F-v1",
         "version": 1,
         "strategy_id": "h_manual_distinct_test",
@@ -240,9 +240,10 @@ class H2Operator(unittest.TestCase):
 
     def test_valid_native_range_receipt_is_verified_without_pit_claim(self):
         s = scope(self.root)
+        n = (s["end_exclusive_ms"] - s["start_ms"]) // 900000
         rows = [{"bar_open_ms": s["start_ms"] + i * 900000,
                  "bar_close_ms": s["start_ms"] + (i + 1) * 900000 - 1}
-                for i in range(4)]
+                for i in range(n)]
         native = {
             "schema": "aql.core.historical-price-custody-query.v1",
             "status": "OK",
@@ -252,8 +253,8 @@ class H2Operator(unittest.TestCase):
             "source_bytes_sha256": s["source_bytes_sha256"],
             "manifest_integrity_sha256": s["manifest_integrity_sha256"],
             "decision_cutoff_ms": s["decision_cutoff_ms"],
-            "required_bar_count": 4,
-            "available_bar_count": 4,
+            "required_bar_count": n,
+            "available_bar_count": n,
             "missing_bar_opens": [],
             "bars": rows,
         }
