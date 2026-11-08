@@ -29,7 +29,15 @@ $required = @(
   'a4b887fe7067b89febc339e466652a5fcb1c2bee',
   '6acbcc7fc243b132f58170df4c6469bbf7f4eff8'
 )
-if ($Mode -eq 'owner-personal') { $required += $personalCommit }
+if ($Mode -eq 'owner-personal') {
+  # Owner-personal overlay is intentionally newer than the frozen license lane.
+  $required += @(
+    $personalCommit,
+    '43a3bf3196649c46aed54872f958c323e4ae4913',
+    'af3720b6be921444cb83d52f3e975a9c85475ec6',
+    '04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf'
+  )
+}
 # Default results to a private profile path, not the original E: source.
 $localData = [Environment]::GetFolderPath('LocalApplicationData')
 if ([string]::IsNullOrWhiteSpace($localData)) {
