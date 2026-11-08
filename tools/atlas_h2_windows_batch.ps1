@@ -12,8 +12,8 @@ param(
   [string]$Git = 'git'
 )
 $ErrorActionPreference = 'Stop'
-$bootstrapCommit = '6968ae0a0566c084fe36163eafce2093a34201ff'
-$operatorCommit = '43903d82e85c272a17183dfbbfbe0c493696d3f2'
+$bootstrapCommit = 'aa0f21bfcbb07d36258c5dca552310bb36f452c8'
+$operatorCommit = '9a4ed276913eac202e0c77778371c91dc482ff23'
 $required = @(
   $bootstrapCommit,
   $operatorCommit,
