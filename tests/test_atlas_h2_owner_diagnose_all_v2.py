@@ -67,6 +67,31 @@ class MultiFindingOwnerPreflight(unittest.TestCase):
         # A second independent SHA check MUST still catch any byte drift.
         _,results=self.entries()
         self.assertEqual(results["NATIVE_FILE_SHA"]["status"],"FAIL")
+    def test_actual_personal_batch_native_cap_is_4mib_not_old_250k(self):
+        from tools.atlas_h2_owner_personal_batch_v1 import _load_intake
+        from tools.atlas_h2_binance_public_lane_v1 import Blocked
+        path=self.fx.evidence/"core245-native-receipt.json"
+        with path.open("ab") as f:
+            f.write(b" "*(700_000-path.stat().st_size))
+        with self.assertRaises(Blocked) as raised:
+            _load_intake(self.fx.evidence)
+        self.assertEqual(str(raised.exception),
+                         "PERSONAL_RECEIPT_FILE_SHA_DRIFT")
+        # Native still fails byte SHA because signed tech was NOT modified.
+        # It must NOT fail the outdated 250 KB file size guard.
+
+    def test_invalid_nonce_and_declared_cost_are_independently_reported(self):
+        p=self.fx.evidence/"owner-personal-assertion.json"
+        doc=json.loads(p.read_text())
+        doc["assertion"]["scope"]["one_use_nonce"]="bad"
+        doc["assertion"]["cost_policy"]["costs"]["fee_entry_bps"]="9999"
+        p.write_text(json.dumps(doc))
+        _,results=self.entries()
+        self.assertEqual(results["SIGNED_NONCE"]["status"],"FAIL")
+        self.assertEqual(results["OWNER_TEST_COSTS"]["status"],"FAIL")
+        self.assertEqual(results["OWNER_MAC_TIME_CUSTODY"]["status"],"FAIL")
+        self.assertEqual(results["EXECUTION_FIVE_ROLE_OVERLAY"]["status"],"PASS")
+
     def test_above_4mib_native_rejected_without_unbounded_json_read(self):
         path=self.fx.evidence/"core245-native-receipt.json"
         with path.open("ab") as f:
