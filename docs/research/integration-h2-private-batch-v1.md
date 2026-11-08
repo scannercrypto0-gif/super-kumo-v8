@@ -7,12 +7,12 @@
 Download the versioned [`tools/atlas_h2_windows_batch.ps1`](../../tools/atlas_h2_windows_batch.ps1) into a trusted local directory, then execute **once** with private local paths:
 
 ```powershell
-& '.\atlas_h2_windows_batch.ps1' -EvidenceDir '<PRIVATE_PREEXISTING_CUSTODY_DIRECTORY>' -OutputDir '<NEW_PRIVATE_OUTPUT_DIRECTORY>' -CustodianVerifierKey '<EXTERNALLY_PROVISIONED_CUSTODIAN_KEY>' -OwnerSigningKey '<SEPARATE_EXISTING_OWNER_KEY>' -ConfirmOneRun
+& '.\atlas_h2_windows_batch.ps1' -EvidenceDir '<PRIVATE_PREEXISTING_CUSTODY_DIRECTORY>' -CustodianVerifierKey '<EXTERNALLY_PROVISIONED_CUSTODIAN_KEY>' -OwnerSigningKey '<SEPARATE_EXISTING_OWNER_KEY>' -ConfirmOneRun
 ```
 
 No hand-authored operator JSON, user-calculated source SHA, or piecemeal PowerShell probes. The script builds a disposable Git repository in Windows TEMP with exact authenticated SHA pins, runs a fresh isolated Python driver, never resets or checks out the owner worktree, and removes only that disposable TEMP directory. Only explicitly named **existing** private custody files are inspected prior to independently authenticated single-run scope. **Do not pass raw source bytes, prices, private paths or key contents to GitHub or chat.** Public network use is restricted to fetching pinned public source commits.
 
-The local result is exactly one **`h2-batch-summary.json`** under the chosen output directory, sealed with its `sha256`. It records either `PASS_ENGINEERING_ONLY` with Core245/Core253, Strategy/Scanner, Factory/Lab/Secretary and no-write hashes, or `BLOCKED` plus a consolidated specific stop reason. In neither case are PIT, economic, alpha, paper, F5, trading, holdout or G0 permissions granted. No actual E: run can be claimed from GitHub CI.
+The launcher defaults to a new private result directory under Windows **LocalApplicationData\\ATLAS\\H2-Local-Batch** (and prints its exact location). An optional `-OutputDir` override is permitted only within that protected profile subtree, never under the original source. The local result is exactly one **`h2-batch-summary.json`** under that output directory, sealed with its `sha256`. It records either `PASS_ENGINEERING_ONLY` with Core245/Core253, Strategy/Scanner, Factory/Lab/Secretary and no-write hashes, or `BLOCKED` plus a consolidated specific stop reason. In neither case are PIT, economic, alpha, paper, F5, trading, holdout or G0 permissions granted. No actual E: run can be claimed from GitHub CI.
 
 ### What must already exist privately
 
@@ -32,7 +32,7 @@ The external **`CustodianVerifierKey`** and separate **`OwnerSigningKey`** must 
 
 The script **never creates** custody proofs or trusted keys. It first verifies the independent custodian MAC and exact file hashes without opening the original source. Only after `-ConfirmOneRun` does it use the separate, externally pre-provisioned owner signing key to construct and sign one strictly bounded local operator manifest; no user manually writes JSON or SHA. It pins the already approved **research-only illustrative Spot LONG cost numbers**: fee entry/exit **10/10 bps**, spread **2/2 bps**, slippage **3/3 bps**, funding per bar **0**. The automatic MAC is an owner-controlled local signing ceremony, *not* independent proof that the rights attestation is true.
 
-Before accessing original data, it creates an exclusive `h2-single-use-claim.json` in the private evidence directory (never in the original source roots). Changing the output directory cannot silently reuse the same one-time permission. A denied or failed run still consumes the attempt; a renewed attempt requires an explicit new owner decision and independent re-evaluation.
+Before accessing original data, it creates an exclusive `h2-single-use-claim.json` in the authenticated private evidence directory (never in the original source roots). Changing the output directory cannot silently reuse the same one-time permission. A denied or failed run still consumes the attempt; a renewed attempt requires an explicit new owner decision and independent re-evaluation.
 
 ### Core and SQLite execution boundary
 
@@ -47,3 +47,5 @@ For example, if the explicit evidence directory does not contain the five genuin
 ### Focused engineering acceptance
 
 Windows and Linux targeted CI tests verify absent evidence refuses any source access, tampering, missing owner confirmation, two-key separation, signed file SHA mismatch, single-use claim against output-path replay, SQLite SHM/WAL read-only snapshot and source immutability. CI never receives private source files or rights/keys. The existing H/H2 accepted suites are not repeated. Final independent Audit remains deferred until the actual engineering batch is closed. The Draft Integration PR stays unmerged; G0, F5, holdout, paper/live and trading remain blocked.
+
+**Receipt accuracy:** If the operator has already been invoked but later blocks, the consolidated report sets `source_read=null`, `source_read_status=POSSIBLE_AFTER_GATES` rather than falsely asserting the source was never accessed. Pre-source bootstrap refusals use `source_read=false`, `NOT_ATTEMPTED`; a verified successful execution uses `source_read=true`, `CONFIRMED`.
