@@ -217,7 +217,9 @@ def _validate_query(query):
     cutoff=query["decision_cutoff_ms"]
     require(all(type(v) is int and 0<=v<=2**53-1
                 for v in (begin,end,cutoff))
-            and 0<=begin<end<=cutoff
+            and 0<=begin<end and begin<cutoff
+            and (end<=cutoff or
+                 query["coverage"] in ("PARTIAL","UNKNOWN"))
             and begin%STEP==0 and end%STEP==0
             and (end-begin)//STEP<=MAX_BARS,
             "H_CORE_CUTOFF_OR_RANGE")
@@ -259,10 +261,17 @@ def _validate_query(query):
             and set(actual).isdisjoint(missing)
             and set(actual)|set(missing)==set(expected),
             "H_BAR_DUPLICATE_MISSING_OR_FUTURE")
-    require((query["coverage"]=="COMPLETE" and not missing)
+    require((query["coverage"]=="COMPLETE" and not missing
+             and end<=cutoff)
             or (query["coverage"]=="PARTIAL" and bool(bars) and bool(missing))
             or (query["coverage"]=="UNKNOWN" and not bars),
             "H_CORE_COVERAGE_DRIFT")
+    # No non-missing bar may extend past the decision cutoff. Future grid
+    # slots in an incomplete Core253 read remain source-unobserved UNKNOWN.
+    require(all(t<cutoff for t in actual)
+            and (end<=cutoff or
+                 all(t in missing for t in expected if t>=cutoff)),
+            "H_CORE_FUTURE_SLOT_MUST_BE_MISSING")
     return expected
 
 
@@ -467,7 +476,9 @@ def verify_factory_signal_batch(batch):
         and type(x.get("end_exclusive_ms")) is int
         and x["end_exclusive_ms"]-x["start_ms"]==
             x["event_count"]*STEP
-        and x["end_exclusive_ms"]<=x["decision_cutoff_ms"],
+        and (x["end_exclusive_ms"]<=x["decision_cutoff_ms"]
+             or (x["coverage"] in ("PARTIAL","UNKNOWN")
+                 and x["start_ms"]<x["decision_cutoff_ms"])),
         "H_FACTORY_DENOMINATOR")
     seen=set()
     counts=Counter()
@@ -480,7 +491,11 @@ def verify_factory_signal_batch(batch):
                 and e["bar_open_ms"] not in seen
                 and e.get("bar_close_ms")==e["bar_open_ms"]+STEP-1
                 and e.get("research_asof_ms")==e["bar_close_ms"]+1
-                and e["bar_close_ms"]<x["decision_cutoff_ms"]
+                and (e["bar_close_ms"]<x["decision_cutoff_ms"]
+                     or (x["coverage"] in ("PARTIAL","UNKNOWN")
+                         and e.get("signal_state")=="UNKNOWN"
+                         and e.get("source_observed") is False
+                         and e.get("next_eligible_open_ms") is None))
                 and e.get("decision_cutoff_ms")==x["decision_cutoff_ms"]
                 and e.get("signal_state") in STATES
                 and e.get("source_observed") is
