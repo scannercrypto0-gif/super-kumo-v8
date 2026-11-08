@@ -217,7 +217,8 @@ def run_owner_personal_batch(evidence_dir, output_dir, *,
         for k in ("native_core245_sha256","bounded_core253_sha256",
                   "coverage","required_bars","observed_bars","missing_bars",
                   "scanner_sha256","factory_package_sha256","lab_sha256",
-                  "secretary_sha256","replay","cost_policy_sha256",
+                  "secretary_sha256","factory_lab_index_sha256",
+                  "factory_lab_index_status","replay","cost_policy_sha256",
                   "isolated_code_sha256","source_no_write_sha256"):
             if k in result:
                 details[k]=result[k]
