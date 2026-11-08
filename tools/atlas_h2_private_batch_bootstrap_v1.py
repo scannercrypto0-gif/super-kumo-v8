@@ -193,6 +193,7 @@ def run_batch(directory, verifier_key, owner_key, output, git_repo,
     """One result. Authenticated metadata before any source read or mutation."""
     reasons = []
     details = {}
+    invoked = False
     try:
         claim, intake_path, intake_digest = inspect_private_intake(
             directory, verifier_key)
@@ -226,6 +227,7 @@ def run_batch(directory, verifier_key, owner_key, output, git_repo,
             json.dump({"authorization_digest": digest(scope),
                        "custodian_packet_sha256": intake_digest,
                        "state": "ONE_ATTEMPT_RESERVED_NO_AUTOMATIC_REPLAY"}, stream)
+        invoked = True
         operator_result = execute(
             signed, key_file=owner_key, repo=git_repo,
             allow_local_run=True)
@@ -247,7 +249,8 @@ def run_batch(directory, verifier_key, owner_key, output, git_repo,
     except (Blocked, OSError, ValueError, KeyError, TypeError) as exc:
         reasons.append(str(exc) if isinstance(exc, Blocked)
                        else "PRIVATE_BOOTSTRAP_INPUT_OR_PATH_UNVERIFIABLE")
-        return single_report("BLOCKED", reasons, details=details)
+        return single_report("BLOCKED", reasons, details=details,
+                             operator_invoked=invoked)
 
 
 def write_report(output, report):
