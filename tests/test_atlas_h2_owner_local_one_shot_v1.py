@@ -164,6 +164,24 @@ class H2Operator(unittest.TestCase):
         self.assertEqual(fingerprint(original), before)
         self.assertFalse((snapshot / "warehouse.sqlite-shm").exists())
 
+    def test_idle_shm_churn_does_not_hide_actual_source_change(self):
+        root = self.root / "warehouse"
+        durable = root / "warehouse.sqlite"
+        durable.write_bytes(b"original data")
+        before = fingerprint(root)
+        shm = root / "warehouse.sqlite-shm"
+        shm.write_bytes(b"x" * 32768)
+        wal = root / "warehouse.sqlite-wal"
+        wal.write_bytes(b"")
+        self.assertEqual(fingerprint(root), before)
+        shm.write_bytes(b"y" * 32768)
+        self.assertEqual(fingerprint(root), before)
+        shm.unlink()
+        wal.unlink()
+        self.assertEqual(fingerprint(root), before)
+        durable.write_bytes(b"changed original")
+        self.assertNotEqual(fingerprint(root), before)
+
     def test_durable_source_mutation_changes_fingerprint(self):
         durable = self.root / "warehouse" / "archive.json"
         durable.write_text('{"v":1}')
