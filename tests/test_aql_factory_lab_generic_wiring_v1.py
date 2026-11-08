@@ -67,7 +67,7 @@ class LabWiring(unittest.TestCase):
         cost=packet["operator_cost_policy"]["sha256"]
         # Test only: this distinct later research observation clock is outside
         # the Scanner decision cutoff but BEFORE the 72h embargo/holdout.
-        asof=train_end+HOUR*73
+        asof=train_end+HOUR*72-1  # last 15m bar matures before embargo
         observation=[]
         for index,e in enumerate(events):
             for h in HORIZONS:
