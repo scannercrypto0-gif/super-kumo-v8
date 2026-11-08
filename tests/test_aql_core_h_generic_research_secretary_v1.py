@@ -21,7 +21,7 @@ def seal(d, field="sha256"):
     return {**d,field:digest(d)}
 
 
-S={k:chr(ord("a")+i)*64 for i,k in enumerate((
+S={k:str(i+1)*64 for i,k in enumerate((
     "source_query_sha256","source_bytes_sha256","manifest_integrity_sha256",
     "strategy_definition_sha256","strategy_plugin_sha256","config_sha256",
     "scanner_policy_sha256","scanner_evaluator_code_sha256",
