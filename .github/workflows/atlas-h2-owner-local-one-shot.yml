@@ -26,6 +26,9 @@ on:
       - 'tools/atlas_h2_owner_readiness_bundle_v2.ps1'
       - 'tools/atlas_h2_owner_execution_overlay_smoke_v2.py'
       - 'tests/test_atlas_h2_owner_readiness_v2.py'
+      - 'tools/atlas_h2_owner_diagnose_all_v2.py'
+      - 'tools/atlas_h2_owner_diagnose_all_bundle_v2.ps1'
+      - 'tests/test_atlas_h2_owner_diagnose_all_v2.py'
       - '.github/workflows/atlas-h2-owner-local-one-shot.yml'
       - 'docs/research/integration-r1-first-original-test-readiness-v1.md'
   workflow_dispatch:
@@ -61,6 +64,7 @@ jobs:
               'test_atlas_h2_owner_identity_v2',
               'test_atlas_h2_owner_evidence_recovery_v2',
               'test_atlas_h2_owner_readiness_v2',
+              'test_atlas_h2_owner_diagnose_all_v2',
               'test_atlas_h2_binance_public_lane_v1'))
           result=unittest.TextTestRunner(verbosity=2).run(suite)
           if not result.wasSuccessful():
@@ -176,7 +180,8 @@ jobs:
           $files = @(
             'tools/atlas_h2_owner_local_prepare_v2.ps1',
             'tools/atlas_h2_owner_recovery_bundle_v2.ps1',
-            'tools/atlas_h2_owner_readiness_bundle_v2.ps1'
+            'tools/atlas_h2_owner_readiness_bundle_v2.ps1',
+            'tools/atlas_h2_owner_diagnose_all_bundle_v2.ps1'
           )
           foreach ($f in $files) {
             $tokens = $null
