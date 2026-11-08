@@ -12,7 +12,7 @@ from test_aql_core_h_generic_research_secretary_v1 import docs
 
 
 class GenericIntegration(unittest.TestCase):
-    def test_three_strategies_durable_restart_idempotency(self):
+    def test_three_distinct_synthetic_envelopes_durable_restart_idempotency(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)
             shas=set()
