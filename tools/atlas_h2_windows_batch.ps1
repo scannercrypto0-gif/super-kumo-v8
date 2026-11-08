@@ -4,7 +4,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory=$true)][string]$EvidenceDir,
-  [Parameter(Mandatory=$true)][string]$OutputDir,
+  [string]$OutputDir = '',
   [string]$CustodianVerifierKey = '',
   [string]$OwnerSigningKey = '',
   [switch]$ConfirmOneRun,
@@ -12,7 +12,7 @@ param(
   [string]$Git = 'git'
 )
 $ErrorActionPreference = 'Stop'
-$bootstrapCommit = 'f93cdaa684bcae1861145f027346486428fb217f'
+$bootstrapCommit = '6968ae0a0566c084fe36163eafce2093a34201ff'
 $operatorCommit = '43903d82e85c272a17183dfbbfbe0c493696d3f2'
 $required = @(
   $bootstrapCommit,
@@ -23,11 +23,27 @@ $required = @(
   'a4b887fe7067b89febc339e466652a5fcb1c2bee',
   '6acbcc7fc243b132f58170df4c6469bbf7f4eff8'
 )
-# Only the explicitly named private evidence directory is inspected here.
-# Never recursively search the user's E: drive or inspect Git working tree.
+# Default results to a private profile path, not the original E: source.
+$localData = [Environment]::GetFolderPath('LocalApplicationData')
+if ([string]::IsNullOrWhiteSpace($localData)) {
+  throw 'SAFE_LOCAL_PROFILE_OUTPUT_UNAVAILABLE'
+}
+$allowedOutputRoot = Join-Path $localData 'ATLAS\H2-Local-Batch'
+if (-not $OutputDir) {
+  $OutputDir = Join-Path $allowedOutputRoot ('run-' + [Guid]::NewGuid().ToString('N'))
+}
+$normalizedOutput = [IO.Path]::GetFullPath($OutputDir).TrimEnd('\')
+$normalizedBase = [IO.Path]::GetFullPath($allowedOutputRoot).TrimEnd('\')
+if (-not $normalizedOutput.StartsWith(($normalizedBase + '\'),
+    [StringComparison]::OrdinalIgnoreCase)) {
+  throw 'OUTPUT_MUST_BE_WITHIN_PRIVATE_LOCAL_PROFILE_ATLAS_H2'
+}
+$OutputDir = $normalizedOutput
 if (-not (Test-Path -LiteralPath $OutputDir -PathType Container)) {
   New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 }
+Write-Host ('H2_LOCAL_REPORT_DIR: ' + $OutputDir)
+# Never scan the user's E: drive or inspect Git working tree.
 $root = Join-Path ([IO.Path]::GetTempPath()) ('aql-h2-batch-' + [Guid]::NewGuid().ToString('N'))
 $clone = Join-Path $root 'pinned-repo'
 $driver = Join-Path $root 'driver'
