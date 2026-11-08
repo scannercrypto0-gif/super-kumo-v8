@@ -289,7 +289,7 @@ def diagnose(evidence_dir,signed_output_dir,owner_key,repo,
            ("TECH_SCHEMA","AST_FILE_SHA"),
            lambda:validate_native_manual_third_ast(
                folder/"manual-third-ast.json",
-               tech["strategy_definition_sha256"],tech["strategy_id"]) is None,
+               tech["strategy_definition_sha256"],tech["strategy_id"]) == tech["strategy_definition_sha256"],
            "MANUAL_NATIVE_AST_DIGEST_OR_SHAPE",
            regression="test_native_ast_not_scanner_plugin")
     F.safe("CORE245_SCHEMA_SEAL","SOURCE",("NATIVE_FILE_SHA","TECH_SCHEMA"),
@@ -469,10 +469,18 @@ def main(argv=None):
     ap.add_argument("--diagnostics-dir",required=True)
     ap.add_argument("--without-original-read",action="store_true")
     args=ap.parse_args(argv)
+    diag=Path(args.diagnostics_dir).resolve(strict=False)
+    signed=Path(args.signed_output_dir).resolve(strict=False)
+    base=Path(os.environ.get("LOCALAPPDATA",""))/"ATLAS"/"H2-Local-Batch"
+    if (not os.environ.get("LOCALAPPDATA") or
+        diag == signed or signed in diag.parents or
+        diag == base or base not in diag.parents or
+        diag.exists() or diag.is_symlink()):
+        raise SystemExit("DIAGNOSTIC_OUTPUT_NOT_FRESH_OR_NOT_ISOLATED")
     report=diagnose(args.evidence_dir,args.signed_output_dir,
                     args.owner_key,args.repo,
                     include_original_read=not args.without_original_read,
-                    scratch_root=Path(args.diagnostics_dir).parent)
+                    scratch_root=diag.parent)
     write_private_report(report,args.diagnostics_dir)
     # Minimal user-console output: IDs and status only, no private path/JSON.
     print(json.dumps({
