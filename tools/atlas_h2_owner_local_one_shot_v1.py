@@ -4,6 +4,7 @@ Never treat a declarative H2 policy preflight as source authorization.
 """
 from __future__ import annotations
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import hmac
 import io
@@ -115,6 +116,12 @@ def verify_owner(manifest, key_path):
           and (end - start) <= 4096 * STEP
           and start % STEP == 0 and end % STEP == 0,
           "BOUND_OR_CUTOFF")
+    month = scope.get("month")
+    check(type(month) is str
+          and len(month) == 7
+          and datetime.fromtimestamp(start / 1000, timezone.utc).strftime("%Y-%m") == month
+          and datetime.fromtimestamp((end - 1) / 1000, timezone.utc).strftime("%Y-%m") == month,
+          "CROSS_MONTH_OR_MONTH_INVALID")
     check(type(scope.get("dataset_id")) is str
           and scope["dataset_id"].startswith("BINANCE-SPOT-BTCUSDT-15M-")
           and type(scope.get("version")) is int and scope["version"] > 0
@@ -289,6 +296,43 @@ def run_authorized(scope, overlay):
           and query["dataset_id"] == scope["dataset_id"]
           and query["version"] == scope["version"],
           "CORE253_COVERAGE_OR_QUERY_SHA")
+    # Reuse the *accepted* declarative Option C v2 contract, but do not
+    # mistake its self-declared READY for independent owner authorization.
+    policy_request = {
+        "schema": "aql.integration.h2.historical-policy-request.v2",
+        "research_class": "RETROSPECTIVE_NON_PIT",
+        "exact_heads": PINS.copy(),
+        "bounded_request": {
+            "dataset_id": scope["dataset_id"],
+            "month": scope["month"],
+            "start_ms": scope["start_ms"],
+            "end_exclusive_ms": scope["end_exclusive_ms"],
+            "decision_cutoff_ms": scope["decision_cutoff_ms"],
+            "strategy_definition_sha256": scope["strategy_definition_sha256"],
+        },
+        "owner_permission": {
+            "granted": True,
+            "scope": "BOUNDED_ORIGINAL_HISTORY_READONLY",
+            "authorization_reference": "OWNER_LOCAL_MAC:" + digest(scope),
+        },
+        "owner_cost_policy": {
+            "owner_authorized": True,
+            "authorization_reference": "OWNER_LOCAL_MAC:" + digest(scope),
+            "market": "SPOT", "direction": "LONG",
+            "scenario_class": "OWNER_DECLARED_RESEARCH_SCENARIO",
+            "costs": scope["costs"],
+        },
+        "source_provenance": {
+            "source_rights_attested": True,
+            "publisher_pit_attested": False,
+            "source_receipt_sha256": scope["source_bytes_sha256"],
+            "manifest_integrity_sha256": scope["manifest_integrity_sha256"],
+            "core245_native_query_sha256": native_sha,
+            "core253_local_query_sha256": query["query_sha256"],
+        },
+    }
+    check(assess(policy_request)["status"] == "READY_FOR_OWNER_AUTHORIZATION",
+          "H2_V2_POLICY_REJECTION")
     definition = json.loads(Path(scope["strategy_definition_file"]).read_text("utf-8"))
     strategy = StrategyDefinition.from_dict(
         definition, registry=IndicatorRegistryV2())
