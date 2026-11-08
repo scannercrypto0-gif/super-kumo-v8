@@ -53,6 +53,7 @@ class OwnerPersonalResearchAuthority(unittest.TestCase):
             "cost_policy_sha256": _digest(self.policy),
             "experiment_id": "RESEARCH-H-GENERIC-TEST-ONE",
             "owner_authorization_ref": "TEST_ONLY_NEVER_OWNER_APPROVAL",
+            "one_use_nonce": "0123456789abcdef0123456789abcdef",
             "research_class": "RETROSPECTIVE_NON_PIT",
             "historical_pit": "NOT_ATTESTED",
             "publisher_pit_attested": False,
