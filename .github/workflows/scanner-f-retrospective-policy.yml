@@ -66,6 +66,12 @@ jobs:
           ref: ef8d41b6ff273e4228e6b90210f4610dccf54251
           path: upstream/factory-f
           persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: 99c27ea2c1a4d41aaae361141301a8a9ea3b33c3
+          path: upstream/core-h-current
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
@@ -77,7 +83,7 @@ jobs:
           cp upstream/core-f/research_wp_r0/aql_core_f_bulk_source_v1.py project/research_wp_r0/
           cp upstream/core-f/research_wp_r0/aql_core_f_private_f2_v1.py project/research_wp_r0/
           cp upstream/core-f/research_wp_r0/aql_core_f_ntfs_acl_v1.py project/research_wp_r0/
-          cp upstream/core-f/research_wp_r0/aql_core_backbone_local_v1.py project/research_wp_r0/ || true
+          cp upstream/core-h-current/research_wp_r0/aql_core_backbone_local_v1.py project/research_wp_r0/
           cp upstream/factory-f/research_wp_r0/aql_factory_historical_rule_projection.py project/research_wp_r0/
           cp upstream/factory-f/research_wp_r0/strategy_definition.py project/research_wp_r0/
           cp upstream/factory-f/research_wp_r0/indicator_library_v2.py project/research_wp_r0/
