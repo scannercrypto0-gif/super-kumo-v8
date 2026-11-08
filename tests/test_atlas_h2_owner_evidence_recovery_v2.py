@@ -54,8 +54,19 @@ class OwnerRecoverySafeSynthetic(unittest.TestCase):
         (self.identity_dir/"owner-revocations.json").write_text(
             json.dumps({"schema":"aql.integration.h2.owner-revocations.v2",
                         "revoked_key_ids":[]}))
-        self.native={"schema":"aql.core.historical-price-custody-query.v1",
-                     "price_query_sha256":"c"*64}
+        from tools.atlas_h2_owner_local_one_shot_v1 import digest
+        bars=[{"bar_open_ms":1709251200000+i*900000,
+               "bar_close_ms":1709251200000+(i+1)*900000-1}
+              for i in range(2976)]
+        body={"schema":"aql.core.historical-price-custody-query.v1",
+              "status":"OK","coverage":"COMPLETE",
+              "dataset_id":"BINANCE-SPOT-BTCUSDT-15M-2024-03",
+              "version":1,"source_bytes_sha256":self.source_sha,
+              "manifest_integrity_sha256":"b"*64,
+              "decision_cutoff_ms":1711929600000,
+              "required_bar_count":2976,"available_bar_count":2976,
+              "missing_bar_opens":[],"bars":bars}
+        self.native={**body,"price_query_sha256":digest(body)}
         self.local={"schema":"aql.core.local-history-query.v1",
                     "query_sha256":"d"*64}
         from research_wp_r0.strategy_definition import digest
@@ -125,6 +136,37 @@ class OwnerRecoverySafeSynthetic(unittest.TestCase):
         with self.assertRaisesRegex(
             RecoveryBlocked,"ORIGINAL_OR_PRIVATE_OUTPUT_PATH_UNSAFE"
         ): self._do()
+
+    def test_v2_identity_and_four_artifacts_reach_only_mocked_operator(self):
+        from tools.atlas_h2_owner_personal_batch_v1 import run_owner_personal_batch
+        self._do()
+        repo=self.root/"synthetic-pinned-repo"
+        repo.mkdir()
+        proof=self._pub()
+        proof["checksum_response_sha256"]="f"*64
+        proof["filename"]=self.source.name
+        calls=[]
+        def mocked_operator(*args,**kwargs):
+            calls.append(True)
+            return {"status":"EXPERIMENT_ENGINEERING_PASS",
+                    "reason":"SYNTHETIC_MOCK_NO_SOURCE",
+                    "sha256":"e"*64}
+        with patch(
+            "tools.atlas_h2_owner_personal_batch_v1.verify_public_month",
+            return_value=proof
+        ):
+            report=run_owner_personal_batch(
+                self.evidence,self.output,
+                owner_key=self.identity_dir/"owner-signing.key",
+                git_repo=repo,confirm_one_run=True,
+                operator=mocked_operator)
+        self.assertEqual(report["status"],"PASS_ENGINEERING_ONLY")
+        self.assertEqual(len(calls),1)
+        self.assertEqual(report["details"]["third_party_rights"],"UNVERIFIED")
+        self.assertEqual(report["details"]["independent_license_review"],"NOT_ATTESTED")
+        self.assertTrue((self.evidence/"h2-personal-one-use-claim.json").is_file())
+        self.assertTrue((self.output/"h2-personal-scope-claim.json").is_file())
+        self.assertNotIn("key",str(report).lower())
 
     def test_no_owner_opt_in_blocks_without_evidence(self):
         with self.assertRaisesRegex(
