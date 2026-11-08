@@ -129,11 +129,13 @@ class PrivateBatch(unittest.TestCase):
         self.assertEqual(first["status"],"BLOCKED")
         self.assertIn("OPERATOR_SOURCE_NONEMPTY_WAL_REQUIRES_OFFLINE_STABLE_SNAPSHOT",
                       first["reasons"])
-        self.assertTrue((self.output/"h2-single-use-claim.json").is_file())
+        self.assertTrue((self.intake/"h2-single-use-claim.json").is_file())
+        alternate = self.root / "alternative-output"
+        alternate.mkdir()
         with patch("tools.atlas_h2_private_batch_bootstrap_v1.execute",
                    side_effect=AssertionError("must not rerun")):
             repeat=run_batch(self.intake,self.verifier,self.owner,
-                             self.output,self.repo,confirm_one_run=True)
+                             alternate,self.repo,confirm_one_run=True)
         self.assertIn("SINGLE_USE_ALREADY_CLAIMED",repeat["reasons"])
 
     def test_signed_stage_sha_mutation_refused(self):
