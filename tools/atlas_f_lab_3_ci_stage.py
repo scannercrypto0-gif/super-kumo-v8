@@ -16,8 +16,7 @@ PINS={
 }
 ALLOWED={
  "work235":("research_wp_r0/","tools/strategy_service_offline/"),
- "scanner":("research_wp_r0/","tools/scanner_strategy_f/",
-            "tools/scanner_strategy_e/"),
+ "scanner":("research_wp_r0/","tools/scanner_strategy_"),
  "factory":("research_wp_r0/","tests/test_aql_factory_h_generic_signal_adapter_v1.py",
             "tests/test_aql_factory_lab_generic_wiring_v1.py"),
  "core":("research_wp_r0/",),
