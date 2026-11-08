@@ -46,12 +46,19 @@ def require(ok, reason):
         raise Blocked(reason)
 
 
-def single_report(status, reasons, *, code_head=None, details=None):
+def single_report(status, reasons, *, code_head=None, details=None,
+                  operator_invoked=False):
     payload = {
         "schema": REPORT_SCHEMA, "status": status,
         "reasons": sorted(set(reasons)),
         "code_head": code_head,
-        "source_read": False if status != "PASS_ENGINEERING_ONLY" else True,
+        # An operator may have begun a read before it blocks. Never report
+        # false NO_SOURCE_IO for a failed invocation that passed prior gates.
+        "source_read": (True if status == "PASS_ENGINEERING_ONLY"
+                        else None if operator_invoked else False),
+        "source_read_status": ("CONFIRMED" if status == "PASS_ENGINEERING_ONLY"
+                               else "POSSIBLE_AFTER_GATES" if operator_invoked
+                               else "NOT_ATTEMPTED"),
         "historical_pit": "NOT_ATTESTED",
         "economic_approval": "NOT_GRANTED",
         "trading_authority": "NONE",
@@ -226,7 +233,8 @@ def run_batch(directory, verifier_key, owner_key, output, git_repo,
         details["operator_status"] = operator_result["status"]
         if operator_result["status"] != "EXPERIMENT_ENGINEERING_PASS":
             reasons.append("OPERATOR_" + operator_result["reason"])
-            return single_report("BLOCKED", reasons, details=details)
+            return single_report("BLOCKED", reasons, details=details,
+                                 operator_invoked=True)
         # Avoid publishing any source paths, key material or source rows.
         for k in ("native_core245_sha256", "bounded_core253_sha256",
                   "coverage", "required_bars", "observed_bars", "missing_bars",
