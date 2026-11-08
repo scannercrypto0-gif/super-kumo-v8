@@ -205,22 +205,28 @@ print(json.dumps({"state":out["state"],"sha256":out["sha256"]}))
             self.secretary,packet["experiment_id"])["state"],
             "WAIT_RESEARCH_REVIEW")
 
-    def test_partial_warehouse_query_not_promoted(self):
-        packet=self.packet(partial=True)
-        self.assertEqual(packet["core_query"]["coverage"],"PARTIAL")
-        self.assertGreater(len(packet["core_query"]["missing_bar_opens"]),0)
-        self.assertEqual(packet["scanner_signal_batch"]["payload"][
-            "signal_counts"]["UNKNOWN"],N)
-        done=self.run_pipeline(packet)
-        self.assertEqual(done["state"],"SECRETARY_WAIT")
-        index=get_experiment_link(self.store,packet["experiment_id"],
-                                  secretary_root=self.secretary)["link"]
-        self.assertEqual(index["modeled_trades"],0)
+    def test_partial_real_core_warehouse_rejected_by_scanner_cutoff_boundary(self):
+        # Core253 may return PARTIAL for a pre-end cutoff; Scanner H requires
+        # cutoff >= end. This is an exact upstream contract mismatch and
+        # must fail closed, not be silently resealed into an accepted packet.
+        query,receipt=synthetic_real_sqlite(self.warehouse,partial=True)
+        self.assertEqual(query["coverage"],"PARTIAL")
+        self.assertGreater(len(query["missing_bar_opens"]),0)
+        baseline=case_for(2)
+        with self.assertRaisesRegex(Exception,"H_CORE_CUTOFF_OR_RANGE"):
+            scanner.evaluate_strategy_plugin(
+                baseline["strategy_plugin"],query,
+                warehouse_root=str(self.warehouse),
+                policy=baseline["scanner_signal_policy"])
         with self.assertRaisesRegex(BackboneError,"WAREHOUSE_INCOMPLETE_OR_FUTURE"):
-            query_local(self.warehouse,packet["core_query"]["dataset_id"],1,
-                        START,START+N*STEP,START+N*STEP+2000,
-                        required_source_sha256=packet["source_bytes_sha256"],
+            query_local(self.warehouse,query["dataset_id"],1,
+                        START,START+N*STEP,query["decision_cutoff_ms"],
+                        required_source_sha256=query["source_bytes_sha256"],
                         require_complete=True,sqlite_immutable=True)
+        with closing(sqlite3.connect(self.store)) as con:
+            self.assertIsNone(con.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                (TABLE,)).fetchone())
 
     def test_unsafe_cutoff_rejects_without_authority_upgrade(self):
         packet=self.packet()
