@@ -327,13 +327,13 @@ class ResearchStrategyPlugin(unittest.TestCase):
                 str(float(i+1)),str(t+step-1),"505",str(2+i),
                 "2","202","0",
             )))
-        csv=("\\n".join(rows)+"\\n").encode()
+        csv=("\n".join(rows)+"\n").encode()
         out=BytesIO()
         with ZipFile(out,"w",compression=ZIP_DEFLATED) as z:
             z.writestr(basename+".csv",csv)
         raw=out.getvalue()
         sha=hashlib.sha256(raw).hexdigest()
-        checksum=(sha+"  "+basename+".zip\\n").encode()
+        checksum=(sha+"  "+basename+".zip\n").encode()
         end=start+n*step
         pin={
             "schema":PIN_SCHEMA,"source_kind":"BINANCE_KLINES_ZIP",
