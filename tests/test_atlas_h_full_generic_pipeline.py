@@ -6,6 +6,7 @@ fixture (not a real warehouse); Factory/Scientific Lab/Secretary are unmocked.
 from __future__ import annotations
 import tempfile
 import json
+import gc
 import sqlite3
 import unittest
 from pathlib import Path
@@ -51,6 +52,8 @@ class FullGenericH(unittest.TestCase):
                     self.assertIsNone(saved["strategy_approval_sha256"])
                     self.assertEqual(saved["trading_authority"],"NONE")
             self.assertEqual(len(seen),3)
+            # Windows SQLite file handles must be released before temp cleanup.
+            gc.collect()
 
 
 if __name__=="__main__":
