@@ -5,6 +5,7 @@ on:
     paths:
       - 'tools/atlas_h2_owner_local_one_shot_v1.py'
       - 'tests/test_atlas_h2_owner_local_one_shot_v1.py'
+      - 'tools/atlas_h2_windows_one_shot.ps1'
       - '.github/workflows/atlas-h2-owner-local-one-shot.yml'
   workflow_dispatch:
 permissions:
@@ -35,3 +36,24 @@ jobs:
           result=unittest.TextTestRunner(verbosity=2).run(suite)
           if not result.wasSuccessful():
               raise SystemExit(1)
+
+      - name: Windows PowerShell launcher parse and no-manifest denial
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path (Get-Location) 'tools/atlas_h2_windows_one_shot.ps1'),
+            [ref]$tokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count -ne 0) {
+            $parseErrors | Out-String | Write-Host
+            exit 1
+          }
+          try {
+            & ./tools/atlas_h2_windows_one_shot.ps1 -PrivateManifest 'NOT_PRESENT' -OwnerHmacKey 'NOT_PRESENT' -AuditOutput 'NOT_PRESENT'
+            throw 'FAIL_OPEN_MISSING_MANIFEST'
+          } catch {
+            if ($_.Exception.Message -notmatch 'OWNER_PRIVATE_MANIFEST_MISSING') { throw }
+            Write-Host 'PASS: no manifest -> no local code fetch or source access'
+          }
