@@ -106,7 +106,16 @@ class Findings:
     def summary(self):
         counter=Counter(x["status"] for x in self.entries)
         ready=(counter["FAIL"]==0 and counter["BLOCKED_BY_DEPENDENCY"]==0)
+        repairs={}
+        for finding in self.entries:
+            if finding["status"] in ("FAIL","BLOCKED_BY_DEPENDENCY"):
+                repairs.setdefault(finding["owner"],[]).append({
+                    "finding_id":finding["id"],
+                    "reason":finding["reason"],
+                    "regression_test":finding["regression_test"]})
         return {"schema":SCHEMA,"version":VERSION,
+                "repair_plan_by_component":repairs,
+                "preflight_complete":ready,
                 "status":("READY_FOR_SEPARATE_OWNER_EXECUTION_APPROVAL"
                           if ready else "PREFLIGHT_FINDINGS_BLOCKED"),
                 "counts":{k:counter[k] for k in STATES},
@@ -238,17 +247,19 @@ def diagnose(evidence_dir,signed_output_dir,owner_key,repo,
               scope_commitment(tech,out,identity_binding=
                  signed["identity_binding_sha256"]),
            "SIGNED_ROOT_OR_ROLE_PIN_MISMATCH")
+    # Independently inspect *declared* cost/nonce even if a MAC is invalid.
+    # This NEVER treats unsigned declarations as an approval.
+    F.safe("OWNER_TEST_COSTS","OWNER",("OWNER_V2_ENVELOPE",),
+           lambda:env["assertion"]["cost_policy"]["costs"]==RESEARCH_COSTS,
+           "SEVEN_TEST_ONLY_SPOT_COSTS_DRIFT")
+    F.safe("SIGNED_NONCE","OWNER",("OWNER_V2_ENVELOPE",),
+           lambda:type(env["assertion"]["scope"]["one_use_nonce"]) is str
+           and len(env["assertion"]["scope"]["one_use_nonce"])==32
+           and all(x in "0123456789abcdef"
+                   for x in env["assertion"]["scope"]["one_use_nonce"]),
+           "ONE_USE_NONCE_SHAPE")
     if F.states["OWNER_MAC_TIME_CUSTODY"]=="PASS":
         claim=env["assertion"]["scope"]
-        F.safe("OWNER_TEST_COSTS","OWNER",("OWNER_MAC_TIME_CUSTODY",),
-               lambda:env["assertion"]["cost_policy"]["costs"]==
-                      RESEARCH_COSTS,
-               "SEVEN_TEST_ONLY_SPOT_COSTS_DRIFT")
-        F.safe("SIGNED_NONCE","OWNER",("OWNER_MAC_TIME_CUSTODY",),
-               lambda:type(claim["one_use_nonce"]) is str
-               and len(claim["one_use_nonce"])==32
-               and all(x in "0123456789abcdef" for x in claim["one_use_nonce"]),
-               "ONE_USE_NONCE_SHAPE")
         F.safe("NO_TRADING_AUTHORITY","AUTHORITY",("OWNER_MAC_TIME_CUSTODY",),
                lambda:signed["original_h2_execution_permitted"] is False
                and claim["historical_pit"]=="NOT_ATTESTED"
@@ -257,10 +268,8 @@ def diagnose(evidence_dir,signed_output_dir,owner_key,repo,
                   "NOT_ATTESTED",
                "RESEARCH_ONLY_AUTHORITY_DRIFT")
     else:
-        for id,area in [("OWNER_TEST_COSTS","OWNER"),
-                        ("SIGNED_NONCE","OWNER"),
-                        ("NO_TRADING_AUTHORITY","AUTHORITY")]:
-            F.blocked(id,area,("OWNER_MAC_TIME_CUSTODY",))
+        F.blocked("NO_TRADING_AUTHORITY","AUTHORITY",
+                  ("OWNER_MAC_TIME_CUSTODY",))
     for id,path in (
         ("NO_EVIDENCE_ONE_USE",folder/"h2-personal-one-use-claim.json"),
         ("NO_SIGNED_OUTPUT_ONE_USE",out/"h2-personal-scope-claim.json"),
@@ -316,6 +325,14 @@ def diagnose(evidence_dir,signed_output_dir,owner_key,repo,
            ("SIGNED_EXACT_ROOT","TECH_SCHEMA"),
            lambda:_bounded_scope(tech,folder,out,owner_key,repo),
            "OUTPUT_WAREHOUSE_VAULT_BOUNDARY")
+    F.safe("CORE245_NATIVE_SEAL","SOURCE",
+           ("CORE245_SCHEMA_SEAL","OUTPUT_EXACT_SCOPE",
+            "OWNER_MAC_TIME_CUSTODY"),
+           lambda:native_receipt_check(
+               build_scope(tech,folder,out),native)==
+                   env["assertion"]["scope"]["core245_native_receipt_sha256"],
+           "ORIGINAL_CORE245_SEAL_OR_MARCH_GRID_INVALID",
+           regression="test_native_month_complete_source_seal")
     # Safe independent Git-stage / role import check proceeds despite
     # evidence problems. Requires no owner original source.
     if F.states["SOURCE_CODE_REPO"]=="PASS":
@@ -356,8 +373,12 @@ def diagnose(evidence_dir,signed_output_dir,owner_key,repo,
                 F.add("PUBLISHER_BYTE_IDENTITY","SOURCE","PASS",
                       regression="test_publisher_signed_zip_checksum")
             except Exception as exc:
-                F.add("PUBLISHER_BYTE_IDENTITY","SOURCE","FAIL",
-                      "OFFICIAL_PROVIDER_UNAVAILABLE_OR_SOURCE_SHA_DRIFT:"+_code(exc),
+                offline=(isinstance(exc,OSError) or
+                         "OFFICIAL_PROVIDER_UNAVAILABLE" in str(exc))
+                F.add("PUBLISHER_BYTE_IDENTITY","SOURCE",
+                      "BLOCKED_BY_DEPENDENCY" if offline else "FAIL",
+                      "OFFICIAL_PROVIDER_UNAVAILABLE" if offline else
+                      "PUBLISHER_SOURCE_IDENTITY_DRIFT:"+_code(exc),
                       regression="test_publisher_signed_zip_checksum")
         else:
             F.blocked("PUBLISHER_BYTE_IDENTITY","SOURCE",deps)
@@ -387,7 +408,7 @@ def diagnose(evidence_dir,signed_output_dir,owner_key,repo,
                       "QUESCENT_SOURCE_FINGERPRINT_UNAVAILABLE:"+_code(exc))
         else:
             F.blocked("SOURCE_DURABLE_FINGERPRINT","SOURCE",deps)
-        deps=("SOURCE_DURABLE_FINGERPRINT","CORE245_SCHEMA_SEAL")
+        deps=("SOURCE_DURABLE_FINGERPRINT","CORE245_NATIVE_SEAL")
         if all(F.states.get(x)=="PASS" for x in deps):
             try:
                 with tempfile.TemporaryDirectory(
