@@ -153,7 +153,7 @@ class OfficialBinanceLane(unittest.TestCase):
         tech = self._intake()
         report = run_public_batch(self.private, self.output, fetcher=self.fetch)
         self.assertEqual(report["status"], "BLOCKED")
-        self.assertIn("WAIT_LICENSE_EVIDENCE", report["reasons"])
+        self.assertIn("WAIT_LICENSE_REVIEWER_KEY", report["reasons"])
         self.assertEqual(report["details"]["official_zip_sha256"], self.sha)
         self.assertFalse(report["source_read"])
         self.assertNotIn("local_source_zip", str(report))
