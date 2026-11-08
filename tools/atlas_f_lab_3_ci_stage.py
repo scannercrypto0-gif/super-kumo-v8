@@ -10,12 +10,14 @@ import tarfile
 
 PINS={
  "work235":"6acbcc7fc243b132f58170df4c6469bbf7f4eff8",
+ "scanner_b":"30c37ae56851488b882998c7fa0085ec51dbfc92",
  "scanner":"3c82448702c9ae35783716e4e2c3b640010db97c",
  "core":"99c27ea2c1a4d41aaae361141301a8a9ea3b33c3",
  "factory":"04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
 }
 ALLOWED={
  "work235":("research_wp_r0/","tools/strategy_service_offline/"),
+ "scanner_b":("tools/scanner_strategy_b/","research_wp_r0/"),
  "scanner":("research_wp_r0/","tools/scanner_strategy_"),
  "factory":("research_wp_r0/","tests/test_aql_factory_h_generic_signal_adapter_v1.py",
             "tests/test_aql_factory_lab_generic_wiring_v1.py"),
