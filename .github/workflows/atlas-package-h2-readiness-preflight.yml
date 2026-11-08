@@ -1,0 +1,31 @@
+name: ATLAS H2 Readiness Permission Preflight Only
+on:
+  push:
+    branches: [integration/package-e-g1-g12-pinned-20261105]
+    paths:
+      - '.github/workflows/atlas-package-h2-readiness-preflight.yml'
+      - 'tools/atlas_h2_readiness_preflight.py'
+      - 'tests/test_atlas_h2_readiness_preflight.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  authorization-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: H2 permission cost provenance negative contracts (NO PRIVATE SOURCE)
+        shell: python
+        run: |
+          import sys,unittest
+          from pathlib import Path
+          sys.path.insert(0,str(Path.cwd()))
+          suite=unittest.defaultTestLoader.discover('tests',pattern='test_atlas_h2_readiness_preflight.py')
+          result=unittest.TextTestRunner(verbosity=2).run(suite)
+          if not result.wasSuccessful():
+              raise SystemExit(1)
