@@ -29,11 +29,18 @@ def _move(root, rel, imports, function, marker):
         raise ImportSeamBlocked("SCANNER_IMPORT_SEAM_PINNED_SOURCE_MISSING")
     before = path.read_bytes()
     try:
-        code = before.decode("utf-8")
+        # Git on Windows may stage CRLF-translated source; exact semantic
+        # anchors are LF-based. Normalize only scratch overlay, preserve
+        # original SHA in the seam receipt.
+        code = before.decode("utf-8").replace("\r\n","\n")
     except UnicodeError:
         raise ImportSeamBlocked("SCANNER_IMPORT_SEAM_SOURCE_ENCODING") from None
     if code.count(imports) != 1 or code.count(function) != 1 or code.count(marker) != 1:
-        raise ImportSeamBlocked("SCANNER_IMPORT_SEAM_SOURCE_CONTRACT_DRIFT")
+        raise ImportSeamBlocked(
+            "SCANNER_IMPORT_SEAM_SOURCE_CONTRACT_DRIFT"
+            + "_IMPORT_" + str(code.count(imports))
+            + "_FUNC_" + str(code.count(function))
+            + "_MARKER_" + str(code.count(marker)))
     # Move rather than elide imports. F3 called in its original F3 context
     # still imports the same dependencies and fails closed if unavailable.
     code = code.replace(imports, "", 1)
