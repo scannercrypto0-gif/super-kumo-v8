@@ -5,6 +5,7 @@ never Factory, Lab, index or Secretary production APIs.
 """
 from __future__ import annotations
 import json
+from contextlib import closing
 import sqlite3
 import tempfile
 import unittest
@@ -77,7 +78,7 @@ class Lifecycle(unittest.TestCase):
         self.assertNotEqual(done[0][1]["run_sha256"],done[1][1]["run_sha256"])
         self.assertEqual(len(list_experiment_links(
             self.store,secretary_root=self.secretary)),2)
-        with sqlite3.connect(self.store) as con:
+        with closing(sqlite3.connect(self.store)) as con:
             self.assertEqual(con.execute(
                 "SELECT COUNT(*) FROM experiments").fetchone()[0],0)
 
