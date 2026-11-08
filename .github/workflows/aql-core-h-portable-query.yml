@@ -1,0 +1,31 @@
+name: ATLAS Core H Portable Historical Query Delta
+on:
+  push:
+    branches:
+      - core/package-f-bulk-source-20261105
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_core_h_portable_query_v1.py'
+      - 'tests/test_aql_core_h_portable_query_v1.py'
+      - 'research_wp_r0/aql_core_h_research_secretary_v1.py'
+      - 'tests/test_aql_core_h_research_secretary_v1.py'
+      - 'tests/test_aql_core_h_generic_research_secretary_v1.py'
+      - '.github/workflows/aql-core-h-portable-query.yml'
+jobs:
+  core-h-query:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Package H synthetic query cutoff, identity and denial negatives
+        run: |
+          python -m unittest discover -s tests -p 'test_aql_core_h_portable_query_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_core_h_research_secretary_v1.py' -v
+          python -m unittest discover -s tests -p 'test_aql_core_h_generic_research_secretary_v1.py' -v
