@@ -21,6 +21,7 @@ on:
       - 'tools/atlas_h2_owner_recovery_bundle_v2.ps1'
       - 'tests/test_atlas_h2_owner_identity_v2.py'
       - 'tests/test_atlas_h2_owner_evidence_recovery_v2.py'
+      - 'tools/atlas_h2_owner_overlay_smoke_v2.py'
       - '.github/workflows/atlas-h2-owner-local-one-shot.yml'
       - 'docs/research/integration-r1-first-original-test-readiness-v1.md'
   workflow_dispatch:
@@ -59,6 +60,11 @@ jobs:
           result=unittest.TextTestRunner(verbosity=2).run(suite)
           if not result.wasSuccessful():
               raise SystemExit(1)
+
+      - name: Reproduce exact pinned owner R2 source overlay module imports (NO ORIGINAL)
+        shell: bash
+        run: |
+          python tools/atlas_h2_owner_overlay_smoke_v2.py --repo . --code-commit 08ffea09c72fffe2fada15a31164cf20dd41f354
 
       - name: Windows PowerShell launcher parse and no-manifest denial
         if: runner.os == 'Windows'
