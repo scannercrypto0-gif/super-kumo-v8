@@ -29,14 +29,13 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install focused test dependency
         run: python -m pip install pytest
-      - name: Stage exact pinned Scanner H code, CI-only, no PR merge
+      - name: Stage pinned Scanner H modules, CI-only
         shell: bash
         run: |
+          git fetch --no-tags origin 3c82448702c9ae35783716e4e2c3b640010db97c
           python - <<'PY'
           from pathlib import Path
-          import hashlib
           import subprocess
-          repo = "https://raw.githubusercontent.com/scannercrypto0-gif/super-kumo-v8/"
           ref = "3c82448702c9ae35783716e4e2c3b640010db97c"
           expected = {
               "tools/scanner_strategy_f/research_strategy_plugin.py": "873e4ed37c50fe225555e208958bfe6674c4bcfd",
@@ -46,15 +45,13 @@ jobs:
               "tools/scanner_strategy_e/historical_research_policy.py": "2d7720eb6cbbc5d40cd9914c97f28604c90cfc31",
               "tools/scanner_strategy_e/historical_policy_approval_request.py": "1b4fef75b415695b0e92cd9340e7ba96229edcbb",
           }
-          import urllib.request
-          for name, git_blob_sha1 in expected.items():
+          for name, blob in expected.items():
+              got = subprocess.check_output(["git","rev-parse",ref+":"+name], text=True).strip()
+              if got != blob:
+                  raise SystemExit("PINNED_SCANNER_GIT_BLOB_MISMATCH: "+name)
+              data = subprocess.check_output(["git","show",ref+":"+name])
               dest = Path(name)
               dest.parent.mkdir(parents=True, exist_ok=True)
-              with urllib.request.urlopen(repo + ref + "/" + name, timeout=30) as response:
-                  data = response.read()
-              git_sha = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\\0" + data).hexdigest()
-              if git_sha != git_blob_sha1:
-                  raise SystemExit("PINNED_SCANNER_GIT_BLOB_MISMATCH: " + name)
               dest.write_bytes(data)
           PY
       - name: Test new synthetic bridge only
