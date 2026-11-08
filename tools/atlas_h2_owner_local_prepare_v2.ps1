@@ -66,7 +66,7 @@ if ($RotateIdentity) {
   try { $rng.GetBytes($key) } finally { $rng.Dispose() }
   try {
     # Explicit exclusive create; never print key or include in reports.
-    $file = New-Object System.IO.FileStream(
+    $file = [IO.FileStream]::new(
       $keyFile, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write,
       [IO.FileShare]::None)
     try { $file.Write($key,0,$key.Length); $file.Flush($true) }
