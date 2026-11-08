@@ -224,7 +224,6 @@ def technical_intake(folder):
          "TECHNICAL_INTAKE_TOO_LARGE")
     try:
         tech = json.loads(technical_file.read_text("utf-8"))
-        lic = json.loads((root/"historical-license-evidence.json").read_text("utf-8"))
     except (UnicodeError, ValueError):
         raise Blocked("PRIVATE_EVIDENCE_INVALID_JSON") from None
     fail(type(tech) is dict and set(tech) == TECH_FIELDS and
@@ -232,6 +231,16 @@ def technical_intake(folder):
          and tech["owner_authorization_ref"] == "#205/6718325330"
          and tech["one_time_scope_authorized"] is True,
          "UNTRUSTED_TECHNICAL_INTAKE")
+    fail(all(type(tech[k]) is str for k in
+             ("warehouse_root", "vault_root", "local_source_zip"))
+         and all(not contained(root, tech[k]) and
+                 not contained(tech[k], root)
+                 for k in ("warehouse_root", "vault_root")),
+         "PRIVATE_INTAKE_MUST_BE_OUTSIDE_ORIGINAL_SOURCE")
+    try:
+        lic = json.loads((root/"historical-license-evidence.json").read_text("utf-8"))
+    except (UnicodeError, ValueError):
+        raise Blocked("PRIVATE_EVIDENCE_INVALID_JSON") from None
     for name, column in (
         ("core245-native-receipt.json", "native_receipt_file_sha256"),
         ("manual-third-ast.json", "strategy_file_sha256"),
@@ -321,7 +330,8 @@ def run_public_batch(evidence_dir, output_dir, *, fetcher=fetch_official,
              and not contained(owner_key, tech["vault_root"])
              and not contained(owner_key, git_repo)
              and not contained(reviewer_key, tech["warehouse_root"])
-             and not contained(reviewer_key, tech["vault_root"]),
+             and not contained(reviewer_key, tech["vault_root"])
+             and not contained(reviewer_key, git_repo),
              "SIGNER_KEY_IN_ORIGINAL_SOURCE_OR_CODE")
         scope["source_rights_attested"] = True
         owner_secret = _key(owner_key)
