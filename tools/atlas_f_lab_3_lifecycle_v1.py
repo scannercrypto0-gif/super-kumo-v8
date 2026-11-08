@@ -180,6 +180,14 @@ def run_synthetic(*,packet,store_path,secretary_root,checkpoint_root,
         return prior
 
     def mark(state,refs=None):
+        # Recovery walks *past* already checkpointed stages without
+        # regressing the durable state or pretending an earlier crash again.
+        saved=_read(path,run_id)
+        if saved and STATES.index(saved["state"])>STATES.index(state):
+            for k,v in (refs or {}).items():
+                ensure(saved["receipts"].get(k)==v,
+                       "RESUMED_STAGE_RECEIPT_CONFLICT")
+            return saved
         receipt=_advance(path,run_id,eid,state,refs or {})
         if state==stop_after:
             raise LifecycleStop("F_LAB_3_SIMULATED_CRASH_AT_"+state)
