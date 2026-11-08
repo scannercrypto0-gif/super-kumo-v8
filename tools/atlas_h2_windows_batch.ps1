@@ -101,12 +101,15 @@ for sha,rel in (
 import pathlib, subprocess, sys
 repo, target, personal = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3]
 # Bootstrap the exact H2 operator from one immutable Integration commit.
-operator='tools/atlas_h2_owner_local_one_shot_v1.py'
-p=target/operator
-p.parent.mkdir(parents=True,exist_ok=True)
-raw=subprocess.run(['git','-C',str(repo),'show',personal+':'+operator],
-    capture_output=True,check=True).stdout
-p.write_bytes(raw)
+# Stage BOTH personal operator AND its matching v2 policy before import.
+# Otherwise old official policy from bootstrap silently contaminates PINS.
+for rel in ('tools/atlas_h2_owner_local_one_shot_v1.py',
+            'tools/atlas_h2_historical_policy_v2.py'):
+    p=target/rel
+    p.parent.mkdir(parents=True,exist_ok=True)
+    raw=subprocess.run(['git','-C',str(repo),'show',personal+':'+rel],
+        capture_output=True,check=True).stdout
+    p.write_bytes(raw)
 sys.path.insert(0,str(target))
 from tools.atlas_h2_owner_local_one_shot_v1 import PINS, isolated_overlay
 expected={
