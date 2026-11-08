@@ -149,6 +149,15 @@ class LabWiring(unittest.TestCase):
             self.path,secretary_root=self.secretary)
         self.assertEqual(len(discovered),3)
         self.assertEqual(len({x["link_sha256"] for x in discovered}),3)
+        self.assertEqual(len({x["link"]["run_sha256"]
+                              for x in discovered}),3)
+        self.assertTrue(all(x["link"]["decision_attempt_count"]==64
+                            and x["link"]["attempt_scope"]==
+                              "SCANNER_DECISION_SLOTS_NOT_F2_TRIALS"
+                            for x in discovered))
+        self.assertEqual(values[2][4]["decision_attempt_count"],64)
+        self.assertNotEqual(values[0][4]["decision_attempt_census_sha256"],
+                            values[1][4]["decision_attempt_census_sha256"])
         self.assertNotEqual(values[0][4]["strategy_definition_sha256"],
                             values[1][4]["strategy_definition_sha256"])
         self.assertNotEqual(values[0][4]["source_bytes_sha256"],
@@ -190,6 +199,12 @@ class LabWiring(unittest.TestCase):
         with self.assertRaises(ResultsStoreError):
             prepare_experiment_link(self.path,{
                 **link,"sha256":"f"*64})
+        forged=copy.deepcopy(link)
+        forged["decision_attempt_census_sha256"]="a"*64
+        forged["sha256"]=digest({k:v for k,v in forged.items()
+                                 if k!="sha256"})
+        with self.assertRaises(ResultsStoreError):
+            prepare_experiment_link(self.path,forged)
         con=sqlite3.connect(self.path)
         try:
             con.execute(
