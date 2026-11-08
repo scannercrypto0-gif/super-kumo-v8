@@ -34,6 +34,8 @@ FIELDS={
     "coverage","expected_bars","observed_bars","missing_bars",
     "decision_counts","modeled_trades","unknown_trades",
     "package_sha256","result_sha256","lab_sha256",
+    "run_sha256","decision_attempt_census_sha256",
+    "decision_attempt_count","attempt_scope",
     "secretary_expected_sha256","historical_pit","holdout",
     "trading_authority","sha256",
 }
@@ -84,6 +86,20 @@ def _load_package(con,experiment_id):
     return raw
 
 
+def _decision_attempt_census(experiment_id,events):
+    # Attempt ID means one actual Scanner closed-bar decision slot; never
+    # masquerades as a strategy-family F2 attempt, fill or approved trial.
+    return digest([{
+        "attempt_id":digest({
+            "experiment_id":experiment_id,
+            "bar_open_ms":e["bar_open_ms"],
+            "scanner_event_sha256":e["scanner_event_sha256"],
+        }),
+        "signal_state":e["signal_state"],
+        "execution_state":e["execution_state"],
+    } for e in events])
+
+
 def build_link(packet,package,result,secretary):
     from research_wp_r0.aql_core_h_research_secretary_v1 import (
         build_generic_research_result_route)
@@ -130,6 +146,16 @@ def build_link(packet,package,result,secretary):
         "package_sha256":package["sha256"],
         "result_sha256":result["result_sha256"],
         "lab_sha256":lab["sha256"],
+        "run_sha256":digest({
+            "experiment_id":packet["experiment_id"],
+            "input_sha256":packet["sha256"],
+            "package_sha256":package["sha256"],
+            "result_sha256":result["result_sha256"],
+        }),
+        "decision_attempt_census_sha256":_decision_attempt_census(
+            packet["experiment_id"],led["events"]),
+        "decision_attempt_count":len(led["events"]),
+        "attempt_scope":"SCANNER_DECISION_SLOTS_NOT_F2_TRIALS",
         "secretary_expected_sha256":expected["receipt_sha256"],
         "historical_pit":"NOT_ATTESTED",
         "holdout":"SEALED_UNOPENED",
@@ -176,13 +202,17 @@ def _validate_link(con,link):
                 "scanner_policy_sha256","scanner_evaluator_code_sha256",
                 "factory_code_sha256","cost_policy_sha256",
                 "package_sha256","result_sha256","lab_sha256",
+                "run_sha256","decision_attempt_census_sha256",
                 "secretary_expected_sha256"))
             and type(link["decision_cutoff_ms"]) is int
             and link["decision_cutoff_ms"]>=0
             and link["coverage"] in ("COMPLETE","PARTIAL","UNKNOWN")
             and link["historical_pit"]=="NOT_ATTESTED"
             and link["holdout"]=="SEALED_UNOPENED"
-            and link["trading_authority"]=="NONE","LINK_SCOPE")
+            and link["trading_authority"]=="NONE"
+            and link["attempt_scope"]=="SCANNER_DECISION_SLOTS_NOT_F2_TRIALS"
+            and type(link["decision_attempt_count"]) is int
+            and link["decision_attempt_count"]>=1,"LINK_SCOPE")
     package=_load_package(con,link["experiment_id"])
     report=verified(package["factory_report"])
     led=verified(package["trade_event_ledger"])
@@ -224,7 +254,16 @@ def _validate_link(con,link):
             and report["lab_sha256"]==review["lab_sha256"]==
                 lab["sha256"]==link["lab_sha256"]
             and lab["ledger_sha256"]==led["sha256"]
-            and review["ledger_sha256"]==led["sha256"],
+            and review["ledger_sha256"]==led["sha256"]
+            and link["run_sha256"]==digest({
+                "experiment_id":link["experiment_id"],
+                "input_sha256":link["input_sha256"],
+                "package_sha256":link["package_sha256"],
+                "result_sha256":link["result_sha256"],
+            })
+            and link["decision_attempt_count"]==len(led["events"])
+            and link["decision_attempt_census_sha256"]==
+                _decision_attempt_census(link["experiment_id"],led["events"]),
             "H_PARENT_DRIFT")
     require(led["cohort"]["coverage"]==link["coverage"]
             and led["cohort"]["expected_bars"]==link["expected_bars"]
