@@ -6,8 +6,6 @@ param(
   [Parameter(ParameterSetName='Enroll', Mandatory=$true)][switch]$EnrollNewIdentity,
   [Parameter(ParameterSetName='Revoke', Mandatory=$true)][switch]$RevokeCurrentIdentity,
   [Parameter(ParameterSetName='Revoke', Mandatory=$true)][switch]$ConfirmRevocation,
-  [Parameter(ParameterSetName='Rotate', Mandatory=$true)][switch]$RotateIdentity,
-  [Parameter(ParameterSetName='Rotate', Mandatory=$true)][switch]$ConfirmRotation,
   [Parameter(ParameterSetName='Inspect')][switch]$Inspect,
   [string]$OutputRoot = ''
 )
@@ -46,113 +44,7 @@ foreach ($p in @($ownerPrincipal,$systemPrincipal)) {
   $acl.AddAccessRule($rule)
 }
 Set-Acl -LiteralPath $expected -AclObject $acl
-if ($RotateIdentity) {
-  if (-not $ConfirmRotation) { throw 'EXPLICIT_OWNER_KEY_ROTATION_CONFIRMATION_REQUIRED' }
-  if (-not (Test-Path -LiteralPath $keyFile -PathType Leaf) -or
-      -not (Test-Path -LiteralPath $identityFile -PathType Leaf) -or
-      -not (Test-Path -LiteralPath $registry -PathType Leaf)) {
-    throw 'ROTATION_REQUIRES_GENUINE_EXISTING_OWNER_IDENTITY'
-  }
-  $prior = Get-Content -LiteralPath $identityFile -Raw | ConvertFrom-Json
-  $revs = Get-Content -LiteralPath $registry -Raw | ConvertFrom-Json
-  if ($prior.schema -ne 'aql.integration.h2.owner-identity.v2' -or
-      $revs.schema -ne 'aql.integration.h2.owner-revocations.v2' -or
-      $revs.revoked_key_ids -contains $prior.key_id -or
-      $prior.key_id -notmatch '^[a-f0-9]{64}
-    throw 'OWNER_EXISTING_IDENTITY_NO_OVERWRITE_USE_EXPLICIT_ROTATION_POLICY'
-  }
-  $key = New-Object byte[] 32
-  $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
-  try { $rng.GetBytes($key) } finally { $rng.Dispose() }
-  try {
-    # Explicit exclusive create; never print key or include in reports.
-    $file = [IO.FileStream]::new(
-      $keyFile, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write,
-      [IO.FileShare]::None)
-    try { $file.Write($key,0,$key.Length); $file.Flush($true) }
-    finally { $file.Dispose() }
-    $hash = [Security.Cryptography.SHA256]::Create()
-    try {
-      $prefix = [Text.Encoding]::UTF8.GetBytes('ATLAS-H2-OWNER-IDENTITY-V2')
-      $blob = New-Object byte[] ($prefix.Length + 1 + $key.Length)
-      [Array]::Copy($prefix,0,$blob,0,$prefix.Length)
-      [Array]::Copy($key,0,$blob,($prefix.Length+1),$key.Length)
-      $id = ([BitConverter]::ToString($hash.ComputeHash($blob))).Replace('-','').ToLowerInvariant()
-      [Array]::Clear($blob,0,$blob.Length)
-    } finally { $hash.Dispose() }
-  } finally { [Array]::Clear($key,0,$key.Length) }
-  $time = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
-  $metadata = [ordered]@{
-    schema = 'aql.integration.h2.owner-identity.v2'
-    key_id = $id
-    created_at_utc = $time
-    activation = 'FORWARD_ONLY'
-    custody = 'OWNER_LOCAL'
-    rights_class = 'OWNER_PERSONAL_NOT_EXTERNAL'
-  }
-  [IO.File]::WriteAllText($identityFile, ($metadata | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding($false)))
-  if (-not (Test-Path -LiteralPath $registry)) {
-    [IO.File]::WriteAllText($registry,
-      (@{schema='aql.integration.h2.owner-revocations.v2';revoked_key_ids=@()} |
-       ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding($false)))
-  }
-  # Child files inherit only owner and SYSTEM from restricted parent.
-  Write-Host ('NEW_FORWARD_ONLY_OWNER_KEY_ID: '+$id)
-  Write-Host ('CREATED_AT_UTC: '+$time)
-  Write-Host 'OWNER_CUSTODY_ACTION_REQUIRED: independently preserve local key and confirm control'
-  Write-Host 'NO_H2_RUN; NO_RETROACTIVE_SIGNATURE; NO_SOURCE_ACCESS'
-  exit 0
-}
-if (-not (Test-Path -LiteralPath $identityFile -PathType Leaf) -or
-    -not (Test-Path -LiteralPath $registry -PathType Leaf)) {
-  throw 'OWNER_IDENTITY_OR_REVOCATION_REGISTRY_MISSING'
-}
-$identity = Get-Content -LiteralPath $identityFile -Raw | ConvertFrom-Json
-$revs = Get-Content -LiteralPath $registry -Raw | ConvertFrom-Json
-if ($identity.schema -ne 'aql.integration.h2.owner-identity.v2' -or
-    $revs.schema -ne 'aql.integration.h2.owner-revocations.v2') {
-  throw 'OWNER_IDENTITY_METADATA_SCHEMA_DRIFT'
-}
-if ($RevokeCurrentIdentity) {
-  if (-not $ConfirmRevocation) { throw 'EXPLICIT_REVOCATION_CONFIRMATION_REQUIRED' }
-  if ($revs.revoked_key_ids -notcontains $identity.key_id) {
-    $new = @($revs.revoked_key_ids) + @($identity.key_id)
-    $pending = Join-Path $expected 'owner-revocations.pending.json'
-    if (Test-Path -LiteralPath $pending) { throw 'OWNER_REVOCATION_PENDING_PRESENT' }
-    [IO.File]::WriteAllText($pending,
-      (@{schema='aql.integration.h2.owner-revocations.v2';revoked_key_ids=$new} |
-       ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding($false)))
-    Move-Item -LiteralPath $pending -Destination $registry -Force
-  }
-  Write-Host ('OWNER_IDENTITY_REVOKED: '+$identity.key_id)
-  Write-Host 'PREVIOUS SIGNED FUTURE ATTEMPTS MUST FAIL CLOSED; KEY NOT DELETED AUTOMATICALLY'
-  exit 0
-}
-$status = if ($revs.revoked_key_ids -contains $identity.key_id) {'REVOKED'} else {'ACTIVE_METADATA_ONLY'}
-Write-Host ('OWNER_KEY_ID: '+$identity.key_id)
-Write-Host ('CREATED_AT_UTC: '+$identity.created_at_utc)
-Write-Host ('STATE: '+$status)
-Write-Host 'THIS IS NOT OWNER_SIGNATURE, COST_APPROVAL OR ORIGINAL H2'
-) {
-    throw 'OWNER_PRIOR_IDENTITY_UNVERIFIABLE_OR_ALREADY_REVOKED'
-  }
-  $retired = Join-Path $expected ('retired-' + $prior.key_id)
-  if (Test-Path -LiteralPath $retired) { throw 'OWNER_RETIRED_KEY_SLOT_ALREADY_EXISTS' }
-  # Revocation FIRST. In any partial failure the old identity remains
-  # BLOCKED instead of accidentally being reused for another one-shot.
-  $pending = Join-Path $expected 'owner-revocations.pending.json'
-  if (Test-Path -LiteralPath $pending) { throw 'OWNER_REVOCATION_PENDING_PRESENT' }
-  [IO.File]::WriteAllText($pending,
-    (@{schema='aql.integration.h2.owner-revocations.v2';
-       revoked_key_ids=(@($revs.revoked_key_ids) + @($prior.key_id))} |
-     ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding($false)))
-  Move-Item -LiteralPath $pending -Destination $registry -Force
-  New-Item -Path $retired -ItemType Directory | Out-Null
-  Move-Item -LiteralPath $keyFile -Destination (Join-Path $retired 'owner-signing.key')
-  Move-Item -LiteralPath $identityFile -Destination (Join-Path $retired 'owner-identity.json')
-  Write-Host ('PREVIOUS_OWNER_IDENTITY_REVOKED_AND_ARCHIVED: ' + $prior.key_id)
-}
-if ($EnrollNewIdentity -or $RotateIdentity) {
+if ($EnrollNewIdentity) {
   if ((Test-Path -LiteralPath $keyFile) -or (Test-Path -LiteralPath $identityFile)) {
     throw 'OWNER_EXISTING_IDENTITY_NO_OVERWRITE_USE_EXPLICIT_ROTATION_POLICY'
   }
@@ -161,7 +53,7 @@ if ($EnrollNewIdentity -or $RotateIdentity) {
   try { $rng.GetBytes($key) } finally { $rng.Dispose() }
   try {
     # Explicit exclusive create; never print key or include in reports.
-    $file = New-Object System.IO.FileStream(
+    $file = [IO.FileStream]::new(
       $keyFile, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write,
       [IO.FileShare]::None)
     try { $file.Write($key,0,$key.Length); $file.Flush($true) }
