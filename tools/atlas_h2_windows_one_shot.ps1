@@ -8,7 +8,7 @@ param(
   [string]$Git = 'git'
 )
 $ErrorActionPreference = 'Stop'
-$operatorCommit = '8b92f329a6bbf1e5cb4ddd3e0a0c33437f1a8d7a'
+$operatorCommit = '43903d82e85c272a17183dfbbfbe0c493696d3f2'
 $required = @(
   $operatorCommit,
   '51f3724213e836fa680f589435e418d4b0c4c20f',
