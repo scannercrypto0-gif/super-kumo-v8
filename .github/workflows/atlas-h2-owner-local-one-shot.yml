@@ -121,3 +121,25 @@ jobs:
           }
           Write-Host 'PASS: official opt-in Windows source gate fail closed before E access'
           exit 0
+
+      - name: Windows personal research lane empty-evidence safe denial (NO ORIGINAL)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $evidence = Join-Path $env:TEMP ('aql-h2-personal-empty-' + [guid]::NewGuid().ToString('N'))
+          $out = Join-Path $env:LOCALAPPDATA ('ATLAS/H2-Local-Batch/run-personal-ci-' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+          & pwsh -NoProfile -File ./tools/atlas_h2_windows_batch.ps1 -Mode owner-personal -EvidenceDir $evidence -OutputDir $out -ConfirmOneRun
+          $rc = $LASTEXITCODE
+          if ($rc -ne 2) { throw "PERSONAL_LANE_FAIL_OPEN_$rc" }
+          $reportFile = Join-Path $out 'h2-batch-summary.json'
+          if (-not (Test-Path -LiteralPath $reportFile)) { throw 'PERSONAL_REPORT_MISSING' }
+          $report = Get-Content -LiteralPath $reportFile -Raw | ConvertFrom-Json
+          if ($report.status -ne 'BLOCKED' -or $report.source_read_status -ne 'NOT_ATTEMPTED') {
+            throw 'PERSONAL_EVIDENCE_FAIL_OPEN'
+          }
+          if ($report.reasons[0] -notmatch 'MISSING_OWNER_PERSONAL_EVIDENCE') {
+            throw 'PERSONAL_MISSING_EXACT_EVIDENCE_REASON'
+          }
+          Write-Host 'PASS: personal mode blocked with missing authenticated evidence, no original source IO'
+          exit 0
