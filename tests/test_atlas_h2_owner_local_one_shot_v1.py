@@ -4,6 +4,7 @@ import copy
 import hashlib
 import hmac
 import json
+import sqlite3
 import subprocess
 import tempfile
 import unittest
@@ -13,6 +14,7 @@ from unittest.mock import patch
 from tools.atlas_h2_owner_local_one_shot_v1 import (
     SCHEMA, PINS, Stop, boundaries, canonical, digest, execute,
     fingerprint, native_receipt_check, isolated_overlay, sha_file, verify_owner,
+    verified_local_sqlite_snapshot,
 )
 
 
@@ -129,6 +131,39 @@ class H2Operator(unittest.TestCase):
         s["results_sqlite"] = str(self.root / "warehouse" / "bad.sqlite")
         with self.assertRaises(Stop):
             boundaries(s, self.key, self.root / "repo")
+
+    def test_idle_shm_zero_wal_allows_readonly_isolated_snapshot(self):
+        original = self.root / "warehouse"
+        db = original / "warehouse.sqlite"
+        conn = sqlite3.connect(db)
+        try:
+            conn.execute("CREATE TABLE t(x INTEGER)")
+            conn.execute("INSERT INTO t VALUES (7)")
+            conn.commit()
+        finally:
+            conn.close()
+        (original / "stage").mkdir()
+        (original / "stage" / "retained.json").write_text('{"ok":true}')
+        (original / "warehouse.sqlite-wal").write_bytes(b"")
+        (original / "warehouse.sqlite-shm").write_bytes(b"\\0" * 32768)
+        before = fingerprint(original)
+        temp = self.root / "overlay-snapshot-test"
+        temp.mkdir()
+        snapshot = verified_local_sqlite_snapshot(original, temp)
+        with sqlite3.connect((snapshot / "warehouse.sqlite").as_uri()
+                             + "?mode=ro&immutable=1", uri=True) as read:
+            self.assertEqual(read.execute("SELECT x FROM t").fetchone(), (7,))
+        self.assertEqual((snapshot / "stage" / "retained.json").read_text(),
+                         '{"ok":true}')
+        self.assertEqual(fingerprint(original), before)
+        self.assertFalse((snapshot / "warehouse.sqlite-shm").exists())
+
+    def test_durable_source_mutation_changes_fingerprint(self):
+        durable = self.root / "warehouse" / "archive.json"
+        durable.write_text('{"v":1}')
+        before = fingerprint(self.root / "warehouse")
+        durable.write_text('{"v":2}')
+        self.assertNotEqual(before, fingerprint(self.root / "warehouse"))
 
     def test_pending_wal_fails_closed(self):
         (self.root / "warehouse" / "warehouse.sqlite-wal").write_bytes(b"x")
