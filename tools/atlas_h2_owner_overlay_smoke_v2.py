@@ -70,6 +70,13 @@ for name in sys.argv[2:]:
     if not path.is_relative_to(Path(sys.argv[1]).resolve()):
         raise AssertionError("IMPORT_ESCAPED_PINNED_OVERLAY:"+name+":"+str(path))
     print("STAGED_PINNED_MODULE_OK:"+name,flush=True)
+# Scanner StrategyDefinition and actual frozen 2 Work235 fixtures are an
+# owner-independent, no-market-data, deterministic manual AST preflight.
+recovery=importlib.import_module("tools.atlas_h2_owner_evidence_recovery_v2")
+definition, config_sha, evaluator_sha = recovery._manual_ast()
+assert definition["definition"]["strategy_id"] == "h_manual_distinct_test"
+assert len(config_sha) == len(evaluator_sha) == 64
+print("STAGED_MANUAL_AST_REAL_PINNED_FIXTURE_OK",flush=True)
 """
         subprocess.run([sys.executable,"-I","-c",child,str(stage),*IMPORTS],
                        check=True)
