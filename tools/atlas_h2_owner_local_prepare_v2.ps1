@@ -24,7 +24,7 @@ $registry = Join-Path $expected 'owner-revocations.json'
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 if (-not (Test-Path -LiteralPath $expected -PathType Container)) {
   if ($PSCmdlet.ParameterSetName -eq 'Inspect') { Write-Host 'OWNER_IDENTITY_NOT_ENROLLED'; exit 2 }
-  New-Item -LiteralPath $expected -ItemType Directory -Force | Out-Null
+  New-Item -Path $expected -ItemType Directory -Force | Out-Null
 }
 if ((Get-Item -LiteralPath $expected -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) {
   throw 'OWNER_IDENTITY_SYMLINK_DENIED'
@@ -35,8 +35,12 @@ $acl.SetAccessRuleProtection($true, $false)
 $ownerPrincipal = New-Object System.Security.Principal.SecurityIdentifier($sid)
 $systemPrincipal = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-18')
 foreach ($p in @($ownerPrincipal,$systemPrincipal)) {
-  $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
-    $p, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
+  $rule = [System.Security.AccessControl.FileSystemAccessRule]::new(
+    $p, [System.Security.AccessControl.FileSystemRights]::FullControl,
+    ([System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor
+     [System.Security.AccessControl.InheritanceFlags]::ObjectInherit),
+    [System.Security.AccessControl.PropagationFlags]::None,
+    [System.Security.AccessControl.AccessControlType]::Allow)
   $acl.AddAccessRule($rule)
 }
 Set-Acl -LiteralPath $expected -AclObject $acl
@@ -73,10 +77,11 @@ if ($EnrollNewIdentity) {
     custody = 'OWNER_LOCAL'
     rights_class = 'OWNER_PERSONAL_NOT_EXTERNAL'
   }
-  $metadata | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $identityFile -Encoding UTF8
+  [IO.File]::WriteAllText($identityFile, ($metadata | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding($false)))
   if (-not (Test-Path -LiteralPath $registry)) {
-    @{schema='aql.integration.h2.owner-revocations.v2';revoked_key_ids=@()} |
-      ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $registry -Encoding UTF8
+    [IO.File]::WriteAllText($registry,
+      (@{schema='aql.integration.h2.owner-revocations.v2';revoked_key_ids=@()} |
+       ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding($false)))
   }
   # Child files inherit only owner and SYSTEM from restricted parent.
   Write-Host ('NEW_FORWARD_ONLY_OWNER_KEY_ID: '+$id)
@@ -101,8 +106,9 @@ if ($RevokeCurrentIdentity) {
     $new = @($revs.revoked_key_ids) + @($identity.key_id)
     $pending = Join-Path $expected 'owner-revocations.pending.json'
     if (Test-Path -LiteralPath $pending) { throw 'OWNER_REVOCATION_PENDING_PRESENT' }
-    @{schema='aql.integration.h2.owner-revocations.v2';revoked_key_ids=$new} |
-      ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $pending -Encoding UTF8
+    [IO.File]::WriteAllText($pending,
+      (@{schema='aql.integration.h2.owner-revocations.v2';revoked_key_ids=$new} |
+       ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding($false)))
     Move-Item -LiteralPath $pending -Destination $registry -Force
   }
   Write-Host ('OWNER_IDENTITY_REVOKED: '+$identity.key_id)
