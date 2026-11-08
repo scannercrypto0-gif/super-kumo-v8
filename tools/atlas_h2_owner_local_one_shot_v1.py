@@ -23,7 +23,7 @@ from tools.atlas_h2_historical_policy_v2 import assess, EXPECTED, KEYS
 SCHEMA = "aql.integration.h2.local-one-shot.v1"
 RECEIPT = "aql.integration.h2.local-one-shot-audit.v1"
 PINS = {
-    "integration": "51f3724213e836fa680f589435e418d4b0c4c20f",
+    "integration": "43a3bf3196649c46aed54872f958c323e4ae4913",
     "core": EXPECTED["core"],
     "scanner": EXPECTED["scanner"],
     "factory": EXPECTED["factory"],
@@ -346,6 +346,13 @@ def run_authorized(scope, overlay):
         run_factory_h_generic_research, SCHEMA as FACTORY_SCHEMA,
         COST_SCHEMA)
     from research_wp_r0.aql_factory_h_research_package_v1 import TABLE
+    from research_wp_r0.aql_factory_lab_experiment_index_v1 import (
+        build_link, prepare_experiment_link, finalize_experiment_link,
+        get_experiment_link,
+    )
+    from research_wp_r0.aql_core_h_research_secretary_v1 import (
+        build_generic_research_result_route,
+    )
     from research_wp_r0.strategy_definition import StrategyDefinition
     from research_wp_r0.indicator_library_v2 import IndicatorRegistryV2
     from tools.scanner_strategy_f import research_strategy_plugin as scanner
@@ -474,12 +481,31 @@ def run_authorized(scope, overlay):
         con.close()
     check(stored is not None, "FACTORY_PACKAGE_NOT_PERSISTED")
     package = json.loads(stored[0])
+    # Factory F-LAB-1 typed link + Core Secretary are separate durable
+    # authorities: prepare the parent link, persist immutable WAIT, and only
+    # then finalize VERIFIED_WAIT after genuine Secretary readback.
+    expected = build_generic_research_result_route(packet, package, first)
+    link = build_link(packet, package, first, expected)
+    prepared = prepare_experiment_link(results, link)
+    check(prepared["status"] == "PREPARED"
+          and prepared["link_sha256"] == link["sha256"],
+          "FACTORY_LAB_INDEX_PREPARE_FAILED")
     delivery = deliver_generic_research_wait(
         secretary_root=scope["secretary_root"], packet=packet,
         factory_package=package, factory_result=first)
     check(delivery["status"] == "WAIT_RESEARCH_REVIEW"
-          and delivery["trading_authority"] == "NONE",
+          and delivery["trading_authority"] == "NONE"
+          and delivery["secretary_route_sha256"] == expected["receipt_sha256"],
           "SECRETARY_ROUTE_FAILED")
+    indexed = finalize_experiment_link(
+        results, scope["secretary_root"], packet["experiment_id"])
+    check(indexed["status"] == "VERIFIED_WAIT"
+          and indexed["link_sha256"] == link["sha256"]
+          and get_experiment_link(
+              results, packet["experiment_id"],
+              secretary_root=scope["secretary_root"])["sha256"] ==
+              indexed["sha256"],
+          "FACTORY_LAB_INDEX_FINAL_READBACK_FAILED")
     return {
         "native_core245_sha256": native_sha,
         "bounded_core253_sha256": query["query_sha256"],
@@ -491,6 +517,8 @@ def run_authorized(scope, overlay):
         "factory_package_sha256": first["package_sha256"],
         "lab_sha256": first["scientific_lab_sha256"],
         "secretary_sha256": delivery["secretary_route_sha256"],
+        "factory_lab_index_sha256": indexed["link_sha256"],
+        "factory_lab_index_status": indexed["status"],
         "replay": replay["store_status"],
         "cost_policy_sha256": cost["sha256"],
     }
