@@ -116,7 +116,8 @@ class MultiFindingOwnerPreflight(unittest.TestCase):
             include_original_read=True,
             publisher=lambda *a,**kw: (_ for _ in ()).throw(
                 OSError("private endpoint not available")))
-        self.assertEqual(results["PUBLISHER_BYTE_IDENTITY"]["status"],"FAIL")
+        self.assertEqual(results["PUBLISHER_BYTE_IDENTITY"]["status"],
+                         "BLOCKED_BY_DEPENDENCY")
         self.assertEqual(results["ORIGINAL_ZIP_IDENTITY"]["status"],
                          "BLOCKED_BY_DEPENDENCY")
         self.assertEqual(results["CORE253_DUAL_COMPLETE"]["status"],
