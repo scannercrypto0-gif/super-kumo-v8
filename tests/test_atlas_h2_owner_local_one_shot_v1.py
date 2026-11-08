@@ -150,9 +150,12 @@ class H2Operator(unittest.TestCase):
         temp = self.root / "overlay-snapshot-test"
         temp.mkdir()
         snapshot = verified_local_sqlite_snapshot(original, temp)
-        with sqlite3.connect((snapshot / "warehouse.sqlite").as_uri()
-                             + "?mode=ro&immutable=1", uri=True) as read:
+        read = sqlite3.connect((snapshot / "warehouse.sqlite").as_uri()
+                               + "?mode=ro&immutable=1", uri=True)
+        try:
             self.assertEqual(read.execute("SELECT x FROM t").fetchone(), (7,))
+        finally:
+            read.close()  # SQLite context manager does not close on Windows.
         self.assertEqual((snapshot / "stage" / "retained.json").read_text(),
                          '{"ok":true}')
         self.assertEqual(fingerprint(original), before)
