@@ -37,10 +37,13 @@ class FullGenericH(unittest.TestCase):
                     self.assertEqual(second["store_status"],"REPLAY_IDENTICAL")
                     self.assertEqual(first["package_sha256"],second["package_sha256"])
                     # Factory returns the immutable nested package as part of result.
-                    with sqlite3.connect(db) as con:
+                    con=sqlite3.connect(db)
+                    try:
                         stored=con.execute(
                             f"SELECT document FROM {TABLE} WHERE experiment_id=?",
                             (packet["experiment_id"],)).fetchone()
+                    finally:
+                        con.close()
                     self.assertIsNotNone(stored)
                     package=json.loads(stored[0])
                     result=deliver_generic_research_wait(
