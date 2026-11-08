@@ -80,6 +80,7 @@ class OfficialBinanceLane(unittest.TestCase):
         }
         (self.private/"technical-intake.json").write_text(json.dumps(tech))
         (self.private/"historical-license-evidence.json").write_text("{}")
+        (self.private/"historical-terms.txt").write_text("synthetic 2024 terms: TEST ONLY")
         (self.private/"historical-license-evidence.mac").write_text("invalid")
         return tech
 
@@ -191,7 +192,8 @@ class OfficialBinanceLane(unittest.TestCase):
         license_doc = {
             "schema": LICENSE_SCHEMA,
             "issuer": "BINANCE_DATASET_RIGHTS_AUTHORITY",
-            "terms_url": TERMS_URL, "terms_sha256": "e"*64,
+            "terms_url": TERMS_URL,
+            "terms_sha256": hashlib.sha256((self.private/"historical-terms.txt").read_bytes()).hexdigest(),
             "applies_to_download_year": 2024, "download_year": 2024,
             "intended_use": "PERSONAL_NONCOMMERCIAL_RESEARCH",
             "permitted_use": "PERSONAL_NONCOMMERCIAL_RESEARCH",
