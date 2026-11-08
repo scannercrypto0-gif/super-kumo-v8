@@ -67,3 +67,26 @@ jobs:
             if ($_.Exception.Message -notmatch 'OWNER_PRIVATE_MANIFEST_MISSING') { throw }
             Write-Host 'PASS: no manifest -> no local code fetch or source access'
           }
+
+      - name: Windows one-command batch smoke without any private evidence
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $evidence = Join-Path $env:TEMP ('aql-h2-ci-empty-' + [guid]::NewGuid().ToString('N'))
+          $out = Join-Path $env:LOCALAPPDATA ('ATLAS/H2-Local-Batch/run-ci-' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+          & pwsh -NoProfile -File ./tools/atlas_h2_windows_batch.ps1 -EvidenceDir $evidence -OutputDir $out -ConfirmOneRun
+          $rc = $LASTEXITCODE
+          if ($rc -ne 2) { throw "FAIL_OPEN_EXPECTED_BLOCKED_EXIT_2_BUT_$rc" }
+          $reportFile = Join-Path $out 'h2-batch-summary.json'
+          if (-not (Test-Path -LiteralPath $reportFile)) {
+            throw 'BATCH_MISSING_CONSOLIDATED_REPORT'
+          }
+          $r = Get-Content -LiteralPath $reportFile -Raw | ConvertFrom-Json
+          if ($r.status -ne 'BLOCKED' -or $r.source_read_status -ne 'NOT_ATTEMPTED') {
+            throw 'BATCH_WRONG_PRIVATE_NO_SOURCE_BOUNDARY'
+          }
+          if ($r.reasons[0] -notmatch 'MISSING_PRIVATE_EVIDENCE') {
+            throw 'BATCH_MISSING_EXACT_EVIDENCE_REASON'
+          }
+          Write-Host 'PASS: one Windows command, exact pinned code, one BLOCKED receipt, no source read'
