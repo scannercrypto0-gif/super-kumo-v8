@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import hashlib
 import hmac
 import io
+import os
 import json
 from pathlib import Path
 import re
@@ -52,6 +53,7 @@ LIC_FIELDS = {
 }
 PUBLIC_REQUIRED = {
     "technical-intake.json", "historical-license-evidence.json",
+    "historical-license-evidence.mac",
     "core245-native-receipt.json", "manual-third-ast.json",
 }
 
@@ -123,8 +125,14 @@ def safe_zip(blob, filename, month):
         raise Blocked("OFFICIAL_ZIP_INVALID") from None
     start = datetime.fromtimestamp(first/1000, timezone.utc)
     end = datetime.fromtimestamp(last/1000, timezone.utc)
-    fail(start.strftime("%Y-%m") == month and end.strftime("%Y-%m") == month,
-         "OFFICIAL_KLINE_WRONG_MONTH")
+    next_month = (datetime(start.year + 1, 1, 1, tzinfo=timezone.utc)
+                  if start.month == 12 else
+                  datetime(start.year, start.month + 1, 1, tzinfo=timezone.utc))
+    fail(start.strftime("%Y-%m") == month and end.strftime("%Y-%m") == month
+         and start.day == 1 and start.hour == 0 and start.minute == 0
+         and first == int(start.timestamp() * 1000)
+         and last + 900000 == int(next_month.timestamp() * 1000),
+         "OFFICIAL_NOT_COMPLETE_CALENDAR_MONTH")
     return {"bar_count": total, "first_open_ms": first,
             "end_exclusive_ms": last + 900000}
 
@@ -231,34 +239,39 @@ def technical_intake(folder):
         fail(type(tech[column]) is str
              and sha_file(root/name) == tech[column],
              "PRIVATE_EVIDENCE_HASH_DRIFT")
-    fail(type(tech["download_year"]) is int if "download_year" in tech else True,
-         "TECHNICAL_YEAR_INVALID")
     return tech, lic, root
 
 
-def public_gate(folder, fetcher=fetch_official):
-    """Read only named private INTAKE files; never open original market store."""
-    tech, lic, root = technical_intake(folder)
-    # Import the legacy shape validator only after publisher proof, without
-    # reusing its independent-custodian HMAC authority requirement.
-    month = tech["month"]
-    proof = verify_public_month(month, fetcher=fetcher)
-    fail(tech["start_ms"] == proof["first_open_ms"]
-         and tech["end_exclusive_ms"] == proof["end_exclusive_ms"]
-         and tech["decision_cutoff_ms"] == proof["end_exclusive_ms"]
-         and proof["bar_count"] <= 4096,
-         "OFFICIAL_ARCHIVE_RANGE_OR_COVERAGE_MISMATCH")
-    # The exact 2024-era rights terms are presently not evidenced.
-    # A purported signer label is not a signature: do not execute original
-    # data until an independent license authority is verifiable.
-    lic_sha = verified_license(lic, 2024)
-    raise Blocked("WAIT_LICENSE_INDEPENDENT_AUTHORITY_VERIFICATION")
+def check_license_signature(root, reviewer_key, owner_key, license_doc):
+    """Fresh rights reviewer identity is separate from source publisher SHA.
+
+    A MAC verifies possession of independently retained reviewer key, not that
+    terms are necessarily legally sound; custodian HMAC is NOT required.
+    """
+    fail(reviewer_key is not None, "WAIT_LICENSE_REVIEWER_KEY")
+    fail(owner_key is not None, "WAIT_OWNER_SIGNING_KEY")
+    reviewer = Path(reviewer_key).resolve(strict=True)
+    signer = Path(owner_key).resolve(strict=True)
+    fail(reviewer != signer and not contained(reviewer, root)
+         and not contained(signer, root),
+         "SEPARATE_OUT_OF_BAND_KEYS_REQUIRED")
+    key = _key(reviewer)
+    raw = (root / "historical-license-evidence.json").read_bytes()
+    mac = (root / "historical-license-evidence.mac").read_text("ascii").strip()
+    fail(len(mac) == 64 and hmac.compare_digest(
+        hmac.new(key, raw, hashlib.sha256).hexdigest(), mac),
+        "WAIT_LICENSE_INDEPENDENT_SIGNATURE")
+    lic_digest = verified_license(license_doc, 2024)
+    return lic_digest
 
 
-def run_public_batch(evidence_dir, output_dir, *, fetcher=fetch_official):
-    """Current safe phase: true publisher verification, then rights stop."""
+def run_public_batch(evidence_dir, output_dir, *, fetcher=fetch_official,
+                     reviewer_key=None, owner_key=None,
+                     git_repo=None, confirm_one_run=False):
+    """One conditional local source read after official + license + scope gates."""
     reasons = []
     details = {"lane": "OFFICIAL_BINANCE_ARCHIVE_NONCOMMERCIAL"}
+    invoked = False
     try:
         tech, lic, root = technical_intake(evidence_dir)
         proof = verify_public_month(tech["month"], fetcher=fetcher)
@@ -267,30 +280,96 @@ def run_public_batch(evidence_dir, output_dir, *, fetcher=fetch_official):
         details["public_bar_count"] = proof["bar_count"]
         fail(tech["start_ms"] == proof["first_open_ms"]
              and tech["end_exclusive_ms"] == proof["end_exclusive_ms"]
-             and tech["decision_cutoff_ms"] == proof["end_exclusive_ms"],
-             "OFFICIAL_ARCHIVE_RANGE_OR_COVERAGE_MISMATCH")
-        verified_license(lic, 2024)
-        # The signer label of a private JSON is not a signature. The external
-        # authority and historically applicable rights must be independently
-        # authenticated before ORIGINAL E: is accessed by a future phase.
-        raise Blocked("WAIT_LICENSE_INDEPENDENT_AUTHORITY_VERIFICATION")
+             and tech["decision_cutoff_ms"] == proof["end_exclusive_ms"]
+             and tech["source_bytes_sha256"] == proof["zip_bytes_sha256"],
+             "OFFICIAL_ARCHIVE_RANGE_OR_SOURCE_SHA_MISMATCH")
+        # No original source read before independent, signed license review.
+        lic_sha = check_license_signature(
+            root, reviewer_key, owner_key, lic)
+        details["license_review_sha256"] = lic_sha
+        fail(confirm_one_run is True, "EXPLICIT_OWNER_ONE_RUN_CONFIRMATION_REQUIRED")
+        fail(git_repo is not None, "PINNED_GIT_REPO_REQUIRED")
+        fail(type(tech["local_source_zip"]) is str,
+             "LOCAL_ARCHIVE_PATH_UNVERIFIED")
+        # This local ZIP is examined only after official publisher and
+        # independently authenticated reviewer rights evidence pass.
+        local = Path(tech["local_source_zip"]).resolve(strict=True)
+        fail(local.is_file() and not local.is_symlink()
+             and local.name == proof["filename"],
+             "OWNER_ORIGINAL_BINANCE_ZIP_MISSING_OR_WRONG_FILENAME")
+        fail(sha_file(local) == proof["zip_bytes_sha256"],
+             "OWNER_ORIGINAL_ZIP_DIFFERS_FROM_OFFICIAL_PUBLISHER")
+        details["owner_zip_publisher_match"] = True
+
+        # Reuse existing operator/queries and private source fingerprint
+        # WITHOUT requiring historical third-party custodian-HMAC fiction.
+        scope = build_scope(tech, root, output_dir)
+        fail(not contained(owner_key, tech["warehouse_root"])
+             and not contained(owner_key, tech["vault_root"])
+             and not contained(owner_key, git_repo)
+             and not contained(reviewer_key, tech["warehouse_root"])
+             and not contained(reviewer_key, tech["vault_root"]),
+             "SIGNER_KEY_IN_ORIGINAL_SOURCE_OR_CODE")
+        scope["source_rights_attested"] = True
+        owner_secret = _key(owner_key)
+        mac = hmac.new(owner_secret,
+                       canonical({"schema": SCHEMA, "scope": scope}),
+                       hashlib.sha256).hexdigest()
+        manifest = {"schema": SCHEMA, "scope": scope, "owner_approval_mac": mac}
+        verify_owner(manifest, owner_key)
+        claim_file = root / "h2-public-lane-one-use-claim.json"
+        fail(not claim_file.exists(), "ONE_RUN_ALREADY_RESERVED")
+        fd = os.open(claim_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump({"scope_sha256": digest(scope),
+                       "official_sha256": proof["zip_bytes_sha256"],
+                       "license_review_sha256": lic_sha,
+                       "state": "ONE_ATTEMPT_NO_AUTOREPLAY"}, handle)
+        invoked = True
+        operator_result = execute(
+            manifest, key_file=owner_key, repo=git_repo, allow_local_run=True)
+        details["operator_receipt_sha256"] = operator_result["sha256"]
+        details["operator_status"] = operator_result["status"]
+        fail(operator_result["status"] == "EXPERIMENT_ENGINEERING_PASS",
+             "OPERATOR_" + operator_result["reason"])
+        for key in ("native_core245_sha256", "bounded_core253_sha256",
+                    "coverage", "required_bars", "observed_bars", "missing_bars",
+                    "scanner_sha256", "factory_package_sha256",
+                    "lab_sha256", "secretary_sha256", "replay",
+                    "cost_policy_sha256", "isolated_code_sha256",
+                    "source_no_write_sha256"):
+            if key in operator_result:
+                details[key] = operator_result[key]
+        return single_report("PASS_ENGINEERING_ONLY", [], details=details)
     except (Blocked, OSError, KeyError, TypeError, ValueError) as exc:
         reasons.append(str(exc) if isinstance(exc, Blocked)
                        else "PUBLIC_LANE_EVIDENCE_UNVERIFIABLE")
-    return single_report("BLOCKED", reasons, details=details)
+    return single_report("BLOCKED", reasons, details=details,
+                         operator_invoked=invoked)
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Official Binance ZIP SHA; no E: IO")
+    ap = argparse.ArgumentParser(description="Official Binance provenance + gated H2")
     ap.add_argument("--private-evidence-dir", required=True)
     ap.add_argument("--isolated-output-dir", required=True)
+    ap.add_argument("--license-reviewer-key")
+    ap.add_argument("--owner-signing-key")
+    ap.add_argument("--pinned-git-repo")
+    ap.add_argument("--confirm-one-run", action="store_true")
     args = ap.parse_args(argv)
-    report = run_public_batch(args.private_evidence_dir, args.isolated_output_dir)
+    existing = Path(args.isolated_output_dir) / "h2-batch-summary.json"
+    if existing.exists():
+        print(json.dumps({"status": "BLOCKED", "reason": "REPORT_ALREADY_EXISTS"}))
+        return 2
+    report = run_public_batch(
+        args.private_evidence_dir, args.isolated_output_dir,
+        reviewer_key=args.license_reviewer_key,
+        owner_key=args.owner_signing_key,
+        git_repo=args.pinned_git_repo, confirm_one_run=args.confirm_one_run)
     dest = write_report(args.isolated_output_dir, report)
-    print(json.dumps({"status": report["status"],
-                      "reasons": report["reasons"],
+    print(json.dumps({"status": report["status"], "reasons": report["reasons"],
                       "summary_filename": dest.name}, sort_keys=True))
-    return 2
+    return 0 if report["status"] == "PASS_ENGINEERING_ONLY" else 2
 
 
 if __name__ == "__main__":
