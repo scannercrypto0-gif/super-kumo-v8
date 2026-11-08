@@ -19,8 +19,8 @@ KEYS=("fee_entry_bps","fee_exit_bps","spread_entry_bps","spread_exit_bps",
 REQUIRED=("integration","core","scanner","factory","work235")
 EXPECTED={
     "core":"99c27ea2c1a4d41aaae361141301a8a9ea3b33c3",
-    "scanner":"3c82448702c9ae35783716e4e2c3b640010db97c",
-    "factory":"a4b887fe7067b89febc339e466652a5fcb1c2bee",
+    "scanner":"af3720b6be921444cb83d52f3e975a9c85475ec6",
+    "factory":"04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
     "work235":"6acbcc7fc243b132f58170df4c6469bbf7f4eff8",
 }
 REQUEST_FIELDS={"schema","research_class","exact_heads","bounded_request","owner_permission",
