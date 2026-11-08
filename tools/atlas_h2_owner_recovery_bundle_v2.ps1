@@ -24,7 +24,7 @@ if (-not (Test-Path -LiteralPath $repo -PathType Container) -or
   throw 'OWNER_EXPECTED_LOCAL_REPO_OR_ORIGINAL_ZIP_MISSING'
 }
 # Verify that the owner has actually synchronized this exact signed source.
-$expectedCode='36b72664b07f2c896df689ef3dcf81521a4abc22'
+$expectedCode='08ffea09c72fffe2fada15a31164cf20dd41f354'
 & $Git -C $repo cat-file -e ($expectedCode + '^{commit}') 2>$null
 if ($LASTEXITCODE -ne 0) { throw 'OWNER_LOCAL_GIT_EXACT_CODE_NOT_FETCHED' }
 $localHead=(& $Git -C $repo rev-parse HEAD)
@@ -37,6 +37,14 @@ $idDir=Join-Path $base 'owner-identity-v2'
 $enroller=Join-Path $repo 'tools\atlas_h2_owner_local_prepare_v2.ps1'
 if (-not (Test-Path -LiteralPath $enroller -PathType Leaf)) {
   throw 'OWNER_IDENTITY_ENROLLER_NOT_SYNCED'
+}
+# Check local key enroller bytes against immutable published Git blob before
+# executing it. No arbitrary local/remote helper can mint a supposed owner key.
+$expectedEnroller = (& $Git -C $repo rev-parse ($expectedCode + ':tools/atlas_h2_owner_local_prepare_v2.ps1')).Trim()
+if ($LASTEXITCODE -ne 0) { throw 'OWNER_ENROLLER_PIN_NOT_VERIFIED' }
+$actualEnroller = (& $Git -C $repo hash-object $enroller).Trim()
+if ($LASTEXITCODE -ne 0 -or $expectedEnroller -cne $actualEnroller) {
+  throw 'OWNER_LOCAL_ENROLLER_CONTENT_DIFFERS_FROM_PIN'
 }
 if ($EnrollNewIdentity) {
   & $enroller -EnrollNewIdentity
