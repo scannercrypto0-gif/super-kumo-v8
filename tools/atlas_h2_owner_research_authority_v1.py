@@ -29,7 +29,7 @@ SCOPE_FIELDS = frozenset((
     "core253_query_sha256", "strategy_id",
     "strategy_definition_sha256", "strategy_config_sha256",
     "evaluator_code_sha256", "cost_policy_sha256",
-    "experiment_id", "owner_authorization_ref",
+    "experiment_id", "owner_authorization_ref", "one_use_nonce",
     "research_class", "historical_pit", "publisher_pit_attested",
     "explicit_readonly_no_export", "source_output_separate", "single_use",
 ))
@@ -121,6 +121,9 @@ def _check_scope(scope):
           and end == int(following.timestamp()*1000)
           and (end-start)//STEP == 2976 and month == "2024-03",
           "OWNER_SCOPE_NOT_SINGLE_MARCH_COMPLETE_MONTH")
+    _need(type(scope["one_use_nonce"]) is str
+          and re.fullmatch(r"[0-9a-f]{32}", scope["one_use_nonce"]) is not None,
+          "OWNER_SCOPE_UNIQUE_NONCE_REQUIRED")
     _need(type(scope["dataset_id"]) is str
           and scope["dataset_id"].startswith("BINANCE-SPOT-BTCUSDT-15M-")
           and type(scope["version"]) is int and scope["version"] > 0
