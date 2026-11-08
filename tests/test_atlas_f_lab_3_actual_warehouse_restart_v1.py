@@ -20,6 +20,10 @@ from research_wp_r0.aql_core_backbone_local_v1 import (
     admit_local_original, query_local, BackboneError,
 )
 from research_wp_r0.aql_authenticated_historical_admission_v1 import PIN_SCHEMA
+from research_wp_r0.aql_archive_custody_bridge_v1 import OfflineBridgeStager
+from research_wp_r0.historical_library import HistoricalLibrary
+from research_wp_r0.aql_native_price_custody_query_v1 import query_price_custody
+from research_wp_r0.aql_core_research_query_seam_v1 import REQUEST_SCHEMA
 from research_wp_r0.aql_factory_e_research_results_store_v1 import (
     migrate_store_v2, digest,
 )
@@ -143,6 +147,22 @@ class RealWarehouseAndKill(unittest.TestCase):
         self.assertEqual(len(packet["core_query"]["bars"]),N)
         self.assertNotEqual(packet["core_query"]["query_sha256"],
                             packet["core_query"]["source_bytes_sha256"])
+        # Independently consume the retained native Core245 parent from
+        # the real stager and compare it with the bounded Core253 query.
+        lib=HistoricalLibrary()
+        OfflineBridgeStager(self.warehouse/"stage").replay_committed(lib)
+        q=packet["core_query"]
+        native=query_price_custody(
+            lib,{
+                "schema":REQUEST_SCHEMA,"dataset_id":q["dataset_id"],
+                "version":q["version"],"start_ms":q["start_ms"],
+                "end_exclusive_ms":q["end_exclusive_ms"],
+                "decision_cutoff_ms":q["decision_cutoff_ms"],
+                "require_complete":True,"confirmed_only":False,
+            },expected_source_sha256=q["source_bytes_sha256"],
+              expected_manifest_integrity_sha256=q["manifest_integrity_sha256"])
+        self.assertEqual(native["coverage"],"COMPLETE")
+        self.assertNotEqual(native["price_query_sha256"],q["query_sha256"])
         result=self.run_pipeline(packet)
         self.assertEqual(result["state"],"SECRETARY_WAIT")
         self.assertEqual(self.run_pipeline(packet),result)
@@ -180,6 +200,16 @@ print(json.dumps({"state":out["state"],"sha256":out["sha256"]}))
                 [sys.executable,"-c",code,str(file),str(self.store),
                  str(self.secretary),str(self.checkpoint),stage],
                 cwd=str(Path.cwd()),text=True,capture_output=True,timeout=45)
+        # Fingerprint durable original *synthetic* source artifacts before
+        # any killed child. Check that these do not change after recovery.
+        def source_hashes():
+            return {
+                str(p.relative_to(self.warehouse)):
+                hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in (self.warehouse/"stage").rglob("*")
+                if p.is_file()
+            }
+        before=source_hashes()
         first=child("SCANNER_VERIFIED")
         self.assertEqual(first.returncode,77,(first.stdout,first.stderr))
         cp=self.checkpoint/(packet["experiment_id"]+".json")
@@ -204,6 +234,7 @@ print(json.dumps({"state":out["state"],"sha256":out["sha256"]}))
         self.assertEqual(read_generic_research_result_route(
             self.secretary,packet["experiment_id"])["state"],
             "WAIT_RESEARCH_REVIEW")
+        self.assertEqual(before,source_hashes())
 
     def test_partial_real_core_warehouse_rejected_by_scanner_cutoff_boundary(self):
         # Core253 may return PARTIAL for a pre-end cutoff; Scanner H requires
