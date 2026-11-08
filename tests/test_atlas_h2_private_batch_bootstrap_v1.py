@@ -127,6 +127,8 @@ class PrivateBatch(unittest.TestCase):
                             self.output,self.repo,confirm_one_run=True)
         self.assertEqual(fake.call_count,1)
         self.assertEqual(first["status"],"BLOCKED")
+        self.assertIsNone(first["source_read"])
+        self.assertEqual(first["source_read_status"],"POSSIBLE_AFTER_GATES")
         self.assertIn("OPERATOR_SOURCE_NONEMPTY_WAL_REQUIRES_OFFLINE_STABLE_SNAPSHOT",
                       first["reasons"])
         self.assertTrue((self.intake/"h2-single-use-claim.json").is_file())
