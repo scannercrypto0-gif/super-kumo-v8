@@ -8,6 +8,8 @@ on:
       - 'tools/atlas_h2_windows_one_shot.ps1'
       - 'tools/atlas_h2_windows_batch.ps1'
       - 'tools/atlas_h2_private_batch_bootstrap_v1.py'
+      - 'tools/atlas_h2_binance_public_lane_v1.py'
+      - 'tests/test_atlas_h2_binance_public_lane_v1.py'
       - 'tests/test_atlas_h2_private_batch_bootstrap_v1.py'
       - '.github/workflows/atlas-h2-owner-local-one-shot.yml'
   workflow_dispatch:
@@ -36,7 +38,8 @@ jobs:
           sys.path.insert(0,str(Path.cwd()/'tests'))
           suite=unittest.defaultTestLoader.loadTestsFromNames((
               'test_atlas_h2_owner_local_one_shot_v1',
-              'test_atlas_h2_private_batch_bootstrap_v1'))
+              'test_atlas_h2_private_batch_bootstrap_v1',
+              'test_atlas_h2_binance_public_lane_v1'))
           result=unittest.TextTestRunner(verbosity=2).run(suite)
           if not result.wasSuccessful():
               raise SystemExit(1)
@@ -90,4 +93,24 @@ jobs:
             throw 'BATCH_MISSING_EXACT_EVIDENCE_REASON'
           }
           Write-Host 'PASS: one Windows command, exact pinned code, one BLOCKED receipt, no source read'
+          exit 0
+
+      - name: Windows opt-in official Binance lane smoke missing private prerequisites
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $evidence = Join-Path $env:TEMP ('aql-h2-public-empty-' + [guid]::NewGuid().ToString('N'))
+          $out = Join-Path $env:LOCALAPPDATA ('ATLAS/H2-Local-Batch/run-public-ci-' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+          & pwsh -NoProfile -File ./tools/atlas_h2_windows_batch.ps1 -Mode official-binance -EvidenceDir $evidence -OutputDir $out -ConfirmOneRun
+          $rc = $LASTEXITCODE
+          if ($rc -ne 2) { throw "OFFICIAL_LANE_FAIL_OPEN_$rc" }
+          $report = Get-Content -LiteralPath (Join-Path $out 'h2-batch-summary.json') -Raw | ConvertFrom-Json
+          if ($report.status -ne 'BLOCKED' -or $report.source_read_status -ne 'NOT_ATTEMPTED') {
+            throw 'OFFICIAL_LANE_REPORT_UNSAFE'
+          }
+          if ($report.reasons[0] -notmatch 'MISSING_PUBLIC_LANE_EVIDENCE') {
+            throw 'OFFICIAL_LANE_EXPECTED_EVIDENCE_GAP'
+          }
+          Write-Host 'PASS: official opt-in Windows source gate fail closed before E access'
           exit 0
