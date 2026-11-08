@@ -555,6 +555,13 @@ def execute(manifest, *, key_file=None, repo=None, allow_local_run=False):
         with tempfile.TemporaryDirectory(prefix="aql-h2-isolated-") as d:
             overlay = Path(d)
             code_sha = isolated_overlay(repo, overlay)
+            # Personal H2 ONLY: Scanner F3 retrospective import depends on an
+            # unpublished old B module. Keep all original F3 review calls
+            # fail-closed; move F3-only imports in isolated scratch only.
+            from tools.atlas_h2_scanner_import_seam_v2 import apply_import_seam
+            seam = apply_import_seam(overlay)
+            code_sha = digest({"raw_pinned_overlay_sha256": code_sha,
+                               "scanner_import_seam": seam})
             # Spawn a fresh isolated interpreter to prevent current process
             # sys.modules / package path contamination from bypassing pins.
             own = Path(__file__).resolve(strict=True)
