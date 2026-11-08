@@ -1,0 +1,33 @@
+name: Discoverer D-SCAN-1 synthetic candidate bridge
+
+on:
+  push:
+    branches:
+      - feat/discoverer-package-f4-original-cohort-contract-20261105
+    paths:
+      - tools/strategy_discoverer_offline/synthetic_scanner_candidate_bridge.py
+      - tools/strategy_discoverer_offline/tests/test_d_scan_1_candidate_bridge.py
+      - .github/workflows/discoverer-d-scan-1.yml
+  pull_request:
+    paths:
+      - tools/strategy_discoverer_offline/synthetic_scanner_candidate_bridge.py
+      - tools/strategy_discoverer_offline/tests/test_d_scan_1_candidate_bridge.py
+      - .github/workflows/discoverer-d-scan-1.yml
+jobs:
+  d-scan-1:
+    name: D-SCAN-1 (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Test new synthetic bridge only
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tools/strategy_discoverer_offline/tests/test_d_scan_1_candidate_bridge.py
