@@ -9,7 +9,7 @@ Authority: owner provisional B [#205/6717854599](https://github.com/scannercrypt
 | Integration | #271 | UPDATE_AFTER_H2_FINAL_COMMIT | H2 gate only |
 | Core | #275 | `99c27ea2c1a4d41aaae361141301a8a9ea3b33c3` | Core245/253 query + same-root research WAIT |
 | Scanner | #277 | `3c82448702c9ae35783716e4e2c3b640010db97c` | AST/signal decisions only |
-| Factory+Lab | #267 | `52504ad59d75976ce45fb8f75c1b278c3d1b0975` | next-eligible fills + Decimal bps, immutable ledger, Lab |
+| Factory+Lab | #267 | `a4b887fe7067b89febc339e466652a5fcb1c2bee` | next-eligible fills + Decimal bps, immutable ledger, Lab |
 | Discoverer | #276 | `1cb70f1212283fe34117882d18e0501fc6409fe7` | optional; manual AST cannot depend on signed F4 |
 | Work235 | frozen | `6acbcc7fc243b132f58170df4c6469bbf7f4eff8` | two old frozen TEST_ONLY strategy definitions |
 
