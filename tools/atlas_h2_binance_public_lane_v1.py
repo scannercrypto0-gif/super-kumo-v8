@@ -215,36 +215,35 @@ def verified_license(license_doc, download_year):
 
 def validate_native_manual_third_ast(path, expected_definition_sha256,
                                      expected_strategy_id):
-    """Pre-source reject Scanner plugin-as-AST and duplicate/foreign strategies.
+    """Pre-source shape + digest guard. Full registry semantics at worker.
 
-    An H2 manual-third-ast.json must be native StrategyDefinition.to_dict(),
-    NOT the separately sealed Scanner plugin {payload,sha256}. No source IO.
+    Native StrategyDefinition receipt: {definition, digest}.
+    A Scanner plugin {payload, sha256} is not a native definition.
+    This guard does not approve an AST or any trading policy.
     """
-    from research_wp_r0.strategy_definition import StrategyDefinition
-    from research_wp_r0.indicator_library_v2 import IndicatorRegistryV2
+    from research_wp_r0.strategy_definition import digest as ast_digest, load_json
     try:
         source = Path(path)
         fail(source.is_file() and not source.is_symlink()
              and source.stat().st_size <= 100_000,
              "H2_MANUAL_AST_SLOT_SCHEMA_MISMATCH")
-        from research_wp_r0.strategy_definition import load_json
-        document = load_json(source.read_text(encoding="utf-8"))
-        fail(type(document) is dict
-             and set(document) == {"definition", "digest"},
+        doc = load_json(source.read_text(encoding="utf-8"))
+        fail(type(doc) is dict and set(doc) == {"definition", "digest"}
+             and type(doc["definition"]) is dict
+             and type(doc["digest"]) is str,
              "H2_MANUAL_AST_SLOT_SCHEMA_MISMATCH")
-        definition = StrategyDefinition.from_dict(
-            document, registry=IndicatorRegistryV2())
-        fail(definition.digest == expected_definition_sha256
-             and definition.spec["strategy_id"] == expected_strategy_id
+        fail(doc["digest"] == ast_digest(doc["definition"])
+             and doc["digest"] == expected_definition_sha256
+             and doc["definition"].get("strategy_id") == expected_strategy_id
              and expected_strategy_id == "h_manual_distinct_test"
-             and definition.spec["scope"] == "RESEARCH_ONLY",
+             and doc["definition"].get("scope") == "RESEARCH_ONLY",
              "H2_MANUAL_AST_IDENTITY_OR_DIGEST_MISMATCH")
     except Blocked:
         raise
     except (OSError, UnicodeError, ValueError, KeyError, TypeError,
             RecursionError):
         raise Blocked("H2_MANUAL_AST_SLOT_SCHEMA_MISMATCH") from None
-    return definition.digest
+    return doc["digest"]
 
 
 def technical_intake(folder):
