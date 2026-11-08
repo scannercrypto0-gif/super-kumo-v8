@@ -212,6 +212,96 @@ class ResearchStrategyPlugin(unittest.TestCase):
         self.assertEqual(out["quarantine"],"ALL_EVENTS_UNKNOWN_SOURCE_GAP")
         self.assertTrue(all(not e["source_observed"] for e in out["events"]))
 
+    def test_pre_end_cutoff_partial_future_slots_quarantined(self):
+        """A source query can end after cutoff; no future bar is observed."""
+        q=synthetic_query()
+        q["decision_cutoff_ms"]=START+2*900000
+        q["bars"]=q["bars"][:2]
+        q["missing_bar_opens"]=list(range(
+            START+2*900000,START+64*900000,900000))
+        q["available_bar_count"]=2
+        q["coverage"]="PARTIAL"
+        reseal_query(q)
+        batch=h.verify_factory_signal_batch(self.evaluate(query=q)).data
+        self.assertEqual(batch["event_count"],64)
+        self.assertEqual(batch["observed_bar_count"],2)
+        self.assertEqual(batch["missing_bar_count"],62)
+        self.assertEqual(batch["signal_counts"]["UNKNOWN"],64)
+        self.assertEqual(batch["signal_counts"]["NO_SIGNAL"],0)
+        self.assertEqual(batch["signal_counts"]["ENTRY_SIGNAL"],0)
+        self.assertEqual(batch["signal_counts"]["EXIT_SIGNAL"],0)
+        self.assertEqual(batch["quarantine"],"ALL_EVENTS_UNKNOWN_SOURCE_GAP")
+        self.assertTrue(all(e["signal_state"]=="UNKNOWN"
+                            and e["next_eligible_open_ms"] is None
+                            and e["source_observed"] is False
+                            and e["next_open_is_fill"] is False
+                            for e in batch["events"]))
+        self.assertEqual(batch["historical_pit"],"NOT_ATTESTED")
+        self.assertIsNone(batch["source_ack_sha256"])
+        self.assertIsNone(batch["strategy_approval_sha256"])
+        self.assertIsNone(batch["factory_consumer_ack_sha256"])
+        self.assertEqual(batch["trading_authority"],"NONE")
+        self.assertGreater(batch["events"][-1]["bar_open_ms"],
+                           batch["decision_cutoff_ms"])
+
+    def test_partial_future_no_observed_future_or_fake_coverage(self):
+        base=synthetic_query()
+        base["decision_cutoff_ms"]=START+2*900000
+        base["bars"]=base["bars"][:2]
+        base["missing_bar_opens"]=list(range(
+            START+2*900000,START+64*900000,900000))
+        base["available_bar_count"]=2
+        base["coverage"]="PARTIAL"
+        reseal_query(base)
+        variants=[]
+        future=copy.deepcopy(base)
+        future["bars"].append(synthetic_query()["bars"][2])
+        future["available_bar_count"]=3
+        future["missing_bar_opens"].remove(START+2*900000)
+        variants.append(("observed_future",future))
+        missing=copy.deepcopy(base)
+        missing["missing_bar_opens"].remove(START+2*900000)
+        variants.append(("unlisted_future",missing))
+        complete=copy.deepcopy(base)
+        complete["coverage"]="COMPLETE"
+        variants.append(("forged_complete",complete))
+        cutoff=copy.deepcopy(base)
+        cutoff["decision_cutoff_ms"]=START
+        variants.append(("cutoff_before_start",cutoff))
+        for label,q in variants:
+            reseal_query(q)
+            with self.subTest(label=label),self.assertRaises(ValueError):
+                self.evaluate(query=q)
+        # A re-sealed but drifted query cannot bypass immutable Core253 re-read.
+        forged=copy.deepcopy(base)
+        forged["bars"][0]["close"]=forged["bars"][0]["open"]+0.1
+        reseal_query(forged)
+        with self.assertRaises(ValueError):
+            self.evaluate(query=forged,replay=base)
+
+    def test_factory_rejects_future_signal_even_if_receipt_resealed(self):
+        q=synthetic_query()
+        q["decision_cutoff_ms"]=START+2*900000
+        q["bars"]=q["bars"][:2]
+        q["missing_bar_opens"]=list(range(
+            START+2*900000,START+64*900000,900000))
+        q["available_bar_count"]=2
+        q["coverage"]="PARTIAL"
+        reseal_query(q)
+        normal=self.evaluate(query=q)
+        for status in ("ENTRY_SIGNAL","EXIT_SIGNAL","NO_SIGNAL"):
+            changed=copy.deepcopy(normal["payload"])
+            event=changed["events"][5]
+            event["signal_state"]=status
+            if status in ("ENTRY_SIGNAL","EXIT_SIGNAL"):
+                event["next_eligible_open_ms"]=event["bar_close_ms"]+1
+            event["event_sha256"]=digest({
+                k:v for k,v in event.items() if k!="event_sha256"})
+            changed["signal_counts"]["UNKNOWN"]-=1
+            changed["signal_counts"][status]+=1
+            with self.subTest(status=status),self.assertRaises(ValueError):
+                h.verify_factory_signal_batch(Frozen.build(changed).receipt())
+
     def test_absent_policy_and_receipts_fail_closed(self):
         with self.assertRaisesRegex(ValueError,"H_POLICY_REQUIRED"):
             h.evaluate_strategy_plugin(
