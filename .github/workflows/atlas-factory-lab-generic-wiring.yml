@@ -1,0 +1,35 @@
+name: ATLAS Factory F-LAB 1+2 Generic Research Wiring
+on:
+  push:
+    branches: [factory/package-e-historical-research-results-20261105]
+    paths:
+      - 'research_wp_r0/aql_factory_lab_experiment_index_v1.py'
+      - 'research_wp_r0/aql_factory_lab_generic_paired_v1.py'
+      - 'tests/test_aql_factory_lab_generic_wiring_v1.py'
+      - '.github/workflows/atlas-factory-lab-generic-wiring.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  factory-lab-wiring:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Stage exact pre-existing pinned Core/Scanner/Work235 research modules
+        run: python tools/atlas_factory_h_scanner_ci_stage.py
+      - name: F-LAB 1/2 real Scanner synthetic fixture to existing Factory E/H Lab/Core Secretary and P2
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p test_aql_factory_lab_generic_wiring_v1.py -v
