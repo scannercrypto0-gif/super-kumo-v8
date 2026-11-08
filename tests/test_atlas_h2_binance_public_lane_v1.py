@@ -15,6 +15,7 @@ from tools.atlas_h2_binance_public_lane_v1 import (
     ROOT, LANE_SCHEMA, LICENSE_SCHEMA, TERMS_URL,
     Blocked, checksum_parse, filename_for_month, verify_public_month,
     run_public_batch, safe_zip, technical_intake, verified_license,
+    validate_native_manual_third_ast,
 )
 
 
@@ -75,7 +76,12 @@ class OfficialBinanceLane(unittest.TestCase):
         native["price_query_sha256"] = digest(native)
         (self.private / "core245-native-receipt.json").write_text(
             json.dumps(native))
-        (self.private / "manual-third-ast.json").write_text("{}")
+        from research_wp_r0.strategy_definition import digest as ast_digest
+        definition = {"strategy_id": "h_manual_distinct_test",
+                      "scope": "RESEARCH_ONLY", "synthetic_test_only": True}
+        ast_sha = ast_digest(definition)
+        (self.private / "manual-third-ast.json").write_text(
+            json.dumps({"definition": definition, "digest": ast_sha}))
         sha = lambda name: hashlib.sha256(
             (self.private / name).read_bytes()).hexdigest()
         tech = {
@@ -92,8 +98,8 @@ class OfficialBinanceLane(unittest.TestCase):
             "manifest_integrity_sha256": "b"*64,
             "native_receipt_file_sha256": sha("core245-native-receipt.json"),
             "strategy_file_sha256": sha("manual-third-ast.json"),
-            "strategy_definition_sha256": "c"*64,
-            "strategy_id": "h_manual_test",
+            "strategy_definition_sha256": ast_sha,
+            "strategy_id": "h_manual_distinct_test",
             "factory_code_sha256": "d"*64,
             "experiment_id": "RESEARCH-H-GENERIC-SYNTHETIC",
         }
@@ -102,6 +108,62 @@ class OfficialBinanceLane(unittest.TestCase):
         (self.private/"historical-terms.txt").write_text("synthetic 2024 terms: TEST ONLY")
         (self.private/"historical-license-evidence.mac").write_text("invalid")
         return tech
+
+    def test_native_manual_receipt_pre_source_guard_accepts_synthetic_shape_only(self):
+        tech = self._intake()
+        self.assertEqual(
+            validate_native_manual_third_ast(
+                self.private/"manual-third-ast.json",
+                tech["strategy_definition_sha256"], tech["strategy_id"]),
+            tech["strategy_definition_sha256"])
+        # This is *only* shape/digest preflight, not full strategy approval.
+
+    def test_scanner_plugin_cannot_be_relabelled_as_native_manual_ast(self):
+        tech = self._intake()
+        plugin = {"payload": {"schema": "aql.scanner.h.strategy-plugin.v1"},
+                  "sha256": "a"*64}
+        (self.private/"manual-third-ast.json").write_text(json.dumps(plugin))
+        with self.assertRaisesRegex(
+            Blocked, "H2_MANUAL_AST_SLOT_SCHEMA_MISMATCH"
+        ):
+            validate_native_manual_third_ast(
+                self.private/"manual-third-ast.json",
+                tech["strategy_definition_sha256"], tech["strategy_id"])
+        # Even if the file digest is updated, the official lane refuses
+        # this mislabeled input before local original source reads.
+        path = self.private/"technical-intake.json"
+        tech["strategy_file_sha256"] = hashlib.sha256(
+            (self.private/"manual-third-ast.json").read_bytes()).hexdigest()
+        path.write_text(json.dumps(tech))
+        with patch("tools.atlas_h2_binance_public_lane_v1.execute",
+                   side_effect=AssertionError("original E: access")):
+            report = run_public_batch(
+                self.private,self.output,fetcher=self.fetch)
+        self.assertEqual(report["status"],"BLOCKED")
+        self.assertEqual(report["reasons"],
+                         ["H2_MANUAL_AST_SLOT_SCHEMA_MISMATCH"])
+        self.assertEqual(report["source_read_status"],"NOT_ATTEMPTED")
+
+    def test_duplicate_or_tampered_manual_third_digest_blocks_before_source(self):
+        tech = self._intake()
+        for field,value in (("strategy_id","test_momentum"),
+                            ("scope","TRADING")):
+            with self.subTest(field=field):
+                from research_wp_r0.strategy_definition import digest as ast_digest
+                doc=json.loads((self.private/"manual-third-ast.json").read_text())
+                doc["definition"][field]=value
+                doc["digest"]=ast_digest(doc["definition"])
+                with self.assertRaisesRegex(
+                    Blocked, "H2_MANUAL_AST_IDENTITY_OR_DIGEST_MISMATCH"
+                ):
+                    validate_native_manual_third_ast(
+                        self._write_temp_ast(doc),
+                        tech["strategy_definition_sha256"], tech["strategy_id"])
+
+    def _write_temp_ast(self, document):
+        p=self.private/"synthetic-variant-ast.json"
+        p.write_text(json.dumps(document))
+        return p
 
     def test_valid_public_zip_and_checksum_bound_to_exact_filename(self):
         p = verify_public_month(self.month, fetcher=self.fetch)
