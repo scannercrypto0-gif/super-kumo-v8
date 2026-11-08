@@ -100,7 +100,7 @@ class PrivateBatch(unittest.TestCase):
     def test_never_reserve_one_shot_inside_original_source(self):
         self._genuine_intake()
         claim, _, _ = inspect_private_intake(self.intake, self.verifier)
-        claim["warehouse_root"] = str(self.root)
+        claim["warehouse_root"] = str(self.intake)
         with self.assertRaisesRegex(
                 Blocked, "PRIVATE_INTAKE_OVERLAPS_ORIGINAL_SOURCE"):
             build_scope(claim, self.intake, self.output)
