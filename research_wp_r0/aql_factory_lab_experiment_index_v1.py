@@ -49,9 +49,9 @@ def seal(value):
 
 
 def verified(value):
-    require(type(value) is dict and
-            value.get("sha256")==digest({k:v for k,v in value.items()
-                                          if k!="sha256"}),"SHA_OR_SHAPE")
+    require(type(value) is dict and _sha(value.get("sha256")) and
+            value["sha256"]==digest({k:v for k,v in value.items()
+                                      if k!="sha256"}),"SHA_OR_SHAPE")
     return value
 
 
