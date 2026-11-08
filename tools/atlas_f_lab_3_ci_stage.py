@@ -19,7 +19,9 @@ ALLOWED={
  "scanner":("research_wp_r0/","tools/scanner_strategy_f/"),
  "factory":("research_wp_r0/","tests/test_aql_factory_h_generic_signal_adapter_v1.py",
             "tests/test_aql_factory_lab_generic_wiring_v1.py"),
- "core":("research_wp_r0/aql_core_h_research_secretary_v1.py",),
+ "core":("research_wp_r0/aql_core_h_research_secretary_v1.py",
+         "research_wp_r0/aql_archive_custody_bridge_v1.py",
+         "research_wp_r0/aql_core_backbone_local_v1.py",),
 }
 
 def main():
