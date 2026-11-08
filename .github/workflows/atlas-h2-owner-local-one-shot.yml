@@ -23,6 +23,8 @@ on:
       - 'tests/test_atlas_h2_owner_evidence_recovery_v2.py'
       - 'tools/atlas_h2_owner_overlay_smoke_v2.py'
       - 'tools/atlas_h2_owner_readiness_v2.py'
+      - 'tools/atlas_h2_owner_readiness_bundle_v2.ps1'
+      - 'tools/atlas_h2_owner_execution_overlay_smoke_v2.py'
       - 'tests/test_atlas_h2_owner_readiness_v2.py'
       - '.github/workflows/atlas-h2-owner-local-one-shot.yml'
       - 'docs/research/integration-r1-first-original-test-readiness-v1.md'
@@ -69,6 +71,10 @@ jobs:
         run: |
           python tools/atlas_h2_owner_overlay_smoke_v2.py --repo . --code-commit 19f24baf32e11b846a4fdf57e90837beb4f72cc0
 
+      - name: Actual Windows owner original H2 and readiness stage parity (NO E SOURCE)
+        shell: bash
+        run: |
+          python tools/atlas_h2_owner_execution_overlay_smoke_v2.py .
       - name: Windows PowerShell launcher parse and no-manifest denial
         if: runner.os == 'Windows'
         shell: pwsh
@@ -169,7 +175,8 @@ jobs:
           if ($PSVersionTable.PSVersion.Major -ne 5) { throw 'WINDOWS_POWERSHELL_51_NOT_USED' }
           $files = @(
             'tools/atlas_h2_owner_local_prepare_v2.ps1',
-            'tools/atlas_h2_owner_recovery_bundle_v2.ps1'
+            'tools/atlas_h2_owner_recovery_bundle_v2.ps1',
+            'tools/atlas_h2_owner_readiness_bundle_v2.ps1'
           )
           foreach ($f in $files) {
             $tokens = $null
