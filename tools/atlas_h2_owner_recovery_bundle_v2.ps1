@@ -24,7 +24,7 @@ if (-not (Test-Path -LiteralPath $repo -PathType Container) -or
   throw 'OWNER_EXPECTED_LOCAL_REPO_OR_ORIGINAL_ZIP_MISSING'
 }
 # Verify that the owner has actually synchronized this exact signed source.
-$expectedCode='6adb698e7f56748d212d62723cfd099c9d78b6e0'
+$expectedCode='19f24baf32e11b846a4fdf57e90837beb4f72cc0'
 & $Git -C $repo cat-file -e ($expectedCode + '^{commit}') 2>$null
 if ($LASTEXITCODE -ne 0) { throw 'OWNER_LOCAL_GIT_EXACT_CODE_NOT_FETCHED' }
 $localHead=(& $Git -C $repo rev-parse HEAD)
