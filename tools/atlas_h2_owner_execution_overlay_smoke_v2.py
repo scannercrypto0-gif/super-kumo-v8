@@ -48,7 +48,7 @@ def check(repo):
                         "https://github.com/scannercrypto0-gif/super-kumo-v8.git"],
                        check=True)
         for sha in (*ROLE_PINS,PERSONAL,READINESS,
-                    "76479babaf1b05ee5ee4bc918a429d1c301e0d76"):
+                    "19280b184c55ceed16fd10989887975b9e988fed"):
             subprocess.run(["git","-C",str(clone),"fetch","-q","--no-tags",
                             "origin",sha],check=True)
         for filename,tag,args in (
@@ -58,7 +58,7 @@ def check(repo):
              (str(clone),None,PERSONAL,READINESS)),
             ("tools/atlas_h2_owner_diagnose_all_bundle_v2.ps1","stageScript",
              (str(clone),None,PERSONAL,READINESS,
-              "76479babaf1b05ee5ee4bc918a429d1c301e0d76")),
+              "19280b184c55ceed16fd10989887975b9e988fed")),
         ):
             source=(repo/filename).read_text("utf-8")
             match=re.search(
