@@ -11,6 +11,8 @@ on:
       - 'tools/atlas_h2_binance_public_lane_v1.py'
       - 'tests/test_atlas_h2_binance_public_lane_v1.py'
       - 'tests/test_atlas_h2_private_batch_bootstrap_v1.py'
+      - 'tools/atlas_h2_owner_research_authority_v1.py'
+      - 'tests/test_atlas_h2_owner_research_authority_v1.py'
       - '.github/workflows/atlas-h2-owner-local-one-shot.yml'
       - 'docs/research/integration-r1-first-original-test-readiness-v1.md'
   workflow_dispatch:
@@ -40,6 +42,7 @@ jobs:
           suite=unittest.defaultTestLoader.loadTestsFromNames((
               'test_atlas_h2_owner_local_one_shot_v1',
               'test_atlas_h2_private_batch_bootstrap_v1',
+              'test_atlas_h2_owner_research_authority_v1',
               'test_atlas_h2_binance_public_lane_v1'))
           result=unittest.TextTestRunner(verbosity=2).run(suite)
           if not result.wasSuccessful():
