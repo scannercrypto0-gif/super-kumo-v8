@@ -1,0 +1,71 @@
+name: ATLAS Package H Final Pinned Grouped Gate
+on:
+  push:
+    branches: [integration/package-e-g1-g12-pinned-20261105]
+    paths:
+      - '.github/workflows/atlas-package-h-final-grouped-gate.yml'
+      - 'tests/test_atlas_h_full_generic_pipeline.py'
+      - 'tests/test_atlas_h_generic_secretary_bridge.py'
+      - 'tools/atlas_h_generic_secretary_bridge.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package-h:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.11', '3.12']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 99c27ea2c1a4d41aaae361141301a8a9ea3b33c3, path: _core_h, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 52504ad59d75976ce45fb8f75c1b278c3d1b0975, path: _factory_h, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 3c82448702c9ae35783716e4e2c3b640010db97c, path: _scanner_h, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8, path: _work235, persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: ${{ matrix.python-version }}}
+      - name: Overlay pinned owner code, no mutation of owner branches
+        shell: python
+        run: |
+          from pathlib import Path
+          from shutil import copyfile
+          # Factory owns causal fills/Lab and must override legacy Integration copies.
+          # Core owns Secretary; Scanner owns signals; Work235 frozen fixture only.
+          for owner in ('_work235','_scanner_h','_factory_h','_core_h'):
+              for folder in ('research_wp_r0','tools','src'):
+                  source=Path(owner)/folder
+                  if not source.is_dir(): continue
+                  for item in source.rglob('*.py'):
+                      target=Path(folder)/item.relative_to(source)
+                      target.parent.mkdir(parents=True,exist_ok=True)
+                      copyfile(item,target)
+          for path in ('tools/strategy_service_offline/fixtures/strategies.json',):
+              source=Path('_work235')/path
+              if source.is_file():
+                  target=Path(path);target.parent.mkdir(parents=True,exist_ok=True)
+                  copyfile(source,target)
+          for item in (Path('_factory_h')/'tests').glob('test_aql_factory_h_generic_signal_adapter_v1.py'):
+              copyfile(item,Path('tests')/item.name)
+          for item in (Path('_core_h')/'tests').glob('test_aql_core_h_generic_research_secretary_v1.py'):
+              copyfile(item,Path('tests')/item.name)
+          for item in (Path('_scanner_h')/'tools/scanner_strategy_f').glob('test_research_strategy_plugin.py'):
+              target=Path('tools/scanner_strategy_f')/item.name
+              target.parent.mkdir(parents=True,exist_ok=True)
+              copyfile(item,target)
+      - name: Full real Factory and Core SQLite grouped gate plus negatives
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=.:tests python -m unittest -v \
+            test_aql_factory_h_generic_signal_adapter_v1 \
+            test_aql_core_h_generic_research_secretary_v1 \
+            test_atlas_h_generic_secretary_bridge \
+            test_atlas_h_full_generic_pipeline
