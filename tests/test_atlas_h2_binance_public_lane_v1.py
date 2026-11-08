@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 import zipfile
 
+from tools.atlas_h2_owner_local_one_shot_v1 import digest
 from tools.atlas_h2_binance_public_lane_v1 import (
     ROOT, LANE_SCHEMA, LICENSE_SCHEMA, TERMS_URL,
     Blocked, checksum_parse, filename_for_month, verify_public_month,
@@ -55,7 +56,25 @@ class OfficialBinanceLane(unittest.TestCase):
         raise AssertionError("UNEXPECTED_OFFICIAL_URL")
 
     def _intake(self):
-        (self.private / "core245-native-receipt.json").write_text("{}")
+        rows = [
+            {"bar_open_ms": self.begin + i * 900000,
+             "bar_close_ms": self.begin + (i + 1) * 900000 - 1}
+            for i in range(31 * 96)
+        ]
+        native = {
+            "schema": "aql.core.historical-price-custody-query.v1",
+            "status": "OK", "coverage": "COMPLETE",
+            "dataset_id": "BINANCE-SPOT-BTCUSDT-15M-2024-03",
+            "version": 1, "source_bytes_sha256": self.sha,
+            "manifest_integrity_sha256": "b"*64,
+            "decision_cutoff_ms": 1711929600000,
+            "required_bar_count": len(rows),
+            "available_bar_count": len(rows),
+            "missing_bar_opens": [], "bars": rows,
+        }
+        native["price_query_sha256"] = digest(native)
+        (self.private / "core245-native-receipt.json").write_text(
+            json.dumps(native))
         (self.private / "manual-third-ast.json").write_text("{}")
         sha = lambda name: hashlib.sha256(
             (self.private / name).read_bytes()).hexdigest()
