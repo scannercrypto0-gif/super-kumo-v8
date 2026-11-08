@@ -1,6 +1,7 @@
 """Official Binance H2 provenance: synthetic-only publisher ZIP + checksum tests."""
 from __future__ import annotations
 import hashlib
+import hmac
 import io
 import json
 import tempfile
@@ -28,7 +29,7 @@ class OfficialBinanceLane(unittest.TestCase):
         self.month = "2024-03"
         self.filename = filename_for_month(self.month)
         self.begin = 1709251200000
-        self.grid = self._grid(4)
+        self.grid = self._grid(31 * 96)
         self.zip = self._zip(self.grid)
         self.sha = hashlib.sha256(self.zip).hexdigest()
         self.checksum = (self.sha + "  " + self.filename + "\n").encode()
@@ -66,9 +67,9 @@ class OfficialBinanceLane(unittest.TestCase):
             "local_source_zip": str(self.root/"original-zip"),
             "dataset_id": "BINANCE-SPOT-BTCUSDT-15M-2024-03",
             "version": 1, "month": self.month,
-            "start_ms": self.begin, "end_exclusive_ms": self.begin+4*900000,
-            "decision_cutoff_ms": self.begin+4*900000,
-            "source_bytes_sha256": "a"*64,
+            "start_ms": self.begin, "end_exclusive_ms": 1711929600000,
+            "decision_cutoff_ms": 1711929600000,
+            "source_bytes_sha256": self.sha,
             "manifest_integrity_sha256": "b"*64,
             "native_receipt_file_sha256": sha("core245-native-receipt.json"),
             "strategy_file_sha256": sha("manual-third-ast.json"),
@@ -79,14 +80,22 @@ class OfficialBinanceLane(unittest.TestCase):
         }
         (self.private/"technical-intake.json").write_text(json.dumps(tech))
         (self.private/"historical-license-evidence.json").write_text("{}")
+        (self.private/"historical-license-evidence.mac").write_text("invalid")
         return tech
 
     def test_valid_public_zip_and_checksum_bound_to_exact_filename(self):
         p = verify_public_month(self.month, fetcher=self.fetch)
         self.assertEqual(p["zip_bytes_sha256"], self.sha)
         self.assertEqual(p["publisher_checksum_sha256"], self.sha)
-        self.assertEqual(p["bar_count"], 4)
+        self.assertEqual(p["bar_count"], 2976)
         self.assertEqual(p["publisher_cryptographic_signature"], "NOT_PRESENT")
+
+    def test_partial_month_even_valid_checksum_is_rejected(self):
+        self.zip = self._zip(self._grid(4))
+        self.checksum = (hashlib.sha256(self.zip).hexdigest()
+                         + "  " + self.filename).encode()
+        with self.assertRaisesRegex(Blocked, "OFFICIAL_NOT_COMPLETE_CALENDAR_MONTH"):
+            verify_public_month(self.month, fetcher=self.fetch)
 
     def test_tampered_zip_is_rejected(self):
         self.zip = self.zip + b"alter"
@@ -167,8 +176,66 @@ class OfficialBinanceLane(unittest.TestCase):
         (self.private/"historical-license-evidence.json").write_text(
             json.dumps(doc))
         blocked = run_public_batch(self.private, self.output, fetcher=self.fetch)
-        self.assertEqual(blocked["reasons"],
-                         ["WAIT_LICENSE_INDEPENDENT_AUTHORITY_VERIFICATION"])
+        self.assertEqual(blocked["reasons"], ["WAIT_LICENSE_REVIEWER_KEY"])
+
+    def test_signed_external_license_and_source_match_reaches_existing_operator(self):
+        self._intake()
+        source = self.root / "original-zip"
+        source.mkdir()
+        archive = source / self.filename
+        archive.write_bytes(self.zip)
+        technical_path = self.private / "technical-intake.json"
+        technical = json.loads(technical_path.read_text())
+        technical["local_source_zip"] = str(archive)
+        technical_path.write_text(json.dumps(technical))
+        license_doc = {
+            "schema": LICENSE_SCHEMA,
+            "issuer": "BINANCE_DATASET_RIGHTS_AUTHORITY",
+            "terms_url": TERMS_URL, "terms_sha256": "e"*64,
+            "applies_to_download_year": 2024, "download_year": 2024,
+            "intended_use": "PERSONAL_NONCOMMERCIAL_RESEARCH",
+            "permitted_use": "PERSONAL_NONCOMMERCIAL_RESEARCH",
+            "status": "INDEPENDENTLY_VERIFIED", "issued_at_utc": "2024-06-01",
+            "signed_by": "EXTERNAL_SYNTHETIC_REVIEWER",
+            "signature_ref": "verified-external:synthetic-test-only",
+        }
+        raw = json.dumps(license_doc).encode()
+        (self.private/"historical-license-evidence.json").write_bytes(raw)
+        reviewer = self.root/"independent-reviewer.key"
+        reviewer.write_bytes(b"r"*32)
+        owner = self.root/"owner.key"
+        owner.write_bytes(b"o"*32)
+        (self.private/"historical-license-evidence.mac").write_text(
+            hmac.new(b"r"*32, raw, hashlib.sha256).hexdigest())
+        with patch("tools.atlas_h2_binance_public_lane_v1.execute",
+                   return_value={"status":"EXPERIMENT_ENGINEERING_PASS",
+                                 "sha256":"f"*64,"reason":"SYNTHETIC_MOCK"}) as worker:
+            report = run_public_batch(
+                self.private, self.output, fetcher=self.fetch,
+                reviewer_key=reviewer, owner_key=owner,
+                git_repo=self.root/"isolated-repo", confirm_one_run=True)
+        self.assertEqual(report["status"], "PASS_ENGINEERING_ONLY")
+        self.assertEqual(worker.call_count, 1)
+        self.assertTrue((self.private/"h2-public-lane-one-use-claim.json").exists())
+        # Calling again cannot consume the same one-run owner permission.
+        with patch("tools.atlas_h2_binance_public_lane_v1.execute",
+                   side_effect=AssertionError("ONE_RUN_REPLAY")):
+            retry = run_public_batch(
+                self.private, self.output, fetcher=self.fetch,
+                reviewer_key=reviewer, owner_key=owner,
+                git_repo=self.root/"other-output", confirm_one_run=True)
+        self.assertEqual(retry["reasons"], ["ONE_RUN_ALREADY_RESERVED"])
+
+    def test_local_zip_drift_never_calls_operator(self):
+        self._intake()
+        # Even if technical metadata is untrusted, absent independent reviewer
+        # license must fail before accessing original ZIP.
+        with patch("tools.atlas_h2_binance_public_lane_v1.execute",
+                   side_effect=AssertionError("NO_LOCAL_SOURCE")):
+            report = run_public_batch(
+                self.private, self.output, fetcher=self.fetch)
+        self.assertEqual(report["status"], "BLOCKED")
+        self.assertFalse(report["source_read"])
 
     def test_unknown_native_and_ast_are_required(self):
         self._intake()
