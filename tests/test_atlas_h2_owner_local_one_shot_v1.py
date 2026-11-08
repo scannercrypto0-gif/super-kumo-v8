@@ -48,9 +48,9 @@ def scope(root):
         "experiment_id": "RESEARCH-H-GENERIC-OWNER-TEST",
         "factory_code_sha256": "e" * 64,
         "costs": {
-            "fee_entry_bps": "1", "fee_exit_bps": "1",
-            "spread_entry_bps": "1", "spread_exit_bps": "1",
-            "slippage_entry_bps": "1", "slippage_exit_bps": "1",
+            "fee_entry_bps": "10", "fee_exit_bps": "10",
+            "spread_entry_bps": "2", "spread_exit_bps": "2",
+            "slippage_entry_bps": "3", "slippage_exit_bps": "3",
             "funding_bps_per_bar": "0",
         },
     }
@@ -122,6 +122,9 @@ class H2Operator(unittest.TestCase):
         d = scope(self.root)
         d["costs"]["fee_entry_bps"] = "NaN"
         variants.append(d)
+        e = scope(self.root)
+        e["costs"]["fee_entry_bps"] = "9"
+        variants.append(e)
         for item in variants:
             with self.assertRaises(Stop):
                 self.verify(item)
