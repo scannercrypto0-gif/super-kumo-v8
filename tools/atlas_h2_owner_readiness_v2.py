@@ -23,9 +23,10 @@ from tools.atlas_h2_owner_personal_batch_v1 import (
     _load_intake, scope_commitment,
 )
 from tools.atlas_h2_owner_local_one_shot_v1 import (
-    OWNER_LIMITED_COSTS, PINS, boundaries, build_scope,
+    OWNER_LIMITED_COSTS, PINS, boundaries,
     fingerprint, isolated_overlay, native_receipt_check, sha_file, Stop,
 )
+from tools.atlas_h2_private_batch_bootstrap_v1 import build_scope
 from tools.atlas_h2_binance_public_lane_v1 import (
     Blocked, verify_public_month, fetch_official,
 )
