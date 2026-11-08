@@ -25,7 +25,7 @@ from tools.atlas_h2_private_batch_bootstrap_v1 import (
 )
 from tools.atlas_h2_owner_local_one_shot_v1 import (
     SCHEMA, OWNER_LIMITED_COSTS, canonical, digest, execute, sha_file,
-    contained, verify_owner,
+    contained, verify_owner, native_receipt_check,
 )
 
 LANE_SCHEMA = "aql.integration.h2.official-binance-archive-intake.v1"
@@ -311,6 +311,12 @@ def run_public_batch(evidence_dir, output_dir, *, fetcher=fetch_official,
         # Reuse existing operator/queries and private source fingerprint
         # WITHOUT requiring historical third-party custodian-HMAC fiction.
         scope = build_scope(tech, root, output_dir)
+        # Verify a real retained Core245 parent BEFORE reserving the only
+        # source run. The bounded Core253 parent is independently recomputed
+        # by the unchanged original operator after all permission gates.
+        native = json.loads((root/"core245-native-receipt.json").read_text("utf-8"))
+        details["preflight_native_core245_sha256"] = native_receipt_check(
+            scope, native)
         fail(not contained(owner_key, tech["warehouse_root"])
              and not contained(owner_key, tech["vault_root"])
              and not contained(owner_key, git_repo)
