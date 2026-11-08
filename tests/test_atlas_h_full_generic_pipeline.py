@@ -5,10 +5,13 @@ fixture (not a real warehouse); Factory/Scientific Lab/Secretary are unmocked.
 """
 from __future__ import annotations
 import tempfile
+import json
+import sqlite3
 import unittest
 from pathlib import Path
 from research_wp_r0.aql_factory_e_research_results_store_v1 import migrate_store_v2
 from research_wp_r0.aql_factory_h_generic_signal_adapter_v1 import run_factory_h_generic_research
+from research_wp_r0.aql_factory_h_research_package_v1 import TABLE
 from tools.atlas_h_generic_secretary_bridge import deliver_generic_research_wait
 from research_wp_r0.aql_core_h_research_secretary_v1 import read_generic_research_result_route
 from test_aql_factory_h_generic_signal_adapter_v1 import case_for
@@ -33,7 +36,12 @@ class FullGenericH(unittest.TestCase):
                     self.assertEqual(second["store_status"],"REPLAY_IDENTICAL")
                     self.assertEqual(first["package_sha256"],second["package_sha256"])
                     # Factory returns the immutable nested package as part of result.
-                    package=first["factory_h_package"]
+                    with sqlite3.connect(db) as con:
+                        stored=con.execute(
+                            f"SELECT document FROM {TABLE} WHERE experiment_id=?",
+                            (packet["experiment_id"],)).fetchone()
+                    self.assertIsNotNone(stored)
+                    package=json.loads(stored[0])
                     result=deliver_generic_research_wait(
                         secretary_root=root,packet=packet,
                         factory_package=package,factory_result=first)
