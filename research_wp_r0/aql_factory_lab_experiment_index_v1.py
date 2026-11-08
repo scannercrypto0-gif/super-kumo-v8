@@ -147,6 +147,12 @@ def _table(con):
     )""")
 
 
+def _index_required(con):
+    require(con.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        (TABLE_INDEX,)).fetchone() is not None,"INDEX_NOT_INITIALIZED")
+
+
 def _existing(con,experiment_id):
     row=con.execute(f"SELECT link_sha256,link_json,status FROM {TABLE_INDEX} "
                     "WHERE experiment_id=?",(experiment_id,)).fetchone()
@@ -178,21 +184,48 @@ def _validate_link(con,link):
             and link["holdout"]=="SEALED_UNOPENED"
             and link["trading_authority"]=="NONE","LINK_SCOPE")
     package=_load_package(con,link["experiment_id"])
-    require(package["sha256"]==link["package_sha256"]
-            and package["input_sha256"]==link["input_sha256"]
-            and package["trade_event_ledger"]["source_query_sha256"]==
-                link["source_query_sha256"]
-            and package["trade_event_ledger"]["source_bytes_sha256"]==
-                link["source_bytes_sha256"]
-            and package["factory_report"]["result_sha256"]==
-                link["result_sha256"]
-            and package["scientific_lab"]["sha256"]==link["lab_sha256"]
-            and package["factory_report"]["cost_policy_sha256"]==
-                link["cost_policy_sha256"]
-            and package["factory_report"]["decision_cutoff_ms"]==
-                link["decision_cutoff_ms"],"H_PARENT_DRIFT")
+    report=verified(package["factory_report"])
     led=verified(package["trade_event_ledger"])
     lab=verified(package["scientific_lab"])
+    review=verified(package["secretary_research_receipt"])
+    require(package["sha256"]==link["package_sha256"]
+            and package["input_sha256"]==link["input_sha256"]
+            and report["input_sha256"]==link["input_sha256"]
+            and review["experiment_input_sha256"]==link["input_sha256"]
+            and led["source_query_sha256"]==report["source_query_sha256"]==
+                review["source_query_sha256"]==link["source_query_sha256"]
+            and led["source_bytes_sha256"]==report["source_bytes_sha256"]==
+                review["source_bytes_sha256"]==link["source_bytes_sha256"]
+            and review["manifest_integrity_sha256"]==
+                link["manifest_integrity_sha256"]
+            and report["strategy_definition_sha256"]==
+                review["strategy_definition_sha256"]==
+                led["strategy_digest"]==link["strategy_definition_sha256"]
+            and review["strategy_plugin_sha256"]==
+                led["scanner_plugin_sha256"]==
+                link["strategy_plugin_sha256"]
+            and report["config_sha256"]==review["config_sha256"]==
+                led["config_sha256"]==link["config_sha256"]
+            and led["scanner_policy_sha256"]==
+                review["scanner_signal_policy_sha256"]==
+                link["scanner_policy_sha256"]
+            and review["scanner_evaluator_code_sha256"]==
+                link["scanner_evaluator_code_sha256"]
+            and report["factory_code_sha256"]==
+                review["factory_code_sha256"]==
+                led["code_sha256"]==link["factory_code_sha256"]
+            and report["cost_policy_sha256"]==
+                review["cost_policy_sha256"]==
+                led["policy_sha256"]==link["cost_policy_sha256"]
+            and report["decision_cutoff_ms"]==
+                review["decision_cutoff_ms"]==link["decision_cutoff_ms"]
+            and report["result_sha256"]==review["result_sha256"]==
+                link["result_sha256"]
+            and report["lab_sha256"]==review["lab_sha256"]==
+                lab["sha256"]==link["lab_sha256"]
+            and lab["ledger_sha256"]==led["sha256"]
+            and review["ledger_sha256"]==led["sha256"],
+            "H_PARENT_DRIFT")
     require(led["cohort"]["coverage"]==link["coverage"]
             and led["cohort"]["expected_bars"]==link["expected_bars"]
             and led["cohort"]["observed_bars"]==link["observed_bars"]
@@ -245,7 +278,7 @@ def finalize_experiment_link(path,secretary_root,experiment_id):
     con=_con(p)
     try:
         con.execute("BEGIN IMMEDIATE")
-        _table(con)
+        _index_required(con)
         old=_existing(con,experiment_id)
         require(old is not None,"JOIN_NOT_PREPARED")
         link,status=old
@@ -278,7 +311,7 @@ def get_experiment_link(path,experiment_id,*,secretary_root=None):
     p=_db(path)
     con=_con(p)
     try:
-        _table(con)
+        _index_required(con)
         old=_existing(con,experiment_id)
         require(old is not None,"JOIN_NOT_FOUND")
         link,status=old
@@ -305,7 +338,7 @@ def list_experiment_links(path,*,secretary_root=None):
     p=_db(path)
     con=_con(p)
     try:
-        _table(con)
+        _index_required(con)
         ids=[x[0] for x in con.execute(
             f"SELECT experiment_id FROM {TABLE_INDEX} ORDER BY experiment_id"
         ).fetchall()]
