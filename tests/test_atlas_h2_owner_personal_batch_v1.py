@@ -72,7 +72,7 @@ class OwnerPersonalBatchSynthetic(unittest.TestCase):
             json.dumps({"definition":definition,"digest":ast_sha}))
         self.tech={
             "schema":LANE_SCHEMA,
-            "owner_authorization_ref":"#205/6718325330",
+            "owner_authorization_ref":"#271/6720832849",
             "one_time_scope_authorized":True,
             "warehouse_root":str(self.warehouse),
             "vault_root":str(self.vault),
@@ -114,6 +114,7 @@ class OwnerPersonalBatchSynthetic(unittest.TestCase):
             "evaluator_code_sha256":"f"*64,
             "cost_policy_sha256":_digest(self.policy),
             "experiment_id":self.tech["experiment_id"],
+            "one_use_nonce":"0123456789abcdef0123456789abcdef",
             "owner_authorization_ref":scope_commitment(
                 self.tech,self.output),
             "research_class":"RETROSPECTIVE_NON_PIT",
