@@ -11,7 +11,7 @@ $ErrorActionPreference = 'Stop'
 $repoUrl='https://github.com/scannercrypto0-gif/super-kumo-v8.git'
 $personal='4098cdde2c1f389e1c3b5821a156bd4acbd39534'
 $readiness='885904a5e1df06bee1e32152a43f0fda4d0a4188'
-$diagnostic='76479babaf1b05ee5ee4bc918a429d1c301e0d76'
+$diagnostic='19280b184c55ceed16fd10989887975b9e988fed'
 $pins=@(
   '43a3bf3196649c46aed54872f958c323e4ae4913',
   '99c27ea2c1a4d41aaae361141301a8a9ea3b33c3',
