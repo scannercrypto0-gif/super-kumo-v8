@@ -64,7 +64,7 @@ jobs:
       - name: Reproduce exact pinned owner R2 source overlay module imports (NO ORIGINAL)
         shell: bash
         run: |
-          python tools/atlas_h2_owner_overlay_smoke_v2.py --repo . --code-commit 08ffea09c72fffe2fada15a31164cf20dd41f354
+          python tools/atlas_h2_owner_overlay_smoke_v2.py --repo . --code-commit 6adb698e7f56748d212d62723cfd099c9d78b6e0
 
       - name: Windows PowerShell launcher parse and no-manifest denial
         if: runner.os == 'Windows'
