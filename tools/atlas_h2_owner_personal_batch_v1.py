@@ -46,10 +46,25 @@ def _load_intake(folder):
     fail(root.is_dir() and not root.is_symlink(), "PERSONAL_EVIDENCE_ROOT_INVALID")
     missing = sorted(x for x in REQUIRED if not (root / x).is_file())
     fail(not missing, "MISSING_OWNER_PERSONAL_EVIDENCE:" + ",".join(missing))
+    # Actual Core245 March receipt embeds 2,976 verified OHLCV rows with
+    # price, volume, availability and per-row checksum, unlike the three small
+    # owner policy/AST files. Do not weaken their 250 KB cap. Cap the native
+    # price receipt at 4 MiB: comfortably above a complete March projection
+    # (~1 MiB), but still bounded to avoid untrusted huge JSON / resource DoS.
+    # Never follow symlinks or Windows reparse points.
     for filename in REQUIRED:
         file = root / filename
-        fail(not file.is_symlink() and file.stat().st_size <= 250_000,
-             "PERSONAL_EVIDENCE_FILE_UNSAFE")
+        try:
+            stat = file.lstat()
+            unsafe_link = file.is_symlink() or bool(
+                getattr(stat, "st_file_attributes", 0) & 0x400
+            )
+            maximum = (4 * 1024 * 1024 if
+                       filename == "core245-native-receipt.json" else 250_000)
+            fail(not unsafe_link and 0 < stat.st_size <= maximum,
+                 "PERSONAL_EVIDENCE_FILE_UNSAFE")
+        except (OSError, ValueError):
+            raise Blocked("PERSONAL_EVIDENCE_FILE_UNSAFE") from None
     try:
         tech = json.loads((root / "technical-intake.json").read_text("utf-8"))
         packet = json.loads((root / "owner-personal-assertion.json").read_text("utf-8"))
