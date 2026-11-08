@@ -161,7 +161,13 @@ def boundaries(scope, key_path, git_repo):
 
 
 def fingerprint(root):
-    """Hash source tree content; no source writes. Reject uncheckpointed WAL."""
+    """Hash durable source bytes, never treat idle SQLite SHM as a WAL.
+
+    SQLite SHM is lock/cache state, not committed market rows. Its content
+    can change during a *read-only* WAL-aware backup. Record its existence and
+    size; independently reject any nonempty WAL or rollback journal. The
+    database and all durable source files must remain byte-identical.
+    """
     root = Path(root)
     rows = []
     for p in sorted(root.rglob("*")):
@@ -169,11 +175,63 @@ def fingerprint(root):
         if p.is_dir():
             continue
         check(p.is_file(), "SOURCE_SPECIAL_FILE")
-        check(not p.name.endswith(("-wal", "-shm", "-journal")),
-              "SOURCE_PENDING_SQLITE_JOURNAL")
-        rows.append((str(p.relative_to(root)).replace("\\", "/"),
-                     p.stat().st_size, sha_file(p)))
+        name = p.name.lower()
+        relative = str(p.relative_to(root)).replace("\\", "/")
+        if name.endswith((".sqlite-wal", ".db-wal")):
+            check(p.stat().st_size == 0,
+                  "SOURCE_NONEMPTY_WAL_REQUIRES_OFFLINE_STABLE_SNAPSHOT")
+            rows.append((relative, "EMPTY_WAL", 0))
+            continue
+        if name.endswith((".sqlite-shm", ".db-shm")):
+            # Do not read/modify/delete SHM. It can carry transient reader
+            # lock state without being an uncheckpointed data journal.
+            rows.append((relative, "SQLITE_SHM_PRESENT", p.stat().st_size))
+            continue
+        check(not name.endswith(("-wal", "-shm", "-journal")),
+              "SOURCE_UNRECOGNIZED_SQLITE_SIDECAR")
+        rows.append((relative, p.stat().st_size, sha_file(p)))
     return digest(rows)
+
+
+def verified_local_sqlite_snapshot(warehouse, workspace):
+    """Read-only WAL-aware SQLite backup into isolated private scratch space.
+
+    Never use immutable=1 against original live SQLite. Core's immutable
+    query runs ONLY against the completed local backup and copied stage.
+    """
+    root = Path(warehouse)
+    src = root / "warehouse.sqlite"
+    check(src.is_file() and not src.is_symlink(),
+          "SOURCE_WAREHOUSE_DB_MISSING")
+    snapshot = Path(workspace) / "_private_warehouse_snapshot"
+    check(not snapshot.exists(), "SNAPSHOT_ALREADY_EXISTS")
+    snapshot.mkdir()
+    copied = snapshot / "warehouse.sqlite"
+    source_con = None
+    dest_con = None
+    try:
+        source_con = sqlite3.connect(src.as_uri() + "?mode=ro", uri=True,
+                                     timeout=3)
+        source_con.execute("PRAGMA query_only=ON")
+        dest_con = sqlite3.connect(copied)
+        source_con.backup(dest_con)
+        check(dest_con.execute("PRAGMA quick_check").fetchone()[0] == "ok",
+              "SNAPSHOT_SQLITE_QUICK_CHECK_FAILED")
+    except sqlite3.Error:
+        raise Stop("SOURCE_READONLY_SNAPSHOT_UNAVAILABLE_CLOSE_WRITERS_AND_RETRY") from None
+    finally:
+        if dest_con is not None:
+            dest_con.close()
+        if source_con is not None:
+            source_con.close()
+    stage = root / "stage"
+    check(stage.is_dir() and not stage.is_symlink(),
+          "SOURCE_STAGE_MISSING")
+    # Private local copy; no upload and no hard links back to original.
+    shutil.copytree(stage, snapshot / "stage", symlinks=False)
+    check(not (snapshot / "warehouse.sqlite-wal").exists(),
+          "SNAPSHOT_HAS_UNEXPECTED_WAL")
+    return snapshot
 
 
 def git_commit(repo, sha):
@@ -469,6 +527,14 @@ def execute(manifest, *, key_file=None, repo=None, allow_local_run=False):
             )
             pre = [fingerprint(r) for r in roots]
             try:
+                # Snapshot is created only AFTER permission, code pins and
+                # source sidecar checks. No implicit mutable original read.
+                snapshot_root = verified_local_sqlite_snapshot(
+                    scope["warehouse_root"], overlay)
+                snap_scope = dict(scope)
+                snap_scope["warehouse_root"] = str(snapshot_root)
+                manifest_file.write_text(
+                    json.dumps(snap_scope), encoding="utf-8")
                 job = subprocess.run(
                     [sys.executable, "-I", "-c", worker, str(overlay)],
                     cwd=overlay, capture_output=True, text=True,
