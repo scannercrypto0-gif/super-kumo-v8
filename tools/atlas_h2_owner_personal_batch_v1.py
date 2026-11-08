@@ -36,6 +36,9 @@ REQUIRED = frozenset((
     "core245-native-receipt.json", "manual-third-ast.json",
 ))
 SCHEMA = "aql.integration.h2.owner-personal-batch.v1"
+from tools.atlas_h2_owner_identity_v2 import (
+    ENVELOPE_SCHEMA, inspect_forward_owner_assertion,
+)
 
 
 def _load_intake(folder):
@@ -69,7 +72,7 @@ def _load_intake(folder):
     return tech, packet, root
 
 
-def scope_commitment(tech, output_root):
+def scope_commitment(tech, output_root, *, identity_binding=None):
     """Only a pre-approved owner MAC binding concrete root+full tech+pins works."""
     output = str(Path(output_root).absolute())
     return "OWNER_PERSONAL_EXACT_INTAKE_SHA256:" + _digest({
@@ -77,6 +80,8 @@ def scope_commitment(tech, output_root):
         "output_root": output,
         "frozen_role_pins": PINS,
         "research_authority": AUTHORITY,
+        **({"forward_identity_binding_sha256":identity_binding}
+           if identity_binding is not None else {}),
     })
 
 
@@ -94,15 +99,32 @@ def run_owner_personal_batch(evidence_dir, output_dir, *,
         tech,packet,root=_load_intake(evidence_dir)
         fail(owner_key is not None, "OWNER_EXISTING_SIGNING_KEY_REQUIRED")
         try:
-            signed=inspect_owner_assertion(
-                packet,trusted_owner_verifier_key=owner_key)
-        except (AuthorityBlocked, OSError, ValueError):
+            if type(packet) is dict and packet.get("schema") == ENVELOPE_SCHEMA:
+                registry=Path(owner_key).parent/"owner-revocations.json"
+                fail(registry.is_file() and not registry.is_symlink(),
+                     "OWNER_V2_REVOCATION_REGISTRY_NOT_FOUND")
+                revocations=json.loads(registry.read_text("utf-8"))
+                signed=inspect_forward_owner_assertion(
+                    packet,owner_key_file=owner_key,
+                    revocation_registry=revocations)
+                assertion=packet["assertion"]
+                binding=signed["identity_binding_sha256"]
+            else:
+                # Legacy v1 stays strictly fail closed with its existing
+                # already-provisioned key; NEVER reclassify it as new v2.
+                signed=inspect_owner_assertion(
+                    packet,trusted_owner_verifier_key=owner_key)
+                assertion=packet
+                binding=None
+        except Blocked:
+            raise
+        except (AuthorityBlocked, OSError, ValueError, KeyError, TypeError):
             raise Blocked("OWNER_PERSONAL_SCOPE_OR_COST_MAC_UNVERIFIED") from None
         assert signed["original_h2_execution_permitted"] is False
-        scope=packet["scope"]
-        policy=packet["cost_policy"]
+        scope=assertion["scope"]
+        policy=assertion["cost_policy"]
         fail(scope["owner_authorization_ref"] ==
-             scope_commitment(tech,output_dir),
+             scope_commitment(tech,output_dir,identity_binding=binding),
              "OWNER_PERSONAL_TECH_ROOT_OR_PIN_DRIFT")
         fail(scope["source_bytes_sha256"] == tech["source_bytes_sha256"]
              and scope["manifest_integrity_sha256"] ==
