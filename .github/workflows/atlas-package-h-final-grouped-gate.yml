@@ -61,7 +61,7 @@ jobs:
                   copyfile(source,target)
           for item in (Path('_factory_h')/'tests').glob('test_aql_factory_h_generic_signal_adapter_v1.py'):
               copyfile(item,Path('tests')/item.name)
-          for item in (Path('_core_h')/'tests').glob('test_aql_core_h_generic_research_secretary_v1.py'):
+          for item in (Path('_core_h')/'tests').glob('test_aql_core_h*research_secretary_v1.py'):
               copyfile(item,Path('tests')/item.name)
           for item in (Path('_scanner_h')/'tools/scanner_strategy_f').glob('test_research_strategy_plugin.py'):
               target=Path('tools/scanner_strategy_f')/item.name
