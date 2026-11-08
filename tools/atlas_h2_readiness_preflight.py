@@ -20,7 +20,7 @@ REQUIRED=("integration","core","scanner","factory","work235")
 EXPECTED={
     "core":"99c27ea2c1a4d41aaae361141301a8a9ea3b33c3",
     "scanner":"3c82448702c9ae35783716e4e2c3b640010db97c",
-    "factory":"52504ad59d75976ce45fb8f75c1b278c3d1b0975",
+    "factory":"a4b887fe7067b89febc339e466652a5fcb1c2bee",
     "work235":"6acbcc7fc243b132f58170df4c6469bbf7f4eff8",
 }
 REQUEST_FIELDS={"schema","exact_heads","bounded_request","owner_permission",
