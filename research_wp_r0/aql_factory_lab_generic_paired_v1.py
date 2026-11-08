@@ -41,7 +41,8 @@ def _sealed(x):
 def build_generic_paired_lab(*,store_path,secretary_root,experiment_id,
                              packet,package,base_result,
                              observation_windows,comparison_definition_sha256,
-                             protocol_sha256,embargo_ms=259200000):
+                             protocol_sha256,evaluation_asof_ms,
+                             embargo_ms=259200000):
     """Use real Generic H ledger, deterministic paired IDs, *actual* P2 Lab.
 
     `observation_windows` is a list with exact horizon/decision market
@@ -88,12 +89,14 @@ def build_generic_paired_lab(*,store_path,secretary_root,experiment_id,
     query=packet["core_query"]
     source_start=query["start_ms"]
     train_end=query["end_exclusive_ms"]
-    eval_asof=query["decision_cutoff_ms"]
+    eval_asof=evaluation_asof_ms
     need(query["source_bytes_sha256"]==link["source_bytes_sha256"] and
          query["query_sha256"]==link["source_query_sha256"] and
          type(train_end) is int and train_end>source_start and
-         eval_asof>=train_end and
-         eval_asof==link["decision_cutoff_ms"],
+         type(eval_asof) is int and
+         eval_asof>query["decision_cutoff_ms"] and
+         eval_asof<train_end+embargo_ms and
+         eval_asof>=train_end,
          "SOURCE_CUTOFF")
     # Research windows require a later, *explicitly observed* as-of time;
     # no implicit immediate horizon results at the signal cutoff.
@@ -122,8 +125,7 @@ def build_generic_paired_lab(*,store_path,secretary_root,experiment_id,
              "WINDOW_IDENTITY")
         due=w["bar_open_ms"]+(w["horizon_hours"]*HOUR)
         need(w["observed_at_ms"]>=due and
-             w["observed_at_ms"]>=query["decision_cutoff_ms"] and
-             w["observed_at_ms"]<eval_asof and
+             w["observed_at_ms"]<=eval_asof and
              w["availability"] in ("COMPLETE","CENSORED","UNKNOWN") and
              (w["availability"]=="COMPLETE" or
               w["market_metrics"] is None) and
@@ -131,9 +133,8 @@ def build_generic_paired_lab(*,store_path,secretary_root,experiment_id,
               type(w["market_metrics"]) is dict),
              "WINDOW_FUTURE_OR_NOT_OBSERVED")
         windows[key]=w
-    # The retrospective research evaluation asof must be a separately
-    # explicitly supplied later timestamp; never infer it from initial
-    # decision_cutoff and pretend future observations were already available.
+    # The retrospective research evaluation asof is independent of initial
+    # signal cutoff; later outcomes are not eligible before this timestamp.
     need(len(windows)==len(observation_windows),"WINDOW_DUPLICATION")
     source_package_sha=digest({
         "source_query_sha256":link["source_query_sha256"],
