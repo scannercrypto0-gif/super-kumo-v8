@@ -240,6 +240,15 @@ def native_receipt_check(scope, receipt):
           receipt.get("available_bar_count")
           and receipt.get("missing_bar_opens") == [],
           "CORE245_NATIVE_PARENT_MISMATCH")
+    # A retained receipt from a different month, or from a sparse
+    # same-count window, cannot be reused as this source's dual-query pin.
+    starts = list(range(scope["start_ms"], scope["end_exclusive_ms"], STEP))
+    check(receipt["required_bar_count"] == len(starts)
+          and [x.get("bar_open_ms") for x in receipt.get("bars", [])] ==
+          starts
+          and all(x.get("bar_close_ms") == t + STEP - 1
+                  for t, x in zip(starts, receipt.get("bars", []))),
+          "CORE245_NATIVE_WINDOW_MISMATCH")
     return seal
 
 
@@ -274,7 +283,11 @@ def run_authorized(scope, overlay):
           and query["source_bytes_sha256"] == scope["source_bytes_sha256"]
           and query["manifest_integrity_sha256"] ==
           scope["manifest_integrity_sha256"]
-          and query["query_sha256"] != native_sha,
+          and query["query_sha256"] != native_sha
+          and query["historical_pit"] == "NOT_ATTESTED"
+          and query["decision_cutoff_ms"] == scope["decision_cutoff_ms"]
+          and query["dataset_id"] == scope["dataset_id"]
+          and query["version"] == scope["version"],
           "CORE253_COVERAGE_OR_QUERY_SHA")
     definition = json.loads(Path(scope["strategy_definition_file"]).read_text("utf-8"))
     strategy = StrategyDefinition.from_dict(
