@@ -47,7 +47,8 @@ def check(repo):
         subprocess.run(["git","-C",str(clone),"remote","add","origin",
                         "https://github.com/scannercrypto0-gif/super-kumo-v8.git"],
                        check=True)
-        for sha in (*ROLE_PINS,PERSONAL,READINESS):
+        for sha in (*ROLE_PINS,PERSONAL,READINESS,
+                    "fc37da13b1b72bfb4b629be7b0f1b36fdd223bcd"):
             subprocess.run(["git","-C",str(clone),"fetch","-q","--no-tags",
                             "origin",sha],check=True)
         for filename,tag,args in (
@@ -55,6 +56,9 @@ def check(repo):
              (str(clone),None,PERSONAL)),
             ("tools/atlas_h2_owner_readiness_bundle_v2.ps1","stageScript",
              (str(clone),None,PERSONAL,READINESS)),
+            ("tools/atlas_h2_owner_diagnose_all_bundle_v2.ps1","stageScript",
+             (str(clone),None,PERSONAL,READINESS,
+              "fc37da13b1b72bfb4b629be7b0f1b36fdd223bcd")),
         ):
             source=(repo/filename).read_text("utf-8")
             match=re.search(
@@ -62,7 +66,7 @@ def check(repo):
                 source,re.DOTALL)
             if not match:
                 raise AssertionError("EXACT_WINDOWS_STAGER_NOT_FOUND:"+tag)
-            stage=base/(tag+"-isolated")
+            stage=base/(pathlib.Path(filename).stem+"-isolated")
             stage.mkdir()
             # The Windows execution script's bootstrap has already staged
             # operator & policies, as verified by its pinned bootstrap tests.
@@ -74,6 +78,12 @@ def check(repo):
             subprocess.run(
                 [sys.executable,"-I","-c",IMPORT_TEST,str(stage)],
                 check=True)
+            if "diagnose_all_bundle" in filename:
+                subprocess.run([sys.executable,"-I","-c",
+                    "import sys;sys.path.insert(0,sys.argv[1]);"
+                    "from tools.atlas_h2_owner_diagnose_all_v2 import diagnose;"
+                    "print('MULTIFINDING_DIAGNOSTIC_PINNED_IMPORT_PASS')",
+                    str(stage)],check=True)
             if tag=="stageScript":
                 subprocess.run([sys.executable,"-I","-c",
                     "import sys;sys.path.insert(0,sys.argv[1]);"
