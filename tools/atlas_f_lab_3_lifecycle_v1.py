@@ -156,7 +156,7 @@ def _stored_package(db,experiment_id):
     return package
 
 def run_synthetic(*,packet,store_path,secretary_root,checkpoint_root,
-                  stop_after=None):
+                  stop_after=None,on_durable_stage=None):
     """Actual Factory H + Factory Lab + Core Secretary, no mocked stage APIs.
 
     Re-execution uses immutable Factory replay and Secretary/index idempotence.
@@ -190,6 +190,8 @@ def run_synthetic(*,packet,store_path,secretary_root,checkpoint_root,
                        "RESUMED_STAGE_RECEIPT_CONFLICT")
             return saved
         receipt=_advance(path,run_id,eid,state,refs or {})
+        if on_durable_stage is not None:
+            on_durable_stage(state,receipt)
         if state==stop_after:
             raise LifecycleStop("F_LAB_3_SIMULATED_CRASH_AT_"+state)
         return receipt
