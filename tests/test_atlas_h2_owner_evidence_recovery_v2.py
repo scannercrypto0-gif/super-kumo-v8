@@ -71,6 +71,9 @@ class OwnerRecoverySafeSynthetic(unittest.TestCase):
 
     def _do(self,*,confirm=True,publisher=None):
         with patch(
+            "tools.atlas_h2_owner_evidence_recovery_v2.verify_public_month",
+            side_effect=lambda *a, **kw: (publisher or self._pub)()
+        ), patch(
             "tools.atlas_h2_owner_evidence_recovery_v2._bounded_warehouse",
             return_value=self.warehouse
         ), patch(
@@ -138,6 +141,9 @@ class OwnerRecoverySafeSynthetic(unittest.TestCase):
 
     def test_no_authentic_original_bridge_parent_returns_single_stop(self):
         with patch(
+            "tools.atlas_h2_owner_evidence_recovery_v2.verify_public_month",
+            side_effect=lambda *a,**kw: self._pub()
+        ), patch(
             "tools.atlas_h2_owner_evidence_recovery_v2._bounded_warehouse",
             side_effect=RecoveryBlocked(
                 "MISSING_OR_AMBIGUOUS_ORIGINAL_WAREHOUSE_SQLITE")
