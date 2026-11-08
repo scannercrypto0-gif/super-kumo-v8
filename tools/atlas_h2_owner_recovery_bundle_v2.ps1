@@ -24,7 +24,7 @@ if (-not (Test-Path -LiteralPath $repo -PathType Container) -or
   throw 'OWNER_EXPECTED_LOCAL_REPO_OR_ORIGINAL_ZIP_MISSING'
 }
 # Verify that the owner has actually synchronized this exact signed source.
-$expectedCode='08ffea09c72fffe2fada15a31164cf20dd41f354'
+$expectedCode='6adb698e7f56748d212d62723cfd099c9d78b6e0'
 & $Git -C $repo cat-file -e ($expectedCode + '^{commit}') 2>$null
 if ($LASTEXITCODE -ne 0) { throw 'OWNER_LOCAL_GIT_EXACT_CODE_NOT_FETCHED' }
 $localHead=(& $Git -C $repo rev-parse HEAD)
@@ -122,12 +122,20 @@ for path in (
     'tools/atlas_h2_owner_local_one_shot_v1.py',
     'tools/atlas_h2_historical_policy_v2.py',
     'tools/atlas_h2_private_batch_bootstrap_v1.py',
+    'tools/atlas_h2_scanner_import_seam_v2.py',
 ):
     res=subprocess.run(['git','-C',str(repo),'show',head+':'+path],
                        stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True)
     dest=stage/path
     dest.parent.mkdir(parents=True,exist_ok=True)
     dest.write_bytes(res.stdout)
+# Same immutable Scanner source code; only isolated scratch import timing
+# adapts the unused F3 diagnostic policy dependency. SHA evidence is printed.
+sys.path.insert(0,str(stage))
+from tools.atlas_h2_scanner_import_seam_v2 import apply_import_seam
+seam=apply_import_seam(stage)
+print('PINNED_SCANNER_IMPORT_SEAM_VERIFIED',
+      *(row['isolated_seam_sha256'] for row in seam['changed_modules']))
 '@
   & $Python -I -c $prepare $clone $overlay $expectedCode
   if ($LASTEXITCODE -ne 0) { throw 'ISOLATED_PINNED_SOURCE_STAGE_FAILED' }
