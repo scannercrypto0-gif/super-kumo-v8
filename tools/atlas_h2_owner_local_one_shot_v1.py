@@ -32,6 +32,12 @@ PINS = {
 STEP = 900000
 ALLOWED = ("research_wp_r0/", "tools/", "src/")
 HEX = set("0123456789abcdef")
+OWNER_LIMITED_COSTS = {
+    "fee_entry_bps": "10", "fee_exit_bps": "10",
+    "spread_entry_bps": "2", "spread_exit_bps": "2",
+    "slippage_entry_bps": "3", "slippage_exit_bps": "3",
+    "funding_bps_per_bar": "0",
+}
 
 
 class Stop(ValueError):
@@ -105,8 +111,9 @@ def verify_owner(manifest, key_path):
         check(set(values) == set(KEYS)
               and all(v.is_finite() and v >= 0 for v in values.values())
               and values["funding_bps_per_bar"] == 0
-              and any(values[k] > 0 for k in KEYS
-                      if k != "funding_bps_per_bar"), "COSTS_INVALID")
+              and all(values[k] == Decimal(v)
+                      for k, v in OWNER_LIMITED_COSTS.items()),
+              "OWNER_ONE_RUN_COST_SCOPE_MISMATCH")
     except (InvalidOperation, ValueError):
         raise Stop("COSTS_INVALID") from None
     start, end, cutoff = (scope.get(k) for k in
