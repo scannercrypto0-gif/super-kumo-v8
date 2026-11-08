@@ -130,11 +130,19 @@ def inspect_private_intake(directory, trusted_key):
             and start % 900000 == 0 and end % 900000 == 0
             and end <= cutoff,
             "SIGNED_15M_BOUNDS_INVALID")
+    first = datetime.fromtimestamp(start / 1000, timezone.utc)
+    last = datetime.fromtimestamp((end-1) / 1000, timezone.utc)
+    next_month = (datetime(first.year + 1, 1, 1, tzinfo=timezone.utc)
+                  if first.month == 12 else
+                  datetime(first.year, first.month + 1, 1, tzinfo=timezone.utc))
     require(type(claim["month"]) is str
-            and datetime.fromtimestamp(start/1000, timezone.utc).strftime("%Y-%m")
-                == claim["month"]
-            and datetime.fromtimestamp((end-1)/1000, timezone.utc).strftime("%Y-%m")
-                == claim["month"], "SIGNED_MONTH_INVALID")
+            and first.strftime("%Y-%m") == claim["month"]
+            and last.strftime("%Y-%m") == claim["month"]
+            and first.day == 1 and first.hour == 0 and first.minute == 0
+            and first.second == 0 and first.microsecond == 0
+            and end == int(next_month.timestamp()*1000)
+            and cutoff == end,
+            "SIGNED_FULL_UTC_CALENDAR_MONTH_REQUIRED")
     require(type(claim["version"]) is int and claim["version"] > 0
             and type(claim["strategy_id"]) is str
             and claim["strategy_id"] not in ("", "f2")
