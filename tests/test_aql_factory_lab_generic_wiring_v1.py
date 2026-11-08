@@ -10,6 +10,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from research_wp_r0.aql_factory_e_research_results_store_v1 import (
     ResultsStoreError,digest,migrate_store_v2)
@@ -24,7 +25,9 @@ from research_wp_r0.aql_factory_lab_generic_paired_v1 import (
 from research_wp_r0.aql_core_h_research_secretary_v1 import (
     build_generic_research_result_route,route_generic_research_result,
     read_generic_research_result_route)
+import test_aql_factory_h_generic_signal_adapter_v1 as hfixture
 from test_aql_factory_h_generic_signal_adapter_v1 import case_for
+from tools.scanner_strategy_f.test_research_strategy_plugin import synthetic_query
 
 HORIZONS=(4,24,72)
 
@@ -38,12 +41,20 @@ class LabWiring(unittest.TestCase):
         migrate_store_v2(self.path)
 
     def run_one(self,i,*,missing=None,source=None,cost=None):
-        packet=case_for(i,missing=missing,extra_bps="1" if cost is None else cost)
-        if source is not None:
-            # Source-version variation MUST be read through actual Scanner
-            # validator, so change the original Core fixture before evaluation
-            # in dedicated cases rather than mutating a sealed Scanner batch.
-            pass
+        if source is None:
+            packet=case_for(i,missing=missing,extra_bps="1" if cost is None else cost)
+        else:
+            # Change source lineage *before* Scanner evaluates the query.
+            # Scanner and Factory then independently check the same receipt.
+            self.assertEqual(len(source),64)
+            query=synthetic_query(n=64,missing_index=missing)
+            query["source_bytes_sha256"]=source
+            query["manifest_integrity_sha256"]="d"*64
+            query["query_sha256"]=digest({
+                k:v for k,v in query.items() if k!="query_sha256"})
+            with patch.object(hfixture,"synthetic_query",return_value=query):
+                packet=case_for(
+                    i,missing=missing,extra_bps="1" if cost is None else cost)
         first=run_factory_h_generic_research(packet,self.path)
         again=run_factory_h_generic_research(packet,self.path)
         self.assertEqual(first["package_sha256"],again["package_sha256"])
@@ -102,7 +113,10 @@ class LabWiring(unittest.TestCase):
     def test_two_distinct_experiments_and_unknown_source_restart_join(self):
         values=[]
         for i,missing in ((0,None),(2,None),(1,4)):
-            packet,package,result,route,link=self.run_one(i,missing=missing)
+            packet,package,result,route,link=self.run_one(
+                i,missing=missing,
+                source="c"*64 if i==2 else None,
+                cost="2" if i==2 else None)
             values.append((packet,package,result,route,link))
             prepared=prepare_experiment_link(self.path,link)
             self.assertEqual(prepared["status"],"PREPARED")
@@ -137,6 +151,10 @@ class LabWiring(unittest.TestCase):
         self.assertEqual(len({x["link_sha256"] for x in discovered}),3)
         self.assertNotEqual(values[0][4]["strategy_definition_sha256"],
                             values[1][4]["strategy_definition_sha256"])
+        self.assertNotEqual(values[0][4]["source_bytes_sha256"],
+                            values[1][4]["source_bytes_sha256"])
+        self.assertNotEqual(values[0][4]["cost_policy_sha256"],
+                            values[1][4]["cost_policy_sha256"])
         self.assertEqual(values[2][4]["missing_bars"],1)
         self.assertEqual(values[2][4]["decision_counts"]["UNKNOWN"],64)
         self.assertEqual(values[2][4]["modeled_trades"],0)
@@ -207,6 +225,8 @@ class LabWiring(unittest.TestCase):
                 replay=build_generic_paired_lab(**kwargs)
                 self.assertEqual(report,replay)
                 self.assertEqual(report["trading_authority"],"NONE")
+                self.assertEqual(report["paired_disposition_counts"].get(
+                    "REJECTED",0),0) # EXIT != REJECTED synthetic opportunity
                 self.assertEqual(report["decision_counts"][
                     "NO_SIGNAL"],link["decision_counts"]["NO_SIGNAL"])
                 self.assertEqual(report["horizon_coverage"]["72"][
@@ -221,6 +241,41 @@ class LabWiring(unittest.TestCase):
                 self.assertEqual(read_generic_research_result_route(
                     self.secretary,packet["experiment_id"])["state"],
                     "WAIT_RESEARCH_REVIEW")
+
+    def test_source_gap_produces_unknown_paired_outcomes_not_fake_data(self):
+        packet,package,result,route,link=self.run_one(1,missing=4)
+        prepare_experiment_link(self.path,link)
+        route_generic_research_result(self.secretary,packet,package,result)
+        finalize_experiment_link(self.path,self.secretary,packet["experiment_id"])
+        windows,asof=self.windows(packet,package)
+        # For an incomplete Core253 source the Factory Generic H cohort is
+        # fully UNKNOWN; the paired evaluator must never report COMPLETE.
+        with self.assertRaisesRegex(
+                ResultsStoreError,"INCOMPLETE_SOURCE_NO_POSITIVE_OUTCOME"):
+            build_generic_paired_lab(
+                store_path=self.path,secretary_root=self.secretary,
+                experiment_id=packet["experiment_id"],packet=packet,
+                package=package,base_result=result,
+                observation_windows=windows,
+                comparison_definition_sha256="d"*64,
+                protocol_sha256="e"*64,evaluation_asof_ms=asof)
+        for w in windows:
+            w["availability"]="UNKNOWN"
+            w["availability_reason"]="SOURCE_GAP_NO_OUTCOME_ATTESTATION"
+            w["market_metrics"]=None
+        report=build_generic_paired_lab(
+            store_path=self.path,secretary_root=self.secretary,
+            experiment_id=packet["experiment_id"],packet=packet,
+            package=package,base_result=result,
+            observation_windows=windows,
+            comparison_definition_sha256="d"*64,
+            protocol_sha256="e"*64,evaluation_asof_ms=asof)
+        self.assertEqual(report["decision_counts"]["UNKNOWN"],64)
+        self.assertEqual(report["horizon_coverage"]["4"]["UNKNOWN"],64)
+        self.assertEqual(report["horizon_coverage"]["72"]["UNKNOWN"],64)
+        self.assertEqual(report["paired_disposition_counts"].get(
+            "TRIGGERED",0),0)
+        self.assertEqual(report["trading_authority"],"NONE")
 
     def test_future_source_cost_identity_and_missing_outcome_refused(self):
         packet,package,result,route,link=self.run_one(2)
