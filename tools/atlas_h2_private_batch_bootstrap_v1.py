@@ -208,7 +208,10 @@ def run_batch(directory, verifier_key, owner_key, output, git_repo,
         # it does not authenticate legal rights beyond the signed custodian intake.
         verify_owner(signed, owner_key)
         output_dir = Path(output)
-        claim_file = output_dir / "h2-single-use-claim.json"
+        # Reserve against the authenticated intake, not an arbitrary new
+        # output directory, so changing output cannot silently rerun the
+        # same one-time owner source-use authorization.
+        claim_file = intake_path / "h2-single-use-claim.json"
         require(not claim_file.exists(), "SINGLE_USE_ALREADY_CLAIMED")
         # Reserve one invocation even if downstream source gate fails.
         fd = os.open(claim_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -261,6 +264,12 @@ def main(argv=None):
     p.add_argument("--pinned-git-repo", required=True)
     p.add_argument("--confirm-one-run", action="store_true")
     args = p.parse_args(argv)
+    existing = Path(args.isolated_output_dir) / "h2-batch-summary.json"
+    if existing.exists():
+        print(json.dumps({"status": "BLOCKED",
+                          "reasons": ["BATCH_SUMMARY_ALREADY_EXISTS_NO_REPLAY"],
+                          "summary_filename": existing.name}, sort_keys=True))
+        return 2
     result = run_batch(
         args.private_evidence_dir, args.trusted_custodian_key,
         args.owner_signing_key, args.isolated_output_dir,
