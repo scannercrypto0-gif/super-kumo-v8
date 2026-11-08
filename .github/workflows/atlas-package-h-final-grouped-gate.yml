@@ -30,6 +30,12 @@ jobs:
         with: {ref: 3c82448702c9ae35783716e4e2c3b640010db97c, path: _scanner_h, persist-credentials: false}
       - uses: actions/checkout@v4
         with: {ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8, path: _work235, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 30c37ae56851488b882998c7fa0085ec51dbfc92, path: _scanner_b, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 1659713c80d1934f3c08af1af422b89cd5706360, path: _scanner_c, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: a2aa9c195095bcfe852fdc760e385ccb2acf3d5d, path: _scanner_e, persist-credentials: false}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -40,7 +46,7 @@ jobs:
           from shutil import copyfile
           # Factory owns causal fills/Lab and must override legacy Integration copies.
           # Core owns Secretary; Scanner owns signals; Work235 frozen fixture only.
-          for owner in ('_work235','_scanner_h','_factory_h','_core_h'):
+          for owner in ('_work235','_scanner_b','_scanner_c','_scanner_e','_scanner_h','_factory_h','_core_h'):
               for folder in ('research_wp_r0','tools','src'):
                   source=Path(owner)/folder
                   if not source.is_dir(): continue
