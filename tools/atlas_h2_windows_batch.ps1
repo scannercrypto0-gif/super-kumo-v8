@@ -18,7 +18,7 @@ $bootstrapCommit = 'aa0f21bfcbb07d36258c5dca552310bb36f452c8'
 $publicCommit = '5a976b8bf04f764b2822d49ff40cc5d60548494b'
 $operatorCommit = '9a4ed276913eac202e0c77778371c91dc482ff23'
 # Immutable owner-personal research-only route + early manual AST guard.
-$personalCommit = 'fc02cb07b212b68255a50d4ee65577f5ff4085b2'
+$personalCommit = '084f97c9f54ba5a37186073216aa1e303e256636'
 $required = @(
   $bootstrapCommit,
   $publicCommit,
