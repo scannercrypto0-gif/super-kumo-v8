@@ -187,15 +187,23 @@ def run_owner_personal_batch(evidence_dir, output_dir, *,
                 "owner_approval_mac":owner_mac}
         verify_owner(legacy,owner_key)
         claim=root/"h2-personal-one-use-claim.json"
-        fail(not claim.exists() and not claim.is_symlink(),
+        # Two independent local replay barriers. A copied EvidenceDir cannot
+        # silently reuse the same signed output-root commitment.
+        output_claim=out/"h2-personal-scope-claim.json"
+        fail(not claim.exists() and not claim.is_symlink()
+             and not output_claim.exists() and not output_claim.is_symlink(),
              "PERSONAL_ONE_RUN_ALREADY_CLAIMED")
+        lease={"schema":SCHEMA,"scope_sha256":_digest(scope),
+               "cost_sha256":_digest(policy),
+               "publisher_zip_sha256":proof["zip_bytes_sha256"],
+               "rights_status":"OWNER_ASSERTED_EXTERNAL_UNVERIFIED",
+               "state":"ONE_ATTEMPT_RESERVED_NO_AUTOREPLAY"}
+        fd=os.open(output_claim,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+        with os.fdopen(fd,"w",encoding="utf-8") as handle:
+            json.dump(lease,handle)
         fd=os.open(claim,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
         with os.fdopen(fd,"w",encoding="utf-8") as handle:
-            json.dump({"schema":SCHEMA,"scope_sha256":_digest(scope),
-                       "cost_sha256":_digest(policy),
-                       "publisher_zip_sha256":proof["zip_bytes_sha256"],
-                       "rights_status":"OWNER_ASSERTED_EXTERNAL_UNVERIFIED",
-                       "state":"ONE_ATTEMPT_RESERVED_NO_AUTOREPLAY"},handle)
+            json.dump(lease,handle)
         invoked=True
         result=operator(legacy,key_file=owner_key,repo=git_repo,
                         allow_local_run=True)
