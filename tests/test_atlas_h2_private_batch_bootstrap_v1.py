@@ -97,6 +97,15 @@ class PrivateBatch(unittest.TestCase):
         self.assertEqual(s["source_rights_attested"], True)
         self.assertNotIn("publisher_pit_claim",str(s))
 
+    def test_never_reserve_one_shot_inside_original_source(self):
+        self._genuine_intake()
+        claim, _, _ = inspect_private_intake(self.intake, self.verifier)
+        claim["warehouse_root"] = str(self.root)
+        with self.assertRaisesRegex(
+                Blocked, "PRIVATE_INTAKE_OVERLAPS_ORIGINAL_SOURCE"):
+            build_scope(claim, self.intake, self.output)
+        self.assertFalse((self.intake/"h2-single-use-claim.json").exists())
+
     def test_different_owner_key_required(self):
         self._genuine_intake()
         result = run_batch(self.intake, self.verifier, self.verifier,
