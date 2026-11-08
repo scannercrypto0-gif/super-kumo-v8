@@ -125,13 +125,16 @@ def build_generic_paired_lab(*,store_path,secretary_root,experiment_id,
              type(w["observed_at_ms"]) is int,
              "WINDOW_IDENTITY")
         due=w["bar_open_ms"]+(w["horizon_hours"]*HOUR)
-        need(w["observed_at_ms"]>=due and
+        need(w["observed_at_ms"]>=query["decision_cutoff_ms"] and
              w["observed_at_ms"]<=eval_asof and
              w["availability"] in ("COMPLETE","CENSORED","UNKNOWN") and
-             (w["availability"]=="COMPLETE" or
-              w["market_metrics"] is None) and
              (w["availability"]!="COMPLETE" or
-              type(w["market_metrics"]) is dict),
+              (w["observed_at_ms"]>=due and
+               type(w["market_metrics"]) is dict)) and
+             (w["availability"]=="COMPLETE" or
+              (w["market_metrics"] is None and
+               type(w["availability_reason"]) is str and
+               bool(w["availability_reason"]))),
              "WINDOW_FUTURE_OR_NOT_OBSERVED")
         windows[key]=w
     # The retrospective research evaluation asof is independent of initial
@@ -233,6 +236,7 @@ def build_generic_paired_lab(*,store_path,secretary_root,experiment_id,
         "paired_schedule_sha256":schedule["artifact_sha256"],
         "paired_lab_sha256":report["artifact_sha256"],
         "horizon_coverage":report["market_coverage_by_horizon"],
+        "observation_asof_ms":eval_asof,
         "observed_outcome_scope":"TEST_ONLY_DESCRIPTIVE_NO_ALPHA",
         "trading_authority":"NONE",
     }
