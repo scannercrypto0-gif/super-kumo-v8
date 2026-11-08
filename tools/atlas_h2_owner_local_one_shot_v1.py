@@ -168,12 +168,12 @@ def boundaries(scope, key_path, git_repo):
 
 
 def fingerprint(root):
-    """Hash durable source bytes, never treat idle SQLite SHM as a WAL.
+    """Hash durable source bytes; reject nonempty WAL or rollback journal.
 
-    SQLite SHM is lock/cache state, not committed market rows. Its content
-    can change during a *read-only* WAL-aware backup. Record its existence and
-    size; independently reject any nonempty WAL or rollback journal. The
-    database and all durable source files must remain byte-identical.
+    Idle SHM and empty WAL are volatile SQLite coordination sidecars. Their
+    presence/content is excluded from the fingerprint; actual source DB,
+    stage receipts and every durable source file are still hashed. A nonzero
+    WAL always blocks to avoid inconsistent immutable original reads.
     """
     root = Path(root)
     rows = []
@@ -187,12 +187,14 @@ def fingerprint(root):
         if name.endswith((".sqlite-wal", ".db-wal")):
             check(p.stat().st_size == 0,
                   "SOURCE_NONEMPTY_WAL_REQUIRES_OFFLINE_STABLE_SNAPSHOT")
-            rows.append((relative, "EMPTY_WAL", 0))
+            # Empty WAL files may appear/disappear when read-only clients
+            # connect. Durable database and stage bytes are hashed instead.
             continue
         if name.endswith((".sqlite-shm", ".db-shm")):
-            # Do not read/modify/delete SHM. It can carry transient reader
-            # lock state without being an uncheckpointed data journal.
-            rows.append((relative, "SQLITE_SHM_PRESENT", p.stat().st_size))
+            # SHM is transient lock/cache state, not committed market data.
+            # Its presence/size/content can change when SQLite opens the
+            # read-only connection. A nonempty WAL always blocks; original
+            # main DB and stage source bytes must remain identical.
             continue
         check(not name.endswith(("-wal", "-shm", "-journal")),
               "SOURCE_UNRECOGNIZED_SQLITE_SIDECAR")
