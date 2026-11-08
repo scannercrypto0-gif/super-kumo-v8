@@ -289,6 +289,11 @@ def prepare_owner_private_evidence(*,source_zip,private_root,output_root,
     candidate_vaults=[p for p in (private/"vault",private/"raw-vault",
                                    private/"RawVault",private/"raw_vault")
                       if p.is_dir() and not p.is_symlink()]
+    # On the owner-reported E:\\ATLAS\\private\\historical layout the
+    # *actual* ZIP parent is the fallback original vault/root, not a made-up
+    # directory. Never choose between multiple named independent vaults.
+    if not candidate_vaults and source.parent.is_dir():
+        candidate_vaults=[source.parent]
     need(len(candidate_vaults)==1,
          "ORIGINAL_VAULT_EXACT_PATH_NOT_UNAMBIGUOUS")
     vault=candidate_vaults[0]
