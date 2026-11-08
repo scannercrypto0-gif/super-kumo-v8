@@ -6,6 +6,7 @@ No source acquisition, rights decisions, broker, PIT promotion or external retry
 """
 from __future__ import annotations
 import json
+from contextlib import closing
 import os
 from pathlib import Path
 
@@ -144,7 +145,7 @@ def _advance(path,run_id,experiment_id,state,refs):
     return completed
 
 def _stored_package(db,experiment_id):
-    with sqlite3.connect(db) as con:
+    with closing(sqlite3.connect(db)) as con:
         row=con.execute(
             f"SELECT document,canonical_sha256,immutable FROM {TABLE} WHERE experiment_id=?",
             (experiment_id,)).fetchone()
