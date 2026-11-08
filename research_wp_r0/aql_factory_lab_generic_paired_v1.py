@@ -104,6 +104,7 @@ def build_generic_paired_lab(*,store_path,secretary_root,experiment_id,
          len(observation_windows)==len(events)*len(HORIZONS),
          "WINDOW_DENOMINATOR")
     windows={}
+    allowed_open_ms={e["bar_open_ms"] for e in events}
     for w in observation_windows:
         need(type(w) is dict and set(w)=={
             "bar_open_ms","horizon_hours","availability",
@@ -113,7 +114,7 @@ def build_generic_paired_lab(*,store_path,secretary_root,experiment_id,
             "cost_policy_sha256"},"WINDOW_SHAPE")
         key=(w["bar_open_ms"],w["horizon_hours"])
         need(key not in windows and w["bar_open_ms"] in
-             {e["bar_open_ms"] for e in events} and
+             allowed_open_ms and
              w["horizon_hours"] in HORIZONS and
              w["experiment_id"]==experiment_id and
              w["source_query_sha256"]==link["source_query_sha256"] and
