@@ -393,9 +393,31 @@ def execute(manifest, *, key_file=None, repo=None, allow_local_run=False):
         with tempfile.TemporaryDirectory(prefix="aql-h2-isolated-") as d:
             overlay = Path(d)
             code_sha = isolated_overlay(repo, overlay)
+            # Spawn a fresh isolated interpreter to prevent current process
+            # sys.modules / package path contamination from bypassing pins.
+            own = Path(__file__).resolve(strict=True)
+            staged_operator = overlay / "tools" / own.name
+            staged_operator.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(own, staged_operator)
+            code_sha = digest({"overlay": code_sha,
+                               "operator_sha256": sha_file(staged_operator)})
+            manifest_file = overlay / "_private_scope.json"
+            manifest_file.write_text(json.dumps(scope), encoding="utf-8")
+            worker = (
+                "import json,sys; from pathlib import Path; "
+                "root=Path(sys.argv[1]); sys.path.insert(0,str(root)); "
+                "from tools.atlas_h2_owner_local_one_shot_v1 import run_authorized; "
+                "scope=json.loads((root/'_private_scope.json').read_text()); "
+                "print(json.dumps(run_authorized(scope,root),sort_keys=True))"
+            )
             pre = [fingerprint(r) for r in roots]
             try:
-                detail = run_authorized(scope, overlay)
+                job = subprocess.run(
+                    [sys.executable, "-I", "-c", worker, str(overlay)],
+                    cwd=overlay, capture_output=True, text=True,
+                    check=False, timeout=3600)
+                check(job.returncode == 0, "ISOLATED_SOURCE_OR_E2E_FAILED")
+                detail = json.loads(job.stdout)
             finally:
                 post = [fingerprint(r) for r in roots]
             check(pre == post, "ORIGINAL_SOURCE_CHANGED_STOP")
