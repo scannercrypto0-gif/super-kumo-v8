@@ -13,7 +13,7 @@ ROLE_PINS=(
  "04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
  "6acbcc7fc243b132f58170df4c6469bbf7f4eff8",
 )
-PERSONAL="82c39963bea8f0a19b67efcfb4c0744dfb8f2d8e"
+PERSONAL="4098cdde2c1f389e1c3b5821a156bd4acbd39534"
 READINESS="885904a5e1df06bee1e32152a43f0fda4d0a4188"
 IMPORT_TEST=r"""
 import importlib,sys
