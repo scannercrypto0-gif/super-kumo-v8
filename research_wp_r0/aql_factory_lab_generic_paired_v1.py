@@ -91,11 +91,17 @@ def build_generic_paired_lab(*,store_path,secretary_root,experiment_id,
          "ORIGINAL_DECISION_CENSUS")
     query=packet["core_query"]
     source_start=query["start_ms"]
-    train_end=query["end_exclusive_ms"]
+    source_end=query["end_exclusive_ms"]
+    # Scanner final confirmed close decision can land at source_end, whereas
+    # the preexisting P2 protocol needs decision_ms < train_end_exclusive.
+    # The decision window is bounded to cutoff+1ms, not an extra price bar.
+    train_end=query["decision_cutoff_ms"]+1
     eval_asof=evaluation_asof_ms
     need(query["source_bytes_sha256"]==link["source_bytes_sha256"] and
          query["query_sha256"]==link["source_query_sha256"] and
-         type(train_end) is int and train_end>source_start and
+         type(source_end) is int and source_end>source_start and
+         type(query["decision_cutoff_ms"]) is int and
+         source_end<=query["decision_cutoff_ms"]<source_end+STEP and
          type(eval_asof) is int and
          eval_asof>query["decision_cutoff_ms"] and
          eval_asof<train_end+embargo_ms and
