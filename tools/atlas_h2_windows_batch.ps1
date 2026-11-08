@@ -15,7 +15,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $bootstrapCommit = 'aa0f21bfcbb07d36258c5dca552310bb36f452c8'
-$publicCommit = '247b803f8cf343e5c1108b22760d477ac0e9e45b'
+$publicCommit = '8ac8542ea19d9eb4589937bbf7859bfe722c9604'
 $operatorCommit = '9a4ed276913eac202e0c77778371c91dc482ff23'
 $required = @(
   $bootstrapCommit,
