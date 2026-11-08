@@ -91,7 +91,7 @@ class Lifecycle(unittest.TestCase):
         self.assertEqual(link["coverage"],"PARTIAL")
         self.assertEqual(link["decision_counts"]["UNKNOWN"],64)
         self.assertEqual(link["modeled_trades"],0)
-        with sqlite3.connect(self.store) as con:
+        with closing(sqlite3.connect(self.store)) as con:
             row=con.execute(f"SELECT document FROM {TABLE} WHERE experiment_id=?",
                             (packet["experiment_id"],)).fetchone()
         package=json.loads(row[0])
@@ -116,7 +116,7 @@ class Lifecycle(unittest.TestCase):
     def test_existing_paired_bridge_real_unmodified_and_missing_72h(self):
         packet=self.packet(2)
         self.drive(packet)
-        with sqlite3.connect(self.store) as con:
+        with closing(sqlite3.connect(self.store)) as con:
             package=json.loads(con.execute(
                 f"SELECT document FROM {TABLE} WHERE experiment_id=?",
                 (packet["experiment_id"],)).fetchone()[0])
