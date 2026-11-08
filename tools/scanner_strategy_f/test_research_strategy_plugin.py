@@ -5,6 +5,11 @@ import copy
 import json
 import unittest
 from unittest.mock import patch
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from io import BytesIO
+from zipfile import ZipFile, ZIP_DEFLATED
+import hashlib
 
 from research_wp_r0.aql_archive_custody_bridge_v1 import digest
 from research_wp_r0.indicator_library_v2 import IndicatorRegistryV2
@@ -301,6 +306,111 @@ class ResearchStrategyPlugin(unittest.TestCase):
             changed["signal_counts"][status]+=1
             with self.subTest(status=status),self.assertRaises(ValueError):
                 h.verify_factory_signal_batch(Frozen.build(changed).receipt())
+
+    def test_partial_cutoff_with_actual_disposable_core253_sqlite(self):
+        """Real Core253 admission/query/readback; no mocked source receipt."""
+        from research_wp_r0.aql_core_backbone_local_v1 import (
+            admit_local_original,query_local,BackboneError,
+        )
+        from research_wp_r0.aql_authenticated_historical_admission_v1 import PIN_SCHEMA
+        from research_wp_r0.aql_archive_custody_bridge_v1 import digest
+        start=1709251200000
+        step=900000
+        n=64
+        basename="BTCUSDT-15m-2024-03"
+        rows=[]
+        for i in range(n):
+            t=start+i*step
+            px=98.0+(i%17)*0.3
+            rows.append(",".join((
+                str(t),str(px),str(px+1),str(px-1),str(px),
+                str(float(i+1)),str(t+step-1),"505",str(2+i),
+                "2","202","0",
+            )))
+        csv=("\\n".join(rows)+"\\n").encode()
+        out=BytesIO()
+        with ZipFile(out,"w",compression=ZIP_DEFLATED) as z:
+            z.writestr(basename+".csv",csv)
+        raw=out.getvalue()
+        sha=hashlib.sha256(raw).hexdigest()
+        checksum=(sha+"  "+basename+".zip\\n").encode()
+        end=start+n*step
+        pin={
+            "schema":PIN_SCHEMA,"source_kind":"BINANCE_KLINES_ZIP",
+            "original_object_id":"TEST_SCANNER_PARTIAL_RAW_ZIP",
+            "original_sha256":sha,"provenance_reference":"SYNTHETIC_TEST_ONLY",
+            "captured_at_ms":end+10000,"claimed_available_at_ms":None,
+            "expected_inventory_sha256":None,"vault_object_metadata":None,
+            "universe_manifest_sha256":None,"universe_member_count":None,
+            "test_only":True,"archive_name":basename+".zip",
+            "csv_member_name":basename+".csv",
+            "csv_member_sha256":hashlib.sha256(csv).hexdigest(),
+            "checksum_file_sha256":hashlib.sha256(checksum).hexdigest(),
+        }
+        spec={
+            "dataset_id":"TEST-ONLY-H-BTC-15M","version":1,
+            "symbol":"BTCUSDT","interval":"15m","exchange":"BINANCE",
+            "market":"SPOT","source_label":"native-monthly-zip",
+            "start_ms":start,"end_exclusive_ms":end,"as_of_ms":end+5000,
+            "parent_source_sha256":None,"correction_reason":None,
+            "test_only":True,
+        }
+        with TemporaryDirectory(prefix="scanner-h-core253-only-") as tmp:
+            root=Path(tmp)
+            admit_local_original(
+                root,raw,checksum,pin,spec,decision_cutoff_ms=end+2000)
+            cutoff=start+step+2000
+            query=query_local(
+                root,spec["dataset_id"],1,start,end,cutoff,
+                required_source_sha256=sha,
+                require_complete=False,sqlite_immutable=True)
+            self.assertEqual(query["coverage"],"PARTIAL")
+            self.assertEqual(query["available_bar_count"],2)
+            self.assertEqual(query["required_bar_count"],64)
+            self.assertEqual(len(query["missing_bar_opens"]),62)
+            batch=h.evaluate_strategy_plugin(
+                self.plugin,query,warehouse_root=str(root),
+                policy=self.policy)
+            body=h.verify_factory_signal_batch(batch).data
+            self.assertEqual(body["signal_counts"]["UNKNOWN"],64)
+            self.assertEqual(body["signal_counts"]["NO_SIGNAL"],0)
+            self.assertEqual(body["signal_counts"]["ENTRY_SIGNAL"],0)
+            self.assertEqual(body["signal_counts"]["EXIT_SIGNAL"],0)
+            self.assertEqual(body["missing_bar_count"],62)
+            self.assertEqual(body["observed_bar_count"],2)
+            self.assertEqual(body["quarantine"],
+                             "ALL_EVENTS_UNKNOWN_SOURCE_GAP")
+            self.assertEqual(body["trading_authority"],"NONE")
+            self.assertEqual(body["historical_pit"],"NOT_ATTESTED")
+            self.assertTrue(all(e["next_eligible_open_ms"] is None
+                                and not e["source_observed"]
+                                for e in body["events"]))
+            with self.assertRaisesRegex(
+                    BackboneError,"WAREHOUSE_INCOMPLETE_OR_FUTURE"):
+                query_local(
+                    root,spec["dataset_id"],1,start,end,cutoff,
+                    required_source_sha256=sha,
+                    require_complete=True,sqlite_immutable=True)
+            complete=query_local(
+                root,spec["dataset_id"],1,start,end,end+2000,
+                required_source_sha256=sha,
+                require_complete=True,sqlite_immutable=True)
+            self.assertEqual(complete["coverage"],"COMPLETE")
+            real_complete=h.verify_factory_signal_batch(
+                h.evaluate_strategy_plugin(
+                    self.plugin,complete,warehouse_root=str(root),
+                    policy=self.policy)).data
+            self.assertEqual(real_complete["event_count"],64)
+            self.assertEqual(real_complete["coverage"],"COMPLETE")
+            # Re-sealing a bad future actual bar cannot bypass physical readback.
+            forged=copy.deepcopy(query)
+            forged["bars"][0]["close"]=forged["bars"][0]["open"]+0.25
+            forged["query_sha256"]=digest({
+                k:v for k,v in forged.items() if k!="query_sha256"})
+            with self.assertRaises(ValueError):
+                h.evaluate_strategy_plugin(
+                    self.plugin,forged,warehouse_root=str(root),
+                    policy=self.policy)
 
     def test_absent_policy_and_receipts_fail_closed(self):
         with self.assertRaisesRegex(ValueError,"H_POLICY_REQUIRED"):
