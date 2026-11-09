@@ -31,7 +31,7 @@ jobs:
           python - <<'PY'
           import subprocess
           expected = {
-              'tools/scanner_strategy_f/g1_g2_explicit_opportunity.py': 'be98a908cd19cffac009f4658c683eec4921a7db',
+              'tools/scanner_strategy_f/g1_g2_explicit_opportunity.py': '6404a4ef4e7c522aab1e705e774db814d04e35d9',
               'tools/scanner_strategy_f/test_g1_g2_explicit_opportunity.py': 'd52dfaa42100dec419483cdc4c16e616d3264f40',
           }
           for path, sha in expected.items():
