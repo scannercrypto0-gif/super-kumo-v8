@@ -41,13 +41,17 @@ class DurableG2Bridge:
     def __init__(self, db):
         self.db = Path(db)
         self.db.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as con:
-            con.execute("""CREATE TABLE IF NOT EXISTS events(
-                seq INTEGER PRIMARY KEY, kind TEXT NOT NULL,
-                identity TEXT NOT NULL, payload TEXT NOT NULL,
-                prev_sha TEXT NOT NULL, event_sha TEXT NOT NULL,
-                UNIQUE(kind, identity))""")
-            self._replay(con)
+        con = self._connect()
+        try:
+            with con:
+                con.execute("""CREATE TABLE IF NOT EXISTS events(
+                    seq INTEGER PRIMARY KEY, kind TEXT NOT NULL,
+                    identity TEXT NOT NULL, payload TEXT NOT NULL,
+                    prev_sha TEXT NOT NULL, event_sha TEXT NOT NULL,
+                    UNIQUE(kind, identity))""")
+                self._replay(con)
+        finally:
+            con.close()
 
     def _connect(self):
         con = sqlite3.connect(self.db, timeout=5)
