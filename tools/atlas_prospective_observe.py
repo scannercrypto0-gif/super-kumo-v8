@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import shutil
 import sqlite3
-from time import time_ns
+from time import monotonic, time_ns
 import platform
 
 from aql.journal.durable_journal import DurableJournal
@@ -88,7 +88,8 @@ def main():
         journal.startup_reconcile(store, SYMBOL, INTERVAL)
         remaining = MAX_BARS - len(journal.replay(SYMBOL, INTERVAL, limit=MAX_BARS + 1))
         if remaining <= 0:
-            p.error("Observation window exhausted; preserve and verify existing state")
+            print(json.dumps({"status": "OBSERVATION_WINDOW_EXHAUSTED"}), flush=True)
+            return 0
         observer.tick()
         collector = BinanceCollector(
             SYMBOL, INTERVAL, journal, store, max_bars=remaining,
@@ -107,6 +108,7 @@ def main():
             print(line, flush=True)
 
         record_health(health)
+        started = monotonic()
         metrics = collector.run(timeout_s=args.seconds)
         observer.tick()
         summary = read_prospective_research(observer, as_of_ms=time_ns() // 1_000_000)
@@ -114,7 +116,9 @@ def main():
                        "committed_this_session": metrics.journal_commit_count,
                        "errors": metrics.error_count, "first_connect_utc_ms": metrics.first_connect_at,
                        "last_commit_utc_ms": metrics.last_commit_return_observed_at, "factory": summary})
-        return 0 if metrics.first_connect_at is not None else 1
+        completed_window = monotonic() - started >= args.seconds
+        exhausted_budget = metrics.journal_commit_count >= remaining
+        return 0 if metrics.first_connect_at and (completed_window or exhausted_budget) else 1
 
 
 if __name__ == "__main__":

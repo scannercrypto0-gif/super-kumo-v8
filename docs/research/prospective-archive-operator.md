@@ -5,7 +5,11 @@ checkout on a persistent host with a synchronized UTC clock, outbound public
 Binance Vision WebSocket over TLS, and a dedicated private volume. Use a clean
 state directory on a non-original volume. Keep SQLite DBs and health records
 private. Use a supervisor with restart-on-failure and the same state directory;
-the runner takes an OS-backed SQLite single-writer lock. The supervisor should
+the runner takes an OS-backed SQLite single-writer lock. For systemd, use
+this checkout as WorkingDirectory, the virtualenv Python command above as
+ExecStart, and Restart=on-failure, RestartSec=30 and UMask=0077. On Windows,
+run the same command from Task Scheduler with restart-on-failure and no
+parallel instances. The supervisor should
 stop after the intended evidence window. The runner bounds the session to four
 days and total storage to 672 finalized 15-minute bars.
 

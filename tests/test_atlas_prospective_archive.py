@@ -1,6 +1,8 @@
 import json
 from io import BytesIO
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -15,7 +17,7 @@ from aql.observation.prospective import ProspectiveObserver, STEP
 from aql.storage.operational_store import OperationalStore
 from research_wp_r0.aql_factory_prospective_read_v1 import read_prospective_research
 from tools.atlas_april_archive import NAME, START, admit_partition, pressure, sha
-from tools.atlas_prospective_observe import FIXTURE
+from tools.atlas_prospective_observe import FIXTURE, read_only_g1
 
 
 class ProspectiveResearchTests(unittest.TestCase):
@@ -104,6 +106,8 @@ class ProspectiveResearchTests(unittest.TestCase):
             collector._on_message(None, json.dumps({"E": now, "k": {**kline, "x": False}}))
             self.assertEqual(self.store.count(), 0)
             collector._on_message(None, json.dumps({"E": now, "k": kline}))
+            collector._on_close(None, 1006, "fixture reconnect")
+            collector._on_open(None)
             collector._on_message(None, json.dumps({"E": now, "k": kline}))
         self.assertEqual(self.store.count(), 1)
         self.assertEqual(len(self.observer.verified_read(as_of_ms=now + 2)["rows"]), 1)
@@ -140,6 +144,42 @@ class ProspectiveResearchTests(unittest.TestCase):
         self.assertEqual(row["state"], "UNKNOWN")
         self.assertEqual(row["cutoff_ms"], now + 60_000)
         self.assertEqual(row["reason"], "STALE_OR_RESTARTED_BEFORE_DECISION")
+
+
+    def test_process_interruption_after_g1_receipt_then_factory_read_only(self):
+        script = """
+import os, sys
+from pathlib import Path
+from aql.journal.durable_journal import DurableJournal
+from aql.models.bar import MarketBar
+from unittest.mock import patch
+root, opened = Path(sys.argv[1]), int(sys.argv[2])
+close = opened + 899999
+bar = MarketBar('BTCUSDT', '15m', opened, close, 101., 102., 100., 101.,
+                4., True, 'binance_ws', close + 1).with_checksum()
+with patch('time.time', return_value=(close + 3) / 1000):
+    assert DurableJournal(str(root / 'journal.sqlite')).commit(bar)
+os._exit(17)
+"""
+        child = subprocess.run([sys.executable, "-B", "-c", script, str(self.root), str(START)],
+                               capture_output=True, text=True, check=False)
+        self.assertEqual(child.returncode, 17, child.stderr)
+        self.assertEqual(self.store.count(), 0)
+        self.journal.startup_reconcile(self.store, "BTCUSDT", "15m")
+        self.observer = self.restart()
+        as_of = START + STEP + 10_000
+        self.tick(as_of)
+        reader = ProspectiveObserver(
+            self.root / "g2.sqlite",
+            read_only_g1(DurableJournal, self.root / "journal.sqlite"),
+            read_only_g1(OperationalStore, self.root / "store.sqlite"),
+            self.fixture, synthetic=True, read_only=True,
+        )
+        report = read_prospective_research(reader, as_of_ms=as_of)
+        self.assertEqual(report["decision_counts"], {"UNKNOWN": 1})
+        self.assertFalse(report["orders_enabled"])
+        with self.assertRaisesRegex(ValueError, "PROSPECTIVE_READ_ONLY"):
+            reader.tick()
 
 
 class ArchiveTests(unittest.TestCase):
