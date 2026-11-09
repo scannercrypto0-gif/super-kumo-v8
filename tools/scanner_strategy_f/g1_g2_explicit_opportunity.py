@@ -207,7 +207,21 @@ def emit_explicit_opportunity(
         journal.require_eligible(bar.stable_key())
         store.require_eligible(bar.stable_key())
         committed = journal.commit_receipt(bar.stable_key())
-        stored = store.get_bar(bar.symbol, bar.interval, bar.bar_open)
+        with store._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM market_bars WHERE symbol=? AND interval=? "
+                "AND bar_open=? AND NOT EXISTS ("
+                "SELECT 1 FROM g1_integrity_events e "
+                "WHERE e.stable_key=market_bars.symbol || ':' || "
+                "market_bars.interval || ':' || market_bars.bar_open)",
+                (bar.symbol, bar.interval, bar.bar_open),
+            ).fetchone()
+            stored = None
+            if row is not None:
+                fields = dict(row)
+                fields.pop("id")
+                fields["is_final"] = bool(fields["is_final"])
+                stored = MarketBar.from_dict(fields)
         original = next((item for item in journal.replay(
             symbol=bar.symbol, interval=bar.interval, final_only=True,
         ) if item.stable_key() == bar.stable_key()), None)
