@@ -8,6 +8,7 @@ matching explicit research decision can create an opportunity.
 from __future__ import annotations
 
 import re
+from contextlib import closing
 
 from src.aql.g1_integrity import content as bar_content, fingerprint
 from src.aql.models.bar import MarketBar
@@ -219,7 +220,7 @@ def emit_explicit_opportunity(
         journal.require_eligible(bar.stable_key())
         store.require_eligible(bar.stable_key())
         committed = journal.commit_receipt(bar.stable_key())
-        with store._connect() as conn:
+        with closing(store._connect()) as conn:
             row = conn.execute(
                 "SELECT * FROM market_bars WHERE symbol=? AND interval=? "
                 "AND bar_open=? AND NOT EXISTS ("
