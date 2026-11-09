@@ -7,12 +7,63 @@
     "candidate": "130261351afda1642e2bda950d1f5f00f9b6fff979e234acc9ea58aa4896f099",
     "historical": "18d3b6a6785cb4890c75a6d30265f546eafa941b936b2ba0900aa2c2da4bf298"
   },
+  "excluded_optional_imports": [
+    {
+      "line": 125,
+      "module": "tools.raw_vault_offline.schema",
+      "path": "research_wp_r0/aql_core_backbone_local_v1.py",
+      "scope": "legacy_or_optional_not_loaded"
+    },
+    {
+      "line": 126,
+      "module": "tools.raw_vault_offline.corrections",
+      "path": "research_wp_r0/aql_core_backbone_local_v1.py",
+      "scope": "legacy_or_optional_not_loaded"
+    },
+    {
+      "line": 88,
+      "module": "research_wp_r0.aql_factory_h_trade_event_ledger_v1",
+      "path": "research_wp_r0/aql_factory_h_research_package_v1.py",
+      "scope": "legacy_or_optional_not_loaded"
+    },
+    {
+      "line": 91,
+      "module": "research_wp_r0.aql_factory_f_f2_recovery_research_v2",
+      "path": "research_wp_r0/aql_factory_h_research_package_v1.py",
+      "scope": "legacy_or_optional_not_loaded"
+    },
+    {
+      "line": 43,
+      "module": "tools.scanner_strategy_f.retrospective_policy",
+      "path": "tools/scanner_strategy_f/frozen_diagnostic_contracts.py",
+      "scope": "legacy_or_optional_not_loaded"
+    },
+    {
+      "line": 46,
+      "module": "tools.scanner_strategy_e.historical_policy_approval_request",
+      "path": "tools/scanner_strategy_f/frozen_diagnostic_contracts.py",
+      "scope": "legacy_or_optional_not_loaded"
+    },
+    {
+      "line": 50,
+      "module": "tools.scanner_strategy_e.historical_research_policy",
+      "path": "tools/scanner_strategy_f/frozen_diagnostic_contracts.py",
+      "scope": "legacy_or_optional_not_loaded"
+    },
+    {
+      "line": 95,
+      "module": "tools.scanner_strategy_f.retrospective_policy",
+      "path": "tools/scanner_strategy_f/research_e2e_diagnostic.py",
+      "scope": "legacy_or_optional_not_loaded"
+    }
+  ],
   "files": {
     "research_wp_r0/__init__.py": {
       "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
       "candidate_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
       "commit": "48858293d5e59560fbdaefd2bcfbc034c3b2fe3e",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
       "origin": "main",
       "required_by": [
@@ -24,6 +75,7 @@
       "candidate_blob": "a531f6f337ad5c0fa7b04a809b4caeabf1bb676a",
       "commit": "99c27ea2c1a4d41aaae361141301a8a9ea3b33c3",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 275,
       "required_by": [
@@ -42,10 +94,12 @@
       "candidate_blob": "1119d95de8a37f5317ad7fd01be6ef725974eb12",
       "commit": "99c27ea2c1a4d41aaae361141301a8a9ea3b33c3",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 275,
       "required_by": [
-        "research_wp_r0/aql_core_backbone_local_v1.py"
+        "research_wp_r0/aql_core_backbone_local_v1.py",
+        "tests/check_generic_h_real_research_authority.py"
       ]
     },
     "research_wp_r0/aql_core_backbone_local_v1.py": {
@@ -53,10 +107,12 @@
       "candidate_blob": "b3289e9e359c3612f58e9d4f618dce70e083cde7",
       "commit": "99c27ea2c1a4d41aaae361141301a8a9ea3b33c3",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 275,
       "required_by": [
         "research_wp_r0/aql_core_h_research_secretary_v1.py",
+        "tests/check_generic_h_real_research_authority.py",
         "tools/atlas_h_generic_secretary_bridge.py",
         "tools/scanner_strategy_f/research_e2e_diagnostic.py",
         "tools/scanner_strategy_f/research_strategy_plugin.py"
@@ -67,6 +123,7 @@
       "candidate_blob": "16ef1e42bfc5afa054e19158873fa5b2bfef6ed0",
       "commit": "99c27ea2c1a4d41aaae361141301a8a9ea3b33c3",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 275,
       "required_by": [
@@ -78,6 +135,7 @@
       "candidate_blob": "861515529d4bb09543634f33b9993a765024de8a",
       "commit": "99c27ea2c1a4d41aaae361141301a8a9ea3b33c3",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 275,
       "required_by": [
@@ -89,6 +147,7 @@
       "candidate_blob": "8e89dd9aae514cbd6c94e83dd85c4bd9534ef6ef",
       "commit": "99c27ea2c1a4d41aaae361141301a8a9ea3b33c3",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 275,
       "required_by": [
@@ -102,16 +161,14 @@
       "candidate_blob": "56f5b5c720955a2aa8595fdc6006dc28dceef8e9",
       "commit": "04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 267,
       "required_by": [
-        "research_wp_r0/aql_factory_f_f2_recovery_diagnostic_v1.py",
-        "research_wp_r0/aql_factory_f_f2_recovery_research_v2.py",
-        "research_wp_r0/aql_factory_f_research_e2e_diagnostic_v1.py",
         "research_wp_r0/aql_factory_h_generic_signal_adapter_v1.py",
         "research_wp_r0/aql_factory_h_research_package_v1.py",
         "research_wp_r0/aql_factory_h_scientific_lab_v1.py",
-        "research_wp_r0/aql_factory_h_trade_event_ledger_v1.py"
+        "tests/check_generic_h_real_research_authority.py"
       ]
     },
     "research_wp_r0/aql_factory_h_generic_signal_adapter_v1.py": {
@@ -119,10 +176,11 @@
       "candidate_blob": "e8bba726487cafb2c15abdea893d43867ad13ed6",
       "commit": "04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 267,
       "required_by": [
-        "actual simulation",
+        "tests/check_generic_h_real_research_authority.py",
         "tools/atlas_h_generic_secretary_bridge.py"
       ]
     },
@@ -131,10 +189,12 @@
       "candidate_blob": "e56daac169d45f5da35bc865709d3db1446b62bb",
       "commit": "04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 267,
       "required_by": [
-        "research_wp_r0/aql_factory_h_generic_signal_adapter_v1.py"
+        "research_wp_r0/aql_factory_h_generic_signal_adapter_v1.py",
+        "tests/check_generic_h_real_research_authority.py"
       ]
     },
     "research_wp_r0/aql_factory_h_scientific_lab_v1.py": {
@@ -142,6 +202,7 @@
       "candidate_blob": "cd12e27415c19559f80b8ffbe26101f2e8560622",
       "commit": "04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 267,
       "required_by": [
@@ -154,13 +215,11 @@
       "candidate_blob": "95b3ff677d220e3242c46ebf8b04881d53d713c9",
       "commit": "04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 267,
       "required_by": [
-        "research_wp_r0/aql_factory_f_f2_recovery_research_v2.py",
-        "research_wp_r0/aql_factory_f_research_e2e_diagnostic_v1.py",
         "research_wp_r0/aql_factory_h_generic_signal_adapter_v1.py",
-        "research_wp_r0/aql_factory_h_trade_event_ledger_v1.py",
         "tools/scanner_strategy_f/research_e2e_diagnostic.py"
       ]
     },
@@ -169,11 +228,12 @@
       "candidate_blob": "3f44d9df1ff38c997d6f78e8a5a93dbe6a053425",
       "commit": "04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 267,
       "path": "research_wp_r0/aql_factory_authentic_research_admission.py",
       "required_by": [
-        "historical rule projection; pure seal and error helpers extracted"
+        "research_wp_r0/aql_factory_historical_rule_projection.py"
       ]
     },
     "research_wp_r0/aql_native_binance_zip_v1.py": {
@@ -181,6 +241,7 @@
       "candidate_blob": "8263aa34125551dd6d17c9b7127e659d5c1c2182",
       "commit": "99c27ea2c1a4d41aaae361141301a8a9ea3b33c3",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 275,
       "required_by": [
@@ -192,6 +253,7 @@
       "candidate_blob": "eaa63500c449322ab1974fb7bf8ad070a91f1177",
       "commit": "99c27ea2c1a4d41aaae361141301a8a9ea3b33c3",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 275,
       "required_by": [
@@ -203,6 +265,7 @@
       "candidate_blob": "4d102025c02f9b0fa7380294612c491893e9e2e1",
       "commit": "48858293d5e59560fbdaefd2bcfbc034c3b2fe3e",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": "4d102025c02f9b0fa7380294612c491893e9e2e1",
       "origin": "main",
       "required_by": [
@@ -222,6 +285,7 @@
       "candidate_blob": "24d70bcaea70d0fadb13084dd7fca08bb95688df",
       "commit": "48858293d5e59560fbdaefd2bcfbc034c3b2fe3e",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": "24d70bcaea70d0fadb13084dd7fca08bb95688df",
       "origin": "main",
       "required_by": [
@@ -234,18 +298,14 @@
       "candidate_blob": "87aa21841c7b649d3b860ee1337ccc45fd08e0bf",
       "commit": "48858293d5e59560fbdaefd2bcfbc034c3b2fe3e",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": "87aa21841c7b649d3b860ee1337ccc45fd08e0bf",
       "origin": "main",
       "required_by": [
-        "research_wp_r0/aql_factory_f_f2_recovery_research_v2.py",
-        "research_wp_r0/aql_factory_f_research_e2e_diagnostic_v1.py",
         "research_wp_r0/aql_factory_h_generic_signal_adapter_v1.py",
         "research_wp_r0/aql_factory_historical_rule_projection.py",
-        "research_wp_r0/strategy_dna_v2.py",
-        "tools/scanner_strategy_b/native15m.py",
         "tools/scanner_strategy_f/research_e2e_diagnostic.py",
-        "tools/scanner_strategy_f/research_strategy_plugin.py",
-        "tools/strategy_service_offline/screening.py"
+        "tools/scanner_strategy_f/research_strategy_plugin.py"
       ]
     },
     "research_wp_r0/strategy_definition.py": {
@@ -253,19 +313,15 @@
       "candidate_blob": "f1061b9367820ec2407dd9680d1c4a0758759ca3",
       "commit": "48858293d5e59560fbdaefd2bcfbc034c3b2fe3e",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": "f1061b9367820ec2407dd9680d1c4a0758759ca3",
       "origin": "main",
       "required_by": [
-        "research_wp_r0/aql_factory_f_f2_recovery_research_v2.py",
-        "research_wp_r0/aql_factory_f_research_e2e_diagnostic_v1.py",
         "research_wp_r0/aql_factory_h_generic_signal_adapter_v1.py",
         "research_wp_r0/aql_factory_historical_rule_projection.py",
-        "research_wp_r0/strategy_dna_v2.py",
-        "tools/scanner_strategy_b/native15m.py",
         "tools/scanner_strategy_f/research_e2e_diagnostic.py",
         "tools/scanner_strategy_f/research_strategy_plugin.py",
-        "tools/strategy_service_offline/common.py",
-        "tools/strategy_service_offline/screening.py"
+        "tools/strategy_service_offline/common.py"
       ]
     },
     "tools/atlas_h_generic_secretary_bridge.py": {
@@ -273,10 +329,11 @@
       "candidate_blob": "91011e827f990710eab3b59777c5ecb465d764db",
       "commit": "a6a28911da5e8f5dc17b39ce0a0d3cc48b927ae4",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 284,
       "required_by": [
-        "entrypoint"
+        "tests/check_generic_h_real_research_authority.py"
       ]
     },
     "tools/scanner_strategy_f/frozen_diagnostic_contracts.py": {
@@ -284,6 +341,7 @@
       "candidate_blob": "2006ef395f87f1aaf04a31600b9f997e0954e354",
       "commit": "ccf57ad3db7e71290a8321840e800136567e3af4",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 277,
       "required_by": [
@@ -295,6 +353,7 @@
       "candidate_blob": "1f15ae4379e917e288d6bdff58e902ccc6c765bc",
       "commit": "ccf57ad3db7e71290a8321840e800136567e3af4",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 277,
       "required_by": [
@@ -306,11 +365,12 @@
       "candidate_blob": "0c381e358c45dd9031d4e2fa00b1ca9d956f3858",
       "commit": "ccf57ad3db7e71290a8321840e800136567e3af4",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 277,
       "required_by": [
-        "actual evaluator",
-        "research_wp_r0/aql_factory_h_generic_signal_adapter_v1.py"
+        "research_wp_r0/aql_factory_h_generic_signal_adapter_v1.py",
+        "tests/check_generic_h_real_research_authority.py"
       ]
     },
     "tools/strategy_service_offline/common.py": {
@@ -318,18 +378,14 @@
       "candidate_blob": "2071bc8b3b232870837beb55af872c13f3fb900e",
       "commit": "6acbcc7fc243b132f58170df4c6469bbf7f4eff8",
       "kind": "runtime",
+      "loaded_by_synthetic_test": true,
       "main_blob": null,
       "origin": 235,
       "required_by": [
         "research_wp_r0/aql_factory_h_generic_signal_adapter_v1.py",
-        "tools/scanner_strategy_b/native15m.py",
-        "tools/scanner_strategy_e/historical_policy_approval_request.py",
-        "tools/scanner_strategy_e/historical_research_policy.py",
         "tools/scanner_strategy_f/frozen_diagnostic_contracts.py",
         "tools/scanner_strategy_f/research_e2e_diagnostic.py",
-        "tools/scanner_strategy_f/research_strategy_plugin.py",
-        "tools/scanner_strategy_f/retrospective_policy.py",
-        "tools/strategy_service_offline/screening.py"
+        "tools/scanner_strategy_f/research_strategy_plugin.py"
       ]
     },
     "tools/strategy_service_offline/fixtures/strategies.json": {
@@ -337,10 +393,11 @@
       "candidate_blob": "c27eb5aa70a6d671791ba1e55e9b078a272b611f",
       "commit": "6acbcc7fc243b132f58170df4c6469bbf7f4eff8",
       "kind": "test-only",
+      "loaded_by_synthetic_test": false,
       "main_blob": null,
       "origin": 235,
       "required_by": [
-        "synthetic test strategy fixture"
+        "tests/check_generic_h_real_research_authority.py"
       ]
     }
   },
