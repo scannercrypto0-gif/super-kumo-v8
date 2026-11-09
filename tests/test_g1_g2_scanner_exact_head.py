@@ -10,14 +10,11 @@ SCANNER_ROOT = os.environ.get("AQL_PINNED_SCANNER_ROOT")
 if not SCANNER_ROOT or not (Path(SCANNER_ROOT) / "tools/scanner_strategy_f/g1_g2_explicit_opportunity.py").is_file():
     raise RuntimeError("PINNED_SCANNER_SOURCE_REQUIRED_NO_SYNTHETIC_FALLBACK")
 
-sys.path.insert(0, str(Path(SCANNER_ROOT).resolve()))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from src.aql.models.bar import MarketBar as ScannerMarketBar
-from tools.scanner_strategy_f.g1_g2_explicit_opportunity import (
-    emit_explicit_opportunity, explicit_test_decision, test_only_policy,
-    verify_opportunity, SCHEMA as PRODUCER_SCHEMA,
-)
+import json
+import subprocess
+
 from aql.models.bar import MarketBar, BarState
 from aql.journal.durable_journal import DurableJournal
 from aql.storage.operational_store import OperationalStore
@@ -29,6 +26,7 @@ class ExactHeadScannerProducerToCore(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         root = Path(self.tmp.name)
+        self.root = root
         self.j = DurableJournal(str(root/"source.sqlite"))
         self.s = OperationalStore(str(root/"store.sqlite"))
         self.g2_path = root/"obs.sqlite"
@@ -51,24 +49,23 @@ class ExactHeadScannerProducerToCore(unittest.TestCase):
         self.tmp.cleanup()
 
     def actual_emitter(self):
-        self.assertEqual(PRODUCER_SCHEMA,SCANNER_SCHEMA)
-        policy = test_only_policy()
-        decision = explicit_test_decision(
-            symbol=self.bar.symbol, interval=self.bar.interval,
-            bar_close_ms=self.bar.bar_close, decision_cutoff_ms=self.now,
-            strategy_id="explicit_real_scanner_test", strategy_version="1",
-            strategy_definition_sha256="a"*64, strategy_config_sha256="b"*64,
-            strategy_evaluator_sha256="c"*64, decision_state="ENTRY_SIGNAL",
+        # Use the exact checked-out Scanner source in a separate process so
+        # its legacy SQLite connections cannot hold Windows test DB handles.
+        script = Path(__file__).with_name("_scanner_exact_head_emitter_worker.py")
+        request = dict(
+            bar=self.bar.to_dict(), journal=str(self.root/"source.sqlite"),
+            store=str(self.root/"store.sqlite"), decision_ms=self.now,
         )
-        # Scanner module imports src.aql.MarketBar: convert only in-memory
-        # representation, retaining identical checksum, source and G1 identity.
-        scanner_bar=ScannerMarketBar.from_dict(self.bar.to_dict())
-        actual=emit_explicit_opportunity(
-            bar=scanner_bar,journal=self.j,store=self.s,
-            decision=decision,policy=policy,decision_ms=self.now,
+        run = subprocess.run(
+            [sys.executable, str(script)], input=json.dumps(request),
+            text=True,capture_output=True,timeout=30,
+            env={**os.environ,"AQL_PINNED_SCANNER_ROOT":str(Path(SCANNER_ROOT).resolve())},
         )
-        self.assertEqual(verify_opportunity(actual),actual)
-        return actual
+        self.assertEqual(run.returncode,0,run.stderr)
+        event=json.loads(run.stdout)
+        self.assertEqual(event["schema"],SCANNER_SCHEMA)
+        self.assertEqual(event["trading_authority"],"NONE")
+        return event
 
     def test_actual_scanner_emission_through_restart_and_three_horizons(self):
         event = self.actual_emitter()
