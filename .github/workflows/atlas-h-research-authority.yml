@@ -1,0 +1,31 @@
+name: ATLAS H Research Authority
+on:
+  pull_request:
+    paths:
+      - 'tools/atlas_h_generic_secretary_bridge.py'
+      - 'tests/test_atlas_h_research_authority.py'
+      - '.github/workflows/atlas-h-research-authority.yml'
+permissions:
+  contents: read
+jobs:
+  authority:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Stage pinned role dependencies
+        run: python tools/atlas_f_lab_3_ci_stage.py
+      - name: Test research authority
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest discover -s tests -p test_atlas_h_research_authority.py -v
+          exit $LASTEXITCODE
+        shell: pwsh
