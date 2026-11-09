@@ -1,0 +1,59 @@
+name: ATLAS B R1 Target-Main Disposable Release Gate
+
+on:
+  push:
+    branches:
+      - release/atlas-b-r1-target-main-disposable-20261109
+
+permissions:
+  contents: read
+
+jobs:
+  target-main-r1:
+    name: R1 target-main (${{ matrix.os }}, py${{ matrix.python-version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.11', '3.12']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout disposable release candidate
+        uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Verify main-target ancestry and approved Scanner blobs
+        shell: bash
+        run: |
+          python - <<'PY'
+          import subprocess
+          expected = {
+              'tools/scanner_strategy_f/g1_g2_explicit_opportunity.py': 'be98a908cd19cffac009f4658c683eec4921a7db',
+              'tools/scanner_strategy_f/test_g1_g2_explicit_opportunity.py': 'd52dfaa42100dec419483cdc4c16e616d3264f40',
+          }
+          for path, sha in expected.items():
+              actual = subprocess.check_output(['git','hash-object',path],text=True).strip()
+              assert actual == sha, (path,actual,sha)
+          main = 'dbc191df72f4b4d1ebb7d490926dcad4325dac12'
+          integration = '0a7846156c07c9eb28bafc483e366553aae0d26a'
+          parents = subprocess.check_output(['git','rev-list','HEAD'],text=True).splitlines()
+          assert integration in parents and main in parents, 'UNEXPECTED_ANCESTRY'
+          print('PINNED_SOURCE_AND_ANCESTRY_PASS')
+          PY
+      - name: One actual candidate Scanner to Core G2 to Secretary test
+        shell: bash
+        env:
+          AQL_PINNED_SCANNER_ROOT: .
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python -m unittest discover -s tests -p 'test_atlas_b_full_synthetic_secretary_e2e_v1.py' -v
+      - name: Candidate Scanner B focused negative acceptance
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python -m unittest tools.scanner_strategy_f.test_g1_g2_explicit_opportunity -v
+      - name: Candidate touched G1 integrity regression
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python -m unittest discover -s tests -p 'test_g1_wp04.py' -v
