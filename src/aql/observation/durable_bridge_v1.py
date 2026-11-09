@@ -257,6 +257,78 @@ class DurableG2Bridge:
             return "pending"
         return "missing" if o["value"] is None else "mature"
 
+    def _connect_readonly(self):
+        """Read an existing G2 WAL DB without migration, checkpoint or writes."""
+        from urllib.parse import quote
+        require(self.db.is_file(), "G2_SOURCE_MISSING")
+        uri = "file:" + quote(str(self.db.resolve()).replace("\\\\", "/"), safe="/:") + "?mode=ro"
+        con = sqlite3.connect(uri, uri=True, timeout=5)
+        try:
+            con.execute("PRAGMA query_only=ON")
+            return con
+        except Exception:
+            con.close()
+            raise
+
+    def read_verified_opportunity(self, snapshot_id, *, as_of_ms):
+        """Pure read-only, fully replay-verified per-opportunity G2 snapshot + horizons.
+
+        UNKNOWN after a due horizon with no eligible evidence is not an invented
+        missing/mature observation. Receipt time controls visibility.
+        """
+        require(sha(snapshot_id) and type(as_of_ms) is int and as_of_ms >= 0,
+                "READ_SCOPE")
+        con = self._connect_readonly()
+        try:
+            snaps, outcomes, tail = self._replay(con)
+        finally:
+            con.close()
+        require(snapshot_id in snaps, "READ_SNAPSHOT_NOT_FOUND")
+        parent = snaps[snapshot_id]
+        snap = parent["snapshot"]
+        require(as_of_ms >= snap["decision_ms"], "READ_BEFORE_DECISION")
+        require(parent["horizons_ms"] == list(HORIZONS_MS) and
+                parent["trading_authority"] == "NONE" and
+                sha(parent["scanner_sha256"]) and
+                sha(parent["scanner_g1_receipt_sha256"]) and
+                sha(parent["decision_receipt_sha256"]) and
+                sha(parent["scanner_policy_sha256"]) and
+                sha(parent["strategy_definition_sha256"]) and
+                sha(parent["strategy_config_sha256"]) and
+                sha(parent["scanner_evaluator_sha256"]) and
+                sha(parent["g1_content_sha256"]) and
+                parent["commit_return_ms"] == snap["receipt_ms"],
+                "READ_PARENT_DRIFT")
+        horizons = []
+        for h in HORIZONS_MS:
+            event = outcomes.get((snapshot_id, h))
+            due = snap["decision_ms"] + h
+            if event is not None and event["received_ms"] <= as_of_ms:
+                state = "missing" if event["value"] is None else "mature"
+                visible = dict(event)
+            else:
+                state = "pending" if as_of_ms < due else "UNKNOWN"
+                visible = None
+            horizons.append(dict(
+                horizon_ms=h, identity=f"{snapshot_id}:{h}",
+                due_ms=due, state=state, observation=visible))
+        doc = dict(schema="aql.core.g1-g2.verified-opportunity-read.v1",
+                   snapshot_id=snapshot_id, snapshot=dict(snap),
+                   g1_content_sha256=parent["g1_content_sha256"],
+                   g1_receipt_sha256=parent["scanner_g1_receipt_sha256"],
+                   scanner_opportunity_sha256=parent["scanner_sha256"],
+                   scanner_decision_sha256=parent["decision_receipt_sha256"],
+                   scanner_policy_sha256=parent["scanner_policy_sha256"],
+                   strategy_definition_sha256=parent["strategy_definition_sha256"],
+                   strategy_config_sha256=parent["strategy_config_sha256"],
+                   scanner_evaluator_sha256=parent["scanner_evaluator_sha256"],
+                   commit_return_ms=parent["commit_return_ms"],
+                   as_of_ms=as_of_ms, horizons=horizons,
+                   event_chain_tail_sha256=tail, test_only=True,
+                   historical_pit="NOT_ATTESTED",
+                   trading_authority="NONE", orders_enabled=False)
+        return {**doc, "sha256": digest(doc)}
+
     def readback(self):
         con=self._connect()
         try:
