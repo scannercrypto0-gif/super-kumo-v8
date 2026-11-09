@@ -373,9 +373,16 @@
       "junit_sha256": "59d8592349523a6655310833ed5f1eed0f44f5d526e838877254e580b3340b97",
       "skip_reason": "Disposable PostgreSQL requires explicitly configured sandbox; not supplied locally"
     },
-    "candidate_ci": "NOT_RUN_NOT_PUBLISHED",
-    "candidate_pr": "NOT_CREATED_AUTHENTICATION_BLOCKED",
+    "candidate_ci": {
+      "g1_tests_windows_ubuntu_and_disposable_postgres": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/42632567782",
+      "integrity_windows_ubuntu": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/42632567713",
+      "focused_initial_failure": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/42632567843",
+      "focused_test_step": "PASS on Ubuntu; failure occurred in measurement step",
+      "root_cause": "Reproduced: shallow checkout lacks origin/main required by measurement merge-base. Full-history fetch restores exact base. Workflow now fetches complete history and exact candidate SHA; both platform results retained with fail-fast false.",
+      "focused_corrected_ci": "PENDING_PUSH"
+    },
+    "candidate_pr": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/287",
     "base_ci_reused": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/42619933487"
   },
-  "publication_blocker": "GitHub CLI current account authentication rejected (HTTP 401). User reports device authorization completed; current process still cannot authenticate. No candidate branch pushed, PR created or PM comment posted."
+  "publication_snapshot": "PR #287 created by owner using native authenticated GitHub CLI. Agent credential remains unusable for writes; public readback verified exact candidate head. CI correction publication pending."
 }
