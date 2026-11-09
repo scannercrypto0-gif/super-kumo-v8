@@ -18,7 +18,17 @@ from aql.observation.contracts import (
     canonical, digest,
 )
 
-SCANNER_SCHEMA = "aql.scanner.g1.explicit-opportunity-test-only.v1"
+SCANNER_SCHEMA = "aql.scanner.g1-g2.test-only-opportunity.v1"
+DECISION_SCHEMA = "aql.scanner.g1-g2.explicit-test-decision.v1"
+SCANNER_FIELDS = frozenset(("schema","opportunity_key","symbol","interval","source",
+    "source_bar_open_ms","source_bar_close_ms","bar_checksum","g1_stable_key",
+    "g1_content_digest","g1_receipt_sha256","g1_receipt_ms",
+    "decision_cutoff_ms","decision_ms","strategy_id","strategy_version",
+    "strategy_definition_sha256","strategy_config_sha256",
+    "strategy_evaluator_sha256","strategy_decision_sha256","decision_state",
+    "policy_sha256","source_availability","test_only","historical_pit",
+    "source_ack_sha256","strategy_approval_sha256","factory_consumer_ack_sha256",
+    "trading_authority","orders_enabled","sha256"))
 EVENT_SCHEMA = "aql.core.g1-g2.durable-observation.v1"
 
 
@@ -106,26 +116,59 @@ class DurableG2Bridge:
                 isinstance(store,OperationalStore) and
                 isinstance(bar,MarketBar), "G1_TYPES")
         o = opportunity
-        require(type(o) is dict and o.get("schema")==SCANNER_SCHEMA and
-                o.get("policy")=="TEST_ONLY" and o.get("decision")=="OPPORTUNITY"
-                and o.get("authority")=="NONE" and
-                o.get("origin")=="SCANNER_EXPLICIT", "SCANNER_AUTHORITY")
-        required = ("strategy_definition_sha256","strategy_config_sha256",
-                    "scanner_policy_sha256","decision_receipt_sha256")
-        require(all(sha(o.get(k)) for k in required) and sha(o.get("sha256"))
-                and o["sha256"]==digest({k:v for k,v in o.items() if k!="sha256"}),
-                "SCANNER_SHA")
-        require(type(o.get("opportunity_key")) is str and o["opportunity_key"]
-                and type(now_ms) is int and
-                all(type(o.get(k)) is int for k in
-                    ("decision_ms","bar_available_ms","bar_close_ms")),
-                "TIME_OR_ID")
-        require(bar.is_final is True and bar.source=="binance_ws" and
-                bar.checksum==bar.compute_checksum() and
-                o.get("bar_key")==bar.stable_key() and
-                o.get("bar_checksum")==bar.checksum and
-                o.get("symbol")==bar.symbol and o.get("interval")==bar.interval and
-                o["bar_close_ms"]==bar.bar_close, "NONFINAL_OR_PARENT")
+        require(type(o) is dict and set(o) == SCANNER_FIELDS and
+                o.get("schema") == SCANNER_SCHEMA and
+                o.get("test_only") is True and
+                o.get("decision_state") in ("ENTRY_SIGNAL", "EXIT_SIGNAL") and
+                o.get("source") == "binance_ws" and
+                o.get("source_availability") ==
+                    "G1_COMMIT_RECEIPT_OBSERVED_TEST_ONLY" and
+                o.get("historical_pit") == "NOT_ATTESTED" and
+                o.get("trading_authority") == "NONE" and
+                o.get("orders_enabled") is False and
+                all(o.get(k) is None for k in ("source_ack_sha256",
+                    "strategy_approval_sha256", "factory_consumer_ack_sha256")),
+                "SCANNER_AUTHORITY_OR_SCHEMA")
+        hash_fields = ("opportunity_key", "bar_checksum", "g1_content_digest",
+            "g1_receipt_sha256", "strategy_definition_sha256",
+            "strategy_config_sha256", "strategy_evaluator_sha256",
+            "strategy_decision_sha256", "policy_sha256", "sha256")
+        require(all(sha(o.get(k)) for k in hash_fields) and
+                o["sha256"] == digest({k:v for k,v in o.items()
+                                      if k != "sha256"}), "SCANNER_SHA")
+        require(all(type(o.get(k)) is int and o[k] >= 0 for k in (
+                "source_bar_open_ms","source_bar_close_ms","g1_receipt_ms",
+                "decision_cutoff_ms","decision_ms")) and
+                o["decision_ms"] == o["decision_cutoff_ms"] and
+                all(type(o.get(k)) is str and bool(o[k]) for k in (
+                "strategy_id","strategy_version","symbol","interval",
+                "g1_stable_key")), "SCANNER_TIME_OR_ID")
+        key_material = dict(schema=SCANNER_SCHEMA,
+            g1_stable_key=o["g1_stable_key"], strategy_id=o["strategy_id"],
+            strategy_version=o["strategy_version"],
+            strategy_definition_sha256=o["strategy_definition_sha256"],
+            strategy_config_sha256=o["strategy_config_sha256"],
+            strategy_evaluator_sha256=o["strategy_evaluator_sha256"],
+            policy_sha256=o["policy_sha256"])
+        require(o["opportunity_key"] == digest(key_material), "SCANNER_OPPORTUNITY_KEY")
+        decision_material = dict(schema=DECISION_SCHEMA,
+            strategy_id=o["strategy_id"],strategy_version=o["strategy_version"],
+            strategy_definition_sha256=o["strategy_definition_sha256"],
+            strategy_config_sha256=o["strategy_config_sha256"],
+            strategy_evaluator_sha256=o["strategy_evaluator_sha256"],
+            symbol=o["symbol"],interval=o["interval"],
+            bar_close_ms=o["source_bar_close_ms"],
+            decision_cutoff_ms=o["decision_cutoff_ms"],
+            decision_state=o["decision_state"],test_only=True)
+        require(o["strategy_decision_sha256"] == digest(decision_material),
+                "SCANNER_DECISION_LINK")
+        require(bar.is_final is True and bar.source == "binance_ws" and
+                bar.checksum == bar.compute_checksum() and
+                o["g1_stable_key"] == bar.stable_key() and
+                o["bar_checksum"] == bar.checksum and
+                o["symbol"] == bar.symbol and o["interval"] == bar.interval and
+                o["source_bar_open_ms"] == bar.bar_open and
+                o["source_bar_close_ms"] == bar.bar_close, "NONFINAL_OR_PARENT")
         journal.require_eligible(bar.stable_key())
         store.require_eligible(bar.stable_key())
         receipt=journal.commit_receipt(bar.stable_key())
@@ -133,8 +176,11 @@ class DurableG2Bridge:
                 receipt.get("version")==1 and
                 receipt.get("content_digest")==fingerprint(content(bar)), "NO_G1_COMMIT_RECEIPT")
         committed=receipt["commit_return_observed_at_ms"]
-        require(bar.bar_close<=bar.ingested_at<=committed<=o["bar_available_ms"]
-                <=o["decision_ms"]<=now_ms and
+        require(o["g1_content_digest"] == receipt["content_digest"] and
+                o["g1_receipt_sha256"] == digest(receipt) and
+                o["g1_receipt_ms"] == committed, "SCANNER_G1_RECEIPT_DRIFT")
+        require(bar.bar_close < bar.ingested_at <= committed <=
+                o["decision_ms"] <= now_ms and
                 o["decision_ms"]-committed<=5000, "FUTURE_OR_STALE_CLOCK")
         # OperationalStore.get_range returns (min_open,max_open), not bar rows.
         # Reuse its existing exact stable-key readback under read-only query.
@@ -155,10 +201,12 @@ class DurableG2Bridge:
         data=dict(snapshot=json.loads(snap.serialized()),scanner_sha256=o["sha256"],
                   g1_content_sha256=receipt["content_digest"],
                   bar_key=bar.stable_key(),commit_return_ms=committed,
-                  strategy_definition_sha256=o[required[0]],
-                  strategy_config_sha256=o[required[1]],
-                  scanner_policy_sha256=o[required[2]],
-                  decision_receipt_sha256=o[required[3]],
+                  strategy_definition_sha256=o["strategy_definition_sha256"],
+                  strategy_config_sha256=o["strategy_config_sha256"],
+                  scanner_policy_sha256=o["policy_sha256"],
+                  decision_receipt_sha256=o["strategy_decision_sha256"],
+                  scanner_evaluator_sha256=o["strategy_evaluator_sha256"],
+                  scanner_g1_receipt_sha256=o["g1_receipt_sha256"],
                   horizons_ms=list(HORIZONS_MS),trading_authority="NONE")
         con=self._connect()
         try:
