@@ -8,6 +8,8 @@ on:
       - src/aql/observation/durable_bridge_v1.py
       - tests/test_g1_g2_durable_bridge_v1.py
       - tests/test_g1_g2_scanner_exact_head.py
+      - tests/test_g1_g2_secretary_readonly_v1.py
+      - src/aql/observation/secretary_g2_readonly_v1.py
       - .github/workflows/core-g1-g2-durable-observation.yml
 jobs:
   g1-g2:
@@ -36,3 +38,6 @@ jobs:
         env:
           AQL_PINNED_SCANNER_ROOT: scanner-ref
         run: python -m unittest discover -s tests -p 'test_g1_g2_scanner_exact_head.py' -v
+      - name: Secretary G2 verified read-only receipt focused tests
+        shell: bash
+        run: python -m unittest discover -s tests -p 'test_g1_g2_secretary_readonly_v1.py' -v
