@@ -27,17 +27,37 @@ def fixture(bar_open=None, *, final=True, source="binance_ws"):
     return bar.with_checksum()
 
 
-def scanner(bar, receipt, *, key="test-opportunity-1"):
-    available = max(bar.ingested_at, receipt["commit_return_observed_at_ms"])
-    body=dict(schema=SCANNER_SCHEMA,opportunity_key=key,origin="SCANNER_EXPLICIT",
-              policy="TEST_ONLY",decision="OPPORTUNITY",authority="NONE",
-              bar_key=bar.stable_key(),bar_checksum=bar.checksum,
-              symbol=bar.symbol,interval=bar.interval,bar_close_ms=bar.bar_close,
-              bar_available_ms=available,decision_ms=available+1,
-              strategy_definition_sha256="1"*64,strategy_config_sha256="2"*64,
-              scanner_policy_sha256="3"*64,decision_receipt_sha256="4"*64)
+def scanner(bar, receipt, *, key=None):
+    """Version-accurate sealed synthetic fixture; actual Scanner is tested separately."""
+    committed = receipt["commit_return_observed_at_ms"]
+    parents = dict(strategy_id="synthetic_explicit_strategy",
+        strategy_version="v1",strategy_definition_sha256="1"*64,
+        strategy_config_sha256="2"*64,strategy_evaluator_sha256="3"*64)
+    policy_sha = "4"*64
+    key_material = dict(schema=SCANNER_SCHEMA,g1_stable_key=bar.stable_key(),
+                        policy_sha256=policy_sha,**parents)
+    decision_ms = committed+1
+    decision_material = dict(
+        schema="aql.scanner.g1-g2.explicit-test-decision.v1",
+        symbol=bar.symbol,interval=bar.interval,bar_close_ms=bar.bar_close,
+        decision_cutoff_ms=decision_ms,decision_state="ENTRY_SIGNAL",
+        test_only=True,**parents)
+    body=dict(schema=SCANNER_SCHEMA,
+        opportunity_key=digest(key_material),
+        symbol=bar.symbol,interval=bar.interval,source=bar.source,
+        source_bar_open_ms=bar.bar_open,source_bar_close_ms=bar.bar_close,
+        bar_checksum=bar.checksum,g1_stable_key=bar.stable_key(),
+        g1_content_digest=receipt["content_digest"],
+        g1_receipt_sha256=digest(receipt),g1_receipt_ms=committed,
+        decision_cutoff_ms=decision_ms,decision_ms=decision_ms,
+        strategy_decision_sha256=digest(decision_material),
+        decision_state="ENTRY_SIGNAL",policy_sha256=policy_sha,
+        source_availability="G1_COMMIT_RECEIPT_OBSERVED_TEST_ONLY",
+        test_only=True,historical_pit="NOT_ATTESTED",
+        source_ack_sha256=None,strategy_approval_sha256=None,
+        factory_consumer_ack_sha256=None,trading_authority="NONE",
+        orders_enabled=False,**parents)
     return {**body,"sha256":digest(body)}
-
 
 class DurableG1G2(unittest.TestCase):
     def setUp(self):
@@ -126,7 +146,7 @@ class DurableG1G2(unittest.TestCase):
         future["sha256"]=digest({k:v for k,v in future.items() if k!="sha256"})
         with self.assertRaises(BridgeStop):
             self.accept(b,future)
-        stale={**e,"decision_ms":e["bar_available_ms"]+6001}
+        stale={**e,"decision_ms":e["g1_receipt_ms"]+6001}
         stale["sha256"]=digest({k:v for k,v in stale.items() if k!="sha256"})
         with self.assertRaises(BridgeStop):
             self.accept(b,stale)
