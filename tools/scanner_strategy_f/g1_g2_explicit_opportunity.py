@@ -164,6 +164,18 @@ def verify_opportunity(receipt):
     }
     need(x["opportunity_key"] == g2_digest(key_material),
          "OPPORTUNITY_IDENTITY_DRIFT")
+    need(x["strategy_decision_sha256"] == g2_digest({
+        "schema": DECISION_SCHEMA,
+        "strategy_id": x["strategy_id"],
+        "strategy_version": x["strategy_version"],
+        "strategy_definition_sha256": x["strategy_definition_sha256"],
+        "strategy_config_sha256": x["strategy_config_sha256"],
+        "strategy_evaluator_sha256": x["strategy_evaluator_sha256"],
+        "symbol": x["symbol"], "interval": x["interval"],
+        "bar_close_ms": x["source_bar_close_ms"],
+        "decision_cutoff_ms": x["decision_cutoff_ms"],
+        "decision_state": x["decision_state"], "test_only": True,
+    }), "EXPLICIT_DECISION_LINK_DRIFT")
     return x
 
 
