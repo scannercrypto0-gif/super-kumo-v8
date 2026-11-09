@@ -56,16 +56,7 @@ jobs:
         run: |
           python - <<'PY'
           import subprocess, sys
-          source = r"""import unittest
-from tools.scanner_strategy_f import test_g1_g2_explicit_opportunity as suite
-from pathlib import Path
-from tempfile import TemporaryDirectory
-# A subprocess isolates Windows SQLite handles from the E2E test.
-result=unittest.TextTestRunner(verbosity=2).run(
-    unittest.defaultTestLoader.loadTestsFromModule(suite))
-raise SystemExit(0 if result.wasSuccessful() else 1)
-"""
-          proc=subprocess.run([sys.executable, '-c',source])
+          proc=subprocess.run([sys.executable, '-m', 'unittest', 'tools.scanner_strategy_f.test_g1_g2_explicit_opportunity', '-v'])
           if sys.platform=='win32' and proc.returncode:
               print('SCANNER_FOCUSED_WINDOWS_LOCK_DIAGNOSTIC: known original source test temp SQLite handle cleanup; not mislabelled product release PASS')
               raise SystemExit(proc.returncode)
