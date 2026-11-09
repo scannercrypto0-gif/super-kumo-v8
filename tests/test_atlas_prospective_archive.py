@@ -1,0 +1,200 @@
+import json
+from io import BytesIO
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+from zipfile import ZipFile
+
+from aql.collector.binance_collector import BinanceCollector
+from aql.g1_integrity import ContentConflictError, propagate_conflict
+from aql.journal.durable_journal import DurableJournal
+from aql.models.bar import MarketBar
+from aql.observation.contracts import HORIZONS_MS
+from aql.observation.prospective import ProspectiveObserver, STEP
+from aql.storage.operational_store import OperationalStore
+from research_wp_r0.aql_factory_prospective_read_v1 import read_prospective_research
+from tools.atlas_april_archive import NAME, START, admit_partition, pressure, sha
+from tools.atlas_prospective_observe import FIXTURE
+
+
+class ProspectiveResearchTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.journal = DurableJournal(str(self.root / "journal.sqlite"))
+        self.store = OperationalStore(str(self.root / "store.sqlite"))
+        self.fixture = json.loads(FIXTURE.read_text())[0]
+        self.observer = self.restart()
+
+    def restart(self):
+        return ProspectiveObserver(self.root / "g2.sqlite", self.journal, self.store,
+                                   self.fixture, synthetic=True)
+
+    def put(self, open_ms, *, delay=1, source="binance_ws", persist=True, price=101.0):
+        close = open_ms + STEP - 1
+        received = close + delay
+        bar = MarketBar("BTCUSDT", "15m", open_ms, close, price, price + 1,
+                        price - 1, price, 4., True, source, received).with_checksum()
+        with patch("time.time", return_value=(received + 2) / 1000):
+            self.journal.commit(bar)
+            if persist:
+                self.store.upsert(bar)
+                self.journal.mark_persisted(bar.stable_key())
+        return received + 3
+
+    def tick(self, now):
+        with patch("aql.observation.prospective.time_ns", return_value=now * 1_000_000):
+            self.observer.tick()
+
+    def test_real_scanner_receipts_and_all_horizons_after_restart(self):
+        for i in range(4):
+            now = self.put(START + i * STEP)
+            self.tick(now)
+        first = self.observer.verified_read(as_of_ms=now)
+        self.assertEqual(len(first["rows"]), 4)
+        self.assertEqual(first["rows"][-1]["decision"]["state"], "ENTRY_SIGNAL")
+        self.assertEqual(first["rows"][0]["decision"]["state"], "UNKNOWN")
+        self.assertIsNone(first["rows"][0]["decision"]["opportunity_id"])
+        self.observer = self.restart()
+        self.tick(now)
+        self.assertEqual(self.observer.verified_read(as_of_ms=now), first)
+
+        for h in HORIZONS_MS:
+            due = now + h
+            opening = due // STEP * STEP
+            self.assertEqual(self.observer.verified_read(as_of_ms=due)["rows"][3]["horizons"][
+                HORIZONS_MS.index(h)]["state"], "UNKNOWN")
+            end = self.put(opening)
+            self.tick(end)
+            after = self.observer.verified_read(as_of_ms=end)
+            self.assertEqual(after["rows"][3]["horizons"][HORIZONS_MS.index(h)]["state"], "mature")
+        self.assertEqual(self.observer.verified_read(as_of_ms=now), first)
+        result = read_prospective_research(self.observer, as_of_ms=end)
+        self.assertEqual(result["trading_authority"], "NONE")
+        self.assertFalse(result["secretary_enqueued"])
+        self.assertEqual(result["evidence_mode"], "SYNTHETIC_TESTED")
+
+    def test_missing_receipt_future_and_no_signal_do_not_create_opportunities(self):
+        self.put(START, persist=False)
+        now = self.put(START + STEP, source="binance_rest_recovery")
+        self.put(START + 10 * STEP)
+        self.tick(now)
+        self.assertEqual(self.observer.verified_read(as_of_ms=now)["rows"], [])
+        for i in range(4):
+            now = self.put(START + (i + 2) * STEP, price=99.5)
+            self.tick(now)
+        rows = self.observer.verified_read(as_of_ms=now)["rows"]
+        self.assertEqual(rows[-1]["decision"]["state"], "NO_SIGNAL")
+        self.assertIsNone(rows[-1]["decision"]["opportunity_id"])
+
+    def test_collector_rejects_clock_and_nonfinal_then_calls_real_observer(self):
+        opening = START
+        close = opening + STEP - 1
+        now = close + 2
+        collector = BinanceCollector("BTCUSDT", "15m", self.journal, self.store,
+                                     on_persisted=lambda: self.tick(now + 2),
+                                     public_market_only=True)
+        kline = dict(s="BTCUSDT", i="15m", t=opening, T=close,
+                     o="101", h="102", l="100", c="101", v="4", x=True)
+        with patch("time.time", return_value=now / 1000):
+            with self.assertLogs("aql.collector.binance_collector", level="ERROR"):
+                collector._on_message(None, json.dumps({"E": now - 10_000, "k": kline}))
+            collector._on_message(None, json.dumps({"E": now, "k": {**kline, "x": False}}))
+            self.assertEqual(self.store.count(), 0)
+            collector._on_message(None, json.dumps({"E": now, "k": kline}))
+            collector._on_message(None, json.dumps({"E": now, "k": kline}))
+        self.assertEqual(self.store.count(), 1)
+        self.assertEqual(len(self.observer.verified_read(as_of_ms=now + 2)["rows"]), 1)
+
+    def test_late_missing_and_revised_source_remain_explicit(self):
+        for i in range(4):
+            now = self.put(START + i * STEP)
+            self.tick(now)
+        due = now + HORIZONS_MS[0]
+        late = self.put(due // STEP * STEP, delay=10_000)
+        self.tick(late)
+        read = self.observer.verified_read(as_of_ms=late)
+        self.assertEqual(read["rows"][3]["horizons"][0]["state"], "late")
+        due2 = now + HORIZONS_MS[1]
+        absent = self.put(due2 // STEP * STEP + STEP)
+        self.tick(absent)
+        read = self.observer.verified_read(as_of_ms=absent)
+        self.assertEqual(read["rows"][3]["horizons"][1]["state"], "missing")
+        try:
+            self.put(START + 3 * STEP, price=102)
+        except ContentConflictError as exc:
+            propagate_conflict(exc, self.journal, self.store)
+        else:
+            self.fail("Revised bar was not quarantined")
+        updated = self.observer.verified_read(as_of_ms=absent)
+        self.assertFalse(updated["rows"][3]["source_valid"])
+        self.assertEqual(updated["rows"][3]["horizons"][0]["state"], "UNKNOWN")
+
+    def test_interruption_between_store_and_observer_recovers_without_backdating(self):
+        now = self.put(START)
+        self.observer = self.restart()
+        self.tick(now + 60_000)
+        row = self.observer.verified_read(as_of_ms=now + 60_000)["rows"][0]["decision"]
+        self.assertEqual(row["state"], "UNKNOWN")
+        self.assertEqual(row["cutoff_ms"], now + 60_000)
+        self.assertEqual(row["reason"], "STALE_OR_RESTARTED_BEFORE_DECISION")
+
+
+class ArchiveTests(unittest.TestCase):
+    def test_immutable_dedup_bad_checksum_and_revision(self):
+        end = START + 4 * STEP
+
+        def capture(price):
+            buffer = BytesIO()
+            with ZipFile(buffer, "w") as z:
+                rows = []
+                for open_ms in range(START, end, STEP):
+                    rows.append(f"{open_ms},{price},{price+1},{price-1},{price},5,{open_ms+STEP-1},500,5,2,200,0")
+                z.writestr(NAME[:-4] + ".csv", "\n".join(rows) + "\n")
+            raw = buffer.getvalue()
+            return raw, f"{sha(raw)}  {NAME}\n".encode()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            raw, check = capture(100)
+            calls = 0
+
+            def pause_after_checkpoint():
+                nonlocal calls
+                calls += 1
+                if calls == 3:
+                    raise RuntimeError("P1_PAUSED_FOR_P0_OBSERVER")
+
+            with self.assertRaisesRegex(RuntimeError, "P1_PAUSED"):
+                admit_partition(root, raw, check, end=end, test_only=True,
+                                check_progress=pause_after_checkpoint)
+            first = admit_partition(root, raw, check, end=end, test_only=True)
+            self.assertEqual(first, admit_partition(root, raw, check, end=end, test_only=True))
+            self.assertNotEqual(first["core245_sha256"], first["core253_sha256"])
+            self.assertEqual(first["bars"], 4)
+            revised, revised_check = capture(101)
+            with self.assertRaisesRegex(ValueError, "CHECKSUM_MISMATCH"):
+                admit_partition(root, revised, check, end=end, test_only=True)
+            next_version = admit_partition(root, revised, revised_check, end=end, test_only=True,
+                                           version=2, parent_sha=first["source_sha256"])
+            self.assertNotEqual(next_version["manifest_sha256"], first["manifest_sha256"])
+
+    def test_priority_pauses_for_p0_lock(self):
+        import sqlite3
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lock = sqlite3.connect(root / "runner-lock.sqlite")
+            try:
+                lock.execute("BEGIN EXCLUSIVE")
+                with self.assertRaisesRegex(RuntimeError, "P1_PAUSED"):
+                    pressure(root)
+                lock.rollback()
+                pressure(root)
+            finally:
+                lock.close()
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -122,7 +122,7 @@ def source_not_available(dataset_id=None):
 def admit_original_bytes(
     source_bytes, pin, spec, *, stager: OfflineBridgeStager,
     library: HistoricalLibrary, decision_cutoff_ms: int,
-    checksum_file_bytes: bytes | None = None,
+    checksum_file_bytes: bytes | None = None, check_progress=None,
 ):
     """Stage one bounded original source object and return sealed custody proof.
 
@@ -180,13 +180,19 @@ def admit_original_bytes(
                   else "RETROSPECTIVE_NON_PIT"),
              "PACKET_SOURCE_IDENTITY_DRIFT")
 
+    if check_progress is not None:
+        check_progress()
     key = stager.stage(packet, source_bytes)
     # Reuse bounded checkpoints, exact source-byte readback, version and
     # correction checks; do not duplicate/import a separate custody store.
     progress = 0
     while progress < len(packet["bars"]):
+        if check_progress is not None:
+            check_progress()
         progress, total = stager.advance(key, batch_size=64)
         _require(total == len(packet["bars"]), "CHECKPOINT_TOTAL_DRIFT")
+    if check_progress is not None:
+        check_progress()
     receipt = stager.commit(key, library)
     _require(receipt["packet_sha256"] == key
              and receipt["source_bytes_sha256"] == pin["original_sha256"]

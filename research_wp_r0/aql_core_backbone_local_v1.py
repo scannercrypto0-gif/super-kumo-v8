@@ -200,7 +200,7 @@ def _vault_admit(vault, raw, pin, spec):
 
 def admit_local_original(
     root, raw_zip, checksum_bytes, external_pin, spec, *,
-    decision_cutoff_ms, vault=None,
+    decision_cutoff_ms, vault=None, check_progress=None,
 ):
     """ONE source object (<=4096 bars) committed to immutable Core and SQLite index.
 
@@ -220,7 +220,7 @@ def admit_local_original(
     a=admit_original_bytes(
         raw_zip,external_pin,spec,stager=stage,library=lib,
         decision_cutoff_ms=decision_cutoff_ms,
-        checksum_file_bytes=checksum_bytes,
+        checksum_file_bytes=checksum_bytes, check_progress=check_progress,
     )
     require(a["coverage"] in ("COMPLETE","PARTIAL","UNKNOWN"),
             "CUSTODY_COVERAGE")
@@ -265,7 +265,9 @@ def admit_local_original(
              a["coverage"],a["underlying_availability_class"],
              json.dumps(a,sort_keys=True,separators=(",",":"))),
         )
-        for bar in prices["bars"]:
+        for index, bar in enumerate(prices["bars"]):
+            if check_progress is not None and index % 64 == 0:
+                check_progress()
             values=(spec["dataset_id"],spec["version"],
                     bar["bar_open_ms"],bar["bar_close_ms"],
                     bar["open"],bar["high"],bar["low"],bar["close"],

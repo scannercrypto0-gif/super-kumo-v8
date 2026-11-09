@@ -85,6 +85,7 @@ class BinanceCollector:
         journal: DurableJournal,
         store: OperationalStore,
         max_bars: Optional[int] = None,
+        *, on_persisted=None, public_market_only=False,
     ):
         # The finite v2 source has no live/legacy collector activation contract.
         # Reject configuration before any network or operational-store effect.
@@ -95,6 +96,8 @@ class BinanceCollector:
         self.journal = journal
         self.store = store
         self.max_bars = max_bars
+        self.on_persisted = on_persisted
+        self.public_market_only = public_market_only
         self.background_persistence = False
         self.health_state = "CONNECTING"
         self.clock_tolerance_ms = 5000
@@ -125,6 +128,12 @@ class BinanceCollector:
                     self.clock_uncertain = True
                     raise ValueError("Source event is ahead of local clock; temporal eligibility denied")
             k = data["k"]
+            if self.public_market_only and (
+                type(data.get("E")) is not int or
+                data["E"] < k["T"] or
+                abs(skew) > self.clock_tolerance_ms
+            ):
+                raise ValueError("Public observation clock or event time outside tolerance")
             if type(k.get("x")) is not bool:
                 raise ValueError("Invalid candle finality flag")
             bar = MarketBar.from_binance_ws_kline(k)
@@ -177,6 +186,8 @@ class BinanceCollector:
                 if self.store.upsert(bar):
                     self.metrics.store_insert_count += 1
                 self.journal.mark_persisted(bar.stable_key())
+                if self.on_persisted is not None:
+                    self.on_persisted()
             self.health_state = "STREAMING"
 
             if self.max_bars and self.metrics.journal_commit_count >= self.max_bars:
@@ -233,7 +244,8 @@ class BinanceCollector:
         """
         from ..delivery.authority import register_legacy_writer
         register_legacy_writer(self.journal, 'collector-run')
-        url = f"{WS_BASE}/{self._stream_name()}"
+        base = "wss://data-stream.binance.vision:443/ws" if self.public_market_only else WS_BASE
+        url = f"{base}/{self._stream_name()}"
         self._stop_event.clear()
 
         def _run_ws():
