@@ -7,6 +7,23 @@ on:
 permissions:
   contents: read
 jobs:
+  scanner-g1-g2-windows-handle-regression:
+    name: Scanner B SQLite handle / ${{ matrix.os }} / py${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Run all eight real SQLite Scanner positive and negative tests
+        run: python -m unittest -v tools.scanner_strategy_f.test_g1_g2_explicit_opportunity
   scanner-e-focused:
     runs-on: ubuntu-latest
     strategy:
