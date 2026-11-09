@@ -194,6 +194,23 @@ class OpportunityBridgeTests(unittest.TestCase):
         with self.assertRaises(op.OpportunityRejected):
             self.emit()
 
+    def test_resealed_conflicting_decision_payload_rejected(self):
+        self.commit()
+        good=self.emit()
+        tampered=copy.deepcopy(good)
+        tampered["strategy_decision_sha256"]="0"*64
+        tampered["sha256"]=op.g2_digest({
+            k:v for k,v in tampered.items() if k!="sha256"})
+        with self.assertRaisesRegex(op.OpportunityRejected,
+                                    "EXPLICIT_DECISION_LINK_DRIFT"):
+            op.verify_opportunity(tampered)
+        # A re-sealed explicit decision whose state changes is not the same
+        # opportunity as the original source/strategy tuple.
+        d=self.decision(decision_state="EXIT_SIGNAL")
+        with self.assertRaisesRegex(op.OpportunityRejected,
+                                    "DUPLICATE_CONFLICT"):
+            self.emit(decision=d,existing=good)
+
     def test_real_core_eligibility_receipt_digest_and_maturity(self):
         self.commit()
         r=self.journal.commit_receipt(self.bar.stable_key())
