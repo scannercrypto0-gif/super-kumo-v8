@@ -1,0 +1,381 @@
+{
+  "schema": "aql.g1.stage-closeout.v1",
+  "package": "PKG-G1-STAGE-CLOSURE-02",
+  "stage_id": "G1",
+  "official_scope_ref": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/90af9794880cbeb00e7e974bfa906ff5e9666183/02_ROADMAP.md",
+  "official_scope_sha256": "f6695a547d1e2a3c8ca702035670fe6ed82041e9f8e43ccdc70b9c26073f8d00",
+  "frozen_base_sha": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+  "branch": "codex/g1-market-foundation-closeout",
+  "assignment": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/205#issuecomment-6741373520",
+  "current_status": "G1_MANDATORY_GAP_EXACT",
+  "recommendation": "G1_BLOCKED_EXACT_MANDATORY_PREDICATES",
+  "owner_decision": "PENDING_OWNER_SIGNOFF_NO_STAGE_CLOSURE",
+  "closure_date": null,
+  "predicates": [
+    {
+      "predicate_id": "G1-UNIVERSE",
+      "official_predicate": "Each discovered Binance symbol has eligible/error/unsupported record",
+      "classification": "IN_SCOPE_REQUIRED",
+      "disposition": "IMPLEMENTED",
+      "evidence": {
+        "grade": "SYNTHETIC_TESTED",
+        "evidence_sha": "57a0b09da7dae4a86e87ed9a61a097b80a102258",
+        "files": [
+          {
+            "path": "src/aql/foundation/census.py",
+            "sha256": "98da0fed8a1e45de780461e6f938eb2f30960d1a8586346145630a9aa4b6fc2b",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/57a0b09da7dae4a86e87ed9a61a097b80a102258/src/aql/foundation/census.py"
+          },
+          {
+            "path": "tests/test_g1_foundation_closeout.py",
+            "sha256": "22cc73126b9659a5bd7ba0bbfd6146f60542d9844607c58b9afa006e14fca4ef",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/57a0b09da7dae4a86e87ed9a61a097b80a102258/tests/test_g1_foundation_closeout.py"
+          }
+        ]
+      },
+      "mandatory_missing": "Current authentic complete Binance exchangeInfo snapshot and acquisition/clock provenance unavailable; fixture census is not actual market coverage."
+    },
+    {
+      "predicate_id": "G1-FINAL",
+      "official_predicate": "Final candles and zero unverified provisional/future inputs in tests",
+      "classification": "IN_SCOPE_REQUIRED",
+      "disposition": "ALREADY_ACCEPTED",
+      "evidence": {
+        "grade": "SYNTHETIC_TESTED",
+        "evidence_sha": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+        "files": [
+          {
+            "path": "src/aql/collector/binance_collector.py",
+            "sha256": "6d6be754820c4b845954091fc24d7e2c72860ebd8bc869aa9031ca80ba2a2841",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/90af9794880cbeb00e7e974bfa906ff5e9666183/src/aql/collector/binance_collector.py"
+          },
+          {
+            "path": "tests/test_g1_completion.py",
+            "sha256": "49d5e075d045834c3c5f7694c0d7f05fbcc9d8aa1b91fb7cfa85ac1a4efe48cb",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/90af9794880cbeb00e7e974bfa906ff5e9666183/tests/test_g1_completion.py"
+          },
+          {
+            "path": "tests/test_g1_integrity_58_59.py",
+            "sha256": "b6aedd7ac2e085d129e461700514061d8c447239d6f0608714152bdd6f285976",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/90af9794880cbeb00e7e974bfa906ff5e9666183/tests/test_g1_integrity_58_59.py"
+          }
+        ]
+      },
+      "mandatory_missing": null
+    },
+    {
+      "predicate_id": "G1-FEATURES",
+      "official_predicate": "Versioned indicator availability and decision-specific valid-as-of readiness",
+      "classification": "IN_SCOPE_REQUIRED",
+      "disposition": "SYNTHETIC_TESTED",
+      "evidence": {
+        "grade": "SYNTHETIC_TESTED",
+        "evidence_sha": "57a0b09da7dae4a86e87ed9a61a097b80a102258",
+        "files": [
+          {
+            "path": "src/aql/foundation/readiness.py",
+            "sha256": "e82768a95e70bbfbc49054e68a472497756e30b09f45e7e43684661fe6592f4e",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/57a0b09da7dae4a86e87ed9a61a097b80a102258/src/aql/foundation/readiness.py"
+          },
+          {
+            "path": "tests/test_g1_foundation_closeout.py",
+            "sha256": "22cc73126b9659a5bd7ba0bbfd6146f60542d9844607c58b9afa006e14fca4ef",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/57a0b09da7dae4a86e87ed9a61a097b80a102258/tests/test_g1_foundation_closeout.py"
+          },
+          {
+            "path": "research_wp_r0/indicator_library.py",
+            "sha256": "91c05962e7d0aa3393a0088a0456e79f70f6f7b391b1ae76fa6229e5abe81b58",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/57a0b09da7dae4a86e87ed9a61a097b80a102258/research_wp_r0/indicator_library.py"
+          },
+          {
+            "path": "research_wp_r0/indicator_library_v2.py",
+            "sha256": "e37a4a9cacb52dcd16aff20fa87b14137adf6a170ba1e8eba0fb2f524ef5b426",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/57a0b09da7dae4a86e87ed9a61a097b80a102258/research_wp_r0/indicator_library_v2.py"
+          },
+          {
+            "path": "tests/test_sf_ind_01.py",
+            "sha256": "dd46c39b0e76233efcad09427e7eba7282d94f182a35ef51f0c96a1fcaa19275",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/57a0b09da7dae4a86e87ed9a61a097b80a102258/tests/test_sf_ind_01.py"
+          },
+          {
+            "path": "tests/test_sf_ind_02.py",
+            "sha256": "08147608153d593653261a4366fb08164659edd8af63ea2234bb8da91b4f1fea",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/57a0b09da7dae4a86e87ed9a61a097b80a102258/tests/test_sf_ind_02.py"
+          }
+        ]
+      },
+      "mandatory_missing": null
+    },
+    {
+      "predicate_id": "G1-SCHEDULER",
+      "official_predicate": "Adaptive priority scheduler with bounded backlog and P0 reservation",
+      "classification": "IN_SCOPE_REQUIRED",
+      "disposition": "SYNTHETIC_TESTED",
+      "evidence": {
+        "grade": "SYNTHETIC_TESTED",
+        "evidence_sha": "57a0b09da7dae4a86e87ed9a61a097b80a102258",
+        "files": [
+          {
+            "path": "src/aql/foundation/scheduler.py",
+            "sha256": "4071551ecf84bfd5e8caa2cc2190c693bab1d560399fadf7c9e7e1ff89135075",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/57a0b09da7dae4a86e87ed9a61a097b80a102258/src/aql/foundation/scheduler.py"
+          },
+          {
+            "path": "src/aql/recovery/rest_budget.py",
+            "sha256": "0a3e9221683d904fce6bf266e7acfd40ecf3af880d0adebd710c064eb48376a8",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/57a0b09da7dae4a86e87ed9a61a097b80a102258/src/aql/recovery/rest_budget.py"
+          },
+          {
+            "path": "src/aql/lanes.py",
+            "sha256": "8115b9e056abb095b4026fbfd3e53a94bf28ec6febd8b0a695631cc7d7896ff5",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/57a0b09da7dae4a86e87ed9a61a097b80a102258/src/aql/lanes.py"
+          },
+          {
+            "path": "tests/test_g1_foundation_closeout.py",
+            "sha256": "22cc73126b9659a5bd7ba0bbfd6146f60542d9844607c58b9afa006e14fca4ef",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/57a0b09da7dae4a86e87ed9a61a097b80a102258/tests/test_g1_foundation_closeout.py"
+          }
+        ]
+      },
+      "mandatory_missing": null
+    },
+    {
+      "predicate_id": "G1-SUPABASE",
+      "official_predicate": "Safe Supabase integration",
+      "classification": "IN_SCOPE_REQUIRED",
+      "disposition": "IMPLEMENTED",
+      "evidence": {
+        "grade": "SYNTHETIC_TESTED",
+        "evidence_sha": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+        "files": [
+          {
+            "path": "src/aql/storage/sandbox_store.py",
+            "sha256": "c8eeafce1649446b099fc1f88a6cea9635cbecd4cec3ae29993146556852c4d6",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/90af9794880cbeb00e7e974bfa906ff5e9666183/src/aql/storage/sandbox_store.py"
+          },
+          {
+            "path": "migrations/sandbox/001_market_bars.sql",
+            "sha256": "7d5195b33d6d0d14556c97383f64c7020a26b2bc03c001413ee36e02798616e6",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/90af9794880cbeb00e7e974bfa906ff5e9666183/migrations/sandbox/001_market_bars.sql"
+          },
+          {
+            "path": "migrations/sandbox/002_writer_role.sql",
+            "sha256": "14189e09ff9c927368003a1f1de59a05aad80cf140436e3305fc334281aebdc0",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/90af9794880cbeb00e7e974bfa906ff5e9666183/migrations/sandbox/002_writer_role.sql"
+          },
+          {
+            "path": "tests/test_g1_completion.py",
+            "sha256": "49d5e075d045834c3c5f7694c0d7f05fbcc9d8aa1b91fb7cfa85ac1a4efe48cb",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/90af9794880cbeb00e7e974bfa906ff5e9666183/tests/test_g1_completion.py"
+          }
+        ]
+      },
+      "mandatory_missing": "G1_EXTERNAL_SANDBOX_NOT_VERIFIED: existing disposable PostgreSQL contract is accepted; no permitted disposable Supabase project/least-privilege connection factory supplied. No production credentials searched."
+    },
+    {
+      "predicate_id": "G1-SPOOL",
+      "official_predicate": "Local durable spool",
+      "classification": "IN_SCOPE_REQUIRED",
+      "disposition": "ALREADY_ACCEPTED",
+      "evidence": {
+        "grade": "SYNTHETIC_TESTED",
+        "evidence_sha": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+        "files": [
+          {
+            "path": "src/aql/journal/durable_journal.py",
+            "sha256": "94ded2070d6994088ce1291493b3ac4e440e127eb20882c72763924833c20338",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/90af9794880cbeb00e7e974bfa906ff5e9666183/src/aql/journal/durable_journal.py"
+          },
+          {
+            "path": "tests/test_g1_wp01.py",
+            "sha256": "fecb1a1a94aac8095b035931858b4f8cd1d322a3fdb8c723a93cf54e19470620",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/90af9794880cbeb00e7e974bfa906ff5e9666183/tests/test_g1_wp01.py"
+          },
+          {
+            "path": "tests/test_g1_completion.py",
+            "sha256": "49d5e075d045834c3c5f7694c0d7f05fbcc9d8aa1b91fb7cfa85ac1a4efe48cb",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/90af9794880cbeb00e7e974bfa906ff5e9666183/tests/test_g1_completion.py"
+          }
+        ]
+      },
+      "mandatory_missing": null
+    },
+    {
+      "predicate_id": "G1-REPLAY",
+      "official_predicate": "Deterministic replay",
+      "classification": "IN_SCOPE_REQUIRED",
+      "disposition": "ALREADY_ACCEPTED",
+      "evidence": {
+        "grade": "SYNTHETIC_TESTED",
+        "evidence_sha": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+        "files": [
+          {
+            "path": "src/aql/journal/durable_journal.py",
+            "sha256": "94ded2070d6994088ce1291493b3ac4e440e127eb20882c72763924833c20338",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/90af9794880cbeb00e7e974bfa906ff5e9666183/src/aql/journal/durable_journal.py"
+          },
+          {
+            "path": "tests/test_g1_wp02.py",
+            "sha256": "546070f36dc8f824f6711f62667a08aca2c5dcf05665fcdc568e748273c71b10",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/90af9794880cbeb00e7e974bfa906ff5e9666183/tests/test_g1_wp02.py"
+          },
+          {
+            "path": "tests/test_g1_completion.py",
+            "sha256": "49d5e075d045834c3c5f7694c0d7f05fbcc9d8aa1b91fb7cfa85ac1a4efe48cb",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/90af9794880cbeb00e7e974bfa906ff5e9666183/tests/test_g1_completion.py"
+          }
+        ]
+      },
+      "mandatory_missing": null
+    },
+    {
+      "predicate_id": "G1-RECOVERY",
+      "official_predicate": "Offline idempotent recovery",
+      "classification": "IN_SCOPE_REQUIRED",
+      "disposition": "ALREADY_ACCEPTED",
+      "evidence": {
+        "grade": "SYNTHETIC_TESTED",
+        "evidence_sha": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+        "files": [
+          {
+            "path": "src/aql/lanes.py",
+            "sha256": "8115b9e056abb095b4026fbfd3e53a94bf28ec6febd8b0a695631cc7d7896ff5",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/90af9794880cbeb00e7e974bfa906ff5e9666183/src/aql/lanes.py"
+          },
+          {
+            "path": "src/aql/recovery/gap_recovery.py",
+            "sha256": "0240730efe96da9e9fb362817f7670bcb018508c31761867f320f1cc35204bce",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/90af9794880cbeb00e7e974bfa906ff5e9666183/src/aql/recovery/gap_recovery.py"
+          },
+          {
+            "path": "tests/test_g1_completion.py",
+            "sha256": "49d5e075d045834c3c5f7694c0d7f05fbcc9d8aa1b91fb7cfa85ac1a4efe48cb",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/90af9794880cbeb00e7e974bfa906ff5e9666183/tests/test_g1_completion.py"
+          }
+        ]
+      },
+      "mandatory_missing": null
+    },
+    {
+      "predicate_id": "G1-BUDGET",
+      "official_predicate": "Measured API/DB resource budget",
+      "classification": "IN_SCOPE_REQUIRED",
+      "disposition": "SYNTHETIC_TESTED",
+      "evidence": {
+        "grade": "SYNTHETIC_TESTED",
+        "evidence_sha": "57a0b09da7dae4a86e87ed9a61a097b80a102258",
+        "files": [
+          {
+            "path": "tools/measure_g1_foundation_closeout.py",
+            "sha256": "93de1012923773512b48183ed548507681da61f66253a7a109625198a88f93c3",
+            "url": "https://github.com/scannercrypto0-gif/super-kumo-v8/blob/57a0b09da7dae4a86e87ed9a61a097b80a102258/tools/measure_g1_foundation_closeout.py"
+          },
+          {
+            "path": "docs/evidence/g1_foundation_closeout_resources.json",
+            "sha256": "35a2337c9e167a498f94fb108e3e6eb3d30c44c8c23974cece477cda1286ed93",
+            "url": null
+          }
+        ]
+      },
+      "mandatory_missing": "Measured local DB bytes/latency and simulated quota admission only. Actual provider weight-header and remote DB latency/quota evidence unavailable; require bounded permitted observation on the intended host, without interfering with A."
+    }
+  ],
+  "mandatory_missing_only": [
+    "G1-UNIVERSE: authentic current complete snapshot/provenance",
+    "G1-SUPABASE: actual disposable Supabase integration evidence",
+    "G1-BUDGET: observed provider/remote DB resource receipt",
+    "Owner final stage approval after all mandatory evidence passes"
+  ],
+  "accepted_subpackages_frozen": [
+    {
+      "scope": "Existing G1 source, durability, offline recovery and PostgreSQL sandbox contract",
+      "sha": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+      "grade": "SYNTHETIC_TESTED",
+      "ci": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/42619933487",
+      "jobs": [
+        "G1 Tests (ubuntu-latest)",
+        "G1 Tests (windows-latest)",
+        "Disposable PostgreSQL sandbox contract"
+      ]
+    },
+    {
+      "scope": "R1 / Generic-H accepted bounded engineering; reused without re-running",
+      "sha": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+      "evidence": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/205#issuecomment-6740555712",
+      "grade": "ALREADY_ACCEPTED"
+    },
+    {
+      "scope": "March one-use original",
+      "evidence": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/271#issuecomment-6738655796",
+      "grade": "OWNER_REPORTED_LOCAL",
+      "rerun": false
+    }
+  ],
+  "independent_audit_if_due": "Narrow candidate safety review and negative tests only; no independent audit verdict claimed.",
+  "collision": {
+    "pr": 286,
+    "head": "c9f9cd960e74002018677d8743c1f61e9c53e6ca",
+    "reserved_files": [
+      ".github/workflows/atlas-prospective-archive.yml",
+      "docs/research/prospective-archive-operator.md",
+      "research_wp_r0/aql_authenticated_historical_admission_v1.py",
+      "research_wp_r0/aql_core_backbone_local_v1.py",
+      "research_wp_r0/aql_factory_prospective_read_v1.py",
+      "src/aql/collector/binance_collector.py",
+      "src/aql/observation/durable_bridge_v1.py",
+      "src/aql/observation/prospective.py",
+      "tests/test_atlas_prospective_archive.py",
+      "tools/atlas_april_archive.py",
+      "tools/atlas_prospective_observe.py"
+    ],
+    "overlap": [],
+    "recheck_before_commit_and_pr": true
+  },
+  "integration_boundary": [
+    "Helpers are opt-in and exercised together by the offline measurement driver.",
+    "No existing collector/journal/Scanner/Factory/G2/archive API or execution path changed.",
+    "Readiness proves source availability for the caller-frozen catalog, not computed feature output.",
+    "A READY receipt is a bounded read snapshot, not a lock on a later decision; callers must revalidate revisions.",
+    "RAM scheduler is admission only; existing journal remains durable source of retries.",
+    "API cost/DB write units are configured; shared budget injection is required for real deployment."
+  ],
+  "evidence_grades": {
+    "IMPLEMENTED": "source present, not proof of actual external integration",
+    "SYNTHETIC_TESTED": "deterministic disposable local fixtures",
+    "ACTUAL_SANDBOX_VERIFIED": false,
+    "EXTERNAL_UNAVAILABLE": [
+      "current market snapshot",
+      "Supabase sandbox",
+      "actual API/remote DB measurements"
+    ]
+  },
+  "inaccessible": [
+    "Private owner chats",
+    "Original E: artifacts",
+    "Production keys/runtime"
+  ],
+  "deferred": [
+    "G2/P0 real 72h and P1 archive belong to PR #286",
+    "G3 separately sequenced by user",
+    "G4/G5/G6 NOT_DUE"
+  ],
+  "audit_scope": "No reopening #285, March/H2, synthetic R1 or approved historical G1 subpackage without regression.",
+  "notes": [
+    "Old draft PR #8 and #16 read-only inspected: documentary proposals, no executable scheduler reused.",
+    "No old draft merged, no G0 acceptance, no broker/order/live/paper execution."
+  ],
+  "validation": {
+    "local": {
+      "passed": 239,
+      "skipped": 1,
+      "failures": 0,
+      "source_commit": "57a0b09da7dae4a86e87ed9a61a097b80a102258",
+      "junit_sha256": "59d8592349523a6655310833ed5f1eed0f44f5d526e838877254e580b3340b97",
+      "skip_reason": "Disposable PostgreSQL requires explicitly configured sandbox; not supplied locally"
+    },
+    "candidate_ci": "NOT_RUN_NOT_PUBLISHED",
+    "candidate_pr": "NOT_CREATED_AUTHENTICATION_BLOCKED",
+    "base_ci_reused": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/42619933487"
+  },
+  "publication_blocker": "GitHub CLI current account authentication rejected (HTTP 401). User reports device authorization completed; current process still cannot authenticate. No candidate branch pushed, PR created or PM comment posted."
+}
