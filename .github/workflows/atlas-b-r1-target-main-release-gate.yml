@@ -49,13 +49,32 @@ jobs:
           AQL_PINNED_SCANNER_ROOT: .
           PYTHONDONTWRITEBYTECODE: '1'
         run: python -m unittest discover -s tests -p 'test_atlas_b_full_synthetic_secretary_e2e_v1.py' -v
-      - name: Candidate Scanner B focused negative acceptance
+      - name: Candidate Scanner B focused negative acceptance (isolated subprocess)
         shell: bash
         env:
           PYTHONDONTWRITEBYTECODE: '1'
-        run: python -m unittest tools.scanner_strategy_f.test_g1_g2_explicit_opportunity -v
+        run: |
+          python - <<'PY'
+          import subprocess, sys
+          source = r"""import unittest
+from tools.scanner_strategy_f import test_g1_g2_explicit_opportunity as suite
+from pathlib import Path
+from tempfile import TemporaryDirectory
+# A subprocess isolates Windows SQLite handles from the E2E test.
+result=unittest.TextTestRunner(verbosity=2).run(
+    unittest.defaultTestLoader.loadTestsFromModule(suite))
+raise SystemExit(0 if result.wasSuccessful() else 1)
+"""
+          proc=subprocess.run([sys.executable, '-c',source])
+          if sys.platform=='win32' and proc.returncode:
+              print('SCANNER_FOCUSED_WINDOWS_LOCK_DIAGNOSTIC: known original source test temp SQLite handle cleanup; not mislabelled product release PASS')
+              raise SystemExit(proc.returncode)
+          raise SystemExit(proc.returncode)
+          PY
       - name: Candidate touched G1 integrity regression
         shell: bash
         env:
           PYTHONDONTWRITEBYTECODE: '1'
-        run: python -m unittest discover -s tests -p 'test_g1_wp04.py' -v
+        run: |
+          python -m pip install pytest
+          python -m pytest tests/test_g1_wp04.py -q
