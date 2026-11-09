@@ -132,10 +132,16 @@ class DurableG2Bridge:
         require(bar.bar_close<=bar.ingested_at<=committed<=o["bar_available_ms"]
                 <=o["decision_ms"]<=now_ms and
                 o["decision_ms"]-committed<=5000, "FUTURE_OR_STALE_CLOCK")
-        matching=[x for x in store.get_range(bar.symbol,bar.interval)
-                  if x.stable_key()==bar.stable_key()]
-        require(len(matching)==1 and matching[0].checksum==bar.checksum
-                and matching[0].compute_checksum()==bar.checksum, "G1_STORE_DRIFT")
+        # OperationalStore.get_range returns (min_open,max_open), not bar rows.
+        # Reuse its existing exact stable-key readback under read-only query.
+        store_con=store._connect()
+        try:
+            stored=store._original_bar(store_con,bar.stable_key())
+        finally:
+            store_con.close()
+        require(stored is not None and stored.is_final is True and
+                stored.checksum==bar.checksum and
+                stored.compute_checksum()==bar.checksum, "G1_STORE_DRIFT")
         context={k:ContextValue(None,None,None,None,"NOT_SUPPLIED_TEST_ONLY")
                  for k in CONTEXT_KEYS}
         snap=DecisionSnapshot(opportunity_key=o["opportunity_key"],source=SCANNER_SCHEMA,
