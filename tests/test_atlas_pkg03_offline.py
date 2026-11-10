@@ -1,6 +1,7 @@
 """Bounded meaningful acceptance tests for the isolated current-head seam."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -114,3 +115,44 @@ def test_resealed_manifest_cannot_replace_parent_retained_identity(completed):
             verify(path.parent, expected_sha=expected)
     finally:
         path.write_bytes(original)
+
+
+def test_pinned_strategy_evaluator_and_forbidden_ack_pit_authority(completed):
+    """Addendum: exercise actual contracts, not a claim-only scope assertion."""
+    overlay = completed / "overlay"
+    verify(overlay)
+    code = r'''
+import copy,json,pathlib,sys
+from aql.paper_sim.adapter import signals_from_prospective
+from aql.paper_sim.engine import PaperSimulator
+from aql.observation.contracts import digest
+root=pathlib.Path(sys.argv[1]);read=json.loads((root/'run/g2-read.json').read_text())
+plan=json.loads((root/'run/commands.json').read_text());results=[]
+def rejected(name,fn):
+    try:fn()
+    except ValueError as exc:results.append({'case':name,'reason':str(exc)})
+    else:raise AssertionError('NEGATIVE_ACCEPTED:'+name)
+for field,value in [('evaluator_sha256','f'*64),('strategy_version','unreviewed-version')]:
+    changed=copy.deepcopy(read);changed['run'][field]=value
+    changed['sha256']=digest({k:v for k,v in changed.items() if k!='sha256'})
+    rejected(field+'_mismatch',lambda d=changed:signals_from_prospective(
+        d,expected_sha=d['sha256'],expected_run=read['run'],as_of_ms=d['as_of_ms']))
+for name,field,value in [('forbidden_ACK','source_ack_sha256','f'*64),
+                         ('fake_PIT','historical_pit','ATTESTED'),
+                         ('forbidden_trading_authority','trading_authority','LIVE')]:
+    watch=copy.deepcopy(plan['commands'][0][1]);watch['signal'][field]=value
+    path=root/(name+'.jsonl');sim=PaperSimulator(path)
+    rejected(name,lambda w=watch,s=sim:s.apply(s.identity(w),'watch',w))
+    assert not path.exists() and sim.states=={}
+(root/'supplemental-rejections.json').write_text(json.dumps(results,sort_keys=True,indent=2)+'\n')
+print(json.dumps(results,sort_keys=True))
+'''
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join((str(overlay / "src"), str(overlay)))
+    result = subprocess.run([sys.executable, "-B", "-c", code, str(completed)],
+                            env=env, cwd=overlay, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    rows = json.loads(result.stdout)
+    assert len(rows) == 5
+    assert {r["reason"] for r in rows} == {
+        "PAPER_SIM_PINNED_SYNTHETIC_RUN", "PAPER_SIM_SIGNAL_FIELDS", "PAPER_SIM_OFFLINE_ONLY"}
