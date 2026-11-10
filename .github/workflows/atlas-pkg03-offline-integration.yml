@@ -1,0 +1,47 @@
+name: PKG03 actual-component isolated offline integration
+on:
+  push:
+    branches: [codex/pkg03-offline-integration]
+  pull_request:
+    paths:
+      - 'tools/atlas_pkg03_*.py'
+      - 'tests/test_atlas_pkg03_offline.py'
+      - '.github/workflows/atlas-pkg03-offline-integration.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pinned-offline:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install pytest pytest-timeout websocket-client
+      - name: Fetch immutable source objects only
+        run: python -B tools/atlas_pkg03_stage.py "${{ runner.temp }}/pkg03-fetch" --fetch
+      - name: One-command offline vertical slice and actual crash/replay
+        run: python -B tools/atlas_pkg03_smoke.py --output pkg03-evidence
+      - name: Exact source, adversarial boundaries and receipt tests
+        run: python -B -m pytest tests/test_atlas_pkg03_offline.py -q --junitxml=pkg03-tests.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pkg03-${{ matrix.os }}-${{ matrix.python }}
+          path: |
+            pkg03-evidence/delivery.json
+            pkg03-evidence/run/*.json
+            pkg03-evidence/run/*.jsonl
+            pkg03-evidence/overlay/source-overlay.json
+            pkg03-tests.xml
