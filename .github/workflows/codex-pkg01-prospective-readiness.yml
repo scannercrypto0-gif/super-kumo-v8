@@ -25,8 +25,8 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: python -m unittest discover -s tests -p test_aql_core_prospective_readiness_v1.py -v
       - run: python -m tools.core_prospective_readiness_smoke --output pkg01-receipt.json
-      - name: Require deterministic checked-in receipt parity
-        run: python -c "from pathlib import Path; assert Path('pkg01-receipt.json').read_bytes() == Path('docs/evidence/pkg01/synthetic-receipt.json').read_bytes()"
+      - name: Require deterministic canonical receipt parity across line endings
+        run: python -c "import json; from pathlib import Path; from research_wp_r0.aql_archive_custody_bridge_v1 import canonical; assert canonical(json.loads(Path('pkg01-receipt.json').read_bytes())) == canonical(json.loads(Path('docs/evidence/pkg01/synthetic-receipt.json').read_bytes()))"
       - uses: actions/upload-artifact@v4
         with:
           name: pkg01-${{ matrix.os }}-${{ matrix.python }}
