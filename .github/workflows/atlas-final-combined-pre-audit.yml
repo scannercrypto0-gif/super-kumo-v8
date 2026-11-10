@@ -1,0 +1,52 @@
+name: ATLAS final combined pre-Audit evidence
+on:
+  push:
+    branches: [integration/final-pre-audit-combined-20261110]
+permissions:
+  contents: read
+jobs:
+  combined:
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      BINANCE_LIVE_TEST: '0'
+      PYTHONDONTWRITEBYTECODE: '1'
+      GIT_CONFIG_COUNT: '2'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+      GIT_CONFIG_KEY_1: core.eol
+      GIT_CONFIG_VALUE_1: lf
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          path: candidate
+          ref: ee8107d88069c73b13abdffb8c5bd1770e2c961b
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify immutable candidate and run only changed seams
+        shell: pwsh
+        working-directory: candidate
+        run: |
+          if ((git rev-parse HEAD) -ne 'ee8107d88069c73b13abdffb8c5bd1770e2c961b') { throw 'Unexpected candidate commit' }
+          if ((git write-tree) -ne '004fc58ad57d70bff7e41c60cdcf5ac1b59abc1e') { throw 'Unexpected candidate tree' }
+          python -m pip install -e ".[dev]"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:PYTHONPATH = '.'
+          $env:G3_UPSTREAM_FILE = Join-Path $PWD 'src/aql/observation/prospective.py'
+          python -B -m pytest -q ../harness/.github/atlas_evidence/test_final_overlay.py tests/test_atlas_prospective_archive.py tests/paper_sim/test_upstream_integration.py -k 'ForwardEvidence or forward_contract or real_scanner_receipts or real_pinned_observer' --junitxml=atlas-final.xml
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: atlas-final-${{ matrix.os }}
+          path: candidate/atlas-final.xml
