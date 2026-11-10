@@ -35,6 +35,8 @@ jobs:
         run: python -B tools/atlas_pkg03_smoke.py --output pkg03-evidence
       - name: Exact source, adversarial boundaries and receipt tests
         run: python -B -m pytest tests/test_atlas_pkg03_offline.py -q --junitxml=pkg03-tests.xml
+      - name: Four delivered packages final acceptance protocol (report may be BLOCKED)
+        run: python -B tools/atlas_pkg03_final_acceptance.py --fetch --output final-acceptance-evidence
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -45,3 +47,10 @@ jobs:
             pkg03-evidence/run/*.jsonl
             pkg03-evidence/overlay/source-overlay.json
             pkg03-tests.xml
+            final-acceptance-evidence/final-acceptance.json
+            final-acceptance-evidence/candidate-manifest.json
+            final-acceptance-evidence/gateway-attempt-*.log
+            final-acceptance-evidence/core.json
+            final-acceptance-evidence/factory/report.json
+            final-acceptance-evidence/factory/negative-rejections.json
+            final-acceptance-evidence/operational/delivery.json
