@@ -1,0 +1,79 @@
+{
+  "controls": [
+    "oos_peek",
+    "embargo_breach",
+    "source_pin_substitution",
+    "authority_escalation",
+    "false_maker_touch_fill",
+    "hidden_attempt_chain",
+    "missing_terminal_detected",
+    "double_cost"
+  ],
+  "fresh_process_replay": "BYTE_IDENTICAL",
+  "market_inference": "NOT_ESTIMABLE_SYNTHETIC",
+  "result": "de2f5ee30444edb37bf1cd96e5bd63265b03c104216c68e456d8b8b8c6b13178",
+  "return_metrics": {
+    "synthetic_oos/BASE": {
+      "gross_return_sum": "0.004937795576530732549081361",
+      "modeled_count": 5,
+      "net_return_sum": "0.001937795576530732549081361",
+      "unknown_outcomes": 1
+    },
+    "synthetic_oos/PLACEBO": {
+      "gross_return_sum": "0.004937795576530732549081361",
+      "modeled_count": 5,
+      "net_return_sum": "0.001937795576530732549081361",
+      "unknown_outcomes": 1
+    },
+    "synthetic_oos/SHADOW": {
+      "gross_return_sum": "0.004937795576530732549081361",
+      "modeled_count": 5,
+      "net_return_sum": "-0.004062204423469267450918639",
+      "unknown_outcomes": 1
+    },
+    "train/BASE": {
+      "gross_return_sum": "0.004937795576530732549081361",
+      "modeled_count": 5,
+      "net_return_sum": "0.001937795576530732549081361",
+      "unknown_outcomes": 1
+    },
+    "train/PLACEBO": {
+      "gross_return_sum": "0.004937795576530732549081361",
+      "modeled_count": 5,
+      "net_return_sum": "0.001937795576530732549081361",
+      "unknown_outcomes": 1
+    },
+    "train/SHADOW": {
+      "gross_return_sum": "0.004937795576530732549081361",
+      "modeled_count": 5,
+      "net_return_sum": "-0.004062204423469267450918639",
+      "unknown_outcomes": 1
+    },
+    "validation/BASE": {
+      "gross_return_sum": "0.004937795576530732549081361",
+      "modeled_count": 5,
+      "net_return_sum": "0.001937795576530732549081361",
+      "unknown_outcomes": 1
+    },
+    "validation/MISSING_CONTROL": {
+      "gross_return_sum": "0",
+      "modeled_count": 0,
+      "net_return_sum": "0",
+      "unknown_outcomes": 0
+    },
+    "validation/PLACEBO": {
+      "gross_return_sum": "0.004937795576530732549081361",
+      "modeled_count": 5,
+      "net_return_sum": "0.001937795576530732549081361",
+      "unknown_outcomes": 1
+    },
+    "validation/SHADOW": {
+      "gross_return_sum": "0.004937795576530732549081361",
+      "modeled_count": 5,
+      "net_return_sum": "-0.004062204423469267450918639",
+      "unknown_outcomes": 1
+    }
+  },
+  "sha256": "329a2290c12b412fb63c695a800ea7cb63c0fc337b5d831c36388d32dc451955",
+  "trial": "8ee17f476a36208452e5b573d9c60d5143ab09c1bdcb83778fe1c6224161994a"
+}

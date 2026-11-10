@@ -1,0 +1,284 @@
+{
+  "historical_pit": "NOT_ATTESTED",
+  "paired": {
+    "synthetic_oos": {
+      "paired_modeled_outcomes": 5,
+      "placebo_delta_bps": 0,
+      "shadow_delta_bps": -12,
+      "unknown_outcomes": 1
+    },
+    "train": {
+      "paired_modeled_outcomes": 5,
+      "placebo_delta_bps": 0,
+      "shadow_delta_bps": -12,
+      "unknown_outcomes": 1
+    },
+    "validation": {
+      "paired_modeled_outcomes": 5,
+      "placebo_delta_bps": 0,
+      "shadow_delta_bps": -12,
+      "unknown_outcomes": 1
+    }
+  },
+  "records": {
+    "synthetic_oos/BASE": {
+      "attempt": "RESEARCH-H-GENERIC-24232d0b2368663d97d443f945634d7b444678dcc411ea63bfb33b78fa42e354",
+      "cohort": {
+        "cohort_class": "GENERIC_SCANNER_H",
+        "coverage": "COMPLETE",
+        "decision_slots": 64,
+        "entry_signals": 61,
+        "exit_signals": 0,
+        "expected_bars": 64,
+        "focus_bar_count": 64,
+        "missing_bars": 0,
+        "modeled_trades": 5,
+        "no_signal_bars": 0,
+        "observed_bars": 64,
+        "signal_unknown": 3,
+        "unknown_trades": 1
+      },
+      "hashes": {
+        "package_sha256": "47b3a15a92eb266bef7059e2acae39af381b9a6741c5d7ad27a8d631eff327ed",
+        "result_sha256": "f0007ea3552d70042d12bae60afb24c55e4e522eb0eb2041ec7eec4991251971",
+        "scientific_lab_sha256": "03bdd12abb5d46ca1b81fb99bee105e686991bc2ebad461f0d4f8883d77ad1c6",
+        "trade_ledger_sha256": "11bca7bad6cab2dc9cc2fd5e9d4e912bbd91b07ff695a9c11ec8d748af07b0e5"
+      }
+    },
+    "synthetic_oos/PLACEBO": {
+      "attempt": "RESEARCH-H-GENERIC-5b38086c3f57ba7e09d71bd8e5db5bce8b6ed365caefb4cc2e82fdd2deba9e30",
+      "cohort": {
+        "cohort_class": "GENERIC_SCANNER_H",
+        "coverage": "COMPLETE",
+        "decision_slots": 64,
+        "entry_signals": 61,
+        "exit_signals": 0,
+        "expected_bars": 64,
+        "focus_bar_count": 64,
+        "missing_bars": 0,
+        "modeled_trades": 5,
+        "no_signal_bars": 0,
+        "observed_bars": 64,
+        "signal_unknown": 3,
+        "unknown_trades": 1
+      },
+      "hashes": {
+        "package_sha256": "db00e1d54f79615e1aa91e32111a0bc8de72f91968e8065be279b47788e62258",
+        "result_sha256": "5ac62b6ebd955e11574e0811837757e9a8b0b5f3025227c16e9aac2084a09464",
+        "scientific_lab_sha256": "a004442399c65498004ed473d70b76f0129b8786b9f06dd05b2dc3d2e787ffd8",
+        "trade_ledger_sha256": "52122eeb532ca5c1ef1bbf5c1d69c16aa8a54e7e4321c089e280e42c5f79e869"
+      }
+    },
+    "synthetic_oos/SHADOW": {
+      "attempt": "RESEARCH-H-GENERIC-8663bf40db4598cd3e89d244753fa99aebf7d3b6a3589a86e20c81c48ec03a21",
+      "cohort": {
+        "cohort_class": "GENERIC_SCANNER_H",
+        "coverage": "COMPLETE",
+        "decision_slots": 64,
+        "entry_signals": 61,
+        "exit_signals": 0,
+        "expected_bars": 64,
+        "focus_bar_count": 64,
+        "missing_bars": 0,
+        "modeled_trades": 5,
+        "no_signal_bars": 0,
+        "observed_bars": 64,
+        "signal_unknown": 3,
+        "unknown_trades": 1
+      },
+      "hashes": {
+        "package_sha256": "775df8d013721c76b527b0b632c9419bfef1b7e6594fd4678139e2691464b5f7",
+        "result_sha256": "9c1a82d5781ac886e7ea3abe05793cb4b374c1ce3f749790e9c0d074c2c6d154",
+        "scientific_lab_sha256": "293769e3b9b9df5e1b29e8ed267d939d1c11ed6e6ccbc7b0c249c2927c583f93",
+        "trade_ledger_sha256": "11f2c132175ff68fd1e5011326d77d9d1de00fed9c84a7149e4d14aa0bc6921c"
+      }
+    },
+    "train/BASE": {
+      "attempt": "RESEARCH-H-GENERIC-6459a8033ae2b0542d5f4538ba252fbb0c2a77c019c3fef6eb81677559194ecf",
+      "cohort": {
+        "cohort_class": "GENERIC_SCANNER_H",
+        "coverage": "COMPLETE",
+        "decision_slots": 64,
+        "entry_signals": 61,
+        "exit_signals": 0,
+        "expected_bars": 64,
+        "focus_bar_count": 64,
+        "missing_bars": 0,
+        "modeled_trades": 5,
+        "no_signal_bars": 0,
+        "observed_bars": 64,
+        "signal_unknown": 3,
+        "unknown_trades": 1
+      },
+      "hashes": {
+        "package_sha256": "92c43936412d0f747590caf31b90b19a4f81b06790c289f6fc734d91fc80b840",
+        "result_sha256": "b174418dc292a137b97ff89c50469aa0ed95011b727daf9db1b877256c1531ae",
+        "scientific_lab_sha256": "8df7fa79865a103c63c297d3e66b28bf8c46dc3131f32dd0d3199128b671db4b",
+        "trade_ledger_sha256": "0734e9f0d66c5dec37e2b2dac0374ec4b92c05210defc7cc4ff5f22edf10d131"
+      }
+    },
+    "train/PLACEBO": {
+      "attempt": "RESEARCH-H-GENERIC-2943289d4ebb3aa732ed12b27a08ecb4f3e1176265d11e49878bccbd459158a4",
+      "cohort": {
+        "cohort_class": "GENERIC_SCANNER_H",
+        "coverage": "COMPLETE",
+        "decision_slots": 64,
+        "entry_signals": 61,
+        "exit_signals": 0,
+        "expected_bars": 64,
+        "focus_bar_count": 64,
+        "missing_bars": 0,
+        "modeled_trades": 5,
+        "no_signal_bars": 0,
+        "observed_bars": 64,
+        "signal_unknown": 3,
+        "unknown_trades": 1
+      },
+      "hashes": {
+        "package_sha256": "a40881fab29869a9a96b69e734c278394037019b2abc8e5faecac06bae6c85ee",
+        "result_sha256": "ecc3202a0e56d0273128031f87262a77ad50e843b731de2747a8a0a77fb052ba",
+        "scientific_lab_sha256": "d17eb29f54a052f1e146229c3322bc01f87d6acfd5d086b2e4a5d32c603008f9",
+        "trade_ledger_sha256": "e33ff0be129136ed7d29334a583644339a8345c06893b5916565d1f54bc0f0e9"
+      }
+    },
+    "train/SHADOW": {
+      "attempt": "RESEARCH-H-GENERIC-477a20170e6b341fffed372671b711ed37f8e5a9a6a629068c313e9eed1610ed",
+      "cohort": {
+        "cohort_class": "GENERIC_SCANNER_H",
+        "coverage": "COMPLETE",
+        "decision_slots": 64,
+        "entry_signals": 61,
+        "exit_signals": 0,
+        "expected_bars": 64,
+        "focus_bar_count": 64,
+        "missing_bars": 0,
+        "modeled_trades": 5,
+        "no_signal_bars": 0,
+        "observed_bars": 64,
+        "signal_unknown": 3,
+        "unknown_trades": 1
+      },
+      "hashes": {
+        "package_sha256": "10f0558971cc766713968e96cad9e0a7e5540e502e101335403c5c7baa656356",
+        "result_sha256": "032cb17f6ece53bcde0f716a68a7ca47a1a1b2d4fa2aaf06c3c703848cb83bbb",
+        "scientific_lab_sha256": "0802db5aa2a9a38d66341696bda906dfafc492fb0e569ac1c070f6becfe38721",
+        "trade_ledger_sha256": "b998c50f80a3345691c0909670dd5edc7b7a020cc92167f79ce70d4523531cdf"
+      }
+    },
+    "validation/BASE": {
+      "attempt": "RESEARCH-H-GENERIC-43ab0181dff08dc8ce061089380a3b3e2a69493fe9c07d4ddcc2b39043e6997b",
+      "cohort": {
+        "cohort_class": "GENERIC_SCANNER_H",
+        "coverage": "COMPLETE",
+        "decision_slots": 64,
+        "entry_signals": 61,
+        "exit_signals": 0,
+        "expected_bars": 64,
+        "focus_bar_count": 64,
+        "missing_bars": 0,
+        "modeled_trades": 5,
+        "no_signal_bars": 0,
+        "observed_bars": 64,
+        "signal_unknown": 3,
+        "unknown_trades": 1
+      },
+      "hashes": {
+        "package_sha256": "d63aea7ad043853a3db320cd6c1332a5721740ed3fdd41c1065bbac416cc4216",
+        "result_sha256": "82997f80da923663a9d5df5b8d9a70b61dc0415e799bc176655f8b1c779aec23",
+        "scientific_lab_sha256": "b0806faf56311c2783720a03cd8120cb332b5770ba9e9acb0d635b011fff8948",
+        "trade_ledger_sha256": "d0a8b04906cc1218b7a1687441f18b740b2a2f591ab4ce9acb5804b8b87c7d6b"
+      }
+    },
+    "validation/MISSING_CONTROL": {
+      "attempt": "RESEARCH-H-GENERIC-de3fed7139057924aaf373fe6605a76f6bd99eded0c62e75962f6b2c70c8457a",
+      "cohort": {
+        "cohort_class": "GENERIC_SCANNER_H",
+        "coverage": "PARTIAL",
+        "decision_slots": 64,
+        "entry_signals": 0,
+        "exit_signals": 0,
+        "expected_bars": 64,
+        "focus_bar_count": 63,
+        "missing_bars": 1,
+        "modeled_trades": 0,
+        "no_signal_bars": 0,
+        "observed_bars": 63,
+        "signal_unknown": 64,
+        "unknown_trades": 0
+      },
+      "hashes": {
+        "package_sha256": "89c802517413aa6def9e49eb7d7d65070e696cf5bf89a7f533ba1e2c73d92707",
+        "result_sha256": "818e710b3c1b682a30c73de3ae973d26d40afa28c3c70c37c98ff6e1f9a5803e",
+        "scientific_lab_sha256": "e31b4fee29eb9c943529292f31b8ec848772c772444f78871bce2425f0f636e8",
+        "trade_ledger_sha256": "1fc5ef00f15e7e4ddd814cf16cdb582c9d5968fd025a22d46685fd5a24192ebe"
+      }
+    },
+    "validation/PLACEBO": {
+      "attempt": "RESEARCH-H-GENERIC-7e13d97f5da84380109b5ba3a9fc8ffa7d644c1ae5087287927071addf95465f",
+      "cohort": {
+        "cohort_class": "GENERIC_SCANNER_H",
+        "coverage": "COMPLETE",
+        "decision_slots": 64,
+        "entry_signals": 61,
+        "exit_signals": 0,
+        "expected_bars": 64,
+        "focus_bar_count": 64,
+        "missing_bars": 0,
+        "modeled_trades": 5,
+        "no_signal_bars": 0,
+        "observed_bars": 64,
+        "signal_unknown": 3,
+        "unknown_trades": 1
+      },
+      "hashes": {
+        "package_sha256": "e93eaa95a6624399c9c1efe5938644c2c17c3b5b3129742fae490010acb55d3d",
+        "result_sha256": "57b29d2ddce367c2b2d1c66fde1657d5939d72e5187ec69f899d809548bf6ae6",
+        "scientific_lab_sha256": "f5780ed4101ed4350b5be45e56ea3d84c1eef23e77db449a835d1186d6bcb016",
+        "trade_ledger_sha256": "29279dad1a245e2581d43fc048353664c8f2b035875532abe0dba89d66da7244"
+      }
+    },
+    "validation/SHADOW": {
+      "attempt": "RESEARCH-H-GENERIC-ecdc325fcf716d3a7b0c6577d5b853fec96a8e7ba2792dbd4d049c4373397a7e",
+      "cohort": {
+        "cohort_class": "GENERIC_SCANNER_H",
+        "coverage": "COMPLETE",
+        "decision_slots": 64,
+        "entry_signals": 61,
+        "exit_signals": 0,
+        "expected_bars": 64,
+        "focus_bar_count": 64,
+        "missing_bars": 0,
+        "modeled_trades": 5,
+        "no_signal_bars": 0,
+        "observed_bars": 64,
+        "signal_unknown": 3,
+        "unknown_trades": 1
+      },
+      "hashes": {
+        "package_sha256": "5a834fbef8b47982424463e719f0aa6f239fe70b5cc0b22f776ccfcc909e505f",
+        "result_sha256": "64fbb4d183e76898189c3326b0818e0055447ea07f81421af9677b35f5217641",
+        "scientific_lab_sha256": "fa1c544bb5f80c6312ad9e497a3dd8a26aa59c8d4f39cb437d58213754dc7ea4",
+        "trade_ledger_sha256": "4142ae6ceab780527c4288a98884e7b863e32fd4ce2a851dbd5a263e28c25b5f"
+      }
+    }
+  },
+  "registry": {
+    "by_state": {
+      "ABANDONED": 0,
+      "COMPLETE": 10,
+      "FAILED": 0,
+      "INVALID": 0,
+      "PENDING": 0,
+      "REGISTERED": 0
+    },
+    "entry_count": 30,
+    "head_digest": "fc83d595a32a0f31b2b3b74fa0d5ee4b7354255ae8fe0a376114cdb3a53f745b",
+    "incomplete_attempts": 0,
+    "total_attempts": 10
+  },
+  "scope": "SYNTHETIC_ONLY",
+  "sha256": "de2f5ee30444edb37bf1cd96e5bd63265b03c104216c68e456d8b8b8c6b13178",
+  "trading_authority": "NONE",
+  "trial_id": "8ee17f476a36208452e5b573d9c60d5143ab09c1bdcb83778fe1c6224161994a",
+  "uncertainty": "INFERENCE_NOT_ESTIMABLE_FROM_SINGLE_GENERATED_PATH_PER_PARTITION"
+}

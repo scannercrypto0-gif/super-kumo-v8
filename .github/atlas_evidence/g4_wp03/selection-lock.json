@@ -1,0 +1,14 @@
+{
+  "completed_non_oos": [
+    "train/BASE",
+    "train/PLACEBO",
+    "train/SHADOW",
+    "validation/BASE",
+    "validation/MISSING_CONTROL",
+    "validation/PLACEBO",
+    "validation/SHADOW"
+  ],
+  "fixed_selection": "FIXED_BEFORE_EVALUATION_NO_TUNING",
+  "registration": "8ee17f476a36208452e5b573d9c60d5143ab09c1bdcb83778fe1c6224161994a",
+  "sha256": "57ba0459597b2f9a5e6978f3514f22235da905574536e02d43b9cb2ba3d7b672"
+}
