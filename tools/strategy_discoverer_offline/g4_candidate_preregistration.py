@@ -39,7 +39,15 @@ def _sha(s):
 def _canonical(value, cls, label):
     _need(type(value) is dict, label + "_TYPE")
     try:
-        obj = cls(**value) if cls is not NominationEvidenceV1 else cls.from_dict(value)
+        unpacked = dict(value)
+        if cls is SearchPlan:
+            unpacked["hypothesis_ids"] = tuple(unpacked["hypothesis_ids"])
+        elif cls is HypothesisProposal:
+            unpacked["assumptions"] = tuple(unpacked["assumptions"])
+        elif cls is ValidationProtocolV1:
+            for name in ("comparator_slate", "predeclared_metrics", "evaluation_gates"):
+                unpacked[name] = tuple(unpacked[name])
+        obj = cls.from_dict(value) if cls is NominationEvidenceV1 else cls(**unpacked)
         actual = obj.to_dict()
     except (TypeError, KeyError, ValueError, AttributeError) as exc:
         raise G4CandidatePreregError("G4_DISCOVERER_" + label + "_INVALID") from exc
