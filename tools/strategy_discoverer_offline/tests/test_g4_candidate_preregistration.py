@@ -24,6 +24,9 @@ from tools.strategy_discoverer_offline.tests.test_d_scan_1_candidate_bridge impo
 def setup(tmp_path):
     candidate, nomination = case()
     family = get_family(candidate["family_id"])
+    # D-SCAN-1 fixture predates G4 and is not tied to registry family version.
+    # G4 binds the sealed candidate to the actual frozen family identity.
+    candidate["family_version"] = family.version
     hypothesis = HypothesisProposal.build(
         family=family, hypothesis_id="g4-synthetic-hypothesis",
         parameter_config={}, entry_direction="LONG",
