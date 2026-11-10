@@ -1,0 +1,75 @@
+name: ATLAS G1 disposable Supabase evidence
+on:
+  push:
+    branches: [integration/g1-supabase-probe-20261110]
+    paths: ['.github/atlas_evidence/g1-run.request']
+permissions:
+  contents: read
+concurrency:
+  group: atlas-g1-disposable-supabase
+  cancel-in-progress: false
+jobs:
+  probe:
+    if: github.event_name == 'push' && github.run_attempt == 1 && github.ref == 'refs/heads/integration/g1-supabase-probe-20261110'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: atlas-g1-supabase-probe
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ee8107d88069c73b13abdffb8c5bd1770e2c961b
+          path: candidate
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Verify source and install client
+        run: |
+          test "$(git -C candidate rev-parse HEAD)" = ee8107d88069c73b13abdffb8c5bd1770e2c961b
+          echo '9e69076fbf4d240597e0eccf588a0ac47cd1acd0d47f5a74c4405c3da3a93714  harness/.github/atlas_evidence/supabase_one_shot.py' | sha256sum -c -
+          python -m pip install --disable-pip-version-check 'psycopg[binary]==3.2.9'
+      - name: Run one bounded external writer probe
+        env:
+          ATLAS_DISPOSABLE_SUPABASE_DSN: ${{ secrets.ATLAS_DISPOSABLE_SUPABASE_DSN }}
+          ATLAS_SUPABASE_CA_PEM: ${{ vars.ATLAS_SUPABASE_CA_PEM }}
+          ATLAS_DISPOSABLE_SUPABASE_AUTHORIZED: '1'
+          PYTHONPATH: ${{ github.workspace }}/candidate/src
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+          from psycopg.conninfo import make_conninfo
+
+          raw = os.environ.get("ATLAS_DISPOSABLE_SUPABASE_DSN")
+          pem = os.environ.get("ATLAS_SUPABASE_CA_PEM", "")
+          if not raw or not pem.strip().startswith("-----BEGIN CERTIFICATE-----"):
+              raise SystemExit("Missing environment writer DSN or CA PEM")
+          root = Path(os.environ["RUNNER_TEMP"])
+          cert = root / "atlas-supabase-ca.pem"
+          cert.write_text(pem.strip() + "\n", encoding="ascii")
+          env = os.environ.copy()
+          try:
+              env["ATLAS_DISPOSABLE_SUPABASE_DSN"] = make_conninfo(
+                  raw, sslmode="verify-full", sslrootcert=str(cert))
+          except Exception:
+              raise SystemExit("Invalid connection configuration") from None
+          result = subprocess.run(
+              [sys.executable, "-B", "harness/.github/atlas_evidence/supabase_one_shot.py"],
+              env=env, capture_output=True, text=True, timeout=120,
+          )
+          if result.returncode:
+              raise SystemExit("Probe failed; review DB-side state before scheduling another run")
+          import json
+          try:
+              report = json.loads(result.stdout)
+              assert report["remote_count"] == 1 and report["candidate"] == "ee8107d88069c73b13abdffb8c5bd1770e2c961b"
+          except Exception:
+              raise SystemExit("Probe did not produce the expected receipt") from None
+          print(json.dumps(report, indent=2))
+          PY
