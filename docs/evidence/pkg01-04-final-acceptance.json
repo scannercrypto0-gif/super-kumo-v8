@@ -1,0 +1,103 @@
+{
+  "bases": {
+    "pkg01": "99c27ea2c1a4d41aaae361141301a8a9ea3b33c3",
+    "pkg02": "04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
+    "pkg03": "182331b90efdcc31cf04476200fe09b45e16997c",
+    "pkg04": "90af9794880cbeb00e7e974bfa906ff5e9666183"
+  },
+  "commands": [
+    {
+      "command": [
+        "python",
+        "-B",
+        "-m",
+        "tools.core_prospective_readiness_smoke",
+        "--output",
+        "$CANDIDATE\\core.json"
+      ],
+      "lane": "pkg01",
+      "name": "core",
+      "returncode": 0
+    },
+    {
+      "command": [
+        "python",
+        "-B",
+        "-m",
+        "tools.atlas_factory_pkg02_execution_smoke",
+        "--output-dir",
+        "$CANDIDATE\\factory"
+      ],
+      "lane": "pkg02",
+      "name": "factory",
+      "returncode": 0
+    },
+    {
+      "command": [
+        "python",
+        "-B",
+        "tools/atlas_pkg03_smoke.py",
+        "--repo",
+        "$REPO",
+        "--output",
+        "$CANDIDATE\\operational"
+      ],
+      "lane": "pkg03",
+      "name": "operational",
+      "returncode": 0
+    }
+  ],
+  "composite_sha256": "2849605d237c97851031d59efa32ed82fa178cbb4a6fe35c55f35c861e075f01",
+  "core_report_sha256": "eb7a869c44e4506ea80a093b127b4cffc7a438dc9ccc104aa796f768136cfb8e",
+  "discoverer_factory_join": "NOT_AVAILABLE_IN_PKG04_NATIVE_CONSUMER",
+  "factory_modeled_fills_promoted_to_real": false,
+  "factory_negative_rejections": 9,
+  "factory_report_sha256": "b7a0aaf75bf350911bafdfc62b51efc1c4174189589155153d5dbd059a91214e",
+  "factory_rows": 72,
+  "gateway_input_bytes_unchanged": true,
+  "gateway_manifest_sha256": "77304f4611b11e86e8f177fc072746b231190a90025f6a9178685b48f0faf753",
+  "gateway_runs": [
+    {
+      "response": {
+        "code": "UNSUPPORTED_MATURE_EVIDENCE_CONTRACT",
+        "status": "REJECTED"
+      },
+      "returncode": 2
+    },
+    {
+      "response": {
+        "code": "UNSUPPORTED_MATURE_EVIDENCE_CONTRACT",
+        "status": "REJECTED"
+      },
+      "returncode": 2
+    }
+  ],
+  "one_owner_handoff": {
+    "affected_regression_only": "Rerun this persisted producer-to-consumer seam and PKG04 focused negatives; no accepted G4 or original rerun",
+    "minimum_fix": "Extend only PKG04 native evidence consumer for mature/missing horizon parents and persisted research lineage; keep UNKNOWN and modeled-only boundaries. Research proposal/attempt/trial parent bundle must be supplied by Discoverer/Factory; never invent the join.",
+    "owner": "PKG04 consumer owner via Integration #271",
+    "reproducible_failure": "UNSUPPORTED_MATURE_EVIDENCE_CONTRACT on current native PKG03 export"
+  },
+  "operational_delivery_sha256": "7b3e24246fbd3159f56a21b6696e27806b9d8060e6aef65b8a05afa9893d966a",
+  "operational_overlay_sha256": "ed6e7297c7bd8c04dd1999606b54989f5b13dce7c7255afe0250efa864fc6057",
+  "pinned_source_bytes_unchanged": true,
+  "pins": {
+    "pkg01": "612d1444ff36ed08b63fd0a98bb8d4e71f88cd0d",
+    "pkg02": "ea4ffd5ce278d93588338122ab6ac1af8ec4da26",
+    "pkg03": "3b31fcc697deeab5b9489f20e026ebede1f4cf85",
+    "pkg04": "a79b26f300f0e4a35c37d231a9d8f3fc0d97d031"
+  },
+  "release_acceptance": "NOT_GRANTED",
+  "schema": "aql.integration.four-package-final-acceptance.v1",
+  "scope": {
+    "G0": "NOT_APPROVED",
+    "external_market_data": false,
+    "merge": false,
+    "observer_reset": false,
+    "original_data_run": false,
+    "paid_resources": false,
+    "trading_authority": "NONE"
+  },
+  "sha256": "e1a672037a33a8a82d50bceb230d21657dfdafbe69bbc949b3ccd83cfd2526b0",
+  "status": "BLOCKED_EXACT_PKG04_EVIDENCE_CONSUMER_SEAM"
+}
