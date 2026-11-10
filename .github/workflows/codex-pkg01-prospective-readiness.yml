@@ -1,0 +1,33 @@
+name: CODEX PKG01 Prospective Safety Rehearsal
+on:
+  push:
+    branches: [codex/pkg01-prospective-admission]
+  pull_request:
+    paths:
+      - research_wp_r0/aql_core_prospective_readiness_v1.py
+      - tools/core_prospective_readiness_smoke.py
+      - tests/test_aql_core_prospective_readiness_v1.py
+      - .github/workflows/codex-pkg01-prospective-readiness.yml
+jobs:
+  prospective-safety:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.13']
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHONPATH: src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m unittest discover -s tests -p test_aql_core_prospective_readiness_v1.py -v
+      - run: python -m tools.core_prospective_readiness_smoke --output pkg01-receipt.json
+      - name: Require deterministic canonical receipt parity across line endings
+        run: python -c "import json; from pathlib import Path; from research_wp_r0.aql_archive_custody_bridge_v1 import canonical; assert canonical(json.loads(Path('pkg01-receipt.json').read_bytes())) == canonical(json.loads(Path('docs/evidence/pkg01/synthetic-receipt.json').read_bytes()))"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pkg01-${{ matrix.os }}-${{ matrix.python }}
+          path: pkg01-receipt.json
