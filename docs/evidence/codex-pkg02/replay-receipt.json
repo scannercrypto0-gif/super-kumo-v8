@@ -1,0 +1,11 @@
+{
+  "assessment": "SYNTHETIC_ENGINEERING_ONLY_NO_ALPHA_CLAIM",
+  "code_sha256": "66075001b6e17bc9b45415c1d48721b9c2d9501b4f83ed8011b27d28afb5b077",
+  "input_sha256": "25445b37c1c3ca4e04bf202e49f1a2eb862779b6023552d1e5315638ffa1cfa2",
+  "package_sha256": "2b9c3cb759b2aad90d7de1010b71ac44b08cd5728f359f6f093ef4f0887d9062",
+  "receipt_sha256": "1947cfbcfebe00c653d4f385fa89f040544c387cca54a961bcf7062034684074",
+  "report_sha256": "b7a0aaf75bf350911bafdfc62b51efc1c4174189589155153d5dbd059a91214e",
+  "schema": "aql.factory.h.execution-comparison-receipt.v1",
+  "store_status": "REPLAY_IDENTICAL",
+  "trading_authority": "NONE"
+}
