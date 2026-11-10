@@ -1,0 +1,43 @@
+name: First research cycle intake
+on:
+  pull_request:
+    paths: ['tools/first_research_cycle/**', '.github/workflows/first-research-cycle.yml']
+  push:
+    branches: ['codex/first-research-cycle-01']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  intake:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONPATH: '.:src'
+      CYCLE_EXPORT_RECEIPT: simulated-adapter-result.json
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - run: python -m pip install pytest
+      - name: Set native module search path
+        shell: python
+        run: |
+          import os
+          with open(os.environ['GITHUB_ENV'],'a') as f:
+              f.write('PYTHONPATH='+os.pathsep.join(('.', 'src'))+'\n')
+              f.write('CYCLE_DEPS='+os.path.abspath('.cycle-dependencies')+'\n')
+      - name: Stage pinned source dependencies only
+        run: python -B tools/first_research_cycle/stage_dependencies.py --fetch --output .cycle-dependencies
+      - run: python -B -m pytest tools/first_research_cycle -q --basetemp=.cycle-tests --junitxml=cycle-tests.xml
+      - run: python -B -m tools.first_research_cycle.cycle --output cycle-readiness.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: first-cycle-${{ matrix.os }}
+          path: |
+            cycle-tests.xml
+            cycle-readiness.json
+            simulated-adapter-result.json

@@ -1,0 +1,40 @@
+{
+  "acceptance": "100percent separate census reconciliation; no leakage or double cost; unknown preserved; two process equal hashes; never require positive alpha",
+  "accepted_period_reuse": "OWNER_AUTHORIZED_NEW_HISTORICAL_CYCLE_NO_OLD_SUITE_RERUN",
+  "baseline": "INDEPENDENT_PREDECLARED_NULL",
+  "baseline_sha256": "55489f6dcc3034ac8a306004ed85e153d161a698e3c58b53c856258670e67a09",
+  "candidate_budget": 1,
+  "candidate_id": "retained_G4_candidate_01",
+  "candidate_origin": "RETAINED_SYNTHETIC_CANDIDATE_NOT_AUTHORIZED_REAL_STRATEGY_OR_ALPHA",
+  "cohort_rule": "Prefer a new permitted 2024 SPOT/15m partition; otherwise owner-authorized existing March/April for a distinct historical NON_PIT cycle; never rerun old acceptance suites or touch G2",
+  "cost_contract": "aql.factory.h.execution-exit-comparison.v1@ea4ffd5ce278d93588338122ab6ac1af8ec4da26; SYNTHETIC_ONLY, actual adapter compatibility NOT_ESTABLISHED",
+  "embargo_ms": 259200000,
+  "exit_policies": [
+    "A",
+    "B",
+    "C"
+  ],
+  "folds": "ONE_CHRONOLOGICAL_TRAIN_VALIDATION_SEALED_HOLDOUT; dates bound to supplied source before evaluation",
+  "holdout": "SEALED_UNOPENED",
+  "hypothesis": "One frozen retained candidate compared with an independent predeclared null on one authorized new actual-market population; no profitability threshold",
+  "issue": 294,
+  "max_bars": 8192,
+  "metrics": [
+    "gross",
+    "net_taker",
+    "net_passive",
+    "net_stress",
+    "unknown",
+    "nonfill",
+    "drawdown",
+    "tail_risk"
+  ],
+  "owner_override": "Current user explicitly permits March/April reuse if another 2024 partition cannot be located; before any market outcomes read",
+  "schema": "aql.first-cycle.design.v1",
+  "seed": 294,
+  "selection": "NO_WINNER_NO_POST_HOLDOUT_TUNING",
+  "source_binding": "PENDING_AUTHORIZED_NEW_ACTUAL_BUNDLE",
+  "strategy_sha256": "20800c5c1c60d03618d51717914e2400e3743e9496572b23a178e59366df166d",
+  "supersedes_design_sha256": "152160b2c699c04293134baa42e77d5c8fcefbc4754341d70110cb2abac83a84",
+  "trading_authority": "NONE"
+}
