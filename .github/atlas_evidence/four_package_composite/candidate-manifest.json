@@ -1,0 +1,80 @@
+{
+  "delta_tree": "332f503f58d9233fa13de53b3bbf07adb7ce21cc",
+  "lanes": {
+    "core": {
+      "base": "99c27ea2c1a4d41aaae361141301a8a9ea3b33c3",
+      "changed_blobs": {
+        ".github/workflows/codex-pkg01-prospective-readiness.yml": "4cd51629c7c7f1798c445767edc185ae0432f3c6",
+        "docs/evidence/pkg01/synthetic-receipt.json": "e658938c9751b477f90985cce28ed2dfece41438",
+        "docs/research/codex-pkg01-prospective-readiness.md": "d14f4ff2e9f754435b89d8cd4a06b1683bc0357d",
+        "research_wp_r0/aql_core_prospective_readiness_v1.py": "0e26084313b1e80778e3f45eb0080f65d59e8294",
+        "tests/test_aql_core_prospective_readiness_v1.py": "b57c9f0fc598237d0dac77ce512a16b1a2a0a7d9",
+        "tools/core_prospective_readiness_smoke.py": "8e932fce4e2151955d90d16c3b966d8aac68e4a3"
+      },
+      "head": "612d1444ff36ed08b63fd0a98bb8d4e71f88cd0d"
+    },
+    "factory": {
+      "base": "04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
+      "changed_blobs": {
+        ".github/workflows/atlas-codex-pkg02-execution.yml": "fbd8b532a15b113fdbb16008359937ac9c0f6a71",
+        "docs/evidence/codex-pkg02/negative-rejections.json": "d469c3b08b9ecfb50f3092feb6d09b0dd2bc3a2e",
+        "docs/evidence/codex-pkg02/receipt.json": "b8ed0cab765eb29aca9c7ce75d90d670512019d8",
+        "docs/evidence/codex-pkg02/replay-receipt.json": "d2d044e62e2f1f1e67130ae0d839d0d7e8e79b35",
+        "docs/evidence/codex-pkg02/report.json": "36e1c249f0c8bed3a14c7f1db4d8655750bfa632",
+        "docs/research/codex-pkg02-execution-exit-comparison.md": "f34cbc05380262d3d3e875b47f9bbcafa4ea8ff7",
+        "research_wp_r0/aql_factory_h_execution_comparison_v1.py": "500809b12b841b34c0f92871438d8bf4907cab44",
+        "research_wp_r0/aql_factory_h_scientific_lab_v1.py": "06a575621acf1a2cd14133818360d46adda434aa",
+        "tests/test_aql_factory_pkg02_execution_comparison_v1.py": "ed734985aed770704cf34db61defb75d2859430b",
+        "tools/atlas_factory_pkg02_execution_smoke.py": "87532a8bdc8f4d75626f0d59b759475c342618ca"
+      },
+      "head": "ea4ffd5ce278d93588338122ab6ac1af8ec4da26"
+    },
+    "gateway": {
+      "base": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+      "changed_blobs": {
+        ".github/workflows/research-evidence-gateway.yml": "90a5aabb08dd63ac5b47d526a2ce13d92508d0dc",
+        "tools/research_evidence_gateway/README.md": "43e2f7bdec898d6d12392c4461f1ee9aaef3545b",
+        "tools/research_evidence_gateway/__init__.py": "e0f67ad0e5549ba33c415da7e2c243ee3f7048e0",
+        "tools/research_evidence_gateway/acceptance.py": "942d32962f900648c085af9686dab28d997342c2",
+        "tools/research_evidence_gateway/example.json": "a23d8e7aa26419dd68fb640d3eb57caa6af7b9ff",
+        "tools/research_evidence_gateway/fixtures/manifest.json": "108d7af642da8b7c5bad1fd07d2bf96d9170d9a9",
+        "tools/research_evidence_gateway/fixtures/manifest.sha256": "357a72e1a733f19afe4119b2790caea703044fb2",
+        "tools/research_evidence_gateway/fixtures/native-current/g4_current_head/closeout.json": "f911a6e70b1dac25dd473da4b1da3939e94556d7",
+        "tools/research_evidence_gateway/fixtures/native-current/g4_current_head/frozen-v2/checkpoint.json": "29252a9b74c0afdd80dd39d7984118632970d251",
+        "tools/research_evidence_gateway/fixtures/native-current/g4_current_head/frozen-v2/originals.json": "deea48f89a57c7d9c5ede792bbf44a58e2833bee",
+        "tools/research_evidence_gateway/fixtures/native-current/g4_current_head/frozen-v2/proposal.json": "58155d637cf0df6c8e75b8b82b689dcea9fe028e",
+        "tools/research_evidence_gateway/fixtures/native-current/g4_current_head/frozen-v2/registration.json": "fe4418f4caf9e7df7a021b9d42bfea369310fae1",
+        "tools/research_evidence_gateway/fixtures/native-current/g4_current_head/registry.json": "11146290465976e1694f17fedd6dbfa907a6f091",
+        "tools/research_evidence_gateway/fixtures/native-current/manifest.json": "915a5088c3616fc0b11308dba019a8b0746364cb",
+        "tools/research_evidence_gateway/fixtures/native-current/manifest.sha256": "1fdd32bd40cc7ddf396533defca742df7fe091d8",
+        "tools/research_evidence_gateway/fixtures/native-current/provenance.json": "9bd1281e337edb3fb3bbd40b762b842aa4555124",
+        "tools/research_evidence_gateway/fixtures/native-current/results.json": "c7ae39ff590c24bc85e88544fc853f9731fbaf33",
+        "tools/research_evidence_gateway/fixtures/native-current/source.json": "01f771e6a633d0760958deae0fcc8ffa1ead93f8",
+        "tools/research_evidence_gateway/fixtures/results.json": "3afb561f3c8977e147eb337f874c33bbc081a8e1",
+        "tools/research_evidence_gateway/fixtures/source.json": "4a5ebed86f2251716b90d3989f0cf1c7da236aea",
+        "tools/research_evidence_gateway/gateway.py": "03476a1c9586161826e1aaf5e3ebe99007b3738d",
+        "tools/research_evidence_gateway/research.py": "b48a7c90fd4344892351d51f35b947db179114cd",
+        "tools/research_evidence_gateway/test_gateway.py": "0d2ba9ff8e4f9e8adab6a8ea218fbee165009752",
+        "tools/research_evidence_gateway/test_native.py": "dee2516a7f75e0a7f87a9af1c761fb81f0aba4a5"
+      },
+      "head": "ccd906ac6d770e1364889623cd79bb215f7b5c63"
+    },
+    "operational": {
+      "base": "182331b90efdcc31cf04476200fe09b45e16997c",
+      "changed_blobs": {
+        ".github/workflows/atlas-pkg03-offline-integration.yml": "1f4ccc3cb14c536671565f66bdbaa8f16561c539",
+        "docs/evidence/pkg01-04-final-acceptance.json": "d63ffedef4017f39691f947f01d982891ced22d9",
+        "docs/evidence/pkg03-offline-delivery.json": "19eaaa3bd44fdc447c3879901ae468e05c7ce5c4",
+        "docs/research/pkg01-04-final-acceptance-handoff.md": "b80871f3187e39dcefeaff61f1981b1c44ca4a9a",
+        "docs/research/pkg03-offline-operational-integration.md": "0aae4ccc8b390ecb49c182adefb5d87f8e06e44c",
+        "tests/test_atlas_pkg03_offline.py": "814e0f84f53d580281d3d8b5bcc51afac2595870",
+        "tools/atlas_pkg03_final_acceptance.py": "6ce1ba4d1125d707d8de054c30393734868fde29",
+        "tools/atlas_pkg03_smoke.py": "1703e00f3873c89c33610929ffee8049b727da88",
+        "tools/atlas_pkg03_stage.py": "5383dc86de626b1616d5fdd9f141b9f45158363a"
+      },
+      "head": "c01f526e762a014e5ed84ca3cf695b9d77502ab3"
+    }
+  },
+  "main": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+  "sha256": "6d44172e674708622a914ccda55200cf529e1391f89596f48beed90d48e282f7"
+}

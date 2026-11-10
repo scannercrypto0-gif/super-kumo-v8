@@ -1,0 +1,216 @@
+{
+  "acceptance": {
+    "G0": "NOT_APPROVED",
+    "accepted_g4_executed": false,
+    "accepted_g4_source_files": {
+      "closeout.json": {
+        "commit": "7b6c8d82ca8111f5fa15dee5e6823bc39289b48c",
+        "git_blob": "f911a6e70b1dac25dd473da4b1da3939e94556d7",
+        "git_bytes_sha256": "64f5d684114cf6fe80e02b489a2a5cc255a5b38efe82cdba34fbcae2cb8bec4a",
+        "path": ".github/atlas_evidence/g4_current_head/closeout.json"
+      },
+      "frozen-v2/checkpoint.json": {
+        "commit": "7b6c8d82ca8111f5fa15dee5e6823bc39289b48c",
+        "git_blob": "29252a9b74c0afdd80dd39d7984118632970d251",
+        "git_bytes_sha256": "b6737fd2f0626c3487d5cd0931c0c95b7cb7aeec157d75c8e8dc4f369b6e55da",
+        "path": ".github/atlas_evidence/g4_current_head/frozen-v2/checkpoint.json"
+      },
+      "frozen-v2/originals.json": {
+        "commit": "7b6c8d82ca8111f5fa15dee5e6823bc39289b48c",
+        "git_blob": "deea48f89a57c7d9c5ede792bbf44a58e2833bee",
+        "git_bytes_sha256": "b17b82e57fab605ad616a54688e1f6cdc242532051df131f479d39ed3b69d150",
+        "path": ".github/atlas_evidence/g4_current_head/frozen-v2/originals.json"
+      },
+      "frozen-v2/proposal.json": {
+        "commit": "7b6c8d82ca8111f5fa15dee5e6823bc39289b48c",
+        "git_blob": "58155d637cf0df6c8e75b8b82b689dcea9fe028e",
+        "git_bytes_sha256": "20dbe9a30bd5d3e44ddf8722169d9998eef8111a952e9173fb9dedc983d8c368",
+        "path": ".github/atlas_evidence/g4_current_head/frozen-v2/proposal.json"
+      },
+      "frozen-v2/registration.json": {
+        "commit": "7b6c8d82ca8111f5fa15dee5e6823bc39289b48c",
+        "git_blob": "fe4418f4caf9e7df7a021b9d42bfea369310fae1",
+        "git_bytes_sha256": "d5ca259ea86a8ff3dad0a878c7920a0724580aa8ce1361aff072d873a4a6f868",
+        "path": ".github/atlas_evidence/g4_current_head/frozen-v2/registration.json"
+      },
+      "registry.json": {
+        "commit": "7b6c8d82ca8111f5fa15dee5e6823bc39289b48c",
+        "git_blob": "11146290465976e1694f17fedd6dbfa907a6f091",
+        "git_bytes_sha256": "b50aa97b3347201e8573bbc4219fbe9b99e5c4396cc967160c2ce447b250b3aa",
+        "path": ".github/atlas_evidence/g4_current_head/registry.json"
+      }
+    },
+    "actual_fills": null,
+    "actual_native_delivery_sha256": "7b3e24246fbd3159f56a21b6696e27806b9d8060e6aef65b8a05afa9893d966a",
+    "assumed_fill_count": 2,
+    "decisions": {
+      "ENTRY_SIGNAL": 21,
+      "UNKNOWN": 3
+    },
+    "denominators": {
+      "discoverer_attempts": 3,
+      "factory_trials": 1,
+      "factory_variants": 10,
+      "modeled_results": 1,
+      "scanner_decisions": 24,
+      "scanner_signals": 21
+    },
+    "durable_producer_bytes_unchanged": true,
+    "final_integrated_release": "PENDING_INTEGRATION_271_NOT_SELF_AWARDED",
+    "fresh_process_replay": "BYTE_IDENTICAL",
+    "horizons": {
+      "NOT_AVAILABLE": 0,
+      "UNKNOWN": 1,
+      "mature": 4,
+      "pending": 58
+    },
+    "input_bytes_unchanged": true,
+    "input_manifest_sha256": "40de1c54e53a6e191b4c8af1e3275feadcf426589fd8a1b9aa5e3125a5a8b461",
+    "integration_pin": "c01f526e762a014e5ed84ca3cf695b9d77502ab3",
+    "mature_g2_consumer_seam": "MATURE_G2_CONSUMER_SEAM_PASS",
+    "merge": false,
+    "native_driver_sha256": {
+      "atlas_pkg03_smoke.py": "f7f4474791f4060c5101d5c6388923540a917755a34f2f8890f0a31597d2f73e",
+      "atlas_pkg03_stage.py": "9e864f278d867107c02885461bbba2499dc1917f745a19335807bfaf8827d2f8"
+    },
+    "native_overlay_sha256": "ed6e7297c7bd8c04dd1999606b54989f5b13dce7c7255afe0250efa864fc6057",
+    "negative_rejections": [
+      {
+        "case": "wrong_receipt",
+        "code": "HORIZON_SOURCE_RECEIPT_SWAP",
+        "status": "REJECTED"
+      },
+      {
+        "case": "future_horizon",
+        "code": "HORIZON_FUTURE_RECORD",
+        "status": "REJECTED"
+      },
+      {
+        "case": "fake_maturity",
+        "code": "HORIZON_LINEAGE_SWAP",
+        "status": "REJECTED"
+      },
+      {
+        "case": "fake_PNL",
+        "code": "MODELED_PNL_PROMOTION",
+        "status": "REJECTED"
+      },
+      {
+        "case": "fake_fill",
+        "code": "FAKE_FILL",
+        "status": "REJECTED"
+      },
+      {
+        "case": "fake_ACK",
+        "code": "FAKE_ACK",
+        "status": "REJECTED"
+      },
+      {
+        "case": "fake_PIT",
+        "code": "PIT_PROMOTION",
+        "status": "REJECTED"
+      },
+      {
+        "case": "trading",
+        "code": "AUTHORITY_PROMOTION",
+        "status": "REJECTED"
+      }
+    ],
+    "observer_accessed": false,
+    "original_data_run": false,
+    "persisted_fixture_matches_actual_native_and_git_bytes": {
+      "g4_current_head/closeout.json": true,
+      "g4_current_head/frozen-v2/checkpoint.json": true,
+      "g4_current_head/frozen-v2/originals.json": true,
+      "g4_current_head/frozen-v2/proposal.json": true,
+      "g4_current_head/frozen-v2/registration.json": true,
+      "g4_current_head/registry.json": true,
+      "results.json": true,
+      "source.json": true
+    },
+    "pkg02_model_comparison": {
+      "actual_fills": null,
+      "linked_to_discoverer_trial": false,
+      "report_sha256": "b7a0aaf75bf350911bafdfc62b51efc1c4174189589155153d5dbd059a91214e",
+      "rows": 72,
+      "same_cohort_or_strategy_not_assumed": true,
+      "status": "VERIFIED_SEPARATE_SYNTHETIC_MODEL_BOUNDARY",
+      "status_counts": {
+        "MODEL_ONLY": 48,
+        "NONFILL": 3,
+        "UNKNOWN_FILL": 12,
+        "UNKNOWN_INTRABAR_STOP_TARGET": 9
+      },
+      "trading_authority": "NONE"
+    },
+    "read_model_sha256": "d26dc7c17c6105ac68db0b97569f450bb08f8bc4f7cc7898b47525dfe07b1f7d",
+    "research_join": "RESEARCH_JOIN_PASS",
+    "research_scope": "PERSISTED_ACCEPTED_SYNTHETIC_RECEIPTS_AND_PARENT_DIGESTS_ONLY",
+    "schema": "aql.pkg04.final-consumer-fix-receipt.v1",
+    "sha256": "9ab6b9b7660029b3e769a5172b47e48d8375108fb46b96528cc60d02e52173c7",
+    "trading_authority": "NONE"
+  },
+  "candidate": "6d44172e674708622a914ccda55200cf529e1391f89596f48beed90d48e282f7",
+  "core_report": "eb7a869c44e4506ea80a093b127b4cffc7a438dc9ccc104aa796f768136cfb8e",
+  "delta_tree": "332f503f58d9233fa13de53b3bbf07adb7ce21cc",
+  "factory_negatives": {
+    "input_sha256": "25445b37c1c3ca4e04bf202e49f1a2eb862779b6023552d1e5315638ffa1cfa2",
+    "rejected_count": 9,
+    "rejections": [
+      {
+        "case": "real_data",
+        "reason": "FACTORY_H_EXEC_AUTHORITY",
+        "result": "REJECTED"
+      },
+      {
+        "case": "live_authority",
+        "reason": "FACTORY_H_EXEC_AUTHORITY",
+        "result": "REJECTED"
+      },
+      {
+        "case": "opened_oos",
+        "reason": "FACTORY_H_EXEC_AUTHORITY",
+        "result": "REJECTED"
+      },
+      {
+        "case": "no_embargo",
+        "reason": "FACTORY_H_EXEC_CHRONOLOGY",
+        "result": "REJECTED"
+      },
+      {
+        "case": "freeze_after_first_sample",
+        "reason": "FACTORY_H_EXEC_CHRONOLOGY",
+        "result": "REJECTED"
+      },
+      {
+        "case": "spread_double_charge",
+        "reason": "FACTORY_H_EXEC_COST_OR_NULL_CONVENTION",
+        "result": "REJECTED"
+      },
+      {
+        "case": "missing_fee",
+        "reason": "FACTORY_H_EXEC_EXPLICIT_COSTS",
+        "result": "REJECTED"
+      },
+      {
+        "case": "unknown_numeric_fill",
+        "reason": "FACTORY_H_EXEC_UNKNOWN_FILL_FRACTION",
+        "result": "REJECTED"
+      },
+      {
+        "case": "lost_attempt_denominator",
+        "reason": "FACTORY_H_EXEC_GENERATION_DENOMINATOR",
+        "result": "REJECTED"
+      }
+    ],
+    "schema": "aql.factory.h.execution-negative-receipt.v1",
+    "sha256": "fc4118e201885af06a365b1446ec5bf9b449d072a0ed8fe0d71f78f022e890f8",
+    "unexpected_acceptances": 0
+  },
+  "factory_report": "b7a0aaf75bf350911bafdfc62b51efc1c4174189589155153d5dbd059a91214e",
+  "pinned_source_bytes_unchanged": true,
+  "real_g2_24_72": "UNVERIFIED",
+  "real_pit_oos": "BLOCKED",
+  "sha256": "e9d7c3236100a9328a32b2959c6d91f35916d11e56e89e3ddcefde5a6171d87c",
+  "status": "INTEGRATED_RESEARCH_ENGINEERING_READY"
+}

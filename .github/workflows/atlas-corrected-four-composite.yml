@@ -1,0 +1,70 @@
+name: ATLAS corrected four-package composite
+on:
+  push:
+    branches: [integration/four-package-composite-20261110]
+    paths: ['.github/workflows/atlas-corrected-four-composite.yml']
+permissions:
+  contents: read
+jobs:
+  composite:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      GIT_CONFIG_COUNT: '2'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+      GIT_CONFIG_KEY_1: core.eol
+      GIT_CONFIG_VALUE_1: lf
+      PYTHONDONTWRITEBYTECODE: '1'
+      BINANCE_LIVE_TEST: '0'
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pytest==9.1.1 websocket-client==1.9.0
+      - name: Fetch pinned objects and run both fresh composite processes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            612d1444ff36ed08b63fd0a98bb8d4e71f88cd0d ea4ffd5ce278d93588338122ab6ac1af8ec4da26 \
+            ccd906ac6d770e1364889623cd79bb215f7b5c63 c01f526e762a014e5ed84ca3cf695b9d77502ab3 \
+            6acbcc7fc243b132f58170df4c6469bbf7f4eff8 30c37ae56851488b882998c7fa0085ec51dbfc92 \
+            ccf57ad3db7e71290a8321840e800136567e3af4 d072544427d6b08473c88b2e36d5857cfd8581dc \
+            852f6fcce1dbb4dede6259fe8d0498d19ff19078 0ca716eaf1b8ae1a66ed6f3fbcec34f22c73ced7 \
+            1ff3d13a3dfd1337bae0659dd03550b764c8799c 7b6c8d82ca8111f5fa15dee5e6823bc39289b48c
+          mkdir -p evidence-driver exact-native-tests
+          cp .github/atlas_evidence/four_package_composite/four.py evidence-driver/
+          git show c01f526e762a014e5ed84ca3cf695b9d77502ab3:tools/atlas_pkg03_final_acceptance.py > evidence-driver/atlas_pkg03_final_acceptance.py
+          git show c01f526e762a014e5ed84ca3cf695b9d77502ab3:tools/atlas_pkg03_stage.py > evidence-driver/atlas_pkg03_stage.py
+          python -B evidence-driver/four.py --repo . --output composite-a
+          python -B evidence-driver/four.py --repo . --output composite-b
+          cmp composite-a/final.json composite-b/final.json
+          git archive ccd906ac6d770e1364889623cd79bb215f7b5c63 tools/research_evidence_gateway | tar -xf - -C exact-native-tests
+          cd exact-native-tests
+          python -B -m pytest -q tools/research_evidence_gateway/test_native.py --junitxml=../native-tests.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: four-composite-${{ matrix.os }}
+          path: |
+            native-tests.xml
+            composite-a/final.json
+            composite-b/final.json
+            composite-a/candidate-manifest.json
+            composite-a/core.json
+            composite-a/factory-output/*.json
+            composite-a/joined/acceptance-receipt.json
+            composite-a/joined/negative-receipts.json
+            composite-a/joined/read-model-*.json
+            composite-a/*.log
+            composite-a/joined/*.log
