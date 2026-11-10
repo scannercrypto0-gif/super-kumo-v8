@@ -85,6 +85,7 @@ class BinanceCollector:
         journal: DurableJournal,
         store: OperationalStore,
         max_bars: Optional[int] = None,
+        *, on_persisted=None, public_market_only=False,
     ):
         # The finite v2 source has no live/legacy collector activation contract.
         # Reject configuration before any network or operational-store effect.
@@ -95,6 +96,8 @@ class BinanceCollector:
         self.journal = journal
         self.store = store
         self.max_bars = max_bars
+        self.on_persisted = on_persisted
+        self.public_market_only = public_market_only
         self.background_persistence = False
         self.health_state = "CONNECTING"
         self.clock_tolerance_ms = 5000
@@ -117,7 +120,7 @@ class BinanceCollector:
             if "k" not in data:
                 return
 
-            if "E" in data:
+            if "E" in data and not self.public_market_only:
                 skew = int(data["E"]) - int(time.time() * 1000)
                 self.metrics.source_clock_skew_ms = skew
                 if skew > self.clock_tolerance_ms:
@@ -134,6 +137,23 @@ class BinanceCollector:
             if not bar.is_final:
                 self.metrics.non_final_bar_count += 1
                 return
+
+            if self.public_market_only:
+                event_ms = data.get("E")
+                if type(event_ms) is not int:
+                    raise ValueError("Public finalized candle is missing an integer event time")
+                skew = event_ms - bar.ingested_at
+                self.metrics.source_clock_skew_ms = skew
+                if event_ms < bar.bar_close or abs(skew) > self.clock_tolerance_ms:
+                    self.clock_uncertain = True
+                    raise ValueError("Public finalized candle clock or event time outside tolerance")
+                if bar.ingested_at <= bar.bar_close:
+                    # Exchange has already finalized the candle, but local UTC
+                    # has not crossed the close. Accept only after real time
+                    # advances; the original arrival skew remains in metrics.
+                    delay_ms = bar.bar_close - bar.ingested_at + 2
+                    time.sleep(delay_ms / 1000)
+                    bar.ingested_at = int(time.time() * 1000)
 
             if bar.bar_close >= bar.ingested_at:
                 self.clock_uncertain = True
@@ -177,6 +197,8 @@ class BinanceCollector:
                 if self.store.upsert(bar):
                     self.metrics.store_insert_count += 1
                 self.journal.mark_persisted(bar.stable_key())
+                if self.on_persisted is not None:
+                    self.on_persisted()
             self.health_state = "STREAMING"
 
             if self.max_bars and self.metrics.journal_commit_count >= self.max_bars:
@@ -233,7 +255,8 @@ class BinanceCollector:
         """
         from ..delivery.authority import register_legacy_writer
         register_legacy_writer(self.journal, 'collector-run')
-        url = f"{WS_BASE}/{self._stream_name()}"
+        base = "wss://data-stream.binance.vision:443/ws" if self.public_market_only else WS_BASE
+        url = f"{base}/{self._stream_name()}"
         self._stop_event.clear()
 
         def _run_ws():

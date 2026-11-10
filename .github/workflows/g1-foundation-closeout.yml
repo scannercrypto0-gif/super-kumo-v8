@@ -1,0 +1,46 @@
+name: G1 foundation closeout
+on:
+  pull_request:
+    paths:
+      - 'src/aql/foundation/**'
+      - 'tests/test_g1_foundation_closeout.py'
+      - 'tools/measure_g1_foundation_closeout.py'
+      - '.github/workflows/g1-foundation-closeout.yml'
+      - 'docs/evidence/g1_foundation_closeout*'
+  push:
+    branches: ['codex/g1-market-foundation-closeout']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -e ".[dev]"
+      - name: Offline changed scope and existing seams
+        run: >-
+          python -B -m pytest tests/test_g1_foundation_closeout.py
+          tests/test_g1_completion.py tests/test_g1_integrity_58_59.py
+          tests/test_sf_ind_01.py tests/test_sf_ind_02.py tests/test_sf_dep_guard.py
+          -q --junitxml=g1-closeout-tests.xml
+        env:
+          BINANCE_LIVE_TEST: '0'
+      - run: python -B tools/measure_g1_foundation_closeout.py --output g1-resource-receipt.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: g1-closeout-${{ matrix.os }}
+          path: |
+            g1-closeout-tests.xml
+            g1-resource-receipt.json

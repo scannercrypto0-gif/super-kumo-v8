@@ -69,7 +69,7 @@ class DurableG2Bridge:
         con.execute("PRAGMA synchronous=FULL")
         return con
 
-    def _replay(self, con):
+    def _replay(self, con, *, prospective=None):
         previous = "0" * 64
         snapshots, outcomes = {}, {}
         for seq, kind, identity, raw, parent, seal in con.execute(
@@ -97,6 +97,8 @@ class DurableG2Bridge:
                 require(identity == f"{key[0]}:{key[1]}" and key not in outcomes,
                         "DUPLICATE_OBSERVATION")
                 outcomes[key] = data
+            elif prospective is not None:
+                prospective(kind, identity, data)
             else:
                 raise BridgeStop("INVALID_KIND")
             previous = seal
