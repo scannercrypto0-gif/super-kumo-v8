@@ -92,7 +92,7 @@ def inspect_actual(root,anchor,design):
     need(dossier['plan_frozen_before_evaluation'] is True and
          dossier['prefreeze_ms']<dossier['evaluation_read_at_ms'],'PLAN_AFTER_EVALUATION')
     retrospective=dossier['first_outcome_available_ms']<=dossier['prefreeze_ms']
-    need(dossier['prefreeze_ms']<dossier['train_end_ms']<dossier['validation_end_ms'] and
+    need(dossier['train_end_ms']<dossier['validation_end_ms'] and
          dossier['validation_end_ms']+design['embargo_ms']<=dossier['holdout_start_ms']<dossier['holdout_end_ms'],'SPLIT_LEAKAGE')
     for row,opened in zip(rows,expected):
         bar=MarketBar.from_dict(row)

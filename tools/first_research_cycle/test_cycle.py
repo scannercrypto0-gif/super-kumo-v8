@@ -85,6 +85,15 @@ def test_source_anchor_tamper(tmp_path):
     with pytest.raises(Stop,match='SOURCE_TRUST_ANCHOR'):inspect_actual(root,'0'*64,DESIGN)
 
 
+def test_retrospective_plan_is_not_falsely_required_to_predate_historical_bars(tmp_path):
+    root=tmp_path/'input';s,b=simulated_input(root)
+    s.update(prefreeze_ms=300000000,evaluation_read_at_ms=300000001)
+    anchor=save(root,s,b)
+    result=inspect_actual(root,anchor,DESIGN)
+    assert result['prefreeze_after_historical_data'] is True
+    assert result['first_known_at']=='NOT_ATTESTED'
+
+
 def test_adaptive_plan_change_rejected():
     d=deepcopy(DESIGN);d['strategy_sha256']='0'*64
     with pytest.raises(Stop,match='FROZEN_DESIGN_PIN'):assess(d)
