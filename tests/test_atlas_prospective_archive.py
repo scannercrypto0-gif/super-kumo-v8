@@ -78,6 +78,43 @@ class ProspectiveResearchTests(unittest.TestCase):
         self.assertFalse(result["secretary_enqueued"])
         self.assertEqual(result["evidence_mode"], "SYNTHETIC_TESTED")
 
+        from aql.observation.forward_evidence import read_forward_evidence
+        reader = ProspectiveObserver(self.root / "g2.sqlite", self.journal, self.store,
+                                     self.fixture, synthetic=True, read_only=True)
+        report = read_forward_evidence(reader, as_of_ms=end)
+        self.assertEqual(report["g2_sha256"], result["g2_sha256"])
+        self.assertEqual(report["factory_sha256"], result["sha256"])
+        self.assertEqual(report["rows"][0]["regimes"]["ALT"]["label"], "UNKNOWN")
+        self.assertEqual(report["rows"][0]["windows"][0]["state"], "missing")
+        self.assertEqual(report, read_forward_evidence(reader, as_of_ms=end))
+        self.assertEqual(reader.verified_read(as_of_ms=now), first)
+
+
+    def test_full_forward_contract_replays_from_durable_historical_fixture(self):
+        from aql.observation.forward_evidence import read_forward_evidence
+
+        for i in range(4):
+            origin = self.put(START + i * STEP)
+            self.tick(origin)
+        first = START + 4 * STEP
+        for i in range(72 * 4):
+            self.put(first + i * STEP, price=100.0 if i != 3 else 103.0)
+        end = origin + HORIZONS_MS[-1]
+
+        def read():
+            reader = ProspectiveObserver(self.root / "g2.sqlite", self.journal, self.store,
+                                         self.fixture, synthetic=True, read_only=True)
+            return read_forward_evidence(reader, as_of_ms=end)
+
+        report = read()
+        self.assertEqual(report, read())
+        self.assertEqual(report["historical_pit"], "NOT_ATTESTED")
+        self.assertEqual(report["evidence_mode"], "SYNTHETIC_TESTED")
+        self.assertEqual([w["state"] for w in report["rows"][0]["windows"]], ["mature"] * 3)
+        self.assertEqual([w["expected_bars"] for w in report["rows"][0]["windows"]], [15, 95, 287])
+        self.assertEqual(report["rows"][0]["windows"][-1]["extrema"]["high"]["value"], 104.0)
+        self.assertEqual(len(report["source_receipts"]), 292)
+
     def test_missing_receipt_future_and_no_signal_do_not_create_opportunities(self):
         self.put(START, persist=False)
         now = self.put(START + STEP, source="binance_rest_recovery")
@@ -264,6 +301,61 @@ class ArchiveTests(unittest.TestCase):
                 pressure(root)
             finally:
                 lock.close()
+
+
+class ForwardEvidenceTests(unittest.TestCase):
+    def test_full_historical_fixture_window_replay_and_temporal_boundaries(self):
+        from types import SimpleNamespace
+        from aql.observation.forward_evidence import _window
+
+        # Frozen, generated fixture with simulated receipt times. Historical PIT
+        # and actual market provenance are deliberately not asserted.
+        origin = START + 7
+        for horizon in HORIZONS_MS:
+            bars = {}
+            for i in range(1, horizon // STEP):
+                opening = START + i * STEP
+                close = opening + STEP - 1
+                bars[opening] = (
+                    SimpleNamespace(open=100, close=100, high=105 if i == 2 else 102,
+                                    low=90 if i == 3 else 98),
+                    dict(open_ms=opening, close_ms=close, commit_ms=close + 3,
+                         g1_receipt_sha256=f"{i:064x}"),
+                )
+            due = origin + horizon
+            self.assertEqual(_window(origin, horizon, due - 1, bars, True)["state"], "pending")
+            report = _window(origin, horizon, due, bars, True)
+            self.assertEqual(report, _window(origin, horizon, due, dict(reversed(list(bars.items()))), True))
+            self.assertEqual(report["expected_bars"], horizon // STEP - 1)
+            self.assertEqual(report["extrema"]["high"]["value"], 105)
+            self.assertEqual(report["extrema"]["low"]["value"], 90)
+            self.assertEqual(report["extrema"]["order"], "HIGH_BEFORE_LOW")
+            self.assertEqual(report["extrema"]["high"]["relative_intervals_ms"][0][0], 2 * STEP - 7)
+            removed = bars.pop(START + STEP)
+            self.assertEqual(_window(origin, horizon, due, bars, True)["state"], "missing")
+            bars[START + STEP] = removed
+            removed[1]["commit_ms"] += 5001
+            self.assertEqual(_window(origin, horizon, due, bars, True)["state"], "late")
+            removed[1]["commit_ms"] -= 5001
+            bars[START + 2 * STEP][0].low = 90
+            self.assertEqual(_window(origin, horizon, due, bars, True)["extrema"]["order"], "AMBIGUOUS")
+            self.assertEqual(_window(origin, horizon, due, bars, False)["state"], "UNKNOWN")
+
+    def test_regime_receipt_available_at_cutoff_and_conflicts(self):
+        from aql.observation.contracts import digest
+        from aql.observation.forward_evidence import _regime
+
+        sample = dict(market="BTC", label="UP", as_of_ms=10, available_ms=20,
+                      valid_until_ms=30, source_sha256="a"*64)
+        sealed = {**sample, "sha256": digest(sample)}
+        self.assertEqual(_regime([sealed], "BTC", 19)["label"], "UNKNOWN")
+        self.assertEqual(_regime([sealed], "BTC", 20)["label"], "UP")
+        self.assertEqual(_regime([sealed], "BTC", 30)["label"], "UNKNOWN")
+        self.assertEqual(_regime([sealed], "ALT", 20)["label"], "UNKNOWN")
+        self.assertEqual(_regime([{**sealed, "label": "DOWN"}], "BTC", 20)["label"], "UNKNOWN")
+        other = {**sample, "label": "DOWN"}
+        self.assertEqual(_regime([sealed, {**other, "sha256": digest(other)}], "BTC", 20)["reason"],
+                         "CONFLICT")
 
 
 if __name__ == "__main__":
