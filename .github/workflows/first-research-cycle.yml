@@ -15,6 +15,7 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     env:
       PYTHONPATH: '.:src'
+      CYCLE_EXPORT_RECEIPT: simulated-adapter-result.json
     steps:
       - uses: actions/checkout@v4
         with: {persist-credentials: false}
@@ -27,6 +28,9 @@ jobs:
           import os
           with open(os.environ['GITHUB_ENV'],'a') as f:
               f.write('PYTHONPATH='+os.pathsep.join(('.', 'src'))+'\n')
+              f.write('CYCLE_DEPS='+os.path.abspath('.cycle-dependencies')+'\n')
+      - name: Stage pinned source dependencies only
+        run: python -B tools/first_research_cycle/stage_dependencies.py --fetch --output .cycle-dependencies
       - run: python -B -m pytest tools/first_research_cycle -q --basetemp=.cycle-tests --junitxml=cycle-tests.xml
       - run: python -B -m tools.first_research_cycle.cycle --output cycle-readiness.json
       - uses: actions/upload-artifact@v4
@@ -36,3 +40,4 @@ jobs:
           path: |
             cycle-tests.xml
             cycle-readiness.json
+            simulated-adapter-result.json

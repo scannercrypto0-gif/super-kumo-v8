@@ -1,4 +1,10 @@
-# Issue 294 — First research cycle, Codex A
+# Issue294 — initial intake record (superseded by actual market cycle)
+
+**Current execution and reproduction: see [MARKET_CYCLE.md](MARKET_CYCLE.md).**
+The source-access blocker recorded below was resolved by explicit owner read
+permission and discovery of actual May/June2024 archives. The old assessment
+is retained as history, not the final package status. Use `market_cycle.py`
+with `market-plan.json` for the executed cycle; `cycle.py` remains intake-only.
 
 **BLOCKED_EXACT_DATA_RUNTIME_DEPENDENCY.** This is an executable intake and
 native-plan commitment seam, not an executed market research cycle. It has no

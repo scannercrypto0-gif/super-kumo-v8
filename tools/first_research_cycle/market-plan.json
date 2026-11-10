@@ -1,0 +1,1193 @@
+{
+  "allocation": [
+    "0.5",
+    "0.3",
+    "0.2"
+  ],
+  "archives": [
+    {
+      "name": "BTCUSDT-15m-2024-05.zip",
+      "rows": 2976,
+      "sha256": "b093a42ba168fbdb34365067a3e0fa714a8856840a9abd12188378b6e54eddb2"
+    },
+    {
+      "name": "BTCUSDT-15m-2024-06.zip",
+      "rows": 2880,
+      "sha256": "41e0e7ecf5087b343daa183d2cf9a0f5e33e1f279a1d529e39845223999be0f1"
+    }
+  ],
+  "candidate_budget": 1,
+  "compatibility_amendment": "Direct native Scanner evaluator and separate train/validation reporting; no strategy, cohort, cost, exit or selection parameter changed after initial execution",
+  "costs": {
+    "PASSIVE_ENTRY_MARKET_EXIT": {
+      "fee_entry_bps": "2",
+      "fee_exit_bps": "10",
+      "funding_bps_per_bar": "0",
+      "slippage_entry_bps": "2",
+      "slippage_exit_bps": "2",
+      "spread_entry_bps": "1",
+      "spread_exit_bps": "1"
+    },
+    "STRESS_TAKER": {
+      "fee_entry_bps": "20",
+      "fee_exit_bps": "20",
+      "funding_bps_per_bar": "0",
+      "slippage_entry_bps": "4",
+      "slippage_exit_bps": "4",
+      "spread_entry_bps": "2",
+      "spread_exit_bps": "2"
+    },
+    "TAKER": {
+      "fee_entry_bps": "10",
+      "fee_exit_bps": "10",
+      "funding_bps_per_bar": "0",
+      "slippage_entry_bps": "2",
+      "slippage_exit_bps": "2",
+      "spread_entry_bps": "1",
+      "spread_exit_bps": "1"
+    }
+  },
+  "dependency_files": [
+    {
+      "path": "factory/research_wp_r0/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "factory/research_wp_r0/_dep_guard.py",
+      "sha256": "54908cba53f77a7fc29201680275c404a172021ee845adf0ff8c0c84d386d134"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_authentic_research_admission.py",
+      "sha256": "4e653412e7d37184edf33282b5190814823328dab641ea60f92dba28d6e17e87"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_authorized_original_run_v1.py",
+      "sha256": "3ab0eaa99c03ecdc47490d25ecd21face5fd3d420319f851b30a23d776c225d5"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_c_canonical_wait_adapter_v1.py",
+      "sha256": "7266b7e45bda7fd18a94f43d43d4ea2e36f8f6b195e11bcd3131fc505752eed8"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_core_price_rule_port.py",
+      "sha256": "42ccad473c7cea37061c1eab780efe07321b08d1769af862dc386bc8b1a6c42c"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_core_query_bridge_v1.py",
+      "sha256": "82bc7e956af6692004db34a8b22bad24a44b7769138b47f8ddb63f61165c6f66"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_cross_owner_compatibility.py",
+      "sha256": "236f352d42cc83597b105eaa95ed3c539563c9e97956785aed8a9b2ef20e4be3"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_d_canonical_consumer_v1.py",
+      "sha256": "30b8f80d194e794de4dad3634f998006bfaef6f8544268c042ea1db7a4cf2554"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_d_lab_paper_v1.py",
+      "sha256": "7f6fb2ca5e24098db48575ed6f0c9a587d38ad0ef6338642d1c2c00ddedde07f"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_e_core_scanner_historical_wait_v1.py",
+      "sha256": "b81ea489eb352a93350fcc096969843d02958a0cd6e677e67996423cea62450b"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_e_discoverer_consumer_v1.py",
+      "sha256": "229f64ceb0f9419b0e41558e56a81a7f8e0049e9f6cc912574c5ba0d674f030b"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_e_durable_discoverer_consumer_v1.py",
+      "sha256": "646dd8c02c26263ad3999f6079dcb891c3795030f61f1cc3330b645003c59a84"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_e_historical_source_boundary_v1.py",
+      "sha256": "c98b78494159608482763f5fbb04fe52ebdcc79add26f8e2690c193782c9db72"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_e_research_results_store_v1.py",
+      "sha256": "ff5d2b40ff27db73113f40cdf3fa0cc98e32c80bf35034a176ae50af001e7f32"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_f_batch_ledger_v1.py",
+      "sha256": "2b2c0f7a815ae0f0a0554f49ecfaf0bad661bf02671ddcdafc4a264a4a63dcd6"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_f_f2_recovery_diagnostic_v1.py",
+      "sha256": "6e1d69295f80af5a04225927ed6d6ab645fee0cd697fee523d2e3102ea98b278"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_f_f2_recovery_research_v2.py",
+      "sha256": "e58096fb548e8358b5d0168471edd95aa62cfca907fe078059be0b618f36e9d5"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_f_private_original_cohort_v1.py",
+      "sha256": "7455780e1c3b7e8c89672949ae74bf28c945414724b4975daa03ac57c40cef68"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_f_research_e2e_diagnostic_v1.py",
+      "sha256": "8f5c1c3bcaa2efd5ad86bb1db051f3d660a80180a1aa13ea932eca064e502ec1"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_f_role_authority_v1.py",
+      "sha256": "6aaa57f97a79d2d936a85242ad79ca74a4f3a1523337d6e291a1d89ac37350f5"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_f_scanner_bulk_consumer_v1.py",
+      "sha256": "9eb43ed294ba48067be71d2350053fb66fa0e0061059f0faf496e90e68a5c30f"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_h_execution_comparison_v1.py",
+      "sha256": "900d68e3abdc9e3932e4454ab9656bc3688c0cc8dc9e8ac3a5dbd93a48fedb75"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_h_generic_signal_adapter_v1.py",
+      "sha256": "b2dfde932c6c88d57ec10b3c53f50cd3fc4c20f31978fc90fd50e50dd691c217"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_h_research_package_v1.py",
+      "sha256": "6a68cf6f788f39d204b23b35004e78e60b45ce6c17f9fb5dc11b3939d18273e4"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_h_scientific_lab_v1.py",
+      "sha256": "5053c59dc4cca9a34ce156448287487872d50a4d181c6cd63440a16e7acf259b"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_h_trade_event_ledger_v1.py",
+      "sha256": "742d9354ab16fdeb0e635c0ac041b2a70ada1e7f457715166b459fd5bee6e39b"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_historical_rule_projection.py",
+      "sha256": "02828554a000ecbd25ca22b03e031dc499efe88a5eea8b093142f54b1e042de7"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_lab_experiment_index_v1.py",
+      "sha256": "b45c836c0196778a9c420e15014c5d76f6ee93f6dbbb0813d120313eb578b522"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_lab_generic_paired_v1.py",
+      "sha256": "27ec1052693e5b922e212bed52fb5d138afde6dad412830ba70601ea26761689"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_opportunity_comparison_gate.py",
+      "sha256": "fdfb38223cfcea3cce8df40f4388cee4f8d9308f3a6dd4a4cc741c5e6a76cb1f"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_research_consumer_seam.py",
+      "sha256": "d18366cb13389814f6090ed32800e3dcca4521497aabff77a67b238b7e03ab4b"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_same_source_lab_paper_v1.py",
+      "sha256": "6918eec6a609038268a12fadc5ba82a63f4a63c3b5c74952341fc7cad7ce8c03"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_strategy_approved_consumer_c_v1.py",
+      "sha256": "6f3d7d870fa58fab880633c3547f41a65ed2a4d3feeade85c379aa5ba541a3c7"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_factory_unified_backbone_v1.py",
+      "sha256": "a9fee634b55aa652f1a0fcb779bdbe7be2becb976c8b9f2f1b155ca27e8cd22e"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_p2_factory_lab.py",
+      "sha256": "00323ed9f9115e16fe753f192712cca1c055e4342e6e9d147581e24d22c4f2ea"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_p2_factory_modeled_trades.py",
+      "sha256": "d22218f4a947bf02a53c7ca4b683841d5857450b86bb30b44d76e5bab9741138"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_p2_factory_portfolio.py",
+      "sha256": "d214a907b86fdf262ade4bcda8a2895bb1202fa526bee21c915a097fed355527"
+    },
+    {
+      "path": "factory/research_wp_r0/aql_p2_factory_real_development.py",
+      "sha256": "d175cd5042562740e34bee9a20e55b3af7b5b00a11623896b03cfd9a64000ce8"
+    },
+    {
+      "path": "factory/research_wp_r0/attempt_ledger.py",
+      "sha256": "1018d05926c4227bcc3bbe2bc471a026d3776a051841a80e9dd40bb030e4268e"
+    },
+    {
+      "path": "factory/research_wp_r0/batch01_admission_bridge.py",
+      "sha256": "fe85610675b89389a92d7ce54c04b4dc3864068014a45a3b7e41929d8e91f182"
+    },
+    {
+      "path": "factory/research_wp_r0/batch01_attempt_adapter.py",
+      "sha256": "59428311be76755afbf20fdaf699e950cafaad2db83700a1039b0b841027585a"
+    },
+    {
+      "path": "factory/research_wp_r0/batch01_result_quarantine.py",
+      "sha256": "7f14709aee29634506ef60df1db7bdfbecc5b5ffb8dfe77318b8ce65817bc0a9"
+    },
+    {
+      "path": "factory/research_wp_r0/content_identity.py",
+      "sha256": "ed46904cead2b349db1c7dbfb3ef1cb5cf009714cf65e950e9696960afba915c"
+    },
+    {
+      "path": "factory/research_wp_r0/custody_anchor_verifier.py",
+      "sha256": "673a82bfbb203bac109893eac4ee3e703133f74b208cf7f1acce4bd59a80f0ee"
+    },
+    {
+      "path": "factory/research_wp_r0/custody_manifest_builder.py",
+      "sha256": "19c57591f97d5daeb92b39abe414f3ce299a455d3d77963b4ca1ed6f0546e413"
+    },
+    {
+      "path": "factory/research_wp_r0/ema_development_replay.py",
+      "sha256": "99effb5a5b6d608268a7a917c755b947524b1ad03c7ac0cc06e2e9e40851cd1d"
+    },
+    {
+      "path": "factory/research_wp_r0/ema_first_backtest.py",
+      "sha256": "b721f0e706be6376e597378fc23cd226fcd97975bece7d3f3450adc8c2044fcc"
+    },
+    {
+      "path": "factory/research_wp_r0/factory_custody_envelope.py",
+      "sha256": "c71a484eaed78fc23ebd036e928ebad1cf03e9e72028a9ced67c6e73be43c251"
+    },
+    {
+      "path": "factory/research_wp_r0/factory_custody_export.py",
+      "sha256": "f9215178d2228ccbba421ee62608fed10150b98a70d25d0770290291f55e16df"
+    },
+    {
+      "path": "factory/research_wp_r0/factory_exam.py",
+      "sha256": "f4df95961cb2835349cf87b8b9e939e4808629d845d7841f15f93c1abbfeff36"
+    },
+    {
+      "path": "factory/research_wp_r0/factory_exam_example.py",
+      "sha256": "39338227dc6fc0ffe9e4cd01ae1ce2c330e7d8690a663f1ef59f23465538866d"
+    },
+    {
+      "path": "factory/research_wp_r0/frozen_attempt_writer.py",
+      "sha256": "043d15412f39518b67637a06061df8e8497eb97ae5eccd5d65e180035ea59eb1"
+    },
+    {
+      "path": "factory/research_wp_r0/frozen_plan_reconciliation.py",
+      "sha256": "4ca94f552973a9b5ee6eaf5adf0db0d81d9ad77f6a8b5f0637fd5ef6a2c55f03"
+    },
+    {
+      "path": "factory/research_wp_r0/frozen_research_plan.py",
+      "sha256": "ec45c9ad2f18a290bcb238474771e55c1a012416056ae7441a56be2fe4e4f8fe"
+    },
+    {
+      "path": "factory/research_wp_r0/future_bar_evidence.py",
+      "sha256": "8a4eb2803f2b8d8e86688a8e1d994817b7db008410890cc04e53bdf16a349791"
+    },
+    {
+      "path": "factory/research_wp_r0/historical_evaluation_bridge.py",
+      "sha256": "c330caf1fb8ce5a4a0e0da1d0bae6318f3aaf7bba03452883906826b6801d24b"
+    },
+    {
+      "path": "factory/research_wp_r0/historical_library.py",
+      "sha256": "a9ae4cb490c3b0eeaa514b25b4c01e1f1617962d5f4639cad0102030cf13c6bd"
+    },
+    {
+      "path": "factory/research_wp_r0/indicator_library.py",
+      "sha256": "51d695d488766f2de86416e34a621818a8d0cc0e68f97feedca576efa45f84e8"
+    },
+    {
+      "path": "factory/research_wp_r0/indicator_library_v2.py",
+      "sha256": "351eb4e256ebd4ddee2031853ab2c93770897e6fbd14c9df0bef50cc72b0de99"
+    },
+    {
+      "path": "factory/research_wp_r0/offline_evaluation_result.py",
+      "sha256": "43bdfca3d21d41959c846e7fe8b567b9166c5fdca11f33d8d0afd0b9b36451b1"
+    },
+    {
+      "path": "factory/research_wp_r0/offline_input_audit.py",
+      "sha256": "cf6f53686d1d0c828146d7dda00570e9eea0fa99e479fa3e2b58c816bc30a3f4"
+    },
+    {
+      "path": "factory/research_wp_r0/offline_simulator.py",
+      "sha256": "2dc7fa631827051fadd036d5b81f7f2cbe62cacbb3cd274fa0e6d089d5a452c4"
+    },
+    {
+      "path": "factory/research_wp_r0/pinned_ema_research.py",
+      "sha256": "1c319107d71f74bb5558183bb0114525ef90d484546f1a0170593672efd601e7"
+    },
+    {
+      "path": "factory/research_wp_r0/research_guards.py",
+      "sha256": "09b68b3dbd54588fbb82b07034b1ba057540e8026a243a4da3eed3ae6cf2c5a8"
+    },
+    {
+      "path": "factory/research_wp_r0/retrospective_kline_intake.py",
+      "sha256": "cf525a66fe019f1247b5bb4ba497aa7fbad13c66cc5fb79e64566d1523b2bbfa"
+    },
+    {
+      "path": "factory/research_wp_r0/sf_breakout_pilot.py",
+      "sha256": "51de0f5e789a08187536d6ba8fb0e2d5fb05009acd9cd9e60c3916f7b2deeaca"
+    },
+    {
+      "path": "factory/research_wp_r0/sf_historical_admission.py",
+      "sha256": "679f25df3b6c15baa1a3430a0a1aba5e7f591b5ffc13f2bdf28157bdbc61514b"
+    },
+    {
+      "path": "factory/research_wp_r0/sf_synthetic_result_link.py",
+      "sha256": "5a6256db903f1ee5f3132cd373da15d708409008e6403105935a008d044886ba"
+    },
+    {
+      "path": "factory/research_wp_r0/sf_synthetic_workflow.py",
+      "sha256": "bb115b5a1bba41b520b15099806443d4c2476075208435255610417266a84447"
+    },
+    {
+      "path": "factory/research_wp_r0/strategy_definition.py",
+      "sha256": "6af2db368ef379e08039d97fba385e4431faf47026b1add82f3c102e1d393b04"
+    },
+    {
+      "path": "factory/research_wp_r0/strategy_dna_v2.py",
+      "sha256": "cfadd6bb763dbbbe52034e70b11df6210fde9f492a55c6cf829af79a217c45a8"
+    },
+    {
+      "path": "factory/research_wp_r0/strategy_dna_v2_example.py",
+      "sha256": "7a9ebfe3c27a314dd08f838e5e8c132c6af42a11bd1655946a7cda57c8db9efa"
+    },
+    {
+      "path": "factory/research_wp_r0/synthetic_execution.py",
+      "sha256": "e063466c8ebd0ce771d53a5de3fc9ba09f0d089acdbd999ffdb3f9fac5d96409"
+    },
+    {
+      "path": "factory/research_wp_r0/synthetic_opportunities.py",
+      "sha256": "b94a353c22fc534460622548699b8f612c819afff958160819a8158da3324899"
+    },
+    {
+      "path": "factory/research_wp_r0/synthetic_summary.py",
+      "sha256": "a728b5a933bba668125bb94febdf19220cb4f5671e489f1badb1e7af5d6a32f5"
+    },
+    {
+      "path": "factory/research_wp_r0/test_factory_custody_adversarial.py",
+      "sha256": "9fa0153bce87fc7f93dc1319209a07ce6ae2fd728b75f7596ecf0d298408d9e0"
+    },
+    {
+      "path": "factory/research_wp_r0/test_factory_custody_envelope.py",
+      "sha256": "4c739f63d0c0b7cab0428bc16cf6bcf9d3f645e0695c4cda08b22ab08c683197"
+    },
+    {
+      "path": "factory/research_wp_r0/test_factory_custody_export.py",
+      "sha256": "fdc5673fb3f38d2011529ce92fef881c7a18f53804164b50b2ce5b802e1055e5"
+    },
+    {
+      "path": "factory/research_wp_r0/test_frozen_attempt_writer.py",
+      "sha256": "8e1749fc601ee9741d3e434554b66632f05412f7529f849ae200fd933f268f63"
+    },
+    {
+      "path": "factory/research_wp_r0/test_frozen_concurrency_recovery.py",
+      "sha256": "8b3486e019fb1cbef4bae020fe56f5db4476f13044aad0a0ac2a1e0543d05ee8"
+    },
+    {
+      "path": "factory/research_wp_r0/test_frozen_default_admission.py",
+      "sha256": "b1cd08aa648d7c6dbc42a5861e1ab31f5756387c6c544bda4207acb840002989"
+    },
+    {
+      "path": "factory/research_wp_r0/test_frozen_multiprocess_recovery.py",
+      "sha256": "e75e8979a92240cc16f3b268eb8c771d8ad40496d6c3c9b91aa28ecadfa68823"
+    },
+    {
+      "path": "factory/research_wp_r0/test_frozen_plan_reconciliation.py",
+      "sha256": "72968225f53f75da201350c093be7bb19a1cbf679249bf3cae001829853e6c5e"
+    },
+    {
+      "path": "factory/research_wp_r0/test_frozen_research_plan.py",
+      "sha256": "f389267be70c8e38d40fc85b8885df17cb315ba8eb3a1512ab3a06e30e82cd8b"
+    },
+    {
+      "path": "factory/research_wp_r0/test_full_plan_ledger.py",
+      "sha256": "1385a78a836036dc40c4c8a74b3d5f3f7f9c93240e267619eff5fa67830d28e9"
+    },
+    {
+      "path": "factory/research_wp_r0/test_legacy_bridge_isolation.py",
+      "sha256": "ce56efa7102e9210e0b96999df1698934386d755eef0e6c2e2e5609069b8be35"
+    },
+    {
+      "path": "factory/research_wp_r0/test_sealed_plan_policy.py",
+      "sha256": "880d6d39e79ba5e60972026f31b46a1db09ce897da0f8a69384ff1157f00aa5a"
+    },
+    {
+      "path": "factory/research_wp_r0/test_sealed_policy_tamper.py",
+      "sha256": "cecbeffd64ef721616f9bc99c42270d92ff83dcb0eda49ac9c69389c6e232064"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/__init__.py",
+      "sha256": "e18f9cc58fa98c4e4b8cc62708f9a596de4422d32cbfd30ae1095ae75b99a090"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/contracts.py",
+      "sha256": "738d019f3c0630844d83e3824ef3957fcb53d1a5f96e2243b5b20fde474daf16"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/data_isolator.py",
+      "sha256": "18d1a9257500adf5dea0f4aa461b8aa05ad3c5b9dfff880d20b3a5362cfe8abd"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/durable_checkpoint_e.py",
+      "sha256": "de2e07aa926992811923563e55fbe291e9c19061859168ee6f3afb33d0c74511"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/factory_lab_bridge.py",
+      "sha256": "e8cd371ae2a8549bad5844e0d557f881a6217de0ab920ffef9a486a1951e988d"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/factory_lab_consumer_contract.py",
+      "sha256": "ef6fe2ea58320bfb3973cba0181b59a102424ab808264fab0f93a96f5ae3b861"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/factory_lab_contracts.py",
+      "sha256": "3683190c1294369ded23afab50f44f848ded28d573ffc057d4b8276ed79b700f"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/families.py",
+      "sha256": "f5d553f8566077100314e6148985dcf2bf1331cdcec923df5157ecc6fc81c0e5"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/g4_candidate_preregistration.py",
+      "sha256": "02024f4de90ccfd1a439e71db6c8e836628f138fad6ae3bf4200f05c659598c5"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/g4_factory_acceptance_seam.py",
+      "sha256": "76dfa207c95dae1b31637ec692a374c028102b4d53904bbb37ac63b5031f03a1"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/generator.py",
+      "sha256": "268c13b925a9ac4743d5c893e80a9c18a4f6d4948070e19671f9f1807a87baec"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/historical_f4_intake.py",
+      "sha256": "28182b09dfb88cb45248a9e8ee0f0a2200ead30b46cf0d271807a73e41804377"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/historical_f4_positive.py",
+      "sha256": "d17d22b7c12bb9c4c23c3cd2538b661261a39e2f8e183b7b12e68a123825413d"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/hypotheses.py",
+      "sha256": "813f8e0df694e1440f4b27ac31c9329aec5fbf37a1c4db56b1167d9061494630"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/ledger.py",
+      "sha256": "2a75c0082ad402d7ede30538f2312867d1eefdf85624c34fbad02610c1597aa5"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/ledger_membership_verifier.py",
+      "sha256": "fdfa829a1503eafe51df2bc406fab2b2ff0c2701d535b912f05cdaa89754fb12"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/package.py",
+      "sha256": "8c30baa9008f923bfda69d190119704ae78e22bcbb0fefcc9f5b073fe8a70fe7"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/research_handoff_e.py",
+      "sha256": "eced9c4f93ab3fe4f7c0b57ccca547461e497a0f0c4c73417c749e87e4f8c132"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/scanner_adapter.py",
+      "sha256": "f545801ec7eeab73f541481581dbd0fdcbfaca1fd1796544f9a708d0ce89bf34"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/synthetic_scanner_candidate_bridge.py",
+      "sha256": "91c9cf398d418c6da7a5add33299889ea29ab9c93a6849491c6f3dd3c2c12d30"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/tests/__init__.py",
+      "sha256": "0739fcabfe642fff6ade63c2eb271807667c6682c719841c29ce3ee40252eda9"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/tests/test_contracts.py",
+      "sha256": "a8b30947b668fd6c6f8a9e52adff82a2badcb867f6626b4ce834e3ac24796807"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/tests/test_d_scan_1_candidate_bridge.py",
+      "sha256": "ac7574dbb3193a787a9d05f5a2ae5f3ffb270b55741e342eb9de3007d7f23632"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/tests/test_factory_lab_bridge.py",
+      "sha256": "d27936d620c604fb78846398291394c243bdab2322334f9627b48fb822fa4b75"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/tests/test_families.py",
+      "sha256": "069f13be746b740372ec8ac26ab5fe33b416a6e0c1e6e8ec1de86115c42d4c81"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/tests/test_g4_candidate_preregistration.py",
+      "sha256": "ac7ff69966bdc18f7a0c79c9000a17180e5ca7ebd1df3c8986809ddc3681dfe4"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/tests/test_g4_factory_acceptance_seam.py",
+      "sha256": "2a3e088fb73fb29c9d0cb1f1551fa20ad35ad4c1446334e7acc9cec613427734"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/tests/test_integration.py",
+      "sha256": "b92bfa0c7ee246f1086c4a640d1d103faa2a3785c5d8003d6f23ca1e77ab71ed"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/tests/test_ledger.py",
+      "sha256": "95a1bc316c656b6145a8a520a290e97cdfa6c9f157bce74461ccf53ef80d457d"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/tests/test_package.py",
+      "sha256": "88e78a0155ca93f5bbb665ff83b59a4e2ca4b4ad50207351f4ab73c6181c70ca"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/tests/test_package_e_durable_checkpoint.py",
+      "sha256": "72f1959bc3e38e41c0c4848fe7a24abb3539533121737e9aece7dedf98a4640d"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/tests/test_package_e_membership.py",
+      "sha256": "dc8a2d31111ef4db3a9e9416571767c67f8f48e3dd4f200e2b2d84f1f2abaa09"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/tests/test_package_f4_historical_intake.py",
+      "sha256": "e619cac060a3b29d3809624322190ddf3b49a1557a3e179ce9fe5a35275c99c7"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/tests/test_package_f4_signed_positive.py",
+      "sha256": "6b5dfd60951028487db81f55bd6a5d7a08b09df0d0410b7400513f6284c58fc3"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/tests/test_scanner_adapter.py",
+      "sha256": "9468af7ee3ad2d70761b44b805d0db970be1a40fa83288bbf62892274557e122"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/tests/test_validation.py",
+      "sha256": "e6c4f5f9a362c342f3a9cecdcc217f9d36d863f07efc9940ba4609c87b138104"
+    },
+    {
+      "path": "discoverer/tools/strategy_discoverer_offline/validation.py",
+      "sha256": "997eb767e47902e24619283d79149eb3b17b1fdd4aeabc0b2c7ed24d7e38e902"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/bulk_census.py",
+      "sha256": "71b436e262a803d586640ff2526ef4407a9f7d7f729494a9121c29b4cee2a67b"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/frozen_diagnostic_contracts.py",
+      "sha256": "830fdb9218edf7a8d79324fd1bba258a7060a07c332f16b943e89f2756747aae"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/g1_g2_explicit_opportunity.py",
+      "sha256": "73e0cabb30c2800bf5440744b40e40bfc7d441aba12b74a325be6713e20ed6d3"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/independent_evaluator_nomination.py",
+      "sha256": "6f59c108b1aed79ff7769c2d42a14d3691669b7cdf6e93870b3d82b199a3a5c5"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/independent_policy_verification.py",
+      "sha256": "d89ea660300b7c015ba5ffb40d6e79c06d930b7871fba82ea5c9a616b1596182"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/policy_activation_request.py",
+      "sha256": "832e0918e2b8dbc3b2d81ad33804bbc0bc95155177f842642e572bad35d8550d"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/private_operator_bundle.py",
+      "sha256": "5c44ccafd2cc13fe011e36c5db90c3abdf60d1b599e81ab3311abda2794afc3b"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/recovery_diagnostic_adapter.py",
+      "sha256": "3b8a13764c5c4d8b05e5bc76b0c1daf07accb8d33b737677e3b3b2fd4b7b4fde"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/research_e2e_diagnostic.py",
+      "sha256": "ab7a80d36fd83506fdf56febcde76a0798671dcee73b65f5185cdba437c1732e"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/research_strategy_plugin.py",
+      "sha256": "2568ffe01135ed521a6a3a1dc6ea9bf7bea429e1ab9d891b95fffc9975654763"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/retrospective_policy.py",
+      "sha256": "e611df69c3748dc4a57f2b5687e6b128621f115c8e00d885cdedbfb51464686a"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/secretary_ack_requirements.py",
+      "sha256": "7e54302fc54479943fc36b3415058638017a1d9f600e747e737b744accd3add7"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/secretary_factory_handoff.py",
+      "sha256": "277d68305ffb107c6c7c4792072cb6c7fa76dc5cc15f4a15d20c5fc96d5bcc81"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/source_bound_intake.py",
+      "sha256": "f1c6e416c67384ce0af6b1af7625425555def71f7678599e0d9fbb5482ee5fc8"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/strategy_specific_decision.py",
+      "sha256": "bb20885d684dc8d46d2fef8fb360b591ae881e247889460e4eddd61697cbadc8"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/test_bulk_census.py",
+      "sha256": "75895b1059cf510c5e2024243c0774a7ff37aa910275e8f64d236258eb100c71"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/test_g1_g2_explicit_opportunity.py",
+      "sha256": "cf8c10ae176a12d37f6bcee06ca49db5408821791af449de5e5cca5bd1967e26"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/test_independent_evaluator_nomination.py",
+      "sha256": "7d8ff8db1052c8309d23c994d3f7b4561cd995532253795baedc85fe50f2b609"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/test_independent_policy_verification.py",
+      "sha256": "baf15d49ae28831cd80042cfa9fb953aa50a1ad4ddb4989f62c56623460f2971"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/test_policy_activation_request.py",
+      "sha256": "8332601de1411900a2cf60b5f49947f7ef0ae42a75284863e3ca9cba9d8ec7c9"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/test_private_operator_bundle.py",
+      "sha256": "d669df7a87876831fc483ea34eb7f14305cd61d80f4f5cebaacd4b58fdfed6bb"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/test_recovery_diagnostic_adapter.py",
+      "sha256": "e42b8dfa255b115f4b51414bf7a45b71aef154362b7faa362c79a675a53daf0e"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/test_research_e2e_diagnostic.py",
+      "sha256": "63222ae45e8581b6fe6169d628af68889e5173cc9d7bbce10e2b85ccf9903675"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/test_research_strategy_plugin.py",
+      "sha256": "3be7c057c1b4cee23eb5f2c993df776154f1f9db60583db4d2cac0b904aa8c4e"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/test_retrospective_policy.py",
+      "sha256": "ef4e74ac02ad36d54b736eaa3d01db36d1d6fde0f0472e98813b3a5e91023c09"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/test_secretary_factory_handoff.py",
+      "sha256": "f5bc739573e18488e074b5694cf4bf156819678b3b94701e552b293cce450eb7"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/test_source_bound_intake.py",
+      "sha256": "e1b9e602c4e75f2220a9f54b5d0654e2eb0c2a0ae7450048914a264936591909"
+    },
+    {
+      "path": "scanner/tools/scanner_strategy_f/test_strategy_specific_decision.py",
+      "sha256": "e1eabbad650a607f583c30d39bd2d44cf208e1fdac95969ef9ddc43a1eb730d1"
+    },
+    {
+      "path": "core/research_wp_r0/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "core/research_wp_r0/_dep_guard.py",
+      "sha256": "54908cba53f77a7fc29201680275c404a172021ee845adf0ff8c0c84d386d134"
+    },
+    {
+      "path": "core/research_wp_r0/aql_archive_custody_bridge_v1.py",
+      "sha256": "a73af68562e79d4eab9c41a7b97712f56f313379d8f976e0fe3e78f4b33bb33d"
+    },
+    {
+      "path": "core/research_wp_r0/aql_authenticated_historical_admission_v1.py",
+      "sha256": "41757beee014cd38870b8b506d86b8a0e787a52739d5ea4465c065237a4416c5"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_authorized_source_transfer_v1.py",
+      "sha256": "b213ace878b55dc47a582d4ec7b790836214b75e3d1f385c89b84eca2e8df05f"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_backbone_local_v1.py",
+      "sha256": "f9ad1b7bd0a49eddf4336931c6c4107b665a2bb4e65fb40d7db92f70cc4e4c48"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_bounded_monthly_source_preflight_v1.py",
+      "sha256": "0d67714177ceb38c10b737d2cb46c3c7ca7a8d638521998b0baaedfc61fcad61"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_c_scanner_reconciliation_v1.py",
+      "sha256": "0c5a93d4971b8964d31bbd7fccf7b5d4480565dd0d3f82899be258cbe7f45a40"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_c_strategy_secretary_route_v1.py",
+      "sha256": "eb98c2116a6fbd51ea291dd06e978ada49b516003ea1ea11a635a1a06209b23d"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_chronology_universe_evidence_v1.py",
+      "sha256": "0aa39aa0edef8a4f792afe66367d2b05c48b578860ab4eadeb062789aeb7032c"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_d_canonical_secretary_v1.py",
+      "sha256": "292564d61b458210bdb1b5e96d308ea438966b42bf559a225ec2db42c288c6bd"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_d_permitted_cohort_v1.py",
+      "sha256": "3ec7e52b4ed9e85a3d7505949518e87b77f830368c7b4532697e92e33bfb654f"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_d_same_source_route_v1.py",
+      "sha256": "1ae76e8922a8cc64e3699f49645e8e99fb28ed3a074213ed8cba920c5e72bb97"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_d_same_source_witness_v1.py",
+      "sha256": "a6ba4a8c34ed70fd26d699aebce8c79d5c0896abb72a9e204c6e88aacde36400"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_dual_query_identity_map_v1.py",
+      "sha256": "c0625c72da3da314641fe0982ea8092ecdcfdf7177f47c4ef46746c7fc288d7e"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_e_historical_boundary_v1.py",
+      "sha256": "56e1df81d60a9d828c36d1f56088cc52012dbe2801cc5c8760bb3ba0c0413d2f"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_e_status_evidence_v1.py",
+      "sha256": "70a2cf0a86750f6efdce744b643a1c7c06b4bfe2aa1c51095045c03054cca65e"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_f5_secretary_authority_v1.py",
+      "sha256": "08e8dc606a8078818ff48e4f2cbae4f54eec0433cdc22c4d48e2fad870badcc4"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_f_bulk_source_v1.py",
+      "sha256": "56291fe50779b4bec5ddcee1aa5537e3fc8f7981bdb9f2ed4217e505c1c797df"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_f_ntfs_acl_v1.py",
+      "sha256": "982d5e7076db757ff126f915d9cc4c80c86528af172e5129d665a6189945d620"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_f_private_f2_v1.py",
+      "sha256": "aaae4b0191fef0c89085bdf8b11bcbbf42988f7afac2e862c3d0076aecfef846"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_f_recovery_readonly_v1.py",
+      "sha256": "9e24d71a8c154fab3503eed4c8725cb5809fe74d62144066c3df0237a2409795"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_f_research_diagnostic_query_v1.py",
+      "sha256": "342d5c477385ddd11c2df9d5b0bead85d8dc30445d63240bd6a42a2e4765622d"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_factory_work_compat_v1.py",
+      "sha256": "2946190d22cbba5e731ad49a6ea886596ae8c9e3a8578ca17f5ba89d435fce07"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_h_portable_query_v1.py",
+      "sha256": "9f8e2c51cc0e495737881bc81fd8347e0eea6256bac5773b680e0f5d466e473a"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_h_research_secretary_v1.py",
+      "sha256": "87b1f22c4d4ef9d4283e7aba71e90e588d0690d4901cb68589e69fea13e58ec6"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_offline_lab_test_strategy_v1.py",
+      "sha256": "4c11fca55a042810aa5367249ad0c3e53275bac59fc057f677209dbc73dfc91f"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_prospective_readiness_v1.py",
+      "sha256": "4ea7d1f0912d5fe0f57e5528574a1e1a967e2aec95899dee04a884cc2327427b"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_research_query_seam_v1.py",
+      "sha256": "7a5a9f6ad94f33e3bad6d63725926b05a00a1d1ece750b71687a100cb400cb19"
+    },
+    {
+      "path": "core/research_wp_r0/aql_core_secretary_routing_v1.py",
+      "sha256": "913ee9e758c63ec826b03d570a269838fda068cc47e55b0f7adc881b28375c92"
+    },
+    {
+      "path": "core/research_wp_r0/aql_native_binance_zip_v1.py",
+      "sha256": "8b77c92bbf7a72d8ba3fcb7f633939c9d984433dce7a159a47c977f8a73f2c1f"
+    },
+    {
+      "path": "core/research_wp_r0/aql_native_price_custody_query_v1.py",
+      "sha256": "543e02cde3a91243e211b95d84f21fae22f91fb6af7a0a10fe4b09b861c1aeaf"
+    },
+    {
+      "path": "core/research_wp_r0/attempt_ledger.py",
+      "sha256": "1018d05926c4227bcc3bbe2bc471a026d3776a051841a80e9dd40bb030e4268e"
+    },
+    {
+      "path": "core/research_wp_r0/batch01_admission_bridge.py",
+      "sha256": "fe85610675b89389a92d7ce54c04b4dc3864068014a45a3b7e41929d8e91f182"
+    },
+    {
+      "path": "core/research_wp_r0/batch01_attempt_adapter.py",
+      "sha256": "59428311be76755afbf20fdaf699e950cafaad2db83700a1039b0b841027585a"
+    },
+    {
+      "path": "core/research_wp_r0/batch01_result_quarantine.py",
+      "sha256": "7f14709aee29634506ef60df1db7bdfbecc5b5ffb8dfe77318b8ce65817bc0a9"
+    },
+    {
+      "path": "core/research_wp_r0/content_identity.py",
+      "sha256": "ed46904cead2b349db1c7dbfb3ef1cb5cf009714cf65e950e9696960afba915c"
+    },
+    {
+      "path": "core/research_wp_r0/custody_anchor_verifier.py",
+      "sha256": "673a82bfbb203bac109893eac4ee3e703133f74b208cf7f1acce4bd59a80f0ee"
+    },
+    {
+      "path": "core/research_wp_r0/custody_manifest_builder.py",
+      "sha256": "19c57591f97d5daeb92b39abe414f3ce299a455d3d77963b4ca1ed6f0546e413"
+    },
+    {
+      "path": "core/research_wp_r0/ema_development_replay.py",
+      "sha256": "99effb5a5b6d608268a7a917c755b947524b1ad03c7ac0cc06e2e9e40851cd1d"
+    },
+    {
+      "path": "core/research_wp_r0/ema_first_backtest.py",
+      "sha256": "b721f0e706be6376e597378fc23cd226fcd97975bece7d3f3450adc8c2044fcc"
+    },
+    {
+      "path": "core/research_wp_r0/factory_custody_envelope.py",
+      "sha256": "c71a484eaed78fc23ebd036e928ebad1cf03e9e72028a9ced67c6e73be43c251"
+    },
+    {
+      "path": "core/research_wp_r0/factory_custody_export.py",
+      "sha256": "f9215178d2228ccbba421ee62608fed10150b98a70d25d0770290291f55e16df"
+    },
+    {
+      "path": "core/research_wp_r0/factory_exam.py",
+      "sha256": "f4df95961cb2835349cf87b8b9e939e4808629d845d7841f15f93c1abbfeff36"
+    },
+    {
+      "path": "core/research_wp_r0/factory_exam_example.py",
+      "sha256": "39338227dc6fc0ffe9e4cd01ae1ce2c330e7d8690a663f1ef59f23465538866d"
+    },
+    {
+      "path": "core/research_wp_r0/frozen_attempt_writer.py",
+      "sha256": "043d15412f39518b67637a06061df8e8497eb97ae5eccd5d65e180035ea59eb1"
+    },
+    {
+      "path": "core/research_wp_r0/frozen_plan_reconciliation.py",
+      "sha256": "4ca94f552973a9b5ee6eaf5adf0db0d81d9ad77f6a8b5f0637fd5ef6a2c55f03"
+    },
+    {
+      "path": "core/research_wp_r0/frozen_research_plan.py",
+      "sha256": "ec45c9ad2f18a290bcb238474771e55c1a012416056ae7441a56be2fe4e4f8fe"
+    },
+    {
+      "path": "core/research_wp_r0/future_bar_evidence.py",
+      "sha256": "8a4eb2803f2b8d8e86688a8e1d994817b7db008410890cc04e53bdf16a349791"
+    },
+    {
+      "path": "core/research_wp_r0/historical_evaluation_bridge.py",
+      "sha256": "c330caf1fb8ce5a4a0e0da1d0bae6318f3aaf7bba03452883906826b6801d24b"
+    },
+    {
+      "path": "core/research_wp_r0/historical_library.py",
+      "sha256": "a9ae4cb490c3b0eeaa514b25b4c01e1f1617962d5f4639cad0102030cf13c6bd"
+    },
+    {
+      "path": "core/research_wp_r0/indicator_library.py",
+      "sha256": "51d695d488766f2de86416e34a621818a8d0cc0e68f97feedca576efa45f84e8"
+    },
+    {
+      "path": "core/research_wp_r0/indicator_library_v2.py",
+      "sha256": "351eb4e256ebd4ddee2031853ab2c93770897e6fbd14c9df0bef50cc72b0de99"
+    },
+    {
+      "path": "core/research_wp_r0/offline_evaluation_result.py",
+      "sha256": "43bdfca3d21d41959c846e7fe8b567b9166c5fdca11f33d8d0afd0b9b36451b1"
+    },
+    {
+      "path": "core/research_wp_r0/offline_input_audit.py",
+      "sha256": "cf6f53686d1d0c828146d7dda00570e9eea0fa99e479fa3e2b58c816bc30a3f4"
+    },
+    {
+      "path": "core/research_wp_r0/offline_simulator.py",
+      "sha256": "2dc7fa631827051fadd036d5b81f7f2cbe62cacbb3cd274fa0e6d089d5a452c4"
+    },
+    {
+      "path": "core/research_wp_r0/pinned_ema_research.py",
+      "sha256": "1c319107d71f74bb5558183bb0114525ef90d484546f1a0170593672efd601e7"
+    },
+    {
+      "path": "core/research_wp_r0/research_guards.py",
+      "sha256": "09b68b3dbd54588fbb82b07034b1ba057540e8026a243a4da3eed3ae6cf2c5a8"
+    },
+    {
+      "path": "core/research_wp_r0/retrospective_kline_intake.py",
+      "sha256": "cf525a66fe019f1247b5bb4ba497aa7fbad13c66cc5fb79e64566d1523b2bbfa"
+    },
+    {
+      "path": "core/research_wp_r0/sf_breakout_pilot.py",
+      "sha256": "51de0f5e789a08187536d6ba8fb0e2d5fb05009acd9cd9e60c3916f7b2deeaca"
+    },
+    {
+      "path": "core/research_wp_r0/sf_historical_admission.py",
+      "sha256": "679f25df3b6c15baa1a3430a0a1aba5e7f591b5ffc13f2bdf28157bdbc61514b"
+    },
+    {
+      "path": "core/research_wp_r0/sf_synthetic_result_link.py",
+      "sha256": "5a6256db903f1ee5f3132cd373da15d708409008e6403105935a008d044886ba"
+    },
+    {
+      "path": "core/research_wp_r0/sf_synthetic_workflow.py",
+      "sha256": "bb115b5a1bba41b520b15099806443d4c2476075208435255610417266a84447"
+    },
+    {
+      "path": "core/research_wp_r0/strategy_definition.py",
+      "sha256": "6af2db368ef379e08039d97fba385e4431faf47026b1add82f3c102e1d393b04"
+    },
+    {
+      "path": "core/research_wp_r0/strategy_dna_v2.py",
+      "sha256": "cfadd6bb763dbbbe52034e70b11df6210fde9f492a55c6cf829af79a217c45a8"
+    },
+    {
+      "path": "core/research_wp_r0/strategy_dna_v2_example.py",
+      "sha256": "7a9ebfe3c27a314dd08f838e5e8c132c6af42a11bd1655946a7cda57c8db9efa"
+    },
+    {
+      "path": "core/research_wp_r0/synthetic_execution.py",
+      "sha256": "e063466c8ebd0ce771d53a5de3fc9ba09f0d089acdbd999ffdb3f9fac5d96409"
+    },
+    {
+      "path": "core/research_wp_r0/synthetic_opportunities.py",
+      "sha256": "b94a353c22fc534460622548699b8f612c819afff958160819a8158da3324899"
+    },
+    {
+      "path": "core/research_wp_r0/synthetic_summary.py",
+      "sha256": "a728b5a933bba668125bb94febdf19220cb4f5671e489f1badb1e7af5d6a32f5"
+    },
+    {
+      "path": "core/research_wp_r0/test_factory_custody_adversarial.py",
+      "sha256": "9fa0153bce87fc7f93dc1319209a07ce6ae2fd728b75f7596ecf0d298408d9e0"
+    },
+    {
+      "path": "core/research_wp_r0/test_factory_custody_envelope.py",
+      "sha256": "4c739f63d0c0b7cab0428bc16cf6bcf9d3f645e0695c4cda08b22ab08c683197"
+    },
+    {
+      "path": "core/research_wp_r0/test_factory_custody_export.py",
+      "sha256": "fdc5673fb3f38d2011529ce92fef881c7a18f53804164b50b2ce5b802e1055e5"
+    },
+    {
+      "path": "core/research_wp_r0/test_frozen_attempt_writer.py",
+      "sha256": "8e1749fc601ee9741d3e434554b66632f05412f7529f849ae200fd933f268f63"
+    },
+    {
+      "path": "core/research_wp_r0/test_frozen_concurrency_recovery.py",
+      "sha256": "8b3486e019fb1cbef4bae020fe56f5db4476f13044aad0a0ac2a1e0543d05ee8"
+    },
+    {
+      "path": "core/research_wp_r0/test_frozen_default_admission.py",
+      "sha256": "b1cd08aa648d7c6dbc42a5861e1ab31f5756387c6c544bda4207acb840002989"
+    },
+    {
+      "path": "core/research_wp_r0/test_frozen_multiprocess_recovery.py",
+      "sha256": "e75e8979a92240cc16f3b268eb8c771d8ad40496d6c3c9b91aa28ecadfa68823"
+    },
+    {
+      "path": "core/research_wp_r0/test_frozen_plan_reconciliation.py",
+      "sha256": "72968225f53f75da201350c093be7bb19a1cbf679249bf3cae001829853e6c5e"
+    },
+    {
+      "path": "core/research_wp_r0/test_frozen_research_plan.py",
+      "sha256": "f389267be70c8e38d40fc85b8885df17cb315ba8eb3a1512ab3a06e30e82cd8b"
+    },
+    {
+      "path": "core/research_wp_r0/test_full_plan_ledger.py",
+      "sha256": "1385a78a836036dc40c4c8a74b3d5f3f7f9c93240e267619eff5fa67830d28e9"
+    },
+    {
+      "path": "core/research_wp_r0/test_legacy_bridge_isolation.py",
+      "sha256": "ce56efa7102e9210e0b96999df1698934386d755eef0e6c2e2e5609069b8be35"
+    },
+    {
+      "path": "core/research_wp_r0/test_sealed_plan_policy.py",
+      "sha256": "880d6d39e79ba5e60972026f31b46a1db09ce897da0f8a69384ff1157f00aa5a"
+    },
+    {
+      "path": "core/research_wp_r0/test_sealed_policy_tamper.py",
+      "sha256": "cecbeffd64ef721616f9bc99c42270d92ff83dcb0eda49ac9c69389c6e232064"
+    },
+    {
+      "path": "work235/tools/strategy_service_offline/__init__.py",
+      "sha256": "b1ccee01546948211bb084e130d54ef644e7792b079aea15ab46bc9bbe852858"
+    },
+    {
+      "path": "work235/tools/strategy_service_offline/__main__.py",
+      "sha256": "4f9fb6f61dd7d64230eefff80217a000e68904774db07f47d0f12662393aff48"
+    },
+    {
+      "path": "work235/tools/strategy_service_offline/common.py",
+      "sha256": "148b6cda2c4bca939775882e4555572fe4de2f454fd32b74fa0b212ce90f76a6"
+    },
+    {
+      "path": "work235/tools/strategy_service_offline/gate.py",
+      "sha256": "782d4fdd756989ddce35893eea60779af340a4b678b29bfaf47cef4b16ad4c34"
+    },
+    {
+      "path": "work235/tools/strategy_service_offline/research.py",
+      "sha256": "5b2476f11ed78e3559cce3a8a23c69e93b4b31b6724199bcad367bf1a88c79a8"
+    },
+    {
+      "path": "work235/tools/strategy_service_offline/routing.py",
+      "sha256": "fb8a3941601e2760522cbd08bc2beb0ff1c307d6b560b712f7b939e3a2cc0d4d"
+    },
+    {
+      "path": "work235/tools/strategy_service_offline/run.py",
+      "sha256": "76e5bf7003651436ab5be93239f2860d18976ef907485bf01be64689ff8a84c9"
+    },
+    {
+      "path": "work235/tools/strategy_service_offline/screening.py",
+      "sha256": "aae8f204593e1c46c94837674fb2a200b4a8802e26ffc2c1cc45beb51d4109ff"
+    },
+    {
+      "path": "work235/tools/strategy_service_offline/test_gate.py",
+      "sha256": "70043bb9c865ced3822dfb6b2f53ea6453db287b905cdc425652c3bfbffadc4a"
+    },
+    {
+      "path": "work235/tools/strategy_service_offline/worker.py",
+      "sha256": "ba2958d37761b09aa2aa8b7d55b1430c9c489706ee638c81df71af4c76176ac4"
+    },
+    {
+      "path": "scanner_b/tools/scanner_strategy_b/core_secretary.py",
+      "sha256": "d708d3b93ce2a4a5ba943a7c3f62b8ce5bf9f71d0e2d55fa9b4062060007a620"
+    },
+    {
+      "path": "scanner_b/tools/scanner_strategy_b/factory_handoff.py",
+      "sha256": "a98126860e05c13e3cad375d8014d22ba5cae1db2fa1faee4a9bd3f0fbe600ac"
+    },
+    {
+      "path": "scanner_b/tools/scanner_strategy_b/native15m.py",
+      "sha256": "fd05a5c832f296532f5673aaa4613b555e573c2b9f92d710f7d25df5a9c55386"
+    },
+    {
+      "path": "scanner_b/tools/scanner_strategy_b/portfolio.py",
+      "sha256": "9015b500fe5eb5230deec998d88e7eee4d91fb1768eb6a222dbb13e795cade78"
+    },
+    {
+      "path": "scanner_b/tools/scanner_strategy_b/test_integration.py",
+      "sha256": "a6974c78ba55ac2a8b19c22e174638f1f26461c5c684e98e26c942b02905adb5"
+    },
+    {
+      "path": "scanner_b/tools/scanner_strategy_b/test_portfolio.py",
+      "sha256": "4245b083ed1fd1b03003f93e539901330042ec34da776afa7b1e26e77a53daf0"
+    }
+  ],
+  "dependency_heads": {
+    "core290": "612d1444ff36ed08b63fd0a98bb8d4e71f88cd0d",
+    "discoverer276": "c568e3b281795f9eef2165c0e6f571b87157a23c",
+    "factory291": "ea4ffd5ce278d93588338122ab6ac1af8ec4da26",
+    "scanner277": "ccf57ad3db7e71290a8321840e800136567e3af4",
+    "scanner_b": "30c37ae56851488b882998c7fa0085ec51dbfc92",
+    "work235": "6acbcc7fc243b132f58170df4c6469bbf7f4eff8"
+  },
+  "end_exclusive_ms": 1719792000000,
+  "expected_bars": 5856,
+  "first_open_ms": 1714521600000,
+  "freeze_purpose": "BEFORE_THIS_CYCLE_OUTCOME_READ_NOT_CONTEMPORANEOUS_2024",
+  "frozen_at_ms": 1794338417849,
+  "holding_bars": 16,
+  "holdout": "SEALED_UNOPENED",
+  "holdout_start_ms": 1717459200000,
+  "null": {
+    "method": "FIXED_PERIODIC_PREDECLARED_INDEPENDENT_OF_RULE_AND_OUTCOMES",
+    "offset": 7,
+    "period": 16
+  },
+  "real_pit": "NOT_ATTESTED",
+  "risk": "0.01",
+  "scanner_import_dependency_amendment_from": "e3527d04c5410613f6e19345e06ac6037a5d87c659ac503303175acb31373a49",
+  "schema": "aql.first-cycle.market-plan.v1",
+  "seed": 294,
+  "source_class": "RETAINED_ACTUAL_MARKET_RETROSPECTIVE_NON_PIT",
+  "source_rights_grade": "CURRENT_PUBLIC_TERMS_AND_OWNER_LOCAL_RESEARCH_PERMISSION_ACQUISITION_RIGHTS_NOT_ATTESTED",
+  "splits": {
+    "embargo_end_exclusive": "2024-06-04",
+    "embargo_ms": 259200000,
+    "holdout_end_exclusive": "2024-07-01",
+    "train_end_exclusive": "2024-05-20",
+    "train_start": "2024-05-01",
+    "validation_end_exclusive": "2024-06-01"
+  },
+  "strategy": {
+    "definition": {
+      "entry": {
+        "left": {
+          "field": "value",
+          "lag": 0,
+          "name": "trend",
+          "op": "indicator"
+        },
+        "op": "gt",
+        "right": {
+          "field": "value",
+          "lag": 0,
+          "name": "slow",
+          "op": "indicator"
+        }
+      },
+      "exit": {
+        "left": {
+          "field": "value",
+          "lag": 0,
+          "name": "trend",
+          "op": "indicator"
+        },
+        "op": "lt",
+        "right": {
+          "field": "value",
+          "lag": 0,
+          "name": "slow",
+          "op": "indicator"
+        }
+      },
+      "indicators": [
+        {
+          "constraints": {
+            "period": {
+              "max": 20,
+              "min": 2,
+              "type": "int"
+            }
+          },
+          "indicator_id": "SMA_v1",
+          "name": "trend",
+          "parameters": {
+            "period": 3
+          },
+          "version": "1"
+        },
+        {
+          "constraints": {
+            "period": {
+              "max": 20,
+              "min": 2,
+              "type": "int"
+            }
+          },
+          "indicator_id": "SMA_v1",
+          "name": "slow",
+          "parameters": {
+            "period": 8
+          },
+          "version": "1"
+        }
+      ],
+      "risk": {
+        "entry_ttl_bars": 2,
+        "holding_bars": 16,
+        "max_exposure": 1,
+        "max_leverage": 1,
+        "stop_fraction": 0.01,
+        "target_fraction": 0.03,
+        "unit": "ENTRY_NOTIONAL"
+      },
+      "schema_version": "1",
+      "scope": "RESEARCH_ONLY",
+      "strategy_id": "first_cycle_sma3_8",
+      "strategy_version": "v1",
+      "timing": {
+        "ambiguity": "REJECT",
+        "decision": "CONFIRMED_CLOSE",
+        "entry_execution": "NEXT_ELIGIBLE_OPEN"
+      }
+    },
+    "digest": "bab9bac7e8cbb6dca5db21ba685a5027d2f197babbc2ec7c60468233a724aabf"
+  },
+  "supersedes_plan_sha256": "29651198afa63b562f2fc220fb1c54f84370aa8dde2a38f9723ce2a0a8c0a475",
+  "target_rs": [
+    "1",
+    "2",
+    "3"
+  ],
+  "terms_reference": "https://github.com/binance/binance-public-data/blob/master/TERMS_AND_CONDITIONS.md",
+  "terms_version": "1.0 updated2026-08-26; CC BY-NC-SA4.0; private noncommercial research; no raw redistribution",
+  "trading_authority": "NONE",
+  "train_end_ms": 1716163200000,
+  "validation_end_ms": 1717200000000,
+  "winner": null
+}
