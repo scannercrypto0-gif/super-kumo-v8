@@ -7,6 +7,8 @@ on:
     paths:
       - tools/strategy_discoverer_offline/synthetic_scanner_candidate_bridge.py
       - tools/strategy_discoverer_offline/tests/test_d_scan_1_candidate_bridge.py
+      - tools/strategy_discoverer_offline/g4_candidate_preregistration.py
+      - tools/strategy_discoverer_offline/tests/test_g4_candidate_preregistration.py
       - .github/workflows/discoverer-d-scan-1.yml
   pull_request:
     paths:
@@ -65,4 +67,4 @@ jobs:
       - name: Test only new Discoverer synthetic candidate seam
         env:
           PYTHONPATH: .
-        run: python -m pytest -q tools/strategy_discoverer_offline/tests/test_d_scan_1_candidate_bridge.py
+        run: python -m pytest -q tools/strategy_discoverer_offline/tests/test_d_scan_1_candidate_bridge.py tools/strategy_discoverer_offline/tests/test_g4_candidate_preregistration.py
