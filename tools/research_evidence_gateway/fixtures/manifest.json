@@ -23,6 +23,7 @@
     "main": "90af9794880cbeb00e7e974bfa906ff5e9666183",
     "scanner": "ccf57ad3db7e71290a8321840e800136567e3af4"
   },
+  "results_as_of_ms": 6300000,
   "run": {
     "config_sha256": "50756758daf2925e704f97531b0de7801b077b66548d2212a3515f9fdf9556d2",
     "definition_sha256": "5d293f892fd829a9d1c1d2933612bbb4f2d57b4445deefce06436959824cb55b",

@@ -89,7 +89,7 @@ def test_corrupt_duplicate_key_nonfinite(tmp_path,raw):
 
 
 def test_fresh_process_replay_and_no_side_effects(tmp_path):
-    before={p.name:p.read_bytes() for p in FIXTURE.iterdir()}
+    before={p.relative_to(FIXTURE).as_posix():p.read_bytes() for p in FIXTURE.rglob('*') if p.is_file()}
     command=[sys.executable,'-B','-m','tools.research_evidence_gateway.gateway',
              '--inputs',str(FIXTURE),'--manifest-sha256',ANCHOR]
     a,b=tmp_path/'a.json',tmp_path/'b.json'
@@ -97,7 +97,7 @@ def test_fresh_process_replay_and_no_side_effects(tmp_path):
     assert a.read_bytes()==b.read_bytes()
     assert subprocess.run(command+['--output',str(a)],capture_output=True).returncode==2
     assert subprocess.run(command+['--output',str(FIXTURE/'out.json')],capture_output=True).returncode==2
-    assert before=={p.name:p.read_bytes() for p in FIXTURE.iterdir()}
+    assert before=={p.relative_to(FIXTURE).as_posix():p.read_bytes() for p in FIXTURE.rglob('*') if p.is_file()}
 
 
 def test_no_rights_known_at_or_real_oos_invented():

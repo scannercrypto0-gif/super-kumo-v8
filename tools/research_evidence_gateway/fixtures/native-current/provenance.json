@@ -1,0 +1,42 @@
+{
+  "files": {
+    "closeout.json": {
+      "commit": "7b6c8d82ca8111f5fa15dee5e6823bc39289b48c",
+      "git_blob": "f911a6e70b1dac25dd473da4b1da3939e94556d7",
+      "git_bytes_sha256": "64f5d684114cf6fe80e02b489a2a5cc255a5b38efe82cdba34fbcae2cb8bec4a",
+      "path": ".github/atlas_evidence/g4_current_head/closeout.json"
+    },
+    "frozen-v2/checkpoint.json": {
+      "commit": "7b6c8d82ca8111f5fa15dee5e6823bc39289b48c",
+      "git_blob": "29252a9b74c0afdd80dd39d7984118632970d251",
+      "git_bytes_sha256": "b6737fd2f0626c3487d5cd0931c0c95b7cb7aeec157d75c8e8dc4f369b6e55da",
+      "path": ".github/atlas_evidence/g4_current_head/frozen-v2/checkpoint.json"
+    },
+    "frozen-v2/originals.json": {
+      "commit": "7b6c8d82ca8111f5fa15dee5e6823bc39289b48c",
+      "git_blob": "deea48f89a57c7d9c5ede792bbf44a58e2833bee",
+      "git_bytes_sha256": "b17b82e57fab605ad616a54688e1f6cdc242532051df131f479d39ed3b69d150",
+      "path": ".github/atlas_evidence/g4_current_head/frozen-v2/originals.json"
+    },
+    "frozen-v2/proposal.json": {
+      "commit": "7b6c8d82ca8111f5fa15dee5e6823bc39289b48c",
+      "git_blob": "58155d637cf0df6c8e75b8b82b689dcea9fe028e",
+      "git_bytes_sha256": "20dbe9a30bd5d3e44ddf8722169d9998eef8111a952e9173fb9dedc983d8c368",
+      "path": ".github/atlas_evidence/g4_current_head/frozen-v2/proposal.json"
+    },
+    "frozen-v2/registration.json": {
+      "commit": "7b6c8d82ca8111f5fa15dee5e6823bc39289b48c",
+      "git_blob": "fe4418f4caf9e7df7a021b9d42bfea369310fae1",
+      "git_bytes_sha256": "d5ca259ea86a8ff3dad0a878c7920a0724580aa8ce1361aff072d873a4a6f868",
+      "path": ".github/atlas_evidence/g4_current_head/frozen-v2/registration.json"
+    },
+    "registry.json": {
+      "commit": "7b6c8d82ca8111f5fa15dee5e6823bc39289b48c",
+      "git_blob": "11146290465976e1694f17fedd6dbfa907a6f091",
+      "git_bytes_sha256": "b50aa97b3347201e8573bbc4219fbe9b99e5c4396cc967160c2ce447b250b3aa",
+      "path": ".github/atlas_evidence/g4_current_head/registry.json"
+    }
+  },
+  "integration_native_source": "c01f526e762a014e5ed84ca3cf695b9d77502ab3",
+  "source": "existing accepted bytes only; no G4 rerun"
+}

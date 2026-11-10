@@ -1,0 +1,89 @@
+[
+  {
+    "adverse_cost": "0",
+    "cash": "10000.7361003",
+    "engine_sha256": "c52719502427f832e9f6db7e9bc8fa2ffc3c596cc9831d826246b1c3b9524e57",
+    "entry_decision_ms": 3600004,
+    "entry_notional": "101.03030",
+    "entry_remaining": "0",
+    "evidence_grade": "SYNTHETIC_TESTED",
+    "exit_due_ms": 5399999,
+    "exit_notional": "101.9694",
+    "exited": "1",
+    "expiry_ms": 6299999,
+    "fees": "0.2029997",
+    "filled": "1",
+    "fills": [
+      {
+        "adverse_cost": "0",
+        "assumed_execution_window": [
+          4500000,
+          4500000
+        ],
+        "execution_ms": 4500000,
+        "fee": "0.1010303",
+        "liquidity": "ASSUMED_TAKER",
+        "price": "101.03030",
+        "qty": "1",
+        "received_ms": 5400000,
+        "side": "buy"
+      },
+      {
+        "adverse_cost": "0",
+        "assumed_execution_window": [
+          4500000,
+          4500000
+        ],
+        "execution_ms": 4500000,
+        "fee": "0.1019694",
+        "liquidity": "ASSUMED_TAKER",
+        "price": "101.9694",
+        "qty": "1",
+        "received_ms": 5400000,
+        "side": "sell"
+      }
+    ],
+    "instance": "pkg03-synthetic-integration",
+    "last_bar": 5399999,
+    "limit": "101",
+    "mode": "taker",
+    "net_pnl": "0.7361003",
+    "phase": "CLOSED",
+    "policy": {
+      "allow_fallback": false,
+      "capital": "10000",
+      "half_spread_bps": "1",
+      "maker_adverse_bps": "1",
+      "maker_fee_bps": "2",
+      "max_notional": "1000",
+      "slippage_bps": "2",
+      "taker_fee_bps": "10",
+      "version": 1
+    },
+    "queue_ahead": "0",
+    "reason": "ASSUMED_TARGET",
+    "requested_qty": "1",
+    "schema": "aql.paper-sim.state.v1",
+    "signal": {
+      "available_ms": 3600002,
+      "config_sha256": "50756758daf2925e704f97531b0de7801b077b66548d2212a3515f9fdf9556d2",
+      "decision_ms": 3600003,
+      "definition_sha256": "5d293f892fd829a9d1c1d2933612bbb4f2d57b4445deefce06436959824cb55b",
+      "evaluator_sha256": "18d3b6a6785cb4890c75a6d30265f546eafa941b936b2ba0900aa2c2da4bf298",
+      "evidence_mode": "SYNTHETIC_TESTED",
+      "interval_ms": 900000,
+      "schema": "aql.paper-sim.signal.v1",
+      "signal_id": "6ce5612d68bd5234ada7953158326b27ddc78bd6558000d0101f1a5a3c579a46",
+      "source_close_ms": 3599999,
+      "source_sha256": "c141fac740e9630fdfb42e16d6d94eb671c80d37f7edc7a4af5f165edc79eb7f",
+      "strategy_id": "test_momentum",
+      "strategy_version": "v1",
+      "symbol": "BTCUSDT",
+      "trading_authority": "NONE"
+    },
+    "stop": "95",
+    "target": "102",
+    "trading_authority": "NONE",
+    "updated_ms": 5400000
+  }
+]

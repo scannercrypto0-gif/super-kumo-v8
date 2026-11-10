@@ -1,0 +1,421 @@
+{
+  "arms": {
+    "BASE": {
+      "costs": {
+        "fee_entry_bps": "1",
+        "fee_exit_bps": "1",
+        "funding_bps_per_bar": "0",
+        "slippage_entry_bps": "1",
+        "slippage_exit_bps": "1",
+        "spread_entry_bps": "1",
+        "spread_exit_bps": "1"
+      },
+      "direction": "LONG",
+      "fill_semantics": "NEXT_ELIGIBLE_OPEN_UNKNOWN_ON_INTRABAR_TOUCH",
+      "holdout": "SEALED_UNOPENED",
+      "market": "SPOT",
+      "owner_operator_authorized": false,
+      "scenario_class": "SYNTHETIC_TEST_EXPLICIT",
+      "schema": "aql.factory.h.generic-cost-policy.v1",
+      "sha256": "082e42d9a10700d9cb61ecf7086de4aee01d7eeb46e4598f767f0b7cfbbf9ac8",
+      "trading_authority": "NONE"
+    },
+    "MISSING_CONTROL": {
+      "costs": {
+        "fee_entry_bps": "1",
+        "fee_exit_bps": "1",
+        "funding_bps_per_bar": "0",
+        "slippage_entry_bps": "1",
+        "slippage_exit_bps": "1",
+        "spread_entry_bps": "1",
+        "spread_exit_bps": "1"
+      },
+      "direction": "LONG",
+      "fill_semantics": "NEXT_ELIGIBLE_OPEN_UNKNOWN_ON_INTRABAR_TOUCH",
+      "holdout": "SEALED_UNOPENED",
+      "market": "SPOT",
+      "owner_operator_authorized": false,
+      "scenario_class": "SYNTHETIC_TEST_EXPLICIT",
+      "schema": "aql.factory.h.generic-cost-policy.v1",
+      "sha256": "082e42d9a10700d9cb61ecf7086de4aee01d7eeb46e4598f767f0b7cfbbf9ac8",
+      "trading_authority": "NONE"
+    },
+    "PLACEBO": {
+      "costs": {
+        "fee_entry_bps": "1",
+        "fee_exit_bps": "1",
+        "funding_bps_per_bar": "0",
+        "slippage_entry_bps": "1",
+        "slippage_exit_bps": "1",
+        "spread_entry_bps": "1",
+        "spread_exit_bps": "1"
+      },
+      "direction": "LONG",
+      "fill_semantics": "NEXT_ELIGIBLE_OPEN_UNKNOWN_ON_INTRABAR_TOUCH",
+      "holdout": "SEALED_UNOPENED",
+      "market": "SPOT",
+      "owner_operator_authorized": false,
+      "scenario_class": "SYNTHETIC_TEST_EXPLICIT",
+      "schema": "aql.factory.h.generic-cost-policy.v1",
+      "sha256": "082e42d9a10700d9cb61ecf7086de4aee01d7eeb46e4598f767f0b7cfbbf9ac8",
+      "trading_authority": "NONE"
+    },
+    "SHADOW": {
+      "costs": {
+        "fee_entry_bps": "3",
+        "fee_exit_bps": "3",
+        "funding_bps_per_bar": "0",
+        "slippage_entry_bps": "3",
+        "slippage_exit_bps": "3",
+        "spread_entry_bps": "3",
+        "spread_exit_bps": "3"
+      },
+      "direction": "LONG",
+      "fill_semantics": "NEXT_ELIGIBLE_OPEN_UNKNOWN_ON_INTRABAR_TOUCH",
+      "holdout": "SEALED_UNOPENED",
+      "market": "SPOT",
+      "owner_operator_authorized": false,
+      "scenario_class": "SYNTHETIC_TEST_EXPLICIT",
+      "schema": "aql.factory.h.generic-cost-policy.v1",
+      "sha256": "a7f277eba94f043b6381728e750a5464272482badecb31ccf7859db8f6150f62",
+      "trading_authority": "NONE"
+    }
+  },
+  "binding": {
+    "binding_sha256": "c445a658656c627ac8a3a0f865d0761a03b8afcca4f04a43bfb4d59f56fab92d",
+    "candidate_id": "1c93b953-7b78-4725-b1e1-7e935ce508d5",
+    "candidate_package_sha256": "c4f6bf9857e5355cb80f63c080aa4b8292e061510b70906fc937256fb3b7363a",
+    "f4_historical_connected": false,
+    "factory_consumer_ack_sha256": null,
+    "historical_pit": "NOT_ATTESTED",
+    "holdout_status": "SEALED_UNOPENED",
+    "nomination_evidence_sha256": "9395141994be38e3333fbd2023eb09ebd4fb1ebee4657b9da03a7cee6ee6034b",
+    "research_scope": "SYNTHETIC_RESEARCH_ONLY",
+    "scanner_plugin_schema": "aql.scanner.h.strategy-plugin.v1",
+    "scanner_plugin_sha256": "50a42850544d6c6ea9ef8cae9423997eb71b4ab3aa5bebada1e342a7d84581f4",
+    "schema_version": "aql.discoverer.h.synthetic-scanner-candidate-binding.v1",
+    "selected": false,
+    "source_ack_sha256": null,
+    "source_class": "TEST_ONLY",
+    "status": "RESEARCH_ONLY_NO_INDEPENDENT_APPROVAL",
+    "strategy_approval_sha256": null,
+    "strategy_definition_sha256": "20800c5c1c60d03618d51717914e2400e3743e9496572b23a178e59366df166d",
+    "trading_authority": "NONE"
+  },
+  "candidate": {
+    "attempt_ledger_head": "6bc439c0343c133b15408f674576f91f5fd3fbac75fe3f2cb1d35af398f04052",
+    "candidate_id": "1c93b953-7b78-4725-b1e1-7e935ce508d5",
+    "counterhypothesis_id": "null-001",
+    "delivery_authorized": false,
+    "evaluation_status": "NOT_EVALUATED",
+    "execution_status": "NOT_AUTHORIZED",
+    "factory_routing": "NOT_CONNECTED",
+    "family_id": "F001",
+    "family_version": "1.0",
+    "holdout_status": "SEALED_UNOPENED",
+    "nomination_evidence_digest": "9395141994be38e3333fbd2023eb09ebd4fb1ebee4657b9da03a7cee6ee6034b",
+    "package_digest": "c4f6bf9857e5355cb80f63c080aa4b8292e061510b70906fc937256fb3b7363a",
+    "publishable": false,
+    "rule_grammar_version": "aql.strategy-definition.grammar.v1",
+    "schema_version": "aql.discoverer.candidate.v1",
+    "scientific_acceptance": "NOT_OBTAINED",
+    "search_plan_digest": "044dd385d6d03943767ad5b865a747ed12d6b265032f0a9a31c6d509d0e1bc77",
+    "source_manifest_sha256": "b53ed8972c464304091aa3e68c2aeb931e3071012e7edfec19287b52b65f91ca",
+    "status": "PROPOSED_RESEARCH_ONLY",
+    "strategy_definition_digest": "20800c5c1c60d03618d51717914e2400e3743e9496572b23a178e59366df166d",
+    "strategy_spec": {
+      "definition": {
+        "entry": {
+          "left": {
+            "field": "value",
+            "lag": 0,
+            "name": "trend",
+            "op": "indicator"
+          },
+          "op": "gt",
+          "right": {
+            "op": "constant",
+            "value": 100
+          }
+        },
+        "exit": {
+          "left": {
+            "field": "value",
+            "lag": 1,
+            "name": "trend",
+            "op": "indicator"
+          },
+          "op": "lt",
+          "right": {
+            "op": "constant",
+            "value": 99
+          }
+        },
+        "indicators": [
+          {
+            "constraints": {
+              "period": {
+                "max": 20,
+                "min": 2,
+                "type": "int"
+              }
+            },
+            "indicator_id": "SMA_v1",
+            "name": "trend",
+            "parameters": {
+              "period": 3
+            },
+            "version": "1"
+          }
+        ],
+        "risk": {
+          "entry_ttl_bars": 2,
+          "holding_bars": 10,
+          "max_exposure": 1,
+          "max_leverage": 1,
+          "stop_fraction": 0.02,
+          "target_fraction": 0.04,
+          "unit": "ENTRY_NOTIONAL"
+        },
+        "schema_version": "1",
+        "scope": "RESEARCH_ONLY",
+        "strategy_id": "d_scan_1_synthetic_test",
+        "strategy_version": "v1",
+        "timing": {
+          "ambiguity": "REJECT",
+          "decision": "CONFIRMED_CLOSE",
+          "entry_execution": "NEXT_ELIGIBLE_OPEN"
+        }
+      },
+      "digest": "20800c5c1c60d03618d51717914e2400e3743e9496572b23a178e59366df166d"
+    }
+  },
+  "closeout_code_sha256": "954c370ef482069d9f45996c62a57f2fc064066efd5b8269d9ed83516f77af55",
+  "code_sha256": "c37603192f68e7c6c0a6120c53b846636fe71fa654f29c876e796cf27e2f8602",
+  "current_head_proposal": "f4dc26a24871e0cea6bfad3232cfbfffefd55e3f20af4330dee80444d924bcc2",
+  "dependency_heads": {
+    "core_fixture_interface": "59510d302e7bb97a63e3d9603b9fb9f81f8f378a",
+    "discoverer": "c568e3b281795f9eef2165c0e6f571b87157a23c",
+    "factory": "04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
+    "main": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+    "scanner": "ccf57ad3db7e71290a8321840e800136567e3af4",
+    "scanner_b": "30c37ae56851488b882998c7fa0085ec51dbfc92",
+    "work235": "6acbcc7fc243b132f58170df4c6469bbf7f4eff8"
+  },
+  "embargo_ms": 259200000,
+  "fixture_source_manifest_sha256": "b53ed8972c464304091aa3e68c2aeb931e3071012e7edfec19287b52b65f91ca",
+  "historical_pit": "NOT_ATTESTED",
+  "holdout": "SYNTHETIC_HASH_SEALED",
+  "hypothesis": "Same gross paths; SHADOW subtracts 12 additional bps; PLACEBO null.",
+  "nomination": {
+    "cutoff_ms": 1735747201000,
+    "eligible_selected": 80,
+    "evidence_class": "TEST_ONLY_SYNTHETIC",
+    "failed_attempts": 0,
+    "full_universe_denominator": 100,
+    "independent_verifier_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "ineligible": 10,
+    "market": "BINANCE_SPOT",
+    "nominated": 60,
+    "nomination_digest": "9395141994be38e3333fbd2023eb09ebd4fb1ebee4657b9da03a7cee6ee6034b",
+    "omission_reason_codes": [],
+    "profile": "default",
+    "quarantine_status": "TEST_ONLY_SYNTHETIC",
+    "scan_run_id": "run-001",
+    "scanner_contract_version": "0.1.0",
+    "scanner_envelope_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "scanner_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "scanner_source_commit": "0000000000000000000000000000000000000000000000000000000000000000",
+    "schema_version": "aql.discoverer.nomination-evidence.v1",
+    "screened_rejected": 3,
+    "source_availability": "CONFIRMED_FINAL",
+    "source_dataset_id": "TEST-ONLY-G4-CURRENT-HEAD",
+    "source_dataset_version": 1,
+    "source_manifest_sha256": "b53ed8972c464304091aa3e68c2aeb931e3071012e7edfec19287b52b65f91ca",
+    "source_raw_sha256": "bbd6b9dc6f74e0fa4614a7f5d39da393969764137454cec2bf6191cb9ea8669b",
+    "symbol": "BTCUSDT",
+    "timeframe": "15m",
+    "universe_snapshot_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "unknown": 2,
+    "unscanned": 5
+  },
+  "plugin": {
+    "payload": {
+      "candidate_sha256": "c4f6bf9857e5355cb80f63c080aa4b8292e061510b70906fc937256fb3b7363a",
+      "config_digest": "ee9afacdd33a1c22054c04bc255a78965112cfa0e50434f6f0c7bb6b4be397e3",
+      "config_identity_class": "MANUAL_AST_PARAMETERS",
+      "definition": {
+        "definition": {
+          "entry": {
+            "left": {
+              "field": "value",
+              "lag": 0,
+              "name": "trend",
+              "op": "indicator"
+            },
+            "op": "gt",
+            "right": {
+              "op": "constant",
+              "value": 100
+            }
+          },
+          "exit": {
+            "left": {
+              "field": "value",
+              "lag": 1,
+              "name": "trend",
+              "op": "indicator"
+            },
+            "op": "lt",
+            "right": {
+              "op": "constant",
+              "value": 99
+            }
+          },
+          "indicators": [
+            {
+              "constraints": {
+                "period": {
+                  "max": 20,
+                  "min": 2,
+                  "type": "int"
+                }
+              },
+              "indicator_id": "SMA_v1",
+              "name": "trend",
+              "parameters": {
+                "period": 3
+              },
+              "version": "1"
+            }
+          ],
+          "risk": {
+            "entry_ttl_bars": 2,
+            "holding_bars": 10,
+            "max_exposure": 1,
+            "max_leverage": 1,
+            "stop_fraction": 0.02,
+            "target_fraction": 0.04,
+            "unit": "ENTRY_NOTIONAL"
+          },
+          "schema_version": "1",
+          "scope": "RESEARCH_ONLY",
+          "strategy_id": "d_scan_1_synthetic_test",
+          "strategy_version": "v1",
+          "timing": {
+            "ambiguity": "REJECT",
+            "decision": "CONFIRMED_CLOSE",
+            "entry_execution": "NEXT_ELIGIBLE_OPEN"
+          }
+        },
+        "digest": "20800c5c1c60d03618d51717914e2400e3743e9496572b23a178e59366df166d"
+      },
+      "definition_digest": "20800c5c1c60d03618d51717914e2400e3743e9496572b23a178e59366df166d",
+      "evaluator_code_sha256": "18d3b6a6785cb4890c75a6d30265f546eafa941b936b2ba0900aa2c2da4bf298",
+      "factory_consumer_ack_sha256": null,
+      "historical_pit": "NOT_ATTESTED",
+      "input_origin": "DISCOVERER_CANDIDATE",
+      "parameters": [
+        {
+          "indicator_id": "SMA_v1",
+          "name": "trend",
+          "parameters": {
+            "period": 3
+          },
+          "version": "1"
+        }
+      ],
+      "policy_status": "RESEARCH_ONLY_NO_INDEPENDENT_APPROVAL",
+      "schema": "aql.scanner.h.strategy-plugin.v1",
+      "source_ack_sha256": null,
+      "source_spec_sha256": null,
+      "strategy_approval_sha256": null,
+      "strategy_id": "d_scan_1_synthetic_test",
+      "strategy_version": "v1",
+      "timing": {
+        "ambiguity": "REJECT",
+        "decision": "CONFIRMED_CLOSE",
+        "entry_execution": "NEXT_ELIGIBLE_OPEN"
+      },
+      "trading_authority": "NONE"
+    },
+    "sha256": "50a42850544d6c6ea9ef8cae9423997eb71b4ab3aa5bebada1e342a7d84581f4"
+  },
+  "query_pins": {
+    "synthetic_oos/BASE": {
+      "decision_cutoff_ms": 1736123401000,
+      "end_exclusive_ms": 1736123400000,
+      "query_sha256": "01f1bd02eb4a7d1a12108330b08cd4dd8eaa03e7503f5bc41cab75fd2c941d17",
+      "source_bytes_sha256": "bbd6b9dc6f74e0fa4614a7f5d39da393969764137454cec2bf6191cb9ea8669b",
+      "start_ms": 1736065800000
+    },
+    "synthetic_oos/PLACEBO": {
+      "decision_cutoff_ms": 1736123401000,
+      "end_exclusive_ms": 1736123400000,
+      "query_sha256": "01f1bd02eb4a7d1a12108330b08cd4dd8eaa03e7503f5bc41cab75fd2c941d17",
+      "source_bytes_sha256": "bbd6b9dc6f74e0fa4614a7f5d39da393969764137454cec2bf6191cb9ea8669b",
+      "start_ms": 1736065800000
+    },
+    "synthetic_oos/SHADOW": {
+      "decision_cutoff_ms": 1736123401000,
+      "end_exclusive_ms": 1736123400000,
+      "query_sha256": "01f1bd02eb4a7d1a12108330b08cd4dd8eaa03e7503f5bc41cab75fd2c941d17",
+      "source_bytes_sha256": "bbd6b9dc6f74e0fa4614a7f5d39da393969764137454cec2bf6191cb9ea8669b",
+      "start_ms": 1736065800000
+    },
+    "train/BASE": {
+      "decision_cutoff_ms": 1735747201000,
+      "end_exclusive_ms": 1735747200000,
+      "query_sha256": "78442cf68b979b672797ac33aed2276adec58a1e849323fa07a4ecb78401c92a",
+      "source_bytes_sha256": "bbd6b9dc6f74e0fa4614a7f5d39da393969764137454cec2bf6191cb9ea8669b",
+      "start_ms": 1735689600000
+    },
+    "train/PLACEBO": {
+      "decision_cutoff_ms": 1735747201000,
+      "end_exclusive_ms": 1735747200000,
+      "query_sha256": "78442cf68b979b672797ac33aed2276adec58a1e849323fa07a4ecb78401c92a",
+      "source_bytes_sha256": "bbd6b9dc6f74e0fa4614a7f5d39da393969764137454cec2bf6191cb9ea8669b",
+      "start_ms": 1735689600000
+    },
+    "train/SHADOW": {
+      "decision_cutoff_ms": 1735747201000,
+      "end_exclusive_ms": 1735747200000,
+      "query_sha256": "78442cf68b979b672797ac33aed2276adec58a1e849323fa07a4ecb78401c92a",
+      "source_bytes_sha256": "bbd6b9dc6f74e0fa4614a7f5d39da393969764137454cec2bf6191cb9ea8669b",
+      "start_ms": 1735689600000
+    },
+    "validation/BASE": {
+      "decision_cutoff_ms": 1735805701000,
+      "end_exclusive_ms": 1735805700000,
+      "query_sha256": "518e583de33fdc6a977524db80588c5528fd7f2c21c19422d1400c00c2325d44",
+      "source_bytes_sha256": "bbd6b9dc6f74e0fa4614a7f5d39da393969764137454cec2bf6191cb9ea8669b",
+      "start_ms": 1735748100000
+    },
+    "validation/MISSING_CONTROL": {
+      "decision_cutoff_ms": 1735805701000,
+      "end_exclusive_ms": 1735805700000,
+      "query_sha256": "e4f8340dce6da9b010ca37f59f006dd18424d27ff48af536fbf0dba6ec642223",
+      "source_bytes_sha256": "bbd6b9dc6f74e0fa4614a7f5d39da393969764137454cec2bf6191cb9ea8669b",
+      "start_ms": 1735748100000
+    },
+    "validation/PLACEBO": {
+      "decision_cutoff_ms": 1735805701000,
+      "end_exclusive_ms": 1735805700000,
+      "query_sha256": "518e583de33fdc6a977524db80588c5528fd7f2c21c19422d1400c00c2325d44",
+      "source_bytes_sha256": "bbd6b9dc6f74e0fa4614a7f5d39da393969764137454cec2bf6191cb9ea8669b",
+      "start_ms": 1735748100000
+    },
+    "validation/SHADOW": {
+      "decision_cutoff_ms": 1735805701000,
+      "end_exclusive_ms": 1735805700000,
+      "query_sha256": "518e583de33fdc6a977524db80588c5528fd7f2c21c19422d1400c00c2325d44",
+      "source_bytes_sha256": "bbd6b9dc6f74e0fa4614a7f5d39da393969764137454cec2bf6191cb9ea8669b",
+      "start_ms": 1735748100000
+    }
+  },
+  "schema": "aql.g4.synthetic.wp03.registration.v1",
+  "selection": "FIXED_BEFORE_EVALUATION_NO_TUNING",
+  "sha256": "161234c88dfd03dcc10f2278effc97282f1cc544e36d7e0d043c46078e9b9f0d",
+  "trading_authority": "NONE",
+  "uncertainty": "INFERENCE_NOT_ESTIMABLE_FROM_SINGLE_GENERATED_PATH_PER_PARTITION"
+}

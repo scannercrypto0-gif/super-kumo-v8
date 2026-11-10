@@ -1,132 +1,139 @@
-# CODEX-PKG-04 — offline consumer v1
+# PKG04 bounded native evidence consumer
 
-Project AQL-CRYPTO-RESEARCH-001. **BLOCKED_ONE_EXACT_SEAM**:
-`PERSISTED_DISCOVERER_FACTORY_JOIN_NOT_AVAILABLE`.
+ACKNOWLEDGED: final correction #292/6774156536 and mandatory acceptance
+#271/6768882892. Only this consumer namespace and its focused workflow change.
+PR292 stays DRAFT/UNMERGED. Integration271 owns final four-package acceptance
+and material-delta Audit. No integrated release/stage/G0 acceptance is awarded here.
 
-Working bounded slice: persisted actual repository-generated synthetic finalized
-source/Scanner decision census → G2 pending horizons → G3 modeled state.
-The reader is standard-library-only and executes no producer, opens no database,
-calls no network, and creates only a new explicitly named output file. It does not
-rebuild an engine, registry, observer, or acknowledgment workflow.
+## Corrected, independently scoped outcomes
 
-From repository root, offline (Python >=3.11):
+- **MATURE_G2_CONSUMER_SEAM_PASS:** native prospective v1 mature, missing,
+  pending, UNKNOWN and late observations are parsed without downgrading them.
+  Validate due/cutoff/record time, run/strategy/evaluator/opportunity/decision
+  identity, finalized source-grid parent and same-export G1 receipt references.
+  Reproduce native state classification from pinned286 STEP900000/CLOCK5000;
+  missing/late value must be null, mature value finite/positive. No raw candle
+  price calculation or publisher authentication is invented by a read-model.
+- **RESEARCH_JOIN_PASS**, limited to persisted accepted synthetic lineage:
+  the exact already-produced G4 bundle at commit
+  `7b6c8d82ca8111f5fa15dee5e6823bc39289b48c` exists and is reused read-only.
+  Proposal/checkpoint/registration/closeout/registry, native receipt seals,
+  generation and variant/result parent links are readable. Three generation
+  attempts (INVALID/FAILED/COMPLETE) remain distinct from one Factory trial and
+  ten H variants (nine selected, one missing-control UNKNOWN).
+- The previous `PERSISTED_DISCOVERER_FACTORY_JOIN_NOT_AVAILABLE` assessment
+  applied to the previously inspected role trees; the specifically identified
+  accepted evidence commit supplies this retained lineage. No G4 producer,
+  WP03/WP04 accepted suite or original market-data run was relaunched.
 
-```powershell
-$anchor = (Get-Content tools/research_evidence_gateway/fixtures/manifest.sha256).Trim()
-python -B -m tools.research_evidence_gateway.gateway --inputs tools/research_evidence_gateway/fixtures --manifest-sha256 $anchor --output gateway-new.json
-python -B -m pytest tools/research_evidence_gateway -q --basetemp=.gateway-tests
+Omitting research evidence still returns an independent research BLOCKED status,
+without reopening the corrected mature-G2 defect. Claiming a research bundle
+while files/parents/trials are missing or mismatched rejects before output.
+
+## Native operational reproduction and exact pins
+
+```text
+python -B -m tools.research_evidence_gateway.acceptance --fetch --output <new-disposable-directory>
+python -B -m pytest tools/research_evidence_gateway -q --basetemp=<new-tests-directory>
 ```
 
-POSIX equivalent:
+`--fetch` retrieves Git source objects only; omit it if already present. The
+acceptance command extracts **unmodified** `atlas_pkg03_stage.py` and
+`atlas_pkg03_smoke.py` from Integration293
+`c01f526e762a014e5ed84ca3cf695b9d77502ab3`, runs only that affected native
+G1 -> actual Scanner -> read-only G2 -> G3 durable/restart path, then submits its
+actual exports to this consumer. It does not run the older four-package driver
+which intentionally pins the old292 and asserts its blocker, or edit PR293.
+Integration must refresh its own candidate with the new292 head after handoff.
 
-```sh
-python -B -m tools.research_evidence_gateway.gateway --inputs tools/research_evidence_gateway/fixtures --manifest-sha256 "$(cat tools/research_evidence_gateway/fixtures/manifest.sha256)" --output gateway-new.json
-python -B -m pytest tools/research_evidence_gateway -q --basetemp=.gateway-tests
+Native upstream pins remain286 `d072544427d6b08473c88b2e36d5857cfd8581dc`,
+287 `852f6fcce1dbb4dede6259fe8d0498d19ff19078`,
+288 `0ca716eaf1b8ae1a66ed6f3fbcec34f22c73ced7`,
+289 `1ff3d13a3dfd1337bae0659dd03550b764c8799c` (stacked on286),
+Scanner277 `ccf57ad3db7e71290a8321840e800136567e3af4`.
+No producer branch/file/schema is changed. Source tree manifest, exact Git
+blobs and imported-module provenance are supplied by the unmodified driver.
+
+The affected producer run includes24 decisions (21ENTRY/3UNKNOWN), one
+predeclared first-causal-entry simulation, three durable commands, two
+**assumed** fills, actual exit73 after commit/before ACK, and fresh-process
+idempotent recovery. This consumer's native verified-read export has4 mature,
+1 UNKNOWN and58 pending horizons; it preserves these actual states. The separate
+forward-report schema's5 mature windows is not substituted for that export.
+No real/natural24h/72h maturity, source-host continuity or stage signoff follows.
+The real observer is never accessed or reset by this command.
+
+Two fresh consumer processes must yield identical output bytes, and all upstream
+input/durable journal bytes must remain unchanged. Eight sanitized rejection
+receipts include wrong receipt, future horizon, semantic state swap, fake PnL,
+real fill, ACK, PIT and trading promotion. Focused tests cover missing/duplicate
+trials, parent and dependency swaps, omitted failures/UNKNOWN, corrupt JSON,
+no-fill/PnL and accounting inconsistencies. Accounting checks verify exported
+aggregate conservation only; they do not re-run a backtester/fill model.
+
+Windows/Linux Python3.11/3.13 focused CI runs the affected seam plus the consumer
+suite, uploading JUnit, actual native outputs, negative receipts and provenance.
+Terminal counts/results are reported in the final handoff, not assumed here.
+
+## Persisted research lineage, not another registry
+
+Consumed original files under `.github/atlas_evidence/g4_current_head`:
+`closeout.json`, `registry.json`, `frozen-v2/checkpoint.json`,
+`frozen-v2/originals.json`, `frozen-v2/proposal.json`, `frozen-v2/registration.json`.
+The checked-in native fixture preserves these bytes; `provenance.json` records
+original commit/path/Git blob/byte SHA. Acceptance verifies fixture canonical
+parity with those exact Git objects and freshly generated native operational
+exports. It never executes `closeout.py` or reconstructs a producer database.
+
+Native Factory267 `04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf`,
+Discoverer276 `c568e3b281795f9eef2165c0e6f571b87157a23c` and Scanner277 above
+are cross-bound through retained registration/receipt fields. Check both
+Discoverer chains, checkpoint seal, generation census, selected candidate,
+frozen protocol/plan/baseline, complete ten-variant population and result
+parents. Missing-control retains64 UNKNOWN source slots and zero modeled
+outcomes. The readback retains45 modeled outcomes,91 UNKNOWN signal slots and
+9 UNKNOWN trade outcomes across the ten existing variants; those are different
+units, not combined into one denominator.
+
+The generation Factory registration is referenced by its native immutable
+join receipt and experiment digest. Inner H package/result/ledger bodies are
+retained as native parent digests in this accepted bundle, **not independently
+reopened or recalculated**. READ-ONLY JOIN PASS verifies these persisted seals,
+links and populations, not scientific validity, original factory calculations,
+external custody or historical source rights. No missing raw body is invented.
+
+The already-persisted PKG02 report at291
+`ea4ffd5ce278d93588338122ab6ac1af8ec4da26` is separately read/checked as72
+synthetic model/UNKNOWN/nonfill rows. It is not substituted for Discoverer
+parents or ten H variants, nor claimed to share the same strategy/cohort.
+`actual_fills` stays null; orders0/winner null/holdout SEALED_UNOPENED.
+
+## Consumer format and boundary
+
+```text
+python -B -m tools.research_evidence_gateway.gateway --inputs <persisted-inputs> --manifest-sha256 <retained-anchor> --output <new-output.json>
 ```
 
-Output must not exist or be inside the input directory. CLI exit 0 means the
-bounded read/export succeeded; inspect JSON `status` for package acceptance.
-Invalid inputs exit 2 without output. Canonical JSON is sorted, compact, ASCII,
-finite numbers only. `sha256` hashes the canonical body excluding that field;
-the final newline is excluded. Input anchors hash canonical JSON, so checkout
-line endings cannot change integrity. Retain the manifest digest independently;
-editing the manifest and its digest together is **not** publisher authentication.
+Canonical JSON is compact, sorted, finite and ASCII; sha256 excludes its own
+field and final newline. Retain the manifest digest independently: a self-hash
+or supplied Git label alone is not publisher authentication. Root output may
+not exist or be inside inputs. Symlink/reparse input paths, duplicate JSON
+keys and nonfinite data are refused. No upstream writes, DB connections,
+network or raw input export occur in the reader.
 
-## Existing evidence and exact reuse
+The optional `research` manifest extension pins exact source version and all
+six native evidence files. The optional `results_as_of_ms` explicitly separates
+a later modeled-result cutoff from source-decision as-of; if absent the source
+cutoff applies. This fixes the earlier pending-only example's implicit later
+modeled state timestamp without silently accepting future fills. Result fill
+windows/receipts and state update must not exceed the declared result cutoff.
 
-`fixtures/source.json` and `fixtures/results.json` were captured on 2026-11-10
-from **the existing test**, unmodified:
-`tests/paper_sim/test_upstream_integration.py::test_real_pinned_observer_scanner_read_to_offline_simulator`
-at G3 PR #288 `0ca716eaf1b8ae1a66ed6f3fbcec34f22c73ced7`.
-Only its adapter invocation and simulator return values were intercepted to save
-the already produced JSON. Its assertions passed, including actual Scanner,
-native journal/OperationalStore, G2 verified reader, simulator durable replay,
-and SQLite before/after equality. No G4 accepted test was rerun.
+Legacy pending fixture intentionally has no research input and returns research
+BLOCKED; `example.json` is that honest uncertainty example. The new
+`fixtures/native-current` exercises the corrected native join.
 
-The existing test independently verifies the two imported upstream files from
-G1 PR #286 `d072544427d6b08473c88b2e36d5857cfd8581dc`:
-
-| File | SHA256 of Git bytes |
-| --- | --- |
-| `src/aql/observation/prospective.py` | `3a72abcdf54d5186736562534e0402dfd18dc465981781edc7c0b4404fdf6fa7` |
-| `src/aql/observation/durable_bridge_v1.py` | `7a97c1d51e74d088d5dacaab604794005c12dc5a1d58a8b1542b794c7993f3b7` |
-
-Four decision slots contain three UNKNOWN warmup/gap decisions and one ENTRY;
-the ENTRY has three pending horizons. One modeled result has two assumed taker
-fills. These are synthetic values, never venue fills. The random journal ID is
-retained as generated; fresh-process replay uses the same persisted bytes.
-
-The manifest records current main and all relevant open draft heads observed at
-intake. Branch is based on main `90af9794880cbeb00e7e974bfa906ff5e9666183`;
-no whole historical PR is included or merged. Only this new namespace and its
-new dedicated workflow are changed.
-
-Existing readers inspected and reused as contract references:
-G3 `adapter.signals_from_prospective`, G1 `ProspectiveObserver.verified_read`,
-G2 `secretary_g2_readonly_v1.consume_verified_opportunity`, Factory E
-`read_experiment` and Discoverer `g4_factory_acceptance_seam`.
-The Secretary reader has a different native schema; it is not substituted for
-the prospective reader. Factory's existing reader opens its DB via its own
-connection helper, so this gateway does not invoke it against upstream stores.
-No duplicate registry or producer business validation is implemented.
-
-## One exact seam and owner
-
-Inspected current Factory #267 `04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf`
-and Discoverer #276 `c568e3b281795f9eef2165c0e6f571b87157a23c` Git trees.
-Their G4 test constructs an ephemeral actual Factory registry; the inspected
-trees contain no persisted candidate proposal/checkpoint + Factory experiment
-readback + join receipt + H trial population for this gateway to consume.
-No accepted G4 fixture is rerun merely to manufacture missing input.
-
-Integration #271 owns the handoff, with Discoverer/Factory contract owners:
-supply a sanitized already-produced synthetic evidence bundle with independently
-retained digests and exact native versions. The current verified native contracts
-include `aql.factory.e.research-experiment.v1` and
-`aql.g4.discoverer.factory-existing-registry-join.v1`. The existing join explicitly
-reports comparison trials/paired results `NOT_PERFORMED`; its three generation
-attempts cannot stand in for ten H variants. This implementation deliberately
-does not claim its missing research adapter or missing-trial rejection is tested.
-Research attempt/trial/variant counts stay null, not zero and not Scanner slots.
-That one absent persisted research chain prevents full Package 04 PASS.
-
-## Tests and boundaries
-
-Positive: existing native synthetic chain; canonical export; four decision slots;
-UNKNOWN retained; pending horizons; missing horizons explicitly NOT_AVAILABLE.
-Negative: missing/duplicate modeled result, duplicate decision, source/config/
-strategy/evaluator/engine swap, parent mismatch, mixed UTC as-of, fake ACK,
-real-fill claim, fabricated maturity, UNKNOWN PnL, NO_FILL with fills, NON_PIT
-promotion, duplicate JSON key, corrupt/truncated/nonfinite JSON, changed manifest
-anchor, output overwrite and output in input directory. Two subprocesses must
-produce byte-identical output; input bytes must remain unchanged.
-
-Missing rights/known-at do not become verified rights/PIT: both remain
-NOT_ATTESTABLE. Mature/missing native observations are currently rejected with
-`UNSUPPORTED_MATURE_EVIDENCE_CONTRACT`, not silently upgraded. Synthetic embargo
-does not mean elapsed natural horizon maturity. No independent publisher custody,
-real OOS, alpha, official stage signoff, G0, paper/live authority, or real data
-operation is claimed. The independently checked grade applies only to bytes and
-bounded synthetic lineage, not scientific acceptance or independent Audit.
-
-## Governance readback
-
-Read PM OS #205/6721828613 and amendments /6721846844 and /6741235513,
-canonical #202, current relevant role records, and PKG01/02/03 dispatch
-#271/6768334518. Latest accessible actual owner-host G2 handoff remains
-#271/6764652288: 29 decisions (16 ENTRY, 13 UNKNOWN), no matured horizon count;
-owner-reported host bytes were not inspected. Later synthetic engineering
-#271/6767096389, scoped Audit /6767647980 and real-admission block /6768196303
-remain distinct. Current user instruction explicitly launches PKG04 only.
-Private chats/E: are inaccessible and not claimed reviewed. G2 is untouched.
-
-ACKNOWLEDGED: mandatory final acceptance addendum #271/6768882892 was read
-during this execution. Local/focused CI success is only a per-package receipt.
-Integration #271 must build its single disposable pinned combined candidate
-after all four deliveries and execute the actual operational and research paths,
-including comparison with PKG02 modeled results. Integrated acceptance and
-material-delta Audit remain PENDING, not self-awarded by this gateway PR.
-Crash/recovery of producers and double-cost business logic are NOT_APPLICABLE
-to this consumer's implementation; native producer replay was exercised in the
-existing seam fixture, while combined crash/cost assertions belong to Integration.
-The consumer's own applicable replay is two fresh processes over immutable bytes.
+Rights/known-at/real OOS/alpha remain NOT_ATTESTABLE, PIT NOT_ATTESTED,
+actual_fills null and trading authority NONE. No acknowledgment, order path,
+G0, merge, private E:, real acquisition, paid resource or accepted historical
+rerun is authorized or performed. Final Integration and independent Audit
+remain separately pending, even when these bounded consumer checks pass.
