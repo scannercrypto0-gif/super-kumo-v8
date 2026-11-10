@@ -8,12 +8,18 @@ on:
       - tools/strategy_discoverer_offline/synthetic_scanner_candidate_bridge.py
       - tools/strategy_discoverer_offline/tests/test_d_scan_1_candidate_bridge.py
       - tools/strategy_discoverer_offline/g4_candidate_preregistration.py
-      - tools/strategy_discoverer_offline/tests/test_g4_candidate_preregistration.py
+      - tools/strategy_discoverer_offline/tests/test_g4_candidate_preregistration.py tools/strategy_discoverer_offline/tests/test_g4_factory_acceptance_seam.py
+      - tools/strategy_discoverer_offline/g4_factory_acceptance_seam.py
+      - tools/strategy_discoverer_offline/tests/test_g4_factory_acceptance_seam.py
       - .github/workflows/discoverer-d-scan-1.yml
   pull_request:
     paths:
       - tools/strategy_discoverer_offline/synthetic_scanner_candidate_bridge.py
       - tools/strategy_discoverer_offline/tests/test_d_scan_1_candidate_bridge.py
+      - tools/strategy_discoverer_offline/g4_candidate_preregistration.py
+      - tools/strategy_discoverer_offline/tests/test_g4_candidate_preregistration.py
+      - tools/strategy_discoverer_offline/g4_factory_acceptance_seam.py
+      - tools/strategy_discoverer_offline/tests/test_g4_factory_acceptance_seam.py
       - .github/workflows/discoverer-d-scan-1.yml
 jobs:
   d-scan-1:
