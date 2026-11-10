@@ -1,0 +1,418 @@
+{
+  "arms": {
+    "BASE": {
+      "costs": {
+        "fee_entry_bps": "1",
+        "fee_exit_bps": "1",
+        "funding_bps_per_bar": "0",
+        "slippage_entry_bps": "1",
+        "slippage_exit_bps": "1",
+        "spread_entry_bps": "1",
+        "spread_exit_bps": "1"
+      },
+      "direction": "LONG",
+      "fill_semantics": "NEXT_ELIGIBLE_OPEN_UNKNOWN_ON_INTRABAR_TOUCH",
+      "holdout": "SEALED_UNOPENED",
+      "market": "SPOT",
+      "owner_operator_authorized": false,
+      "scenario_class": "SYNTHETIC_TEST_EXPLICIT",
+      "schema": "aql.factory.h.generic-cost-policy.v1",
+      "sha256": "082e42d9a10700d9cb61ecf7086de4aee01d7eeb46e4598f767f0b7cfbbf9ac8",
+      "trading_authority": "NONE"
+    },
+    "MISSING_CONTROL": {
+      "costs": {
+        "fee_entry_bps": "1",
+        "fee_exit_bps": "1",
+        "funding_bps_per_bar": "0",
+        "slippage_entry_bps": "1",
+        "slippage_exit_bps": "1",
+        "spread_entry_bps": "1",
+        "spread_exit_bps": "1"
+      },
+      "direction": "LONG",
+      "fill_semantics": "NEXT_ELIGIBLE_OPEN_UNKNOWN_ON_INTRABAR_TOUCH",
+      "holdout": "SEALED_UNOPENED",
+      "market": "SPOT",
+      "owner_operator_authorized": false,
+      "scenario_class": "SYNTHETIC_TEST_EXPLICIT",
+      "schema": "aql.factory.h.generic-cost-policy.v1",
+      "sha256": "082e42d9a10700d9cb61ecf7086de4aee01d7eeb46e4598f767f0b7cfbbf9ac8",
+      "trading_authority": "NONE"
+    },
+    "PLACEBO": {
+      "costs": {
+        "fee_entry_bps": "1",
+        "fee_exit_bps": "1",
+        "funding_bps_per_bar": "0",
+        "slippage_entry_bps": "1",
+        "slippage_exit_bps": "1",
+        "spread_entry_bps": "1",
+        "spread_exit_bps": "1"
+      },
+      "direction": "LONG",
+      "fill_semantics": "NEXT_ELIGIBLE_OPEN_UNKNOWN_ON_INTRABAR_TOUCH",
+      "holdout": "SEALED_UNOPENED",
+      "market": "SPOT",
+      "owner_operator_authorized": false,
+      "scenario_class": "SYNTHETIC_TEST_EXPLICIT",
+      "schema": "aql.factory.h.generic-cost-policy.v1",
+      "sha256": "082e42d9a10700d9cb61ecf7086de4aee01d7eeb46e4598f767f0b7cfbbf9ac8",
+      "trading_authority": "NONE"
+    },
+    "SHADOW": {
+      "costs": {
+        "fee_entry_bps": "3",
+        "fee_exit_bps": "3",
+        "funding_bps_per_bar": "0",
+        "slippage_entry_bps": "3",
+        "slippage_exit_bps": "3",
+        "spread_entry_bps": "3",
+        "spread_exit_bps": "3"
+      },
+      "direction": "LONG",
+      "fill_semantics": "NEXT_ELIGIBLE_OPEN_UNKNOWN_ON_INTRABAR_TOUCH",
+      "holdout": "SEALED_UNOPENED",
+      "market": "SPOT",
+      "owner_operator_authorized": false,
+      "scenario_class": "SYNTHETIC_TEST_EXPLICIT",
+      "schema": "aql.factory.h.generic-cost-policy.v1",
+      "sha256": "a7f277eba94f043b6381728e750a5464272482badecb31ccf7859db8f6150f62",
+      "trading_authority": "NONE"
+    }
+  },
+  "binding": {
+    "binding_sha256": "12b46879505a5b0e023cba87b6ec50716bcd546ee21eafe589143f711e3269de",
+    "candidate_id": "be8db858-2697-409f-b760-0a4fa2eff0ca",
+    "candidate_package_sha256": "68af2f4c3ba9a3a3889f3a04a727027674bac6704d92a8b2ba5b1710f73f37af",
+    "f4_historical_connected": false,
+    "factory_consumer_ack_sha256": null,
+    "historical_pit": "NOT_ATTESTED",
+    "holdout_status": "SEALED_UNOPENED",
+    "nomination_evidence_sha256": "f5b227b49a386b724362567783c82745e9fdbcb337c45937c65b9323eb9145d8",
+    "research_scope": "SYNTHETIC_RESEARCH_ONLY",
+    "scanner_plugin_schema": "aql.scanner.h.strategy-plugin.v1",
+    "scanner_plugin_sha256": "a75a6c362b33679256ac63a78e67c23a0936a0393289026aa171ba455282dd73",
+    "schema_version": "aql.discoverer.h.synthetic-scanner-candidate-binding.v1",
+    "selected": false,
+    "source_ack_sha256": null,
+    "source_class": "TEST_ONLY",
+    "status": "RESEARCH_ONLY_NO_INDEPENDENT_APPROVAL",
+    "strategy_approval_sha256": null,
+    "strategy_definition_sha256": "20800c5c1c60d03618d51717914e2400e3743e9496572b23a178e59366df166d",
+    "trading_authority": "NONE"
+  },
+  "candidate": {
+    "attempt_ledger_head": "0000000000000000000000000000000000000000000000000000000000000000",
+    "candidate_id": "be8db858-2697-409f-b760-0a4fa2eff0ca",
+    "counterhypothesis_id": "null-001",
+    "delivery_authorized": false,
+    "evaluation_status": "NOT_EVALUATED",
+    "execution_status": "NOT_AUTHORIZED",
+    "factory_routing": "NOT_CONNECTED",
+    "family_id": "F001",
+    "family_version": "1.0.0",
+    "holdout_status": "SEALED_UNOPENED",
+    "nomination_evidence_digest": "f5b227b49a386b724362567783c82745e9fdbcb337c45937c65b9323eb9145d8",
+    "package_digest": "68af2f4c3ba9a3a3889f3a04a727027674bac6704d92a8b2ba5b1710f73f37af",
+    "publishable": false,
+    "rule_grammar_version": "aql.strategy-definition.grammar.v1",
+    "schema_version": "aql.discoverer.candidate.v1",
+    "scientific_acceptance": "NOT_OBTAINED",
+    "search_plan_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "source_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "status": "PROPOSED_RESEARCH_ONLY",
+    "strategy_definition_digest": "20800c5c1c60d03618d51717914e2400e3743e9496572b23a178e59366df166d",
+    "strategy_spec": {
+      "definition": {
+        "entry": {
+          "left": {
+            "field": "value",
+            "lag": 0,
+            "name": "trend",
+            "op": "indicator"
+          },
+          "op": "gt",
+          "right": {
+            "op": "constant",
+            "value": 100
+          }
+        },
+        "exit": {
+          "left": {
+            "field": "value",
+            "lag": 1,
+            "name": "trend",
+            "op": "indicator"
+          },
+          "op": "lt",
+          "right": {
+            "op": "constant",
+            "value": 99
+          }
+        },
+        "indicators": [
+          {
+            "constraints": {
+              "period": {
+                "max": 20,
+                "min": 2,
+                "type": "int"
+              }
+            },
+            "indicator_id": "SMA_v1",
+            "name": "trend",
+            "parameters": {
+              "period": 3
+            },
+            "version": "1"
+          }
+        ],
+        "risk": {
+          "entry_ttl_bars": 2,
+          "holding_bars": 10,
+          "max_exposure": 1,
+          "max_leverage": 1,
+          "stop_fraction": 0.02,
+          "target_fraction": 0.04,
+          "unit": "ENTRY_NOTIONAL"
+        },
+        "schema_version": "1",
+        "scope": "RESEARCH_ONLY",
+        "strategy_id": "d_scan_1_synthetic_test",
+        "strategy_version": "v1",
+        "timing": {
+          "ambiguity": "REJECT",
+          "decision": "CONFIRMED_CLOSE",
+          "entry_execution": "NEXT_ELIGIBLE_OPEN"
+        }
+      },
+      "digest": "20800c5c1c60d03618d51717914e2400e3743e9496572b23a178e59366df166d"
+    }
+  },
+  "code_sha256": "c37603192f68e7c6c0a6120c53b846636fe71fa654f29c876e796cf27e2f8602",
+  "dependency_heads": {
+    "core_fixture_interface": "59510d302e7bb97a63e3d9603b9fb9f81f8f378a",
+    "discoverer": "711fd97a65e3bcc37695ec3f33ce3a97772ee8fd",
+    "factory": "04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
+    "main": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+    "scanner": "ccf57ad3db7e71290a8321840e800136567e3af4",
+    "scanner_b": "30c37ae56851488b882998c7fa0085ec51dbfc92",
+    "work235": "6acbcc7fc243b132f58170df4c6469bbf7f4eff8"
+  },
+  "embargo_ms": 259200000,
+  "historical_pit": "NOT_ATTESTED",
+  "holdout": "SYNTHETIC_HASH_SEALED",
+  "hypothesis": "Same gross paths; SHADOW subtracts 12 additional bps; PLACEBO null.",
+  "nomination": {
+    "cutoff_ms": 1700000000000,
+    "eligible_selected": 80,
+    "evidence_class": "TEST_ONLY_SYNTHETIC",
+    "failed_attempts": 0,
+    "full_universe_denominator": 100,
+    "independent_verifier_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "ineligible": 10,
+    "market": "BINANCE_SPOT",
+    "nominated": 60,
+    "nomination_digest": "f5b227b49a386b724362567783c82745e9fdbcb337c45937c65b9323eb9145d8",
+    "omission_reason_codes": [],
+    "profile": "default",
+    "quarantine_status": "TEST_ONLY_SYNTHETIC",
+    "scan_run_id": "run-001",
+    "scanner_contract_version": "0.1.0",
+    "scanner_envelope_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "scanner_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "scanner_source_commit": "0000000000000000000000000000000000000000000000000000000000000000",
+    "schema_version": "aql.discoverer.nomination-evidence.v1",
+    "screened_rejected": 3,
+    "source_availability": "CONFIRMED_FINAL",
+    "source_dataset_id": "test-dataset-001",
+    "source_dataset_version": 1,
+    "source_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "source_raw_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "universe_snapshot_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "unknown": 2,
+    "unscanned": 5
+  },
+  "plugin": {
+    "payload": {
+      "candidate_sha256": "68af2f4c3ba9a3a3889f3a04a727027674bac6704d92a8b2ba5b1710f73f37af",
+      "config_digest": "ee9afacdd33a1c22054c04bc255a78965112cfa0e50434f6f0c7bb6b4be397e3",
+      "config_identity_class": "MANUAL_AST_PARAMETERS",
+      "definition": {
+        "definition": {
+          "entry": {
+            "left": {
+              "field": "value",
+              "lag": 0,
+              "name": "trend",
+              "op": "indicator"
+            },
+            "op": "gt",
+            "right": {
+              "op": "constant",
+              "value": 100
+            }
+          },
+          "exit": {
+            "left": {
+              "field": "value",
+              "lag": 1,
+              "name": "trend",
+              "op": "indicator"
+            },
+            "op": "lt",
+            "right": {
+              "op": "constant",
+              "value": 99
+            }
+          },
+          "indicators": [
+            {
+              "constraints": {
+                "period": {
+                  "max": 20,
+                  "min": 2,
+                  "type": "int"
+                }
+              },
+              "indicator_id": "SMA_v1",
+              "name": "trend",
+              "parameters": {
+                "period": 3
+              },
+              "version": "1"
+            }
+          ],
+          "risk": {
+            "entry_ttl_bars": 2,
+            "holding_bars": 10,
+            "max_exposure": 1,
+            "max_leverage": 1,
+            "stop_fraction": 0.02,
+            "target_fraction": 0.04,
+            "unit": "ENTRY_NOTIONAL"
+          },
+          "schema_version": "1",
+          "scope": "RESEARCH_ONLY",
+          "strategy_id": "d_scan_1_synthetic_test",
+          "strategy_version": "v1",
+          "timing": {
+            "ambiguity": "REJECT",
+            "decision": "CONFIRMED_CLOSE",
+            "entry_execution": "NEXT_ELIGIBLE_OPEN"
+          }
+        },
+        "digest": "20800c5c1c60d03618d51717914e2400e3743e9496572b23a178e59366df166d"
+      },
+      "definition_digest": "20800c5c1c60d03618d51717914e2400e3743e9496572b23a178e59366df166d",
+      "evaluator_code_sha256": "18d3b6a6785cb4890c75a6d30265f546eafa941b936b2ba0900aa2c2da4bf298",
+      "factory_consumer_ack_sha256": null,
+      "historical_pit": "NOT_ATTESTED",
+      "input_origin": "DISCOVERER_CANDIDATE",
+      "parameters": [
+        {
+          "indicator_id": "SMA_v1",
+          "name": "trend",
+          "parameters": {
+            "period": 3
+          },
+          "version": "1"
+        }
+      ],
+      "policy_status": "RESEARCH_ONLY_NO_INDEPENDENT_APPROVAL",
+      "schema": "aql.scanner.h.strategy-plugin.v1",
+      "source_ack_sha256": null,
+      "source_spec_sha256": null,
+      "strategy_approval_sha256": null,
+      "strategy_id": "d_scan_1_synthetic_test",
+      "strategy_version": "v1",
+      "timing": {
+        "ambiguity": "REJECT",
+        "decision": "CONFIRMED_CLOSE",
+        "entry_execution": "NEXT_ELIGIBLE_OPEN"
+      },
+      "trading_authority": "NONE"
+    },
+    "sha256": "a75a6c362b33679256ac63a78e67c23a0936a0393289026aa171ba455282dd73"
+  },
+  "query_pins": {
+    "synthetic_oos/BASE": {
+      "decision_cutoff_ms": 1736123401000,
+      "end_exclusive_ms": 1736123400000,
+      "query_sha256": "bf575e570c94333c7555d5119ca85e4cc01eb8da37738cdd8e2ea2902f0d3a5f",
+      "source_bytes_sha256": "b9166332016c0c944bac26bae4cb31449796407c6da19d66b0450578c70cee25",
+      "start_ms": 1736065800000
+    },
+    "synthetic_oos/PLACEBO": {
+      "decision_cutoff_ms": 1736123401000,
+      "end_exclusive_ms": 1736123400000,
+      "query_sha256": "bf575e570c94333c7555d5119ca85e4cc01eb8da37738cdd8e2ea2902f0d3a5f",
+      "source_bytes_sha256": "b9166332016c0c944bac26bae4cb31449796407c6da19d66b0450578c70cee25",
+      "start_ms": 1736065800000
+    },
+    "synthetic_oos/SHADOW": {
+      "decision_cutoff_ms": 1736123401000,
+      "end_exclusive_ms": 1736123400000,
+      "query_sha256": "bf575e570c94333c7555d5119ca85e4cc01eb8da37738cdd8e2ea2902f0d3a5f",
+      "source_bytes_sha256": "b9166332016c0c944bac26bae4cb31449796407c6da19d66b0450578c70cee25",
+      "start_ms": 1736065800000
+    },
+    "train/BASE": {
+      "decision_cutoff_ms": 1735747201000,
+      "end_exclusive_ms": 1735747200000,
+      "query_sha256": "b98867f5854bb26266c93197f57d45c7840f463fa8381f119a12e87b8a561c36",
+      "source_bytes_sha256": "4e0fa07c64247babf370169891c80ea52e30cfa5cc863c1d9e64ff492c683065",
+      "start_ms": 1735689600000
+    },
+    "train/PLACEBO": {
+      "decision_cutoff_ms": 1735747201000,
+      "end_exclusive_ms": 1735747200000,
+      "query_sha256": "b98867f5854bb26266c93197f57d45c7840f463fa8381f119a12e87b8a561c36",
+      "source_bytes_sha256": "4e0fa07c64247babf370169891c80ea52e30cfa5cc863c1d9e64ff492c683065",
+      "start_ms": 1735689600000
+    },
+    "train/SHADOW": {
+      "decision_cutoff_ms": 1735747201000,
+      "end_exclusive_ms": 1735747200000,
+      "query_sha256": "b98867f5854bb26266c93197f57d45c7840f463fa8381f119a12e87b8a561c36",
+      "source_bytes_sha256": "4e0fa07c64247babf370169891c80ea52e30cfa5cc863c1d9e64ff492c683065",
+      "start_ms": 1735689600000
+    },
+    "validation/BASE": {
+      "decision_cutoff_ms": 1735805701000,
+      "end_exclusive_ms": 1735805700000,
+      "query_sha256": "96099a971b70afb7cf5456a9f7af45feef2b06c060c250822cf7ce78f2c1fc18",
+      "source_bytes_sha256": "9764023b5d085f5e4cab021a901253191030649bc0e6ac14505dd0c5092653d3",
+      "start_ms": 1735748100000
+    },
+    "validation/MISSING_CONTROL": {
+      "decision_cutoff_ms": 1735805701000,
+      "end_exclusive_ms": 1735805700000,
+      "query_sha256": "a811d932a8d8cf101b4ca5a2bcdadcb8cb098765d55a0e1bcc3d0bdd2e2d9d1f",
+      "source_bytes_sha256": "266a2d858c3408b7dad2c438b5642aede96dc843a6893c7833d62dc3da6e7736",
+      "start_ms": 1735748100000
+    },
+    "validation/PLACEBO": {
+      "decision_cutoff_ms": 1735805701000,
+      "end_exclusive_ms": 1735805700000,
+      "query_sha256": "96099a971b70afb7cf5456a9f7af45feef2b06c060c250822cf7ce78f2c1fc18",
+      "source_bytes_sha256": "9764023b5d085f5e4cab021a901253191030649bc0e6ac14505dd0c5092653d3",
+      "start_ms": 1735748100000
+    },
+    "validation/SHADOW": {
+      "decision_cutoff_ms": 1735805701000,
+      "end_exclusive_ms": 1735805700000,
+      "query_sha256": "96099a971b70afb7cf5456a9f7af45feef2b06c060c250822cf7ce78f2c1fc18",
+      "source_bytes_sha256": "9764023b5d085f5e4cab021a901253191030649bc0e6ac14505dd0c5092653d3",
+      "start_ms": 1735748100000
+    }
+  },
+  "schema": "aql.g4.synthetic.wp03.registration.v1",
+  "selection": "FIXED_BEFORE_EVALUATION_NO_TUNING",
+  "sha256": "8ee17f476a36208452e5b573d9c60d5143ab09c1bdcb83778fe1c6224161994a",
+  "trading_authority": "NONE",
+  "uncertainty": "INFERENCE_NOT_ESTIMABLE_FROM_SINGLE_GENERATED_PATH_PER_PARTITION"
+}

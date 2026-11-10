@@ -80,8 +80,9 @@ def cost(bps):
                      holdout="SEALED_UNOPENED", trading_authority="NONE"))
 
 
-def register():
-    candidate, nomination = case()
+def register(candidate=None, nomination=None):
+    if candidate is None:
+        candidate, nomination = case()
     plugin, binding = project_test_only_candidate(candidate_package=candidate,
                                                  synthetic_nomination=nomination)
     query_pins = {}
@@ -165,12 +166,13 @@ def compare(group):
 
 
 def run(reg, root):
-    assert reg == register()
+    assert reg == register(reg["candidate"], reg["nomination"])
     validate_schedule(reg)
     db = root / "factory.sqlite"
     migrate_store_v2(db)
     registry = DiscovererLedger()
-    attempts = {f"{p}/{a}": digest([reg["sha256"], p, a]) for p, a in PLAN}
+    attempts = {f"{p}/{a}": "RESEARCH-H-GENERIC-" + digest([reg["sha256"], p, a])
+                for p, a in PLAN}
     for key, attempt in attempts.items():
         registry.register(attempt, reg["candidate"]["candidate_id"], "G4-WP03",
                           reg["plugin"]["payload"]["definition_digest"], reg["sha256"],
