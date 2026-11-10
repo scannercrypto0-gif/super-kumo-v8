@@ -1,0 +1,112 @@
+{
+  "schema": "aql.g1.resource-receipt.v1",
+  "grade": "SYNTHETIC_TESTED",
+  "base_sha": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+  "tested_tree_sha": "2ed26b9e53c868275c03bb0c1f06e7ae8fed5053",
+  "platform": "Windows-11-10.0.22000-SP0",
+  "python": "3.14.3",
+  "rows": 256,
+  "symbols": 8,
+  "census": {
+    "schema": "aql.g1.census.v1",
+    "snapshot_sha256": "45fe5f4837a636b3223402ab54eeae2940b18662e1a3f1d8a8e47f8d9ef87bc6",
+    "observed_ms": 1794232476424,
+    "decision_ms": 1794232476424,
+    "discovered": 8,
+    "records": [
+      {
+        "index": 0,
+        "symbol": "SYM0USDT",
+        "status": "ELIGIBLE",
+        "reason": "ACTIVE_SPOT_METADATA_ONLY"
+      },
+      {
+        "index": 1,
+        "symbol": "SYM1USDT",
+        "status": "ELIGIBLE",
+        "reason": "ACTIVE_SPOT_METADATA_ONLY"
+      },
+      {
+        "index": 2,
+        "symbol": "SYM2USDT",
+        "status": "ELIGIBLE",
+        "reason": "ACTIVE_SPOT_METADATA_ONLY"
+      },
+      {
+        "index": 3,
+        "symbol": "SYM3USDT",
+        "status": "ELIGIBLE",
+        "reason": "ACTIVE_SPOT_METADATA_ONLY"
+      },
+      {
+        "index": 4,
+        "symbol": "SYM4USDT",
+        "status": "ELIGIBLE",
+        "reason": "ACTIVE_SPOT_METADATA_ONLY"
+      },
+      {
+        "index": 5,
+        "symbol": "SYM5USDT",
+        "status": "ELIGIBLE",
+        "reason": "ACTIVE_SPOT_METADATA_ONLY"
+      },
+      {
+        "index": 6,
+        "symbol": "SYM6USDT",
+        "status": "ELIGIBLE",
+        "reason": "ACTIVE_SPOT_METADATA_ONLY"
+      },
+      {
+        "index": 7,
+        "symbol": "SYM7USDT",
+        "status": "ELIGIBLE",
+        "reason": "ACTIVE_SPOT_METADATA_ONLY"
+      }
+    ],
+    "counts": {
+      "ELIGIBLE": 8,
+      "ERROR": 0,
+      "UNSUPPORTED": 0
+    },
+    "scope": "supplied snapshot only; metadata eligibility is not decision readiness"
+  },
+  "scheduler": {
+    "admitted": 256,
+    "rejected": 0,
+    "duplicate": 0,
+    "quota_denied": 0,
+    "api_weight_reserved": 512,
+    "db_writes_reserved": 256,
+    "peak_backlog": 256
+  },
+  "simulated_api_weight": 512,
+  "actual_http_requests": 0,
+  "remote_db_writes": 0,
+  "local_store_rows": 256,
+  "local_file_bytes": {
+    "journal.sqlite": 266240,
+    "store.sqlite": 106496
+  },
+  "local_total_bytes": 372736,
+  "commit_ms": {
+    "median": 24.502799999027047,
+    "p95": 70.26670000050217,
+    "max": 119.90629999854718
+  },
+  "elapsed_seconds": 39.607033799999044,
+  "all_decisions_source_ready": true,
+  "source_sha256": {
+    "src/aql/foundation/__init__.py": "666df2eae3a05925593aa2c0db1671d979a9626c9efa7e0c2823134d473ced49",
+    "src/aql/foundation/census.py": "98da0fed8a1e45de780461e6f938eb2f30960d1a8586346145630a9aa4b6fc2b",
+    "src/aql/foundation/readiness.py": "e82768a95e70bbfbc49054e68a472497756e30b09f45e7e43684661fe6592f4e",
+    "src/aql/foundation/scheduler.py": "4071551ecf84bfd5e8caa2cc2190c693bab1d560399fadf7c9e7e1ff89135075"
+  },
+  "limits": [
+    "Synthetic metadata, bars and clock trust; no current Binance census or live budget measurement",
+    "API weights and DB write units are configured assumptions; local SQLite bytes/time are measured",
+    "DB reservation counts logical jobs, not SQLite physical statements/fsyncs",
+    "No Supabase sandbox or production integration verified",
+    "Per-process cooperative scheduling, not host-wide resource enforcement",
+    "Source readiness only; indicator computation remains in existing versioned library"
+  ]
+}
