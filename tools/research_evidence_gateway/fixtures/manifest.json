@@ -1,0 +1,37 @@
+{
+  "as_of_ms": 3600003,
+  "engine_sha256": "c52719502427f832e9f6db7e9bc8fa2ffc3c596cc9831d826246b1c3b9524e57",
+  "expected_decisions": 4,
+  "expected_result_signal_ids": [
+    "f606d2e108c4346794a515157c05680a96d428618cf9e2102e49cf191e3e44e1"
+  ],
+  "expected_signal_ids": [
+    "f606d2e108c4346794a515157c05680a96d428618cf9e2102e49cf191e3e44e1"
+  ],
+  "files": {
+    "results.json": "e678dcf7a216ac98ecc1d338f5da526739718ca1c1442d7006120efd07289ac7",
+    "source.json": "6c0b0758f33e40b4b585430978bde4b2759dd59cac0d9fe50f7d6fece783c9b4"
+  },
+  "pinned_heads": {
+    "archive": "1ff3d13a3dfd1337bae0659dd03550b764c8799c",
+    "discoverer": "c568e3b281795f9eef2165c0e6f571b87157a23c",
+    "factory": "04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
+    "g1": "d072544427d6b08473c88b2e36d5857cfd8581dc",
+    "g2": "852f6fcce1dbb4dede6259fe8d0498d19ff19078",
+    "g3": "0ca716eaf1b8ae1a66ed6f3fbcec34f22c73ced7",
+    "integration": "182331b90efdcc31cf04476200fe09b45e16997c",
+    "main": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+    "scanner": "ccf57ad3db7e71290a8321840e800136567e3af4"
+  },
+  "run": {
+    "config_sha256": "50756758daf2925e704f97531b0de7801b077b66548d2212a3515f9fdf9556d2",
+    "definition_sha256": "5d293f892fd829a9d1c1d2933612bbb4f2d57b4445deefce06436959824cb55b",
+    "evaluator_sha256": "130261351afda1642e2bda950d1f5f00f9b6fff979e234acc9ea58aa4896f099",
+    "evidence_mode": "SYNTHETIC_TESTED",
+    "journal_instance": "5d3e3ec603f14fa0a9cda5be1ba9224f",
+    "strategy_fixture_sha256": "20ae2d83a8d315c71a8e2caa84160a6323fe3f7e409015644da7a0fbc29b7bc8",
+    "strategy_id": "test_momentum",
+    "strategy_version": "v1"
+  },
+  "schema": "aql.research-evidence-gateway.inputs.v1"
+}

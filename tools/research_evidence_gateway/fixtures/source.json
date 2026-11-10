@@ -1,0 +1,214 @@
+{
+  "as_of_ms": 3600003,
+  "rows": [
+    {
+      "decision": {
+        "cutoff_ms": 900003,
+        "inputs": [
+          {
+            "g1_receipt_sha256": "51e71e4a8c41bc05b93308cf0e05effe47c47b0c8f2273c05f818b30c690ff1f",
+            "key": "BTCUSDT:15m:0"
+          }
+        ],
+        "opportunity_id": null,
+        "parent": {
+          "bar_checksum": "8caeee84b67c33da5250274fa16f759dcc32f06a8a4dfb3b56d6340b1e1d0601",
+          "close_ms": 899999,
+          "commit_ms": 900002,
+          "content_sha256": "4b3c24db93ebc7303cea434ad87f37bafa655ceb35411f141b33f30abade1763",
+          "g1_receipt_sha256": "51e71e4a8c41bc05b93308cf0e05effe47c47b0c8f2273c05f818b30c690ff1f",
+          "ingested_ms": 900000,
+          "key": "BTCUSDT:15m:0",
+          "open_ms": 0
+        },
+        "reason": "WARMUP_OR_GAP",
+        "run": {
+          "config_sha256": "50756758daf2925e704f97531b0de7801b077b66548d2212a3515f9fdf9556d2",
+          "definition_sha256": "5d293f892fd829a9d1c1d2933612bbb4f2d57b4445deefce06436959824cb55b",
+          "evaluator_sha256": "130261351afda1642e2bda950d1f5f00f9b6fff979e234acc9ea58aa4896f099",
+          "evidence_mode": "SYNTHETIC_TESTED",
+          "journal_instance": "5d3e3ec603f14fa0a9cda5be1ba9224f",
+          "strategy_fixture_sha256": "20ae2d83a8d315c71a8e2caa84160a6323fe3f7e409015644da7a0fbc29b7bc8",
+          "strategy_id": "test_momentum",
+          "strategy_version": "v1"
+        },
+        "state": "UNKNOWN",
+        "trading_authority": "NONE"
+      },
+      "decision_sha256": "1db0eea399419524487336df0263e6e3ea625be764e69b235cc168ec683d4d43",
+      "horizons": [],
+      "source_valid": true
+    },
+    {
+      "decision": {
+        "cutoff_ms": 1800003,
+        "inputs": [
+          {
+            "g1_receipt_sha256": "51e71e4a8c41bc05b93308cf0e05effe47c47b0c8f2273c05f818b30c690ff1f",
+            "key": "BTCUSDT:15m:0"
+          },
+          {
+            "g1_receipt_sha256": "e2393190b618264e4134de925ddcd68603ca5fe317af8d28ce18c0011539fe14",
+            "key": "BTCUSDT:15m:900000"
+          }
+        ],
+        "opportunity_id": null,
+        "parent": {
+          "bar_checksum": "fa51ea3288643c520f10ff8a238ed1dc92aa15c846a829069881d82b757bb2ae",
+          "close_ms": 1799999,
+          "commit_ms": 1800002,
+          "content_sha256": "00bdde81621b6ff88e6ff5e809624932867f4d87b64be5520103f78b7db47eda",
+          "g1_receipt_sha256": "e2393190b618264e4134de925ddcd68603ca5fe317af8d28ce18c0011539fe14",
+          "ingested_ms": 1800000,
+          "key": "BTCUSDT:15m:900000",
+          "open_ms": 900000
+        },
+        "reason": "WARMUP_OR_GAP",
+        "run": {
+          "config_sha256": "50756758daf2925e704f97531b0de7801b077b66548d2212a3515f9fdf9556d2",
+          "definition_sha256": "5d293f892fd829a9d1c1d2933612bbb4f2d57b4445deefce06436959824cb55b",
+          "evaluator_sha256": "130261351afda1642e2bda950d1f5f00f9b6fff979e234acc9ea58aa4896f099",
+          "evidence_mode": "SYNTHETIC_TESTED",
+          "journal_instance": "5d3e3ec603f14fa0a9cda5be1ba9224f",
+          "strategy_fixture_sha256": "20ae2d83a8d315c71a8e2caa84160a6323fe3f7e409015644da7a0fbc29b7bc8",
+          "strategy_id": "test_momentum",
+          "strategy_version": "v1"
+        },
+        "state": "UNKNOWN",
+        "trading_authority": "NONE"
+      },
+      "decision_sha256": "3d776c9f7315268a2e9572ac0a33eb0b1cda6baa668e9ad449d082444117b1d2",
+      "horizons": [],
+      "source_valid": true
+    },
+    {
+      "decision": {
+        "cutoff_ms": 2700003,
+        "inputs": [
+          {
+            "g1_receipt_sha256": "51e71e4a8c41bc05b93308cf0e05effe47c47b0c8f2273c05f818b30c690ff1f",
+            "key": "BTCUSDT:15m:0"
+          },
+          {
+            "g1_receipt_sha256": "e2393190b618264e4134de925ddcd68603ca5fe317af8d28ce18c0011539fe14",
+            "key": "BTCUSDT:15m:900000"
+          },
+          {
+            "g1_receipt_sha256": "8d491e7e877ccb86b038d750491b4801bb4d5defa6b86e2d83c985e1027bea4a",
+            "key": "BTCUSDT:15m:1800000"
+          }
+        ],
+        "opportunity_id": null,
+        "parent": {
+          "bar_checksum": "4afeac57dd0cc3a14959dda3b00b86623e9dee147bf1b23dcbc03cd124f9a0ee",
+          "close_ms": 2699999,
+          "commit_ms": 2700002,
+          "content_sha256": "8206124cb412c0757020ac4c888315f80d4cbfa644e4aed68c33f950a21c1600",
+          "g1_receipt_sha256": "8d491e7e877ccb86b038d750491b4801bb4d5defa6b86e2d83c985e1027bea4a",
+          "ingested_ms": 2700000,
+          "key": "BTCUSDT:15m:1800000",
+          "open_ms": 1800000
+        },
+        "reason": "WARMUP_OR_GAP",
+        "run": {
+          "config_sha256": "50756758daf2925e704f97531b0de7801b077b66548d2212a3515f9fdf9556d2",
+          "definition_sha256": "5d293f892fd829a9d1c1d2933612bbb4f2d57b4445deefce06436959824cb55b",
+          "evaluator_sha256": "130261351afda1642e2bda950d1f5f00f9b6fff979e234acc9ea58aa4896f099",
+          "evidence_mode": "SYNTHETIC_TESTED",
+          "journal_instance": "5d3e3ec603f14fa0a9cda5be1ba9224f",
+          "strategy_fixture_sha256": "20ae2d83a8d315c71a8e2caa84160a6323fe3f7e409015644da7a0fbc29b7bc8",
+          "strategy_id": "test_momentum",
+          "strategy_version": "v1"
+        },
+        "state": "UNKNOWN",
+        "trading_authority": "NONE"
+      },
+      "decision_sha256": "125eeb392ac2ed2d4fd26d2fad63ce206be776750cd518ea032f5ae6556a7b68",
+      "horizons": [],
+      "source_valid": true
+    },
+    {
+      "decision": {
+        "cutoff_ms": 3600003,
+        "inputs": [
+          {
+            "g1_receipt_sha256": "51e71e4a8c41bc05b93308cf0e05effe47c47b0c8f2273c05f818b30c690ff1f",
+            "key": "BTCUSDT:15m:0"
+          },
+          {
+            "g1_receipt_sha256": "e2393190b618264e4134de925ddcd68603ca5fe317af8d28ce18c0011539fe14",
+            "key": "BTCUSDT:15m:900000"
+          },
+          {
+            "g1_receipt_sha256": "8d491e7e877ccb86b038d750491b4801bb4d5defa6b86e2d83c985e1027bea4a",
+            "key": "BTCUSDT:15m:1800000"
+          },
+          {
+            "g1_receipt_sha256": "4270e1d35c33befc60582b0b1f8c40aec2fc9885160166ee104d8ab5914e026a",
+            "key": "BTCUSDT:15m:2700000"
+          }
+        ],
+        "opportunity_id": "f606d2e108c4346794a515157c05680a96d428618cf9e2102e49cf191e3e44e1",
+        "parent": {
+          "bar_checksum": "de95425ca1f4f58978cdfc1890b23171adb6f5ee03e5fe0378161fe5790d0b66",
+          "close_ms": 3599999,
+          "commit_ms": 3600002,
+          "content_sha256": "1378b18689739715c0a27529ed7427781e25cbf267f308ac88e1d338dadafa63",
+          "g1_receipt_sha256": "4270e1d35c33befc60582b0b1f8c40aec2fc9885160166ee104d8ab5914e026a",
+          "ingested_ms": 3600000,
+          "key": "BTCUSDT:15m:2700000",
+          "open_ms": 2700000
+        },
+        "reason": null,
+        "run": {
+          "config_sha256": "50756758daf2925e704f97531b0de7801b077b66548d2212a3515f9fdf9556d2",
+          "definition_sha256": "5d293f892fd829a9d1c1d2933612bbb4f2d57b4445deefce06436959824cb55b",
+          "evaluator_sha256": "130261351afda1642e2bda950d1f5f00f9b6fff979e234acc9ea58aa4896f099",
+          "evidence_mode": "SYNTHETIC_TESTED",
+          "journal_instance": "5d3e3ec603f14fa0a9cda5be1ba9224f",
+          "strategy_fixture_sha256": "20ae2d83a8d315c71a8e2caa84160a6323fe3f7e409015644da7a0fbc29b7bc8",
+          "strategy_id": "test_momentum",
+          "strategy_version": "v1"
+        },
+        "state": "ENTRY_SIGNAL",
+        "trading_authority": "NONE"
+      },
+      "decision_sha256": "1fe0a0210fdd90467a7a3b24094e5fcb1c9491fbf55ee11e6464d7cc5ae54b95",
+      "horizons": [
+        {
+          "due_ms": 18000003,
+          "evidence": null,
+          "horizon_ms": 14400000,
+          "state": "pending"
+        },
+        {
+          "due_ms": 90000003,
+          "evidence": null,
+          "horizon_ms": 86400000,
+          "state": "pending"
+        },
+        {
+          "due_ms": 262800003,
+          "evidence": null,
+          "horizon_ms": 259200000,
+          "state": "pending"
+        }
+      ],
+      "source_valid": true
+    }
+  ],
+  "run": {
+    "config_sha256": "50756758daf2925e704f97531b0de7801b077b66548d2212a3515f9fdf9556d2",
+    "definition_sha256": "5d293f892fd829a9d1c1d2933612bbb4f2d57b4445deefce06436959824cb55b",
+    "evaluator_sha256": "130261351afda1642e2bda950d1f5f00f9b6fff979e234acc9ea58aa4896f099",
+    "evidence_mode": "SYNTHETIC_TESTED",
+    "journal_instance": "5d3e3ec603f14fa0a9cda5be1ba9224f",
+    "strategy_fixture_sha256": "20ae2d83a8d315c71a8e2caa84160a6323fe3f7e409015644da7a0fbc29b7bc8",
+    "strategy_id": "test_momentum",
+    "strategy_version": "v1"
+  },
+  "schema": "aql.g2.prospective-verified-read.v1",
+  "sha256": "f2abe751aa4475d3876f2e36440ecc3f49d2b96aed306774943d6daefe75dff6",
+  "trading_authority": "NONE",
+  "visible_sha256": "bcb9ac3164fdc85715785967183353e547ce90782d0eff0d9d91bd90269c231f"
+}
