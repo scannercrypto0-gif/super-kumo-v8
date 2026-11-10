@@ -1,0 +1,48 @@
+name: ATLAS combined Windows evidence
+on:
+  push:
+    branches: [integration/closeout-windows-evidence-20261110]
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    env:
+      BINANCE_LIVE_TEST: '0'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 5d4fd79a90875dc15991570c87efbf53555bb016
+          path: candidate
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify pinned candidate and exercise the cross-lane seam
+        shell: pwsh
+        working-directory: candidate
+        run: |
+          if ((git rev-parse HEAD) -ne '5d4fd79a90875dc15991570c87efbf53555bb016') { throw 'Unexpected candidate commit' }
+          if ((git write-tree) -ne 'a8c90c7c59767a7415be3d4adeb041eac101fd48') { throw 'Unexpected candidate tree' }
+          python -m pip install -e ".[dev]"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:PYTHONPATH = '.'
+          $env:G3_UPSTREAM_FILE = Join-Path $PWD 'src/aql/observation/prospective.py'
+          python -B -m pytest -q ../harness/.github/atlas_evidence/test_three_way_overlay.py tests/test_atlas_prospective_archive.py -k 'test_real_pinned_observer_scanner_read_to_offline_simulator or test_real_scanner_receipts_and_all_horizons_after_restart' --junitxml=atlas-windows.xml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Measure G3 offline restart and replay soak
+        working-directory: candidate
+        run: python -B -m aql.paper_sim.measure --seconds 60 --max-signals 256 --output g3-soak.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: atlas-combined-windows-evidence
+          path: |
+            candidate/atlas-windows.xml
+            candidate/g3-soak.json
