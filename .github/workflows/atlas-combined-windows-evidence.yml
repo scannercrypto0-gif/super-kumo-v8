@@ -11,6 +11,11 @@ jobs:
     env:
       BINANCE_LIVE_TEST: '0'
       PYTHONDONTWRITEBYTECODE: '1'
+      GIT_CONFIG_COUNT: '2'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+      GIT_CONFIG_KEY_1: core.eol
+      GIT_CONFIG_VALUE_1: lf
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,6 +44,9 @@ jobs:
       - name: Measure G3 offline restart and replay soak
         working-directory: candidate
         run: python -B -m aql.paper_sim.measure --seconds 60 --max-signals 256 --output g3-soak.json
+      - name: Record measured soak result in job log
+        working-directory: candidate
+        run: Get-Content g3-soak.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
