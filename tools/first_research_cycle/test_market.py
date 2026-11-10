@@ -72,6 +72,10 @@ def test_joined_native_replay_and_crash(tmp_path):
     assert result['status']=='PASS_ADAPTER_SIMULATION_ONLY'
     assert result['populations']['scanner_slots']==640
     assert result['actual_fills'] is None and result['trading_authority']=='NONE'
+    from tools.first_research_cycle.verify_run import verify
+    readback=verify(a)
+    assert readback['verified_cost_rows']==result['populations']['cost_rows']
+    assert len(readback['paired_exit_shadow'])==12
     if os.environ.get('CYCLE_EXPORT_RECEIPT'):
         Path(os.environ['CYCLE_EXPORT_RECEIPT']).write_bytes((a/'result.json').read_bytes())
     r=invoke(source,plan,c,crash=True);assert r.returncode==73,r.stdout+r.stderr
