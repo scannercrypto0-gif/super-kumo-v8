@@ -120,7 +120,7 @@ class BinanceCollector:
             if "k" not in data:
                 return
 
-            if "E" in data:
+            if "E" in data and not self.public_market_only:
                 skew = int(data["E"]) - int(time.time() * 1000)
                 self.metrics.source_clock_skew_ms = skew
                 if skew > self.clock_tolerance_ms:
@@ -128,12 +128,6 @@ class BinanceCollector:
                     self.clock_uncertain = True
                     raise ValueError("Source event is ahead of local clock; temporal eligibility denied")
             k = data["k"]
-            if self.public_market_only and (
-                type(data.get("E")) is not int or
-                data["E"] < k["T"] or
-                abs(skew) > self.clock_tolerance_ms
-            ):
-                raise ValueError("Public observation clock or event time outside tolerance")
             if type(k.get("x")) is not bool:
                 raise ValueError("Invalid candle finality flag")
             bar = MarketBar.from_binance_ws_kline(k)
@@ -143,6 +137,23 @@ class BinanceCollector:
             if not bar.is_final:
                 self.metrics.non_final_bar_count += 1
                 return
+
+            if self.public_market_only:
+                event_ms = data.get("E")
+                if type(event_ms) is not int:
+                    raise ValueError("Public finalized candle is missing an integer event time")
+                skew = event_ms - bar.ingested_at
+                self.metrics.source_clock_skew_ms = skew
+                if event_ms < bar.bar_close or abs(skew) > self.clock_tolerance_ms:
+                    self.clock_uncertain = True
+                    raise ValueError("Public finalized candle clock or event time outside tolerance")
+                if bar.ingested_at <= bar.bar_close:
+                    # Exchange has already finalized the candle, but local UTC
+                    # has not crossed the close. Accept only after real time
+                    # advances; the original arrival skew remains in metrics.
+                    delay_ms = bar.bar_close - bar.ingested_at + 2
+                    time.sleep(delay_ms / 1000)
+                    bar.ingested_at = int(time.time() * 1000)
 
             if bar.bar_close >= bar.ingested_at:
                 self.clock_uncertain = True

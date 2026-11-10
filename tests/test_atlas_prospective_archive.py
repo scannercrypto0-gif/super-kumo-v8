@@ -103,7 +103,9 @@ class ProspectiveResearchTests(unittest.TestCase):
         with patch("time.time", return_value=now / 1000):
             with self.assertLogs("aql.collector.binance_collector", level="ERROR"):
                 collector._on_message(None, json.dumps({"E": now - 10_000, "k": kline}))
-            collector._on_message(None, json.dumps({"E": now, "k": {**kline, "x": False}}))
+            collector._on_message(None, json.dumps({"E": close - 60_000, "k": {**kline, "x": False}}))
+            self.assertEqual(collector.metrics.non_final_bar_count, 1)
+            self.assertEqual(collector.metrics.error_count, 1)
             self.assertEqual(self.store.count(), 0)
             collector._on_message(None, json.dumps({"E": now, "k": kline}))
             collector._on_close(None, 1006, "fixture reconnect")
@@ -111,6 +113,34 @@ class ProspectiveResearchTests(unittest.TestCase):
             collector._on_message(None, json.dumps({"E": now, "k": kline}))
         self.assertEqual(self.store.count(), 1)
         self.assertEqual(len(self.observer.verified_read(as_of_ms=now + 2)["rows"]), 1)
+
+    def test_public_final_waits_for_local_close_and_preserves_arrival_skew(self):
+        close = START + STEP - 1
+        now = close - 14
+        collector = BinanceCollector("BTCUSDT", "15m", self.journal, self.store,
+                                     public_market_only=True)
+        kline = dict(s="BTCUSDT", i="15m", t=START, T=close,
+                     o="101", h="102", l="100", c="101", v="4", x=True)
+
+        def advance(seconds):
+            nonlocal now
+            now += round(seconds * 1000)
+
+        message = json.dumps({"E": close + 59, "k": kline})
+        with patch("time.time", side_effect=lambda: now / 1000):
+            with patch("time.sleep") as stalled:
+                with self.assertLogs("aql.collector.binance_collector", level="ERROR"):
+                    collector._on_message(None, message)
+                stalled.assert_called_once()
+                self.assertEqual(self.store.count(), 0)
+            with patch("time.sleep", side_effect=advance) as wait:
+                collector._on_message(None, message)
+                wait.assert_called_once_with(0.016)
+        self.assertEqual(collector.metrics.source_clock_skew_ms, 73)
+        bar = self.journal.replay("BTCUSDT", "15m")[0]
+        self.assertGreater(bar.ingested_at, close)
+        self.assertEqual(self.journal.commit_receipt(bar.stable_key())["status"],
+                         "SQLITE_COMMIT_RETURN_OBSERVED")
 
     def test_late_missing_and_revised_source_remain_explicit(self):
         for i in range(4):
