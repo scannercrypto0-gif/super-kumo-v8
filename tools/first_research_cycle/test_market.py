@@ -52,7 +52,7 @@ def test_missing_or_swapped_population(tmp_path,key,value):
 
 
 def invoke(source,plan,out,*,crash=False):
-    path=out.parent/(out.name+'-plan.json');path.write_bytes(canonical(plan));path.with_suffix('.sha256').write_text(sha(plan))
+    path=source.parent/(out.name+'-plan.json');path.write_bytes(canonical(plan));path.with_suffix('.sha256').write_text(sha(plan))
     deps=os.environ.get('CYCLE_DEPS')
     assert deps,'CYCLE_DEPS must point to separately staged immutable source snapshots'
     cmd=[sys.executable,'-B',str(Path(__file__).with_name('market_cycle.py')),'--source',str(source),
