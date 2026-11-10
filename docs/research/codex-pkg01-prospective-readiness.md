@@ -76,6 +76,11 @@ separate permissions and independent witness remain externally gated.
 15-minute candles, prospective research only. Reuse the existing bounded
 Coinbase adapter (#217) if separately authorized; no second downloader.
 OHLCV alone cannot establish maker queue/fill, spread or intrabar ordering.
+References verified 2026-11-10: [Coinbase Exchange candles API](https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-product-candles)
+and [Coinbase Market Data Terms](https://www.coinbase.com/legal/market_data)
+(last updated 2026-08-07). These references are not a grant of legal rights;
+provider-specific approved use and redistribution restrictions remain subject
+to the owner rights review below.
 
 Proposed UTC schedule (must be replaced if prefreeze cannot be witnessed in
 time): freeze and independent custody witness before **2026-11-12 00:00 UTC**;
@@ -98,6 +103,8 @@ One owner envelope must provide all of:
    train/validation/embargo/OOS windows), <=1 bounded polling request/minute,
    <=8 MiB retained payload, bounded retries and no paid/account/private API.
    Provider actual limits and approved retention must be verified first.
+   Expected scheduled grid: **575 slots** (95 train + 96 validation + 288
+   embargo + 96 OOS); 672 is only the proposed upper budget, not expected data.
 4. Isolated named custody location, access/retention policy, immutable manifest
    pin outside the mutable writer, independent prefreeze and source receive/
    COMMIT witness, source-version/correction lineage and no-peek OOS owner.
