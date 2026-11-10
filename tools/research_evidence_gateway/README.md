@@ -14,14 +14,14 @@ From repository root, offline (Python >=3.11):
 ```powershell
 $anchor = (Get-Content tools/research_evidence_gateway/fixtures/manifest.sha256).Trim()
 python -B -m tools.research_evidence_gateway.gateway --inputs tools/research_evidence_gateway/fixtures --manifest-sha256 $anchor --output gateway-new.json
-python -B -m pytest tools/research_evidence_gateway -q --basetemp=work/gateway-tests
+python -B -m pytest tools/research_evidence_gateway -q --basetemp=.gateway-tests
 ```
 
 POSIX equivalent:
 
 ```sh
 python -B -m tools.research_evidence_gateway.gateway --inputs tools/research_evidence_gateway/fixtures --manifest-sha256 "$(cat tools/research_evidence_gateway/fixtures/manifest.sha256)" --output gateway-new.json
-python -B -m pytest tools/research_evidence_gateway -q --basetemp=work/gateway-tests
+python -B -m pytest tools/research_evidence_gateway -q --basetemp=.gateway-tests
 ```
 
 Output must not exist or be inside the input directory. CLI exit 0 means the
@@ -119,3 +119,14 @@ owner-reported host bytes were not inspected. Later synthetic engineering
 #271/6767096389, scoped Audit /6767647980 and real-admission block /6768196303
 remain distinct. Current user instruction explicitly launches PKG04 only.
 Private chats/E: are inaccessible and not claimed reviewed. G2 is untouched.
+
+ACKNOWLEDGED: mandatory final acceptance addendum #271/6768882892 was read
+during this execution. Local/focused CI success is only a per-package receipt.
+Integration #271 must build its single disposable pinned combined candidate
+after all four deliveries and execute the actual operational and research paths,
+including comparison with PKG02 modeled results. Integrated acceptance and
+material-delta Audit remain PENDING, not self-awarded by this gateway PR.
+Crash/recovery of producers and double-cost business logic are NOT_APPLICABLE
+to this consumer's implementation; native producer replay was exercised in the
+existing seam fixture, while combined crash/cost assertions belong to Integration.
+The consumer's own applicable replay is two fresh processes over immutable bytes.

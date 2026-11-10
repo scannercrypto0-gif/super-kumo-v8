@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: '3.11'
       - run: python -m pip install pytest
-      - run: python -B -m pytest tools/research_evidence_gateway -q --basetemp=work/gateway-tests --junitxml=gateway-tests.xml
+      - run: python -B -m pytest tools/research_evidence_gateway -q --basetemp=.gateway-tests --junitxml=gateway-tests.xml
       - uses: actions/upload-artifact@v4
         if: always()
         with:
