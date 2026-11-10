@@ -87,6 +87,14 @@ def test_joined_native_replay_and_crash(tmp_path):
     r=invoke(source,changed,c);assert r.returncode!=0
 
 
+def test_source_output_collision_has_no_side_effects(tmp_path):
+    source=tmp_path/'source';plan=fixture(source)
+    before={p.name:p.read_bytes() for p in source.iterdir()}
+    r=invoke(source,plan,source/'forbidden-output')
+    assert r.returncode==2 and not (source/'forbidden-output').exists()
+    assert before=={p.name:p.read_bytes() for p in source.iterdir()}
+
+
 @pytest.mark.parametrize('mutation',[
     lambda p:p.update(real_pit='ATTESTED'),lambda p:p.update(holdout='OPENED'),
     lambda p:p.update(trading_authority='LIVE'),lambda p:p.update(winner='C'),

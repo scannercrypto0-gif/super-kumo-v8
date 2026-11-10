@@ -103,8 +103,10 @@ def run(source,deps,output,plan,*,crash=False):
     from tools.strategy_discoverer_offline.contracts import DiscoveryCandidatePackageV1
     from research_wp_r0.frozen_research_plan import commit_research_plan,verify_research_plan
     from tools.scanner_strategy_f.research_e2e_diagnostic import _eval_strategy
+    need(source.resolve()!=output.resolve() and source.resolve() not in output.resolve().parents and
+         output.resolve() not in source.resolve().parents,'SOURCE_OUTPUT_COLLISION')
+    need(not output.exists() or (output/'market-plan.json').is_file(),'UNRELATED_OUTPUT_DIRECTORY')
     output.mkdir(parents=True,exist_ok=True)
-    need(source.resolve()!=output.resolve() and source.resolve() not in output.resolve().parents,'SOURCE_OUTPUT_COLLISION')
     persist(output/'market-plan.json',plan)
     bars,source_proof=load_archives(source,plan)
     definition=StrategyDefinition.from_dict(plan['strategy'],registry=IndicatorRegistryV2())
