@@ -166,8 +166,13 @@ def test_pinned_consumer_sources_and_no_shared_changes(deps):
     assert integration['sha256']==digest({k:v for k,v in integration.items() if k!='sha256'})
     assert integration['result']['trading_authority']=='NONE' and integration['result']['historical_pit']=='NOT_ATTESTED'
     assert integration['result']['duplicate_fills']==0 and integration['result']['stage_signoff']=='NOT_GRANTED'
-    changed=git(REPO,'diff','--name-only','ea4ffd5ce278d93588338122ab6ac1af8ec4da26').decode().splitlines()
-    assert all(p.startswith('tools/research_capacity_scale/') or p=='.github/workflows/research-capacity-scale.yml' for p in changed)
+    changed = git(REPO, 'diff', '--name-only', 'ea4ffd5ce278d93588338122ab6ac1af8ec4da26', 'HEAD').decode().splitlines()
+    unexpected = [
+        path for path in changed
+        if not path.startswith('tools/research_capacity_scale/')
+        and path != '.github/workflows/research-capacity-scale.yml'
+    ]
+    assert changed and not unexpected, unexpected
 
 def test_fabricated_report_unknown_profit_or_actual_fill(deps,hashes):
     from research_wp_r0.aql_factory_h_scientific_lab_v1 import evaluate_execution_exit_comparison
