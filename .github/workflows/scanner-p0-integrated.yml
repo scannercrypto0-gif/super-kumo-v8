@@ -1,0 +1,40 @@
+name: Scanner P0 integrated readiness
+on:
+  push:
+    branches: [feat/scanner-f-bulk-historical-research-policy-20261105]
+permissions:
+  contents: read
+jobs:
+  fixture:
+    name: Scanner P0 / ${{ matrix.os }} / Python 3.13
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            pythonpath: "src:."
+          - os: windows-latest
+            pythonpath: "src;."
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install pytest==9.0.2
+      - run: python -B tools/scanner_strategy_f/p0_stage.py p0-ci --fetch
+      - name: Focused H and P0 acceptance and two clean replays
+        working-directory: p0-ci
+        env:
+          PYTHONPATH: ${{ matrix.pythonpath }}
+        shell: bash
+        run: |
+          python -B -m pytest tools/scanner_strategy_f/test_p0_slice.py tools/scanner_strategy_f/test_research_strategy_plugin.py --basetemp fixture-tests --junitxml ../p0-evidence/junit.xml -q
+          python -B -m tools.scanner_strategy_f.p0_evidence ../p0-evidence --head "$GITHUB_SHA"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scanner-p0-${{ matrix.os }}
+          path: p0-evidence/
