@@ -51,3 +51,17 @@ Updated after exact-head focused CI. Existing [draft #276](https://github.com/sc
 | D6 | PASS fixture UP and DOWN with no-event controls and exclusion of late news/revisions. Pre-onset freeze then forward settlement gives one TP, one FP and one UNKNOWN in each direction. Genuine PIT/OOS and scientific claims BLOCKED_EXTERNAL. |
 
 Local fixture evidence digest 40a63a5b5b71cc063e4b91511d2ef59b2954df9352cbb8a7fa24def1f6707253. Core owns as-of data and trusted timestamps. Scanner owns monitor definitions. Factory owns independent scientific evaluation and receipt. Integration owns the sustained cross-owner runtime proof. No G2 observer change, source activation, trading, G0 or merge.
+
+
+## v0.4 coordination update — 2026-11-11 — Core completion mandate, not new Discoverer code
+**Prior v0.3 test results remain valid at their synthetic scope; this update does not claim new D1–D6 implementation or CI.** Owner approved Core to finish every outstanding Core-owned gap from initial C1–C6 and to close Discoverer's real Core contract dependencies in a single package. [Core follow-up assignment #273/6798181298](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/273#issuecomment-6798181298), existing [Core Draft #308](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/308) last verified HEAD `fd39b0189d85e5628ac0fd520368cf48e18d1f8f`, existing [Discoverer Draft #276](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/276) last verified HEAD `9b60eb00aa890ecbd7e617925896e02963c1b5e3`; both OPEN/DRAFT/UNMERGED when checked. Refresh heads before further work.
+
+| Discoverer dependency | Newly assigned Core responsibility | Remaining non-Core responsibility |
+|---|---|---|
+| D1 | Trusted admitted Core watch snapshot, versioned universe/membership/sector/eligibility and coverage UNKNOWN, without invented sources | Owner final ranking/taxonomy decisions; Discoverer watches |
+| D2/D6 | Typed Core historical pre-onset context query/response with effective/published/received/committed/known-at, corrections, rights, source SHA, missing and no-lookahead; exact-head disposable consumer contract test | Discoverer outcome→precursor hypotheses and forward checks; genuine PIT custody external |
+| D3 | Source freshness, bounded query budget and replay-safe Core input | Discoverer continuous search, already PASS_SYNTHETIC |
+| D4 | Reproducible as-of feature definition + provenance for precursor predicate | **Factory** must independently translate/evaluate and return scientific feedback; current predicate non-executable |
+| D5 | Core-side timeout, 429, quota/shared-IP fencing, backpressure, recovery and health tests | **Integration/Operations** must witness sustained 24/7 host/service proof; no #286 observer disruption |
+
+**Handoff acceptance:** do not upgrade D1/D4/D5 to deployed PASS from Core-only synthetic tests. On Codex delivery, record exact PR HEAD, cross-owner consumer test, CI, source/rights grades and any owner decisions. Core C6 source feeds not already authorized remain BLOCKED_SOURCE, not fabricated. No merge, G0 or live/paper trading authorized.
