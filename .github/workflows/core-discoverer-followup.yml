@@ -1,0 +1,39 @@
+name: Core C4–C6 Discoverer seam (#273)
+on:
+  pull_request:
+    paths:
+      - .github/workflows/core-discoverer-followup.yml
+      - src/aql/archive/discoverer_view.py
+      - src/aql/archive/scanner_view.py
+      - src/aql/archive/source_poll.py
+      - src/aql/archive/source_registry.py
+      - tests/test_core_discoverer_followup.py
+permissions:
+  contents: read
+jobs:
+  core-delta:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    env:
+      PYTHONPATH: src${{ matrix.os == 'windows-latest' && ';' || ':' }}.
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: git fetch --no-tags origin 9b60eb00aa890ecbd7e617925896e02963c1b5e3 04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf ccf57ad3db7e71290a8321840e800136567e3af4
+      - run: python -m pip install pytest==9.0.2
+      - run: python -B -m pytest tests/test_core_discoverer_followup.py -q --junitxml=core-followup.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-followup-${{ matrix.os }}
+          path: core-followup.xml
