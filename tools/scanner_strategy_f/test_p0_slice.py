@@ -261,3 +261,26 @@ def test_missing_window_and_warmup(setup,tmp_path):
             lab = json.loads(db.execute("SELECT raw FROM outbox WHERE route='LAB'").fetchone()[0])["body"]
         assert lab["availability"]=="UNKNOWN" and lab["reason"]==reason
     assert missing.evidence()["census"]=={"UNKNOWN":1}
+
+
+def test_unacked_secretary_signal_expires_before_dispatch(setup,tmp_path):
+    plan,plug,source,root = setup
+    now = ORIGIN+STEP
+    store = Store(tmp_path/"expiry",plan,plan["sha256"])
+    store.poll(now,[plug],{"BTCUSDT":(source,root)},{})
+    assert store.deliver(now+plan["lag_ms"]+1,lambda _:pytest.fail("stale dispatch"))=="EXPIRED"
+    assert store.evidence()["delivery"]=={"EXPIRED":1}
+    assert store.evidence()["census"]=={"ENTRY_SIGNAL":1}
+
+
+@pytest.mark.parametrize("order",["duplicate","reversed"])
+def test_reject_duplicate_and_disordered_core_bars(setup,order):
+    _,_,source,root = setup
+    now = ORIGIN+STEP
+    query = p.source_query(source,source["sha256"],"BTCUSDT",now-4*STEP,now,now,warehouse=root)
+    bars = query["bars"]
+    query["bars"] = [bars[0],*bars[:-1]] if order=="duplicate" else list(reversed(bars))
+    query["query_sha256"] = p.digest({key:value for key,value in query.items() if key!="query_sha256"})
+    with pytest.raises(ValueError,match="H_BAR_DUPLICATE_MISSING_OR_FUTURE"):
+        p.source_query(source,source["sha256"],"BTCUSDT",now-4*STEP,now,now,
+                       warehouse=root,reader=lambda *args,**kwargs:query)

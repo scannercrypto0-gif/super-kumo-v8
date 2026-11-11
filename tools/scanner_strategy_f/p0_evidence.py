@@ -13,6 +13,37 @@ import tracemalloc
 
 from tools.scanner_strategy_f.p0_delivery import Store, canonical, fixture_receive
 from tools.scanner_strategy_f.test_p0_slice import ORIGIN, STEP, custody, plugin, request, schedule
+from tools.scanner_strategy_f.p0_stage import PINS
+
+
+def peak_rss_bytes():
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
+
+        class ProcessMemory(ctypes.Structure):
+            _fields_ = [
+                ("size", wintypes.DWORD), ("page_faults", wintypes.DWORD),
+                *((name, ctypes.c_size_t) for name in (
+                    "peak_working_set", "working_set", "peak_paged_pool", "paged_pool",
+                    "peak_nonpaged_pool", "nonpaged_pool", "pagefile", "peak_pagefile",
+                )),
+            ]
+
+        process = ctypes.windll.kernel32.GetCurrentProcess
+        process.restype = wintypes.HANDLE
+        counters = ProcessMemory()
+        counters.size = ctypes.sizeof(counters)
+        get_memory = ctypes.windll.psapi.GetProcessMemoryInfo
+        get_memory.argtypes = (wintypes.HANDLE, ctypes.POINTER(ProcessMemory), wintypes.DWORD)
+        if not get_memory(process(), ctypes.byref(counters), counters.size):
+            raise ctypes.WinError()
+        return counters.peak_working_set
+
+    import resource
+
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return peak if sys.platform == "darwin" else peak * 1024
 
 
 def replay(root):
@@ -41,10 +72,11 @@ def replay(root):
     assert ledger["expected"]==4 and ledger["delivery"]=={"ACKED":8} and len(effects)==8
     assert len(ledger["native_batches"])==4 and ledger["routes"]=={"LAB":4,"SECRETARY":4}
     proof = dict(scope="TEST_ONLY",authority="NONE",source=source,plan=plan,ledger=ledger,
-                 effects=effects,acknowledgements=acknowledgements,provider_requests=0)
+                 effects=effects,acknowledgements=acknowledgements,provider_requests=0,dependency_heads=PINS)
     return dict(proof=proof,proof_sha256=hashlib.sha256(canonical(proof)).hexdigest(),
                 metrics=dict(wall_us=(time.monotonic_ns()-wall)//1000,cpu_us=(time.process_time_ns()-cpu)//1000,
                              python_allocation_peak_bytes=tracemalloc.get_traced_memory()[1],
+                             process_peak_rss_bytes=peak_rss_bytes(),
                              poll_wall_us=latencies,decision_bytes=ledger["decision_bytes"]))
 
 

@@ -10,6 +10,8 @@ Each requested Lab indicator resolves through IndicatorRegistryV2, using the sam
 
 The Scanner transaction commits the decision, native batch and outbox together. The producer sends sealed `aql.scanner.p0.handoff.v1` with a canonical digest as effect key. It sends eligible on-time `aql.scanner.p0.decision.v1` to SECRETARY and `aql.scanner.p0.lab-monitor.v1` to LAB. A consumer must validate the route, scope, envelope digest, body digest and authority, then persist the effect and key atomically. Replaying an identical key and body returns the same receipt. Conflicting bytes fail closed. The fixture sends `aql.scanner.p0.fixture-consumer-ack.v1` after commit. Retries reuse the key, wait exponentially and quarantine malformed responses or exhausted attempts.
 
+An outstanding Secretary envelope expires once the dispatch clock exceeds the slot cutoff plus the frozen lag allowance. The decision stays immutable. A downstream receiver must also validate its delivery deadline before using any signal.
+
 The current F3 Secretary proposal accepts the historical source-policy graph, and rejects the new per-slot body with `F3_SOURCE_AND_POLICY_GRAPH_NOT_READY_FOR_PROPOSAL`. Factory Lab's evaluation path takes a Factory ledger. Lab's owner needs to register an independent monitor receiver for the new route. Integration #271 and the respective Secretary and Lab owners need to agree on authenticated receipt binding and demonstrate durable effects in their actual receivers before deployment. The fixture receipt has authority NONE and cannot stand in for that evidence.
 
 ## Reproduction
@@ -27,6 +29,6 @@ python -B -m pytest tools/scanner_strategy_f/test_p0_slice.py tools/scanner_stra
 python -B -m tools.scanner_strategy_f.p0_evidence ../p0-evidence
 ```
 
-The dependency overlay is copied from pinned Git objects and leaves the checkout unchanged. Each replay creates a fresh native Core warehouse, Scanner ledger and fixture consumer database. Metrics record CPU and wall time and peak traced Python allocations. The canonical digest excludes machine-specific metrics. Storage budgets limit canonical payload bytes independently for the decision and monitor lanes. Physical disk size and process RSS require separate operational measurement.
+The dependency overlay is copied from pinned Git objects and leaves the checkout unchanged. Each replay creates a fresh native Core warehouse, Scanner ledger and fixture consumer database. Metrics record CPU and wall time, peak process RSS (peak working set on Windows), and peak traced Python allocations. The canonical digest excludes machine-specific metrics. Storage budgets limit canonical payload bytes independently for the decision and monitor lanes. Physical disk size requires separate operational measurement.
 
 This runtime has zero provider requests. It uses historical fixture rights and has no production egress authority. Real rights, point-in-time custody and shared IP fencing need owner approval and evidence from Core, the #305 pilot and Integration. The current tests establish a bounded offline poll and crash recovery. They leave sustained operation, real PIT/OOS, G0 and execution authority unverified.

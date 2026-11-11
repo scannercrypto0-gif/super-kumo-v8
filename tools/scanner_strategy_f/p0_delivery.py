@@ -88,7 +88,7 @@ class Store:
                         if source is not None:
                             query = source_query(source,source_pin,symbol,cutoff-p["warmup"]*STEP,cutoff,cutoff,
                                                  warehouse=warehouse)
-                    except (ValueError,KeyError,OSError,sqlite3.DatabaseError):
+                    except (ValueError,KeyError,TypeError,OSError,sqlite3.DatabaseError):
                         query = None
                     for plugin in plugins:
                         event,batch = decision(p,plugin,symbol,slot,now,source_pin,query,warehouse=warehouse)
@@ -142,19 +142,27 @@ class Store:
         require(type(max_attempts) is int and 1<=max_attempts<=8,"P0_ATTEMPT_LIMIT")
         with self.tx() as db:
             self._clock(db,now)
-            row = db.execute("SELECT id,raw,attempts FROM outbox WHERE state IN ('READY','PENDING') "
+            row = db.execute("SELECT id,raw,attempts,route FROM outbox WHERE state IN ('READY','PENDING') "
                              "AND due<=? ORDER BY due,id LIMIT 1",(now,)).fetchone()
             if not row:
                 return "IDLE"
-            key,raw,count = row
+            key,raw,count,route = row
+            try:
+                doc = json.loads(raw)
+                verify(doc,key)
+                require(doc["route"]==route,"P0_OUTBOX_ROUTE")
+            except (ValueError,KeyError,TypeError):
+                db.execute("UPDATE outbox SET state='QUARANTINED' WHERE id=?",(key,))
+                return "QUARANTINED"
+            if route=="SECRETARY" and now-doc["body"]["cutoff"]>self.plan["lag_ms"]:
+                db.execute("UPDATE outbox SET state='EXPIRED' WHERE id=?",(key,))
+                return "EXPIRED"
             if count>=max_attempts:
                 db.execute("UPDATE outbox SET state='QUARANTINED' WHERE id=?",(key,))
                 return "QUARANTINED"
             db.execute("UPDATE outbox SET state='PENDING',attempts=?,due=? WHERE id=?",
                        (count+1,now+1000*2**count,key))
         try:
-            doc = json.loads(raw)
-            verify(doc,key)
             ack = receiver(doc)
             if fault:
                 fault()
