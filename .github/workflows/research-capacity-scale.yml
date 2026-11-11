@@ -1,0 +1,45 @@
+name: Bounded research capacity (Issue 295)
+on:
+  pull_request:
+    paths: ['tools/research_capacity_scale/**', '.github/workflows/research-capacity-scale.yml']
+  push:
+    branches: ['codex/research-capacity-scale-01']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  joined-capacity:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.13']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    env:
+      PYTHONPATH: src${{ runner.os == 'Windows' && ';' || ':' }}.
+      PYTHONDONTWRITEBYTECODE: '1'
+      CAPACITY_DEPS: ${{ runner.temp }}/capacity-deps
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install pytest==9.0.2
+      - name: Read-only immutable dependencies (no accepted pipeline reruns)
+        run: python -B -m tools.research_capacity_scale dependencies --destination "${{ runner.temp }}/capacity-deps" --fetch
+      - name: Joined faults, recovery, resource and scientific gates
+        run: python -B -m pytest tools/research_capacity_scale/tests -q --basetemp "${{ runner.temp }}/capacity-tests" --junitxml=capacity-tests.xml
+      - name: Native baseline and two fresh 1/10/50 serial-parallel replays
+        run: python -B -m tools.research_capacity_scale.benchmark --deps "${{ runner.temp }}/capacity-deps" --output "${{ runner.temp }}/capacity-benchmark"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: capacity-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            capacity-tests.xml
+            ${{ runner.temp }}/capacity-benchmark
+          retention-days: 30
