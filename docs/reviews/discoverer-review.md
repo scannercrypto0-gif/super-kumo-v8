@@ -37,3 +37,17 @@ Top 10 Alt ranking metric, stablecoin/wrapped-asset exclusions and rebalance; To
 
 ## Handoff and updates
 Owner explicitly authorized a **single Codex execution package for all Discoverer gaps including D6** on 2026-11-11; see linked assignment on PR #276 once posted. Before implementation, implement in existing Discoverer draft where ancestry safe, reuse accepted work, avoid Core/Factory duplicate writers and active #286 observer, no private source access or new provider traffic without separate approval. Update this living file after evidenced delivery with PR exact HEAD, focused CI, D1–D6 statuses, coverage and remaining blockers. All approvals provisional pending G0.
+
+## v0.3 implementation and evidence — 2026-11-11
+Updated after exact-head focused CI. Existing [draft #276](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/276) remains open, unmerged at 9b60eb00aa890ecbd7e617925896e02963c1b5e3 on base 149ca90c09b96abb45d3bc2839b657711c9826ac. [CI 43031928957](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/43031928957) passed 8 focused tests on Windows and 8 on Ubuntu, zero skips. Evidence grade DRAFT_TESTED / SYNTHETIC_ONLY.
+
+| Gate | Current status |
+|---|---|
+| D1 | PASS fixture roster, gainers/losers, BTC/PAXG, eligible top alts, sectors, quiet/UNKNOWN/MISSED and bounded catch-up. Real ranking eligibility, taxonomy, membership evolution and live Core coverage BLOCKED_EXTERNAL. |
+| D2 | PASS fixture pinned snapshots, pre-onset context refs, revision lineage, immutable replay and journal ACK. Independent live custody remains external. |
+| D3 | PASS fixture scheduled quiet-period search, event priority, bounded native proposals and failed/invalid/unavailable census. No actual autonomous long-running service shown. |
+| D4 | PARTIAL. Pinned immutable feedback and restart ACK tested. Earlier native D-SCAN-1 / Factory E registry reused at its original scope. New precursor-to-Factory scientific evaluation requires an agreed feature/strategy translation and external result. |
+| D5 | PARTIAL. Bounded 24-tick soak, clock/outage/budget handling and real subprocess crash/replay tested. Hard runtime resource isolation, production Core timeout/egress controls and witnessed sustained 24/7 are external. |
+| D6 | PASS fixture UP and DOWN with no-event controls and exclusion of late news/revisions. Pre-onset freeze then forward settlement gives one TP, one FP and one UNKNOWN in each direction. Genuine PIT/OOS and scientific claims BLOCKED_EXTERNAL. |
+
+Local fixture evidence digest 40a63a5b5b71cc063e4b91511d2ef59b2954df9352cbb8a7fa24def1f6707253. Core owns as-of data and trusted timestamps. Scanner owns monitor definitions. Factory owns independent scientific evaluation and receipt. Integration owns the sustained cross-owner runtime proof. No G2 observer change, source activation, trading, G0 or merge.
