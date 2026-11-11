@@ -1,0 +1,21 @@
+# Frozen-owner boundaries and patch proposals — no source edits made
+
+Current prior independent Audit: #134/6623767670 CHANGES_REQUIRED at Scanner
+b9c9ff8 / Discoverer f2006c0. Work does not lift that judgment. Current owner
+#205/6624060886 freezes those PRs and assigns Work only new isolated code.
+
+| Frozen path/interface | Proven defect/missing boundary | Work-owned protection | Exact owner action still required |
+|---|---|---|---|
+| #227 `tools/scanner_engine_offline/engine.py::_admit_symbol_bars` and `contracts.py::admit_bars` | Filters wrong identity and sorts/drops members before scoring | New whole-window original-byte/identity/finality/grid/cutoff admission; no feature computation on affected corrupt window | If reusing the old native scan entrypoint operationally, replace salvage-scoring with all-or-nothing symbol/TF refusal and reason census inside that entrypoint; no such source patch authorized here |
+| #227 `contracts.py::SourceManifest`, `engine.py::scan`, `universe.py` | Caller dataset SHA and membership cannot prove original source or full historical as-of census | Test byte hashes and cutoff-bound source/universe; all genuine unverified sources UNKNOWN, no real computation | Owner must supply/version an independent original-byte/availability/membership verification interface and authorized approved strategy registry; no boolean attestation |
+| #227 `ScannerNominationEnvelope`, `evidence.py::EvidenceReceipt/BoundedSpool/SpoolCheckpoint` | Nested seal/header/replay/census incomplete | New canonical-bytes-only nomination and restore validation; version/config/source/run/payload-bound receipts, create-only replay/readback | Frozen native envelope/checkpoint APIs remain unsafe if called directly; native deep-freeze/header/count repair is owner-controlled; Work neither edits nor claims them repaired |
+| #230 `generator.py::run_family` | Mandatory Scanner-shaped admission; pre-grid validation occurs before full draw accounting | Independent seed adapter reuses actual stateless family builders and merged candidate_grid/AttemptRecorder, records each draw before validation | For a native public independent generator API, owner must authorize adding independent provenance port and pre-validation attempt hook to this exact module. Work uses a version-pinned adapter, not copied families |
+| #230 `ledger.py` | Wall-clock ledger observations prevent fresh-run canonical byte identity | Work local transport result/attempt receipts contain no wall-clock fields and reuse #228 storage; not another global trial journal | Independent native ledger repair remains owner-controlled if that ledger is promoted to production; no native time/custody assurance inferred |
+| Main `StrategyDefinition` / `StrategyDNAV2` | Research-only schemas are not an approved paper strategy registry | Real immutable definition and screening policy adapter; paper_approval NOT_FOUND | Owner-controlled promotion/registry contract and actual approval records required; no synthetic approval record is invented |
+| Main `src/aql/observation/contracts.py::PaperIntent` | Interface intent, no strategy-addressed ACCEPT/REJECT/WAIT consumer or execution route | Executable versioned idempotent handoff and TEST_ONLY strategy consumer; default PAPER_CONSUMER_NOT_CONNECTED | Provide actual consumer/version/decision receipt contract and separate activation authorization; this package does not attach to D2 dispatcher or submit orders |
+| #229 `build_research_report` | Existing descriptive paired fixture port does not compile candidate AST into genuine source-triggered schedules | Reparse independent candidate; explicit TEST_ONLY definition-digest handoff to existing descriptive engine | Authentic strategy-rule historical evaluation requires genuine schedule/source/feature/attempt binding or an existing owner-verified evaluator interface; no invented opportunities/new backtester here |
+
+These are patch proposals against exact frozen boundaries, not untested source
+patches claimed as applied. Independent components continue while affected real
+source/Paper/semantic-evaluation paths remain NOT_CONNECTED. No separate Claude or
+Antigravity task was opened. No producer branch, shared contract or main was changed.
