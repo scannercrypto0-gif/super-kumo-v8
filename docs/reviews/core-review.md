@@ -51,3 +51,20 @@ No private owner E: files, March/April original replay, unapproved source/provid
 - Remaining blockers, accountable owner and smallest next step:
 - Audit/owner decisions pending; G0 remains provisional:
 - Prior version retained; update link to this review:
+
+
+## Delivery update v0.2 — 2026-11-11 — Codex C1–C6, independently checked documentary/code scope
+**Original review v0.1 retained above.** Codex handoff: [#273/6797120003](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/273#issuecomment-6797120003); [PR #308](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/308), reported OPEN/DRAFT/UNMERGED, base `90af9794880cbeb00e7e974bfa906ff5e9666183`, exact HEAD `fd39b0189d85e5628ac0fd520368cf48e18d1f8f`. New authoritative implementation detail [docs/core/core-c1-c6-source-repository.md](https://github.com/scannercrypto0-gif/super-kumo-v8/blob/fd39b0189d85e5628ac0fd520368cf48e18d1f8f/docs/core/core-c1-c6-source-repository.md). Five changed paths: that document, `src/aql/archive/source_view.py`, `src/aql/recovery/gap_recovery.py`, `tests/test_core_source_view.py`, `.github/workflows/core-source-view.yml`. Reviewer fetched and inspected source-view and focused tests; CI statuses below are from GitHub handoff, not independently rerun locally.
+
+| Workstream | Updated acceptance | Actual evidence / remaining owner |
+|---|---|---|
+| C1 | PASS bounded accessible inventory | Detailed main-vs-Draft custody/source/consumer mapping; Integration still owns exact release-tree reconciliation |
+| C2 | PASS OFFLINE ONLY | Caller-pinned `aql.core.source-view.v1` read-only projection checks market/source, revision, finality, published/received/committed/known-at, rights, grade, grid, freshness; **not** independent issuer rights or chronology authentication; trusted producer adapter still Core-owned |
+| C3 | PASS MATRIX ONLY | Explicit BTC/top alts/gainers/losers/PAXG/sectors/news/gold/yields/macro/liquidity coverage with many UNKNOWN sources and owner decisions; **not** live coverage proof |
+| C4 | PARTIAL | Existing Generic H/Integration evidence reused, but no new actual cross-owner consumer adapter or cross-process lost-ACK/restart end-to-end proof; Integration owns joined release |
+| C5 | PARTIAL / BLOCKED_EXTERNAL | Offline injected transport 429 malformed Retry-After, cooldown, reserved headroom and gap recovery; shared-IP exclusivity, host continuity, actual 24/7 sustained observation not proven; Operations + Core |
+| C6 | DESIGN_ONLY / BLOCKED_SOURCE | No newly authorized news/macro/PAXG/sector feeds; Core/Operations own terms/rights/retention/clock/cost; Lab incremental value |
+
+**Tests:** 8 focused cases per Windows and Ubuntu runner [CI #43029012680](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/43029012680); [G1 integrity #43029012362](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/43029012362), [archive #43029012411](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/43029012411), [G1 WP01–WP04 #43029012916](https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/43029012916) reported successful. No original private data replay, provider traffic, #286 observer changes, merge, Paper/live, prospective PIT/OOS or G0.
+
+**Review conclusion:** Bounded Core package delivered, **not full C1–C6 system closure**. Next: Integration exact-HEAD consumer seams, Operations actual provider/IP exclusivity and witnessed continuity, Core trusted-source/rights admission, owner/product source universe/taxonomy choices. Do not reopen passed C1–C3 inventory/contracts/matrix just to restate them; preserve C4–C6 as evidence-limited and update only when verified.
