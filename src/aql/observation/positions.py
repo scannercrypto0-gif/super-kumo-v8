@@ -30,8 +30,10 @@ class PositionEvent:
     price: str | None = None
     reason: str | None = None
     def __post_init__(self):
-        if not self.position_id or not self.event_id or not self.source or self.kind not in ('opened','quote','closed'):
+        if any(not isinstance(x, str) or not x for x in (self.position_id, self.event_id, self.source, self.kind)) or self.kind not in ('opened','quote','closed'):
             raise PositionContractError('invalid event identity')
+        if self.reason is not None and not isinstance(self.reason, str):
+            raise PositionContractError('reason must be a string or unavailable')
         if any(type(x) is not int for x in (self.event_ms,self.received_ms)) or not 0 <= self.event_ms <= self.received_ms:
             raise PositionContractError('invalid temporal provenance')
         if self.kind == 'closed' and not self.reason:
