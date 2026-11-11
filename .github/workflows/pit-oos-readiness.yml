@@ -1,0 +1,40 @@
+name: Prospective PIT/OOS readiness (Issue 299)
+on:
+  pull_request:
+    paths: ['tools/pit_oos_readiness/**', '.github/workflows/pit-oos-readiness.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prospective-delta:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: src${{ matrix.os == 'windows-latest' && ';' || ':' }}.
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install pytest==9.0.2
+      - run: python -B -m tools.pit_oos_readiness.dependencies --fetch
+      - run: python -B -m pytest tools/pit_oos_readiness/test_readiness.py -q --junitxml=pit-tests.xml
+      - run: python -B -m tools.pit_oos_readiness.readiness pit-evidence
+      - name: Seal the evidence manifest
+        run: python -B -m tools.pit_oos_readiness.manifest pit-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pit-readiness-${{ matrix.os }}
+          path: |
+            pit-tests.xml
+            pit-evidence/
+            tools/pit_oos_readiness/owner-envelope.json
