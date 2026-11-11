@@ -109,7 +109,12 @@ def test_fresh_process_crash_windows(tmp_path,deps,hashes,stage,code,claims):
 def test_all_terminal_statuses_and_resource_faults(tmp_path,deps,hashes):
     faults={0:'none',1:'raise',2:'skip',3:'reject',4:'sleep',5:'cpu',6:'memory',7:'io',8:'no_fill'}
     p=make_plan(9,hashes,faults=faults);result,m=run(tmp_path/'mixed',p,deps=deps,workers=2)
-    assert result['population']['statuses']=={'SUCCEEDED':1,'FAILED':1,'SKIPPED':1,'REJECTED':3,'TIMEOUT':2,'NO_FILL':1}
+    by_id = {task['sha256']: task['fault'] for task in p['tasks']}
+    observed = {
+        by_id[row['task_sha256']]: (row['status'], row['reason'])
+        for row in result['outcomes']
+    }
+    assert result['population']['statuses']=={'SUCCEEDED':1,'FAILED':1,'SKIPPED':1,'REJECTED':3,'TIMEOUT':2,'NO_FILL':1}, observed
     assert result['population']['factory_comparison_packages']==2 and m['physical_claims']==7
     cp=closed_checkpoint(deps,tmp_path/'mixed/checkpoint.sqlite')
     assert len(cp.read_latest_ledger()['entries'])==25  # 9 registrations + 7 pending + 9 terminal; no failures omitted
