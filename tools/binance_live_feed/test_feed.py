@@ -65,6 +65,16 @@ def test_ip_header_and_fixed_endpoint_weights(tmp_path):
         Quota(q.path, Limits(100))
 
 
+def test_raw_requests_and_weight_are_independent_windows(tmp_path):
+    q = Quota(tmp_path/"ip.sqlite", Limits(100,raw_requests=4))
+    for now in (10,11):
+        token = q.rest("time",now)
+        assert token
+        q.result(token,now,200)
+    assert q.rest("time",60_011) is None
+    assert q.rest("time",300_010)
+
+
 def test_429_5xx_half_open_418_shared_and_persistent(tmp_path):
     path = tmp_path/"shared.sqlite"
     q = Quota(path, Limits(40))

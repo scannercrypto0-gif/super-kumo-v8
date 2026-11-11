@@ -24,7 +24,7 @@ Prior accepted #296/#297/#300, G4 and four-package evidence is reused.
 
 | Surface | Documented behavior and lane budget |
 |---|---|
-| [Public market-data REST](https://github.com/binance/binance-spot-api-docs/blob/master/rest-api.md#limits) | Use `data-api.binance.vision` if approved. `exchangeInfo` provides applicable rate windows, and `X-MBX-USED-WEIGHT-*` reports shared IP usage. The published 6,000/min examples are planning references, never an entitlement. The pilot must confirm all actual windows and block on an unknown smaller limit. |
+| [Public market-data REST](https://github.com/binance/binance-spot-api-docs/blob/master/rest-api.md#limits) | Use `data-api.binance.vision` if approved. `exchangeInfo` provides applicable rate windows, and `X-MBX-USED-WEIGHT-*` reports shared IP usage. The published 6,000 weight/min and 61,000 raw requests/5min examples are planning references, never an entitlement. The pilot must confirm all actual windows and block on an unknown smaller limit. |
 | REST public weights | `time` 1, `exchangeInfo` 20, `klines` 2, `aggTrades` 4, single-symbol `ticker/bookTicker` 2, depth up to 100 levels 5, recent `trades` 25. Parameters affect weight. A raw trade ID cannot be filled with an aggregate trade ID. Orders/unfilled-order and private/authenticated limits are unused. |
 | [Market WebSocket streams](https://github.com/binance/binance-spot-api-docs/blob/master/web-socket-streams.md#websocket-limits) | 5 incoming-to-server frames/s including PING, PONG and JSON controls, 1,024 streams/connection, 300 connection attempts per 5 min/IP. Targets are 2/s, 4 streams, 1 active socket and 3 attempts total for the proposed pilot. Offline generic guard caps per-IP attempts at half the configured limit. |
 | Lifecycle | Server ping every 20s, echo payload in pong within one minute, close before 24h and handle disconnect/shutdown. No unsolicited client ping. Separate pacing for reconnect and REST recovery, with deterministic bounded jitter. |
@@ -53,7 +53,8 @@ provider transport. No SQLite file sharing over a network filesystem. Unknown
 egress clients, clock authority or quotas block real use.
 
 The sliding weighted windows are stricter than a burst-credit token bucket.
-They admit at most floor(limit/2) in any applicable local interval. REST has one
+They admit at most floor(limit/2) in the configured rolling 1m weight and 5m
+raw request windows. REST has one
 outstanding request, persistent cooldown and 1s spacing for recovery. A
 current-minute used-weight header can lower admission further. Production needs
 to reconcile **all** published windows and headers before enabling egress. The

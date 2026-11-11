@@ -13,6 +13,7 @@ STREAMS = frozenset(("btcusdt@trade", "btcusdt@bookTicker", "btcusdt@kline_1m", 
 @dataclass(frozen=True)
 class Limits:
     rest_weight: int
+    raw_requests: int = 61_000
     connections: int = 300
     ws_messages: int = 5
     subscriptions: int = 1024
@@ -99,8 +100,11 @@ class Quota:
             since_header = self.used(db, "rest", now, max(1, now-self.get(db, "header_at"))) if has_header else 0
             if observed + since_header + weight > cap:
                 return None
+            if self.used(db, "raw", now, 300_000) >= self.limits.raw_requests//2:
+                return None
             if not self.charge(db, "rest", now, 60_000, weight, cap):
                 return None
+            db.execute("INSERT INTO usage VALUES ('raw',?,1)", (now,))
             token = self.get(db, "serial") + 1
             self.set(db, "serial", token)
             self.set(db, "pending", token)
