@@ -1,0 +1,54 @@
+name: AQL Integration Intel CI
+on:
+  pull_request:
+    paths:
+      - 'tools/integration_intel_offline/**'
+      - 'tests/integration_intel_offline/**'
+      - '.github/workflows/aql-integration-intel-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integration-intel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: python -m pip install pytest pytest-timeout
+      - name: Exact source and environment
+        run: |
+          git rev-parse HEAD | tee intel-ci-source.txt
+          git rev-parse 'HEAD^{tree}' | tee -a intel-ci-source.txt
+          python --version | tee -a intel-ci-source.txt
+          python -m pip freeze | tee -a intel-ci-source.txt
+      - name: Run integration_intel_offline tests
+        run: python -B -m pytest -p no:cacheprovider tests/integration_intel_offline/ -q --tb=short --junitxml=intel-ci.xml
+      - name: Verify test count and zero failures
+        run: |
+          python -B -c "
+          import xml.etree.ElementTree as E
+          tree = E.parse('intel-ci.xml')
+          suite = tree.getroot().find('testsuite')
+          print('JUnit attributes:', suite.attrib)
+          failures = int(suite.get('failures', 0))
+          errors   = int(suite.get('errors', 0))
+          skipped  = int(suite.get('skipped', 0))
+          tests    = int(suite.get('tests', 0))
+          assert failures == 0, f'Expected 0 failures, got {failures}'
+          assert errors   == 0, f'Expected 0 errors, got {errors}'
+          assert skipped  == 0, f'Expected 0 skipped, got {skipped}'
+          assert tests   >= 188, f'Expected >= 188 tests, got {tests} (regression: tests were deleted or not collected)'
+          print(f'PASS: {tests} tests collected, 0 failures, 0 errors, 0 skipped')
+          "
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: intel-ci-evidence
+          path: |
+            intel-ci-source.txt
+            intel-ci.xml
