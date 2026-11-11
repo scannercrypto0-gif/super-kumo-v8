@@ -1,0 +1,32 @@
+name: Actual research batch bridge
+on:
+  pull_request:
+    paths: ['tools/actual_research_batch_bridge/**', '.github/workflows/actual-research-batch-bridge.yml']
+  push:
+    branches: ['codex/actual-research-batch-298']
+permissions:
+  contents: read
+jobs:
+  bridge:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - run: python -m pip install pytest
+      - run: python -B -m tools.actual_research_batch_bridge.stage .bridge-stage --fetch
+      - run: python -B -m tools.actual_research_batch_bridge.acceptance .bridge-stage .bridge-stage/deps .bridge-proof
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bridge-${{ matrix.os }}
+          path: |
+            .bridge-proof/acceptance.json
+            .bridge-proof/**/*.log
+          include-hidden-files: true
