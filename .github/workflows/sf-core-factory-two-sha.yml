@@ -1,0 +1,30 @@
+name: Factory Core two-SHA offline receipt
+on:
+  pull_request:
+    paths:
+      - 'research_wp_r0/core_proof_bridge.py'
+      - 'tests/test_sf_two_sha_core_factory.py'
+      - '.github/workflows/sf-core-factory-two-sha.yml'
+  workflow_dispatch:
+jobs:
+  dual-sha-negative:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Pin Core producer to immutable SHA
+        shell: bash
+        run: |
+          git clone --no-checkout --filter=blob:none https://github.com/scannercrypto0-gif/super-kumo-v8.git /tmp/atlas-core-proof
+          git -C /tmp/atlas-core-proof fetch origin 0c0108a072f9e0ed780dc0b780c75ff2f24a4840
+          git -C /tmp/atlas-core-proof checkout --detach 0c0108a072f9e0ed780dc0b780c75ff2f24a4840
+          test "$(git -C /tmp/atlas-core-proof rev-parse HEAD)" = "0c0108a072f9e0ed780dc0b780c75ff2f24a4840"
+      - name: Run producer consumer negative test
+        shell: bash
+        env:
+          CORE_PROOF_SOURCE_ROOT: /tmp/atlas-core-proof
+        run: |
+          python -m pip install pytest
+          python -m pytest -q tests/test_sf_two_sha_core_factory.py
