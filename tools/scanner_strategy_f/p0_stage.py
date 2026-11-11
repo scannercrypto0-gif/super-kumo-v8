@@ -20,7 +20,7 @@ PINS = {
 
 
 def git(*args):
-    return subprocess.check_output(["git","-C",str(ROOT),*args])
+    return subprocess.check_output(["git","-c","core.autocrlf=false","-C",str(ROOT),*args])
 
 
 def stage(output, fetch=False, working=False):

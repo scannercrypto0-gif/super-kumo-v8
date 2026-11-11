@@ -38,3 +38,35 @@ jobs:
         with:
           name: scanner-p0-${{ matrix.os }}
           path: p0-evidence/
+  compare:
+    needs: fixture
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: scanner-p0-*
+          path: p0-evidence
+      - name: Compare canonical replay proof across runners
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          digests = set()
+          root = Path("p0-evidence")
+          for platform in ("ubuntu", "windows"):
+              directory = root / f"scanner-p0-{platform}-latest"
+              summary = json.loads((directory / "summary.json").read_bytes())
+              assert summary["head"] == os.environ["GITHUB_SHA"], summary
+              for i in (1, 2):
+                  result = json.loads((directory / f"replay-{i}.json").read_bytes())
+                  canonical = json.dumps(result["proof"], sort_keys=True, separators=(",", ":"), allow_nan=False)
+                  digest = hashlib.sha256(canonical.encode()).hexdigest()
+                  assert digest == result["proof_sha256"] == summary["proof_sha256"]
+                  digests.add(digest)
+          assert len(digests) == 1, digests
+          print("Verified four identical canonical replay proofs:", digests.pop())
+          PY

@@ -49,7 +49,9 @@ def custody(root):
     csv = ("\n".join(rows)+"\n").encode()
     archive = BytesIO()
     with ZipFile(archive,"w") as z:
-        z.writestr(ZipInfo(basename+".csv",(2025,7,1,0,0,0)),csv)
+        member = ZipInfo(basename+".csv",(2025,7,1,0,0,0))
+        member.create_system = 3
+        z.writestr(member,csv)
     raw = archive.getvalue()
     source = hashlib.sha256(raw).hexdigest()
     checksum = (source+"  "+basename+".zip\n").encode()
