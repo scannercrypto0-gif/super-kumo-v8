@@ -17,9 +17,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 18
     env:
-      PYTHONPATH: src${{ runner.os == 'Windows' && ';' || ':' }}.
+      PYTHONPATH: src${{ matrix.os == 'windows-latest' && ';' || ':' }}.
       PYTHONDONTWRITEBYTECODE: '1'
-      CAPACITY_DEPS: ${{ runner.temp }}/capacity-deps
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,6 +31,8 @@ jobs:
       - name: Read-only immutable dependencies (no accepted pipeline reruns)
         run: python -B -m tools.research_capacity_scale dependencies --destination "${{ runner.temp }}/capacity-deps" --fetch
       - name: Joined faults, recovery, resource and scientific gates
+        env:
+          CAPACITY_DEPS: ${{ runner.temp }}/capacity-deps
         run: python -B -m pytest tools/research_capacity_scale/tests -q --basetemp "${{ runner.temp }}/capacity-tests" --junitxml=capacity-tests.xml
       - name: Native baseline and two fresh 1/10/50 serial-parallel replays
         run: python -B -m tools.research_capacity_scale.benchmark --deps "${{ runner.temp }}/capacity-deps" --output "${{ runner.temp }}/capacity-benchmark"
