@@ -1,0 +1,49 @@
+{
+  "schema": "aql.pit-oos.owner-decision.v1",
+  "package": 299,
+  "status": "PENDING_OWNER_DECISION",
+  "collection": "NOT_ACTIVATED",
+  "trading_authority": "NONE",
+  "proposal": {
+    "provider": "Coinbase Exchange",
+    "market": "SPOT",
+    "instrument": "BTC-USD",
+    "interval_seconds": 900,
+    "eligible_source": "Publisher-authorized finalized bars with independently verifiable first-release/version records",
+    "reference_terms_url": "https://www.coinbase.com/legal/market_data",
+    "reference_terms_status": "Public reference only. Confirm applicable version, jurisdiction, retention, and outside-organization review rights before authorizing any use.",
+    "currency": "USD",
+    "spend_ceiling": 0,
+    "storage_ceiling_bytes": 16000000,
+    "slot_ceiling": 4096,
+    "current_requests": 0,
+    "current_source_bytes": 0
+  },
+  "owner_decision": {
+    "decision": null,
+    "approver_reference": null,
+    "approved_at_utc": null,
+    "jurisdiction": null,
+    "exact_publisher_endpoint_and_rate_budget": null,
+    "terms_url_version_as_of_and_sha256": null,
+    "documented_personal_noncommercial_research_retention_and_derivative_rights": null,
+    "future_freeze_and_first_eligible_utc": null,
+    "train_validation_and_blind_oos_windows_utc": null,
+    "first_release_version_clock_and_correction_proof_method": null,
+    "independent_timestamp_issuer_public_key_and_external_receipt_retention": null,
+    "private_custodian_store_retention_acl_and_immutable_ack_method": null,
+    "blind_holdout_release_authority_and_one_shot_procedure": null,
+    "collection_method_and_limits": null,
+    "exact_frozen_protocol_sha256": null
+  },
+  "conditions": [
+    "Verify publisher terms, jurisdiction and rights before any requests or writes to external custody.",
+    "Owner approval precedes independent witnessing of the actual frozen protocol. Both precede first eligible release.",
+    "Require UTC grid and publication/version evidence. Bar close, local receipt and commit return are separate events.",
+    "Quarantine corrections and conflicts, preserve initial version and gaps, and refuse backdating or historical substitution.",
+    "Keep blind holdout bytes in a separate private custody identity without analyst read permission. Expose only commitments and counts.",
+    "Validate issuer signature, trust chain, independently retained timestamp and canonical content with real evidence before admitting any cohort.",
+    "Treat modeled fills as assumptions and keep unavailable execution evidence UNKNOWN.",
+    "The rehearsal has no collection or holdout release entry point. Real operation requires separate authorization and Audit review."
+  ]
+}
