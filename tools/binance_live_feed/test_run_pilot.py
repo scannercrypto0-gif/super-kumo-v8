@@ -53,15 +53,15 @@ class FixtureTransport:
 
     @staticmethod
     def schedule():
-        for index in range(1, 601):
-            now = START + 2000 * index
-            if index % 10 == 0:
+        for index in range(1, 121):
+            now = START + 10_000 * index
+            if index % 2 == 0:
                 yield now, "ping", b"ping"
             yield now, "text", trade(index, now - 3)
             yield now, "text", bbo(index)
-            if index % 30 == 0:
+            if index % 6 == 0:
                 yield now + 12, "text", kline("1m", now, now + 10)
-            if index % 450 == 0:
+            if index % 90 == 0:
                 yield now + 15, "text", kline("15m", now, now + 13)
 
 
