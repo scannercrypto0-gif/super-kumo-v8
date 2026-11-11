@@ -12,6 +12,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+backup = ["cryptography==50.0.2"]
 dev = [
     "pytest>=7.4",
     "pytest-timeout>=2.1",
