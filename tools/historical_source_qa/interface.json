@@ -1,0 +1,37 @@
+{
+  "schema": "aql.binance-spot.source-envelope.v1",
+  "market_field_order": ["provider", "market_type", "symbol", "base_asset", "quote_asset", "calendar"],
+  "market": ["BINANCE", "SPOT", "BTCUSDT", "BTC", "USDT", "UTC"],
+  "canonical_time_unit": "epoch_ms",
+  "kline_window": "[open_ms,end_exclusive_ms)",
+  "required_fields": [
+    "market", "product", "interval", "open_ms", "end_exclusive_ms", "is_final",
+    "exchange_event_at_ms", "received_at_ms", "committed_at_ms",
+    "publisher_first_available_at_ms", "availability", "evidence_class",
+    "source_version", "source_manifest_sha256", "pit", "missingness", "actual_fill"
+  ],
+  "archive_product": "BINANCE_VISION",
+  "mock_live_products": ["BINANCE_SPOT_WS", "BINANCE_SPOT_REST"],
+  "historical_evidence": "RETROSPECTIVE_NON_PIT",
+  "mock_evidence": "TEST_ONLY",
+  "unknown_availability": {
+    "publisher_first_available_at_ms": null,
+    "availability": "UNKNOWN",
+    "pit": "NOT_ATTESTED",
+    "actual_fill": null
+  },
+  "historical_clocks": {
+    "exchange_event_at_ms": null,
+    "received_at_ms": null,
+    "committed_at_ms": null
+  },
+  "precision": "Decimal strings for economic values and integer trade counts",
+  "revision_policy": "Separate manifest versions and quarantine changed slots. No overwrite.",
+  "asof_policy": "Structural close cutoff applies to final complete archive windows only. Historical decision-time availability is unknown.",
+  "live_extension_boundary": {
+    "L7": "Event, receive and durable commit clocks are distinct. Trade/BBO cadence, rolling updates, and final 1m/15m close are separate measurements. Partial bars cannot enter the final-bar consumer.",
+    "L8": "Quota evidence is a separate per-IP and per-endpoint receipt. Historical ingestion does not infer quota or entitlement.",
+    "L9": "Transport and quota failures stay in the live package. Shared records retain missingness and finality.",
+    "L10": "Real-feed measurements remain NOT_RUN until separate rights, authorization and recorded pilot evidence exist."
+  }
+}
