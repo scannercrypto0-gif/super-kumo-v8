@@ -130,24 +130,27 @@ class Gap(ValueError):
 class Feed:
     """Own fixture journal. Records lacking observed data COMMIT remain unreadable."""
 
-    def __init__(self, root, *, max_rows=MAX_ROWS):
+    def __init__(self, root, *, max_rows=MAX_ROWS, pilot=False):
         need(type(max_rows) is int and 4 <= max_rows <= MAX_ROWS, "STORE_BOUND")
         root = Path(root).absolute()
         need(all(not p.is_symlink() and not (p.exists() and getattr(p.lstat(),"st_file_attributes",0)&0x400)
                  for p in (root, *root.parents)), "REPARSE_CUSTODY")
+        marker = root / ("pilot-store" if pilot else "fixture-store")
+        marker_bytes = b"303-pilot-v1" if pilot else b"303-offline-v1"
         if root.exists():
-            need((root/"fixture-store").is_file() and (root/"fixture-store").read_bytes() == b"303-offline-v1",
+            need(marker.is_file() and marker.read_bytes() == marker_bytes,
                  "UNOWNED_STORE")
         else:
             root.mkdir()
-            (root/"fixture-store").write_bytes(b"303-offline-v1")
+            marker.write_bytes(marker_bytes)
         self.path = root/"observations.sqlite"
         need(not self.path.is_symlink() and not (self.path.exists() and getattr(self.path.lstat(),"st_file_attributes",0)&0x400),
              "REPARSE_STORE")
+        self.pilot = pilot
         self.max_rows = max_rows
         self.unhealthy = False
         with self.tx() as db:
-            db.execute("PRAGMA max_page_count=16384")
+            db.execute(f"PRAGMA max_page_count={8192 if pilot else 16384}")
             db.execute("CREATE TABLE IF NOT EXISTS records (channel TEXT, key TEXT, generation INTEGER, "
                        "recv INTEGER, ack INTEGER, ack_sha TEXT, digest TEXT, raw BLOB, doc BLOB, PRIMARY KEY(channel,key))")
             db.execute("CREATE TABLE IF NOT EXISTS feed_state (id INTEGER PRIMARY KEY CHECK(id=1), "
@@ -205,6 +208,8 @@ class Feed:
     def ingest(self, raw, received, commit_clock, *, crash=False):
         try:
             record = normalize(raw, received)
+            if self.pilot:
+                record["evidence"] = "PUBLIC_WS_PILOT_NON_PIT"
             return self._commit(record, raw, commit_clock, crash=crash)
         except Gap as gap:
             with self.tx() as db:
@@ -302,6 +307,8 @@ class Feed:
     def read(self, cutoff):
         """Read only current-generation final WS marks by observed durable cutoff."""
         ms(cutoff)
+        if self.pilot:
+            return self.blocked("PILOT_METRICS_ONLY")
         if self.unhealthy:
             return self.blocked("STORE_OR_FEED_FAULT")
         try:

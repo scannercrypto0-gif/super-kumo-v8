@@ -1,13 +1,13 @@
 {
   "schema": "aql.binance.spot.owner-pilot.v1",
-  "status": "BLOCKED_RIGHTS_AND_DISTINCT_OWNER_ACTIVATION",
+  "status": "BLOCKED_SOURCE_RIGHTS_AND_HOST_PREFLIGHT",
   "collection": "NOT_ACTIVATED",
   "real_feed": "NOT_RUN",
   "real_pit_oos": "BLOCKED",
   "owner_inputs": {
     "jurisdiction_and_binance_entity": null,
     "terms_version_url_sha256_and_effective_utc": null,
-    "written_endpoint_research_capture_retention_and_review_rights": null,
+    "applicable_endpoint_research_capture_retention_and_review_rights_ref": null,
     "verified_ip_quota_windows_and_all_egress_workers": null,
     "future_utc_start_on_15m_boundary": null,
     "future_utc_end": null,

@@ -25,8 +25,8 @@ jobs:
         with:
           python-version: '3.13'
       - run: git fetch --no-tags origin e0e08a8381a8cceaaa44d6ae2721e9cb0d004648
-      - run: python -m pip install pytest==9.0.2
-      - run: python -B -m pytest tools/binance_live_feed/test_feed.py -q --junitxml=feed-tests.xml
+      - run: python -m pip install pytest==9.0.2 websocket-client==1.9.2
+      - run: python -B -m pytest tools/binance_live_feed/test_feed.py tools/binance_live_feed/test_run_pilot.py -q --junitxml=feed-tests.xml
       - run: python -B -m tools.binance_live_feed.simulation feed-evidence
       - name: Record source and evidence hashes
         run: python -B -m tools.binance_live_feed.manifest feed-evidence

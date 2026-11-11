@@ -48,8 +48,7 @@ All scanner, capture, backfill, health and diagnostic traffic on the same IP
 must route through one dispatch owner before activation. The SQLite reservation
 ledger is the cross-worker authority on that host. Multiple hosts sharing a NAT
 must submit to that single owner through an authenticated deployment transport
-and be prevented from bypassing it. The code contains no deployed service or
-provider transport. No SQLite file sharing over a network filesystem. Unknown
+and be prevented from bypassing it. The one-shot runner contains a fixed public provider transport. No shared-IP dispatch service is deployed by this package. No SQLite file sharing over a network filesystem. Unknown
 egress clients, clock authority or quotas block real use.
 
 The sliding weighted windows are stricter than a burst-credit token bucket.
@@ -87,12 +86,12 @@ separate blind custody for real holdout data.
 ## Reproduction and pilot handoff
 
 Use a disposable checkout with Python 3.13. Set PYTHONPATH to `src;.` on
-Windows or `src:.` on Ubuntu. Install pytest 9.0.2. Fetch only the #304 Git object
+Windows or `src:.` on Ubuntu. Install pytest 9.0.2 and websocket-client 1.9.2. Fetch only the #304 Git object
 to resolve its contract test, then run:
 
 ```text
 git fetch --no-tags origin e0e08a8381a8cceaaa44d6ae2721e9cb0d004648
-python -B -m pytest tools/binance_live_feed/test_feed.py -q --junitxml=feed-tests.xml
+python -B -m pytest tools/binance_live_feed/test_feed.py tools/binance_live_feed/test_run_pilot.py -q --junitxml=feed-tests.xml
 python -B -m tools.binance_live_feed.simulation feed-evidence
 python -B -m tools.binance_live_feed.manifest feed-evidence
 ```
@@ -107,3 +106,33 @@ disconnects, gaps, REST header/weight and outbound WS frame counts. Report
 nearest-rank p50/p95/p99, including counts and unavailable percentiles. A no-event
 period is reported as observed. It never implies a fixed tick cadence.
 Only a future recorded authorized pilot can establish real source quality.
+
+
+### One-shot capture entry point
+
+After independently checking the source scope and actual host, create a private
+JSON preflight file. It contains integer `start_ms` on a UTC 15-minute boundary,
+`clock_checked_ms` and signed `clock_error_ms` from an independent UTC check,
+and evidence references `source_rights_ref`, `region_entity_ref`,
+`egress_inventory_ref`, `clock_ref`, and `custody_ref`. The references are
+operator assertions checked for presence. Keep their underlying receipts with
+the private preflight. Supply the verified values for `rest_weight`,
+`raw_requests`, `connections`, `ws_messages` and `subscriptions` under
+`verified_limits`. Use a dedicated, inventoried egress and its shared SQLite
+quota ledger. The REST bootstrap reconciles the provider's actual raw-request
+and weight windows and current one-minute used weight before opening a socket.
+
+At the declared start, run from the pinned checkout with the same PYTHONPATH:
+
+```text
+python -B -m tools.binance_live_feed.run_pilot preflight.json NEW_PRIVATE_OUTPUT SHARED_IP_QUOTA.sqlite
+```
+
+The output directory and quota ledger reserve the one-shot activation. Retain
+both after a failure. The pilot uses a stricter envelope of one exchangeInfo
+request, one WS attempt and no REST backfill. Gaps, transport failure and quota
+uncertainty terminate capture. A frame cap or deadline can yield insufficient
+samples. The output report distinguishes an incomplete sample, a failed stop
+and quality PASS for the admitted non-PIT feed. The isolated capture journal
+keeps original bytes and durable ACKs, and exposes no strategy view. Preserve
+the raw journal and preflight privately under the verified retention scope.
