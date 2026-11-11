@@ -204,3 +204,7 @@ No orders, production DB, credentials, research changes or merges.
 See docs/operations/G1_COMPLETION_20261024.md and evidence/g1_completion_public_smoke.json.
 Final-head local/CI evidence belongs to the resulting consolidated Draft PR.
 R09 unresolved; PR16 left open with a scoped supersession recommendation.
+
+## 2026-11-11 — Architecture v1 documentation proposal (#306)
+
+Documented ARCH-P0-01/02/03, typed lifecycle and permissions, independent evaluation and feedback, BTC-first Asset Intelligence and optional AI/ML contracts. See [Architecture v1](docs/architecture-v1.md) and [contract coverage](docs/architecture-v1-acceptance.md). Proposal based on 90af9794880cbeb00e7e974bfa906ff5e9666183. Historical contracts remain traceable. Review the scoped promotion-policy delta and Architecture v1 freeze as owner decisions. No runtime validation or activation was performed.
