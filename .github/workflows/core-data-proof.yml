@@ -1,0 +1,95 @@
+name: Core data proof focused
+on:
+  pull_request:
+    paths:
+      - 'src/aql/data_proof.py'
+      - 'src/aql/pipeline.py'
+      - 'tests/test_core_recovery_ack_pending.py'
+      - 'tests/test_core_clipped_gap_report.py'
+      - 'tests/test_core_delivery_ack_boundary.py'
+      - 'tests/test_core_clock_correction_boundary.py'
+      - 'src/aql/recovery/gap_recovery.py'
+      - 'src/aql/data_proof_registry.py'
+      - 'src/aql/data_proof_envelope.py'
+      - 'src/aql/data_proof_exporter.py'
+      - 'src/aql/data_proof_shared_fixture.py'
+      - 'src/aql/data_proof_g1_sidecopy.py'
+      - 'src/aql/data_proof_g1_adapter.py'
+      - 'src/aql/data_proof_g1_writer.py'
+      - 'src/aql/data_proof_g1_composition.py'
+      - 'src/aql/data_proof_g1_reconcile.py'
+      - 'src/aql/data_proof_g1_paged_reconcile.py'
+      - 'src/aql/data_proof_g1_checkpoint.py'
+      - 'src/aql/data_proof_g1_sweep.py'
+      - 'src/aql/data_proof_g1_sweep_progress.py'
+      - 'src/aql/journal/durable_journal.py'
+      - 'src/aql/lanes.py'
+      - 'src/aql/pipeline.py'
+      - 'tests/test_data_proof.py'
+      - 'tests/test_data_proof_registry.py'
+      - 'tests/test_data_proof_envelope.py'
+      - 'tests/test_data_proof_exporter.py'
+      - 'tests/test_data_proof_receipts.py'
+      - 'tests/test_data_proof_crash_gap.py'
+      - 'tests/test_data_proof_shared_fixture.py'
+      - 'tests/test_data_proof_g1_sidecopy.py'
+      - 'tests/test_data_proof_g1_consumer_seam.py'
+      - 'tests/test_data_proof_pipeline_seam.py'
+      - 'tests/test_data_proof_g1_adapter.py'
+      - 'tests/test_data_proof_g1_writer.py'
+      - 'tests/test_data_proof_g1_composition.py'
+      - 'tests/test_data_proof_g1_reconcile.py'
+      - 'tests/test_data_proof_g1_paged_reconcile.py'
+      - 'tests/test_data_proof_g1_real_journal.py'
+      - 'tests/test_data_proof_g1_checkpoint.py'
+      - 'tests/test_data_proof_g1_forced_exit.py'
+      - 'tests/test_data_proof_g1_exit_after_checkpoint.py'
+      - 'tests/test_data_proof_g1_midbatch_failure.py'
+      - 'tests/test_data_proof_g1_late_ack_sweep.py'
+      - 'tests/test_data_proof_g1_sweep_progress.py'
+      - 'tests/test_data_proof_g1_sweep_high_water.py'
+      - 'tests/test_data_proof_g1_sweep_time_budget.py'
+      - 'tests/test_data_proof_g1_sweep_concurrent.py'
+      - 'tests/test_data_proof_g1_sweep_cas.py'
+      - 'tests/test_data_proof_g1_sweep_restart_fencing.py'
+      - 'benchmarks/core_proof_sweep_latency.py'
+      - 'benchmarks/core_proof_late_ack_discovery.py'
+      - 'benchmarks/README-core-proof-sweep.md'
+      - '.github/workflows/core-data-proof.yml'
+  workflow_dispatch:
+jobs:
+  evidence-contract:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.11']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run Core data-proof negative acceptance
+        shell: bash
+        run: |
+          python -m pip install pytest websocket-client
+          PYTHONPATH=src python -m pytest -q tests/test_data_proof.py tests/test_data_proof_registry.py tests/test_data_proof_envelope.py tests/test_data_proof_exporter.py tests/test_data_proof_receipts.py tests/test_data_proof_crash_gap.py tests/test_data_proof_shared_fixture.py tests/test_data_proof_g1_sidecopy.py tests/test_data_proof_g1_consumer_seam.py tests/test_data_proof_pipeline_seam.py tests/test_data_proof_g1_adapter.py tests/test_data_proof_g1_writer.py tests/test_data_proof_g1_composition.py tests/test_data_proof_g1_reconcile.py tests/test_data_proof_g1_paged_reconcile.py tests/test_data_proof_g1_real_journal.py tests/test_data_proof_g1_checkpoint.py tests/test_data_proof_g1_forced_exit.py tests/test_data_proof_g1_exit_after_checkpoint.py tests/test_data_proof_g1_midbatch_failure.py tests/test_data_proof_g1_late_ack_sweep.py tests/test_data_proof_g1_sweep_progress.py tests/test_data_proof_g1_sweep_high_water.py tests/test_data_proof_g1_sweep_time_budget.py tests/test_data_proof_g1_sweep_concurrent.py tests/test_data_proof_g1_sweep_cas.py tests/test_data_proof_g1_sweep_restart_fencing.py tests/test_core_recovery_ack_pending.py tests/test_core_clipped_gap_report.py tests/test_core_delivery_ack_boundary.py tests/test_core_clock_correction_boundary.py
+      - name: Observe Core journal latency baseline versus sweep (non-gating)
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          PYTHONPATH=src python benchmarks/core_proof_sweep_latency.py
+      - name: Observe lower-duty-cycle sweep latency (Linux only; non-gating)
+        if: matrix.os == 'ubuntu-latest'
+        continue-on-error: true
+        shell: bash
+        run: |
+          PYTHONPATH=src python benchmarks/core_proof_sweep_latency.py --page-size 4 --pause-ms 50
+      - name: Observe late ACK discovery for both sweep settings (non-gating)
+        if: matrix.os == 'ubuntu-latest'
+        continue-on-error: true
+        shell: bash
+        run: |
+          PYTHONPATH=src python benchmarks/core_proof_late_ack_discovery.py

@@ -62,13 +62,16 @@ class JournalConsumer:
     Store success (including an existing key) precedes ACK. A failed store never
     prevents another core commit; retry uses the journal, not a lossy RAM queue.
     """
-    def __init__(self, journal, store, symbol, interval, batch_size=64, ready=None):
+    def __init__(self, journal, store, symbol, interval, batch_size=64, ready=None, after_persisted=None):
         from .delivery.authority import register_legacy_writer
         register_legacy_writer(journal, 'journal-consumer')
         self.journal, self.store = journal, store
         self.symbol, self.interval = symbol, interval
         self.batch_size = batch_size
         self.ready = ready
+        # Opt-in observer only; cannot change journal/store ACK authority.
+        self.after_persisted = after_persisted
+        self.sidecopy_errors = 0
         self.stop_event = threading.Event()
         self.errors = 0
         self.thread = threading.Thread(target=self._run, daemon=True)
@@ -86,6 +89,11 @@ class JournalConsumer:
                 self.journal.require_eligible(bar.stable_key())
                 self.store.upsert(bar)
                 self.journal.mark_persisted(bar.stable_key())
+                if self.after_persisted is not None:
+                    try:
+                        self.after_persisted(bar)
+                    except Exception:
+                        self.sidecopy_errors += 1
             except ContentConflictError as exc:
                 propagate_conflict(exc,self.journal,self.store)
                 self.errors += 1  # leave this key unacknowledged; continue others
