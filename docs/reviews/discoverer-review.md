@@ -1,0 +1,35 @@
+# ATLAS — Discoverer departmental review / living reference
+**AQL-CRYPTO-RESEARCH-001 | 2026-11-11 | v0.1 | OWNER PROVISIONAL / NOT G0 / NOT EXECUTION AUTHORIZATION**
+
+## Method and continuity
+Use the same 7-step method as [Core review](core-review.md): target; main/Draft inventory; evidence grades; precise gap; minimal architecture; deliverable acceptance plan; versioned post-Codex update. Source-of-truth owner vision [#202/6796603961](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/202#issuecomment-6796603961); Core [#273/6796830279](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/273#issuecomment-6796830279); whole-system Audit [#134/6794166523](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6794166523); Lab/Discoverer origin split [#134/6796197377](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6796197377). Architecture #307 remains DRAFT/UNMERGED. Refresh all PR heads and owner handoffs before execution.
+
+## Target architecture — provisional B refined
+Discoverer is a **continuous 24/7 market-wide research observer**, not merely a sector-rotation example or a one-time candidate generator. Mandatory monitored scope: **Top Gainers, Top Losers, BTC, Top 10 Altcoins, PAXG and sector movement/rotation**. Preserve membership and ranking timestamps, negative/no-event cases, missing coverage, precursor and post-event context, cross-asset news/macro and Scanner MONITOR_ONLY features. Use Core admitted as-of source evidence, not independent uncontrolled exchange API collectors. Core may supply reusable general feature computations; Discoverer owns discovery/interpretation, not Core. Research history includes successful, failed, invalid and never-triggered analogues. Maintain cumulative linked memory without duplicating Core raw warehouse or Factory registry.
+
+**Owner refinement of B:** comprehensive ongoing observation **AND ongoing pattern search**, not merely heavy analysis after large moves. Schedule/reuse costly historical comparisons with resource budgets; event-triggered deep dives are an optimization, not a coverage restriction. Produce new falsifiable hypotheses with baseline, falsification, lineage and full candidate-generation attempt census. Factory owns scientific trial execution and immutable experiment registry; Lab owns versioned Shadows for existing strategies after preliminary evidence, including research-stage and Paper-stage. Discoverer receives independent evaluation feedback and updates evidence, not retrospectively rewrites a prior prediction. No new gate subsystem or per-candidate Audit. All stage permissions remain separate.
+
+## As-built evidence — preliminary, not complete code audit
+| Capability | Evidence | Grade / limit |
+|---|---|---|
+| HypothesisProposal, SearchPlan, ValidationProtocolV1 and bounded candidate budgets | [Discoverer #276/6768095655](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/276#issuecomment-6768095655) | DRAFT_TESTED, synthetic freeze; no genuine prospective no-peek attestation |
+| Durable attempt ledger/checkpoint/restart/idempotence and full generation attempt census | [Discoverer #268/6655001792](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/268#issuecomment-6655001792) | DRAFT_TESTED, local SQLite, not independent remote custody |
+| Scanner D-SCAN-1 candidate preregistration and Factory E actual registry intake | [Discoverer #276/6766870391](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/276#issuecomment-6766870391), 84 focused synthetic CI executions at that HEAD | SYNTHETIC_ONLY; no actual Factory H full paired scientific evaluation |
+| Continuous Top Gainers/Losers, BTC/top alts, PAXG and sector observation | Owner target | NOT_VERIFIED deployed |
+| Historical/news context linked to all observations and negative denominator | Owner target, Core #307 contracts | NOT_VERIFIED full production loop |
+| 24/7 continuous discovery, feedback and recovery across components | Owner target | NOT_VERIFIED operational continuity |
+
+## Gap analysis
+| ID | Gap | Proposed smallest delta | Acceptance |
+|---|---|---|---|
+| D1 | Continuous market watch/universe and membership | Core source/coverage contract + Discoverer watch projection over admitted Core streams, no second source collector | Frozen universe/rank/horizon, gainers/losers/BTC/top-alts/PAXG/sectors coverage; as-of member snapshots, missing/UNKNOWN, restart |
+| D2 | Historical pattern memory with counterexamples | Immutable linked observation/pattern evidence over Core source refs and existing Discoverer attempt ledger | Positive/negative/no-event denominators, no survivorship/lookahead, time-replay and corrections |
+| D3 | Continuous hypothesis search from observations | Reuse HypothesisProposal/SearchPlan/ValidationProtocol and Factory registry; scheduled historical searches and event-based prioritization, not event-only research | Duplicate/failure/invalid attempt census, predeclared hypothesis and baseline, budgets, source/clock controls |
+| D4 | Independent evaluation feedback into memory | Versioned Factory/Lab feedback refs and idempotent consumer/recovery; Lab existing-strategy variants stay Lab-owned | Rejected/failed/unknown/scientific results return, no self-approval, no rewriting prior observation |
+| D5 | Sustainable 24/7 operation and transparent coverage | Lightweight continuous watch, bounded heavy research queue, checkpoints, monitoring, replay, shared budgets | Backpressure/recovery/lag/CPU/memory/queue and source freshness metrics, bounded soak; real continuity only if witnessed |
+
+## Open specification points (do not guess)
+Top 10 Alt ranking metric, stablecoin/wrapped-asset exclusions and rebalance; Top Gainers/Losers ranking window and eligible liquidity/universe; sector taxonomy and sector membership changes; PAXG spot vs gold references; refresh windows; history depth; baseline/false-positive denominator; legal rights for news/macro; owner-approved operational resource budget. These are contract details, not permission to omit the watch categories.
+
+## Handoff and updates
+No Codex execution authorized **for Discoverer** by this review. After an explicit owner assignment, implement in existing Discoverer draft where ancestry safe, reuse accepted work, avoid Core/Factory duplicate writers and active #286 observer, no private source access or new provider traffic without separate approval. Update this living file after evidenced delivery with PR exact HEAD, focused CI, D1–D5 statuses, coverage and remaining blockers. All approvals provisional pending G0.
