@@ -4,6 +4,7 @@ import math
 from pathlib import Path
 import sqlite3
 import time
+from urllib.error import HTTPError
 
 from .contracts import canonical, digest, parse, timestamp
 from .source_view import require, is_pin
@@ -147,6 +148,9 @@ class PollFence:
             size = len(canonical(result))
             require(size<=MAX_BODY,"POLL_RESPONSE_BOUND")
             require(time.monotonic()-wall<=1 and time.process_time()-cpu<=0.5,"POLL_RESOURCE_BOUND")
+        except HTTPError as error:
+            hint = error.headers.get("Retry-After") if error.headers else None
+            return "UNKNOWN",self.complete(request_pin,now,error.code,retry_after=hint,measurements=metrics())
         except (OSError,ValueError):
             return "UNKNOWN",self.complete(request_pin,now,0,measurements=metrics())
         receipt = self.complete(request_pin,now,200,result_pin=digest(result),measurements=metrics())

@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tarfile
 import types
+from urllib.error import HTTPError
 
 import pytest
 
@@ -240,6 +241,18 @@ os._exit(73)
     assert fence.health(5102)["used_weight"]==2
     with pytest.raises(ValueError,match="POLL_CLOCK_REGRESSION"):
         fence.health(5101)
+
+
+def test_transport_status_enters_fence_and_half_open(tmp_path):
+    fence = PollFence(tmp_path/"ip",scope="FIXTURE:NAT",verified_weight=20)
+    def limited(**_):
+        raise HTTPError("fixture",429,"fixture",{"Retry-After":"7"},None)
+    _, receipt = fence.read("1"*64,100,1,limited)
+    assert receipt["http_status"]==429 and receipt["retry_at"]==7100
+    assert fence.claim("2"*64,7099,1)[0]=="COOLDOWN_OR_BAN"
+    assert fence.claim("2"*64,7100,1)[0]=="CLAIMED"
+    assert fence.claim("3"*64,7100,1)[0]=="EXCLUSIVE_OWNER_BUSY"
+    assert fence.complete("2"*64,7101,503)["retry_at"]>=9101
 
 
 def test_two_workers_and_continuous_core_discoverer_soak(discoverer,tmp_path):
