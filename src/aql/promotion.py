@@ -26,6 +26,22 @@ def check(document, expected, schema, fields):
          and digest({k: v for k, v in document.items() if k != "sha256"}) == expected, "PROMOTION_PIN")
 
 
+def read_factory_receipt(raw):
+    need(type(raw) is bytes and 0 < len(raw) <= 65536, "FACTORY_RECEIPT_SIZE")
+
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            need(key not in result, "FACTORY_DUPLICATE_JSON_KEY")
+            result[key] = value
+        return result
+
+    def reject_constant(_):
+        raise ValueError("PAPER_SIM_FACTORY_NONFINITE_JSON")
+
+    return json.loads(raw.decode("utf-8"), object_pairs_hook=unique, parse_constant=reject_constant)
+
+
 def assess_factory(result, *, factory_pin, policy, policy_pin, evidence, evidence_pins, at_ms):
     check(result, factory_pin, FACTORY_HANDOFF,
           ("experiment_id", "baseline", "shadow", "category", "protocol_sha256", "evidence_grade",
@@ -238,6 +254,28 @@ class Lifecycle:
         self._commands[command_id] = frozen
         self._state = state
         return self.state
+
+    def apply_simulated(self, simulator, simulation_id, command_id, command, *, source_at_ms, source_valid):
+        """Gate writes to the existing simulator while the fixture is active."""
+        need(self._state["status"] == "PAPER_ACTIVE_FIXTURE", "PAPER_SIMULATION_INACTIVE")
+        now = ms(command.get("at_ms"))
+        need(now >= self._state["updated_at_ms"], "PAPER_SIMULATION_CLOCK")
+        need(type(source_valid) is bool and (source_at_ms is None or ms(source_at_ms) <= now),
+             "PAPER_SOURCE_PROOF")
+        if not source_valid or source_at_ms is None or now - source_at_ms > self._assessment["source_max_age_ms"]:
+            proof = {"source_at_ms": source_at_ms, "source_valid": source_valid}
+            self.apply("safety:" + digest([now, proof]), dict(op="safety_pause", at_ms=now, proof=proof))
+            raise ValueError("PAPER_SIM_SOURCE_SAFETY_PAUSE")
+        if command.get("op") == "watch":
+            instance, signal = command.get("instance"), command.get("signal", {})
+        else:
+            prior = simulator.states.get(simulation_id, {})
+            instance, signal = prior.get("instance"), prior.get("signal", {})
+        need(instance == self._assessment["sha256"]
+             and all(signal.get(key) == self._assessment[key]
+                     for key in ("strategy_id", "strategy_version", "config_sha256")),
+             "PAPER_SIMULATION_IDENTITY")
+        return simulator.apply(simulation_id, command_id, command)
 
 
 def dashboard(manager, simulator, *, as_of_ms, source_at_ms=None):

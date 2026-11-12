@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 
 from aql.paper_sim.engine import PaperSimulator
-from aql.promotion import EXITS, GATES, Lifecycle, _assess as assess, assess_factory, dashboard, live_candidate, seal
+from aql.promotion import EXITS, GATES, Lifecycle, _assess as assess, assess_factory, dashboard, live_candidate, read_factory_receipt, seal
 from tests.paper_sim.test_engine import arm, candle, watch
 
 
@@ -94,9 +94,9 @@ def test_dashboard_native_journal_restart_and_cost_once(tmp_path):
     key = sim.identity(first)
     commands = [first, arm(), candle(), candle(180000, high="112", low="99", close="111")]
     for i, command in enumerate(commands):
-        sim.apply(key, str(i), command)
+        manager.apply_simulated(sim, key, str(i), command, source_at_ms=command["at_ms"]-1, source_valid=True)
     original = path.read_bytes()
-    sim.apply(key, "3", commands[3])
+    manager.apply_simulated(sim, key, "3", commands[3], source_at_ms=239999, source_valid=True)
     assert path.read_bytes() == original
     result = dashboard(manager, sim, as_of_ms=240000, source_at_ms=239999)
     assert result == dashboard(manager, PaperSimulator(path), as_of_ms=240000, source_at_ms=239999)
@@ -105,6 +105,9 @@ def test_dashboard_native_journal_restart_and_cost_once(tmp_path):
     assert result["closed_trades"] == 1 and result["uptime_ms"] == 180000
     assert Decimal(result["mean_closed_trades_per_active_day"]) == 480
     assert result["actual_execution"] == "NONE" and result["freshness"] == "FRESH"
+    with pytest.raises(ValueError, match="SOURCE_SAFETY_PAUSE"):
+        manager.apply_simulated(sim, key, "gap", candle(240000), source_at_ms=239999, source_valid=True)
+    assert path.read_bytes() == original and manager.state["status"] == "TECHNICAL_PAUSE"
 
 
 def test_live_candidate_one_exit_bound_to_risk_cost_and_version():
@@ -167,3 +170,12 @@ def test_dashboard_preserves_unknown_and_partial_fills(tmp_path):
     assert {trade["phase"] for trade in report["trades"]} == {"UNKNOWN", "TRIGGERED"}
     assert all(trade["net"] is None and trade["fills"][0]["qty"] == "0.4" for trade in report["trades"])
     assert report["realized_net"] is None and report["freshness"] == "UNKNOWN"
+
+
+@pytest.mark.parametrize("raw, reason", [
+    (b'{"x":{"y":1,"y":2}}', "DUPLICATE_JSON_KEY"),
+    (b'{"x":NaN}', "NONFINITE_JSON"),
+])
+def test_factory_decoder_rejects_ambiguous_json(raw, reason):
+    with pytest.raises(ValueError, match=reason):
+        read_factory_receipt(raw)
