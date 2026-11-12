@@ -1,0 +1,49 @@
+name: ATLAS I0-I6 joined evidence
+on:
+  push:
+    branches: [integration/atlas-i0-i6-joined]
+permissions:
+  contents: read
+jobs:
+  joined:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pytest==9.0.2
+      - name: Stage exact component pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          scanner=33c3b1c410035077ae5a5296c7703938addc62b4
+          factory=203289f7cac191dca92df2f4d8fa84ec9cf369cc
+          paper=3e7afd10497365dbbfb2a0760bf5f6d0a4591fd1
+          receivers=67fbd88535479f8dc54ad2e792d7aa44929bc081
+          git fetch --no-tags origin "$scanner" "$factory" "$paper" "$receivers"
+          git worktree add --detach scanner-pinned "$scanner"
+          git worktree add --detach factory-pinned "$factory"
+          git worktree add --detach paper-pinned "$paper"
+          python -B scanner-pinned/tools/scanner_strategy_f/p0_stage.py scanner-stage --fetch
+          git show "$receivers:tools/atlas_scanner_p0_receivers.py" > scanner-stage/tools/atlas_scanner_p0_receivers.py
+      - name: Run joined path twice and check the canonical digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B tools/atlas_i0_i6.py evidence scanner-stage factory-pinned paper-pinned | tee joined.log
+          grep -Fx 'JOIN_PROOF_SHA256=ec457308481f7bc39718e46e2667105d5df76b19c31fdc0e5fa6afbd5fc2321a' joined.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: atlas-i0-i6-${{ matrix.os }}
+          path: |
+            joined.log
+            evidence/**/*.json
