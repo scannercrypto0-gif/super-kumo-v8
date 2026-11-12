@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import tempfile
 import zipfile
 
 
@@ -34,6 +35,54 @@ def persist(path,value):
     if path.exists():
         need(path.read_bytes()==raw,'IMMUTABLE_OUTPUT_CONFLICT');return
     with path.open('xb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+
+
+def publish_immutable(path, value):
+    """Publish fsynced bytes without overwriting a competing writer."""
+    raw = canonical(value) + b'\n'
+    fd, name = tempfile.mkstemp(prefix=f'.{path.name}.', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'wb') as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            os.link(name, path)
+        except FileExistsError:
+            need(not path.is_symlink() and path.read_bytes() == raw, 'IMMUTABLE_OUTPUT_CONFLICT')
+        if os.name == 'posix':
+            directory = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+    finally:
+        Path(name).unlink()
+
+
+def scanner_receipt(report, plan, experiment, candidate, decisions):
+    return dict(
+        schema='aql.first-cycle.scanner-census-receipt.v1',
+        decision_census_sha256=report['decision_census_sha256'],
+        plan_sha256=report['plan_sha256'],
+        source_sha256=experiment['source_sha256'],
+        source_class=report['source_class'],
+        rights=report['rights'],
+        availability='RETROSPECTIVE_NON_PIT',
+        known_at_status='UNKNOWN',
+        core_receipt_id=None,
+        core_link_status='SOURCE_BLOCKED',
+        strategy_sha256=plan['strategy']['digest'],
+        config_sha256=experiment['config_sha256'],
+        candidate_id=candidate['candidate_id'],
+        candidate_package_sha256=report['candidate_package_sha256'],
+        attempt_id=experiment['attempts'][0]['attempt_id'],
+        factory_experiment_id=experiment['experiment_id'],
+        factory_experiment_sha256=report['factory_experiment_sha256'],
+        result_store_sha256=report['result_store_sha256'],
+        # The zero-based list index is the native position used by entry<N>.
+        decisions=decisions,
+    )
 
 
 def checkpoint(path,value):
@@ -106,6 +155,14 @@ def run(source,deps,output,plan,*,crash=False):
     need(source.resolve()!=output.resolve() and source.resolve() not in output.resolve().parents and
          output.resolve() not in source.resolve().parents,'SOURCE_OUTPUT_COLLISION')
     need(not output.exists() or (output/'market-plan.json').is_file(),'UNRELATED_OUTPUT_DIRECTORY')
+    if (output/'result.json').exists():
+        existing = json.loads((output/'result.json').read_bytes())
+        need('scanner_receipt_sha256' in existing, 'LEGACY_SCANNER_RECEIPT_NOT_BACKFILLABLE')
+        from tools.first_research_cycle.verify_run import verify
+        need(sha(plan) == existing['plan_sha256'], 'PLAN_PARENT')
+        need(load_archives(source, plan)[1] == existing['source'], 'SOURCE_PARENT')
+        verify(output)
+        return existing
     output.mkdir(parents=True,exist_ok=True)
     persist(output/'market-plan.json',plan)
     bars,source_proof=load_archives(source,plan)
@@ -227,8 +284,11 @@ def run(source,deps,output,plan,*,crash=False):
                 'No continuous stop/trailing optimization; C is next-bar breakeven','No causal regime generalization or alpha claim'],
         rights=dict(reference=plan['terms_reference'],scope='OWNER_AUTHORIZED_NONCOMMERCIAL_LOCAL_RESEARCH_NO_RAW_REDISTRIBUTION',
                     acquisition_time_rights='NOT_INDEPENDENTLY_ATTESTED'),source_bytes_unchanged=True)
+    receipt = scanner_receipt(body, plan, experiment, package.to_dict(), decisions)
+    publish_immutable(output/'scanner-census.json', receipt)
+    body['scanner_receipt_sha256'] = sha(receipt)
     result={**body,'sha256':sha(body)}
-    persist(output/'result.json',result)
+    publish_immutable(output/'result.json', result)
     return result
 
 

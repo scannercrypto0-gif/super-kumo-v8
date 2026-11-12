@@ -123,3 +123,34 @@ Only `tools/first_research_cycle/**` and its dedicated new workflow change.
 Parallel Issue295 capacity files, existing engines/source stores and G2 are
 unchanged. Initial private-access automatic rejection was not bypassed; owner
 subsequently explicitly authorized the three named historical archive paths.
+
+### Ordered Scanner receipt (forward only)
+
+New runs publish `scanner-census.json` before the final `result.json`.
+The versioned canonical receipt contains the ordered decision rows, source and
+configuration digests, Discoverer and Factory IDs, and the source rights grade.
+Its zero-based list position is the native index used in `entry<N>`. The
+result seals the receipt and Factory retains the independent census digest.
+The output directory must support same-volume hard links (for example NTFS
+or ext4). The writer fsyncs file data before publishing and syncs the directory
+on POSIX. A completed retry verifies existing evidence and preserves its bytes.
+
+On a detached copy of the completed directory, run:
+
+```sh
+python -B -m tools.first_research_cycle.verify_run --run completed-run --output verification.json --entry-id entry20
+```
+
+Replace `entry20` with a candidate entry from that run. Keep the result SHA-256
+independently to authenticate the packet. The verifier reports the native row
+and its canonical digest after verifying ordered census membership and the
+Discoverer/Factory linkage. Known-at remains UNKNOWN. The ZIP adapter has a
+source-row digest and retained archive proof, with no authenticated Core
+receipt ID. The verifier therefore reports `SOURCE_BLOCKED` for that part of
+the link.
+
+Existing accounting-only readback retains its original shape for legacy
+results. A membership request against a legacy result fails closed. Existing
+outputs cannot be backfilled by rerunning this writer. New result digests
+include the receipt SHA; #300's existing pinned adapter and reference results
+remain on their original contract.

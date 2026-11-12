@@ -109,3 +109,101 @@ def test_source_output_collision_has_no_side_effects(tmp_path):
 def test_joined_authority_and_temporal_negatives(tmp_path,mutation):
     source=tmp_path/'source';plan=fixture(source);mutation(plan)
     r=invoke(source,plan,tmp_path/'out');assert r.returncode==2
+
+
+def test_scanner_receipt_reopens_and_retries(tmp_path):
+    from tools.first_research_cycle.verify_run import verify
+
+    source = tmp_path/'source'
+    plan = fixture(source)
+    first, second = tmp_path/'first', tmp_path/'second'
+    for output in (first, second):
+        process = invoke(source, plan, output, crash=True)
+        assert process.returncode == 73, process.stdout + process.stderr
+        assert not (output/'result.json').exists()
+        process = invoke(source, plan, output)
+        assert process.returncode == 0, process.stdout + process.stderr
+
+    packet = first/'scanner-census.json'
+    original = packet.read_bytes()
+    assert original == (second/packet.name).read_bytes()
+    receipt = json.loads(original)
+    position = next(i for i, row in enumerate(receipt['decisions']) if row['state'] == 'ENTRY_SIGNAL')
+    entry_id = f'entry{position}'
+    link = verify(first, entry_id=entry_id)['scanner_membership']
+    assert link['opportunity']['position'] == position
+    assert link['opportunity']['decision_sha256'] == sha(receipt['decisions'][position])
+    assert link['opportunity']['attempt_id'] == 'attempt294'
+    assert link['opportunity']['candidate_id'] == 'sma3_8'
+    assert link['opportunity']['experiment_id'] == 'FIRST-CYCLE-294'
+    assert link['opportunity']['decision']['known_at_ms'] is None
+    assert link['known_at'] == 'KNOWN_AT_UNATTESTED'
+    assert link['core'] == 'SOURCE_BLOCKED'
+    assert receipt['core_receipt_id'] is None
+    timestamp = packet.stat().st_mtime_ns
+    process = invoke(source, plan, first)
+    assert process.returncode == 0, process.stdout + process.stderr
+    assert packet.read_bytes() == original and packet.stat().st_mtime_ns == timestamp
+
+    # Simulate interruption after publishing the receipt, before result publication.
+    completed = (first/'result.json').read_bytes()
+    (first/'result.json').unlink()
+    process = invoke(source, plan, first)
+    assert process.returncode == 0, process.stdout + process.stderr
+    assert (first/'result.json').read_bytes() == completed
+    assert packet.read_bytes() == original and packet.stat().st_mtime_ns == timestamp
+
+
+@pytest.mark.parametrize('mutation', ['missing-file', 'truncate', 'missing-row', 'reorder', 'source', 'cutoff'])
+def test_scanner_receipt_rejects_tampering(tmp_path, mutation):
+    from tools.first_research_cycle.verify_run import verify
+
+    source, output = tmp_path/'source', tmp_path/'run'
+    process = invoke(source, fixture(source), output)
+    assert process.returncode == 0, process.stdout + process.stderr
+    path = output/'scanner-census.json'
+    if mutation == 'missing-file':
+        path.unlink()
+    elif mutation == 'truncate':
+        path.write_bytes(path.read_bytes()[:60])
+    else:
+        receipt = json.loads(path.read_bytes())
+        rows = receipt['decisions']
+        if mutation == 'missing-row':
+            rows.pop()
+        elif mutation == 'reorder':
+            rows[0], rows[1] = rows[1], rows[0]
+        elif mutation == 'source':
+            rows[0]['source_row_sha256'] = '0' * 64
+        elif mutation == 'cutoff':
+            rows[0]['decision_cutoff_ms'] += 1
+        path.write_bytes(canonical(receipt) + b'\n')
+        # Reseal the outer files, leaving the independent Factory census pinned.
+        report_path = output/'result.json'
+        report = json.loads(report_path.read_bytes())
+        report['scanner_receipt_sha256'] = sha(receipt)
+        report.pop('sha256')
+        report_path.write_bytes(canonical({**report, 'sha256':sha(report)}) + b'\n')
+    with pytest.raises(ValueError, match='SCANNER_|Unterminated|Expecting'):
+        verify(output)
+
+
+def test_legacy_scanner_receipt_is_not_backfilled(tmp_path):
+    from tools.first_research_cycle.verify_run import verify
+
+    source, output = tmp_path/'source', tmp_path/'run'
+    plan = fixture(source)
+    process = invoke(source, plan, output)
+    assert process.returncode == 0, process.stdout + process.stderr
+    (output/'scanner-census.json').unlink()
+    path = output/'result.json'
+    report = json.loads(path.read_bytes())
+    report.pop('scanner_receipt_sha256')
+    report.pop('sha256')
+    path.write_bytes(canonical({**report, 'sha256':sha(report)}) + b'\n')
+    assert 'scanner_membership' not in verify(output)
+    with pytest.raises(ValueError, match='BLOCKED_SCANNER_INDIVIDUAL_RECEIPT'):
+        verify(output, entry_id='entry20')
+    process = invoke(source, plan, output)
+    assert process.returncode == 2 and 'LEGACY_SCANNER_RECEIPT_NOT_BACKFILLABLE' in process.stdout
+    assert not (output/'scanner-census.json').exists()
