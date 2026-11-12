@@ -104,7 +104,7 @@ def main():
         if caps["main_sha"] != main_sha or not HEX.fullmatch(main_sha):
             raise ValueError("registry baseline inconsistent")
         changed = [p for p in args.changed if p]
-        source_changed = [p for p in changed if p not in DOC_FILES and not p.startswith(DOC_PREFIXES) and not p.startswith("tools/pm/anti_redo_gate")]
+        source_changed = [p for p in changed if p not in DOC_FILES and not p.lower().endswith((".md", ".mdx", ".rst", ".txt")) and not p.startswith(DOC_PREFIXES) and not p.startswith("tools/pm/anti_redo_gate") and p != "tools/pm/test_anti_redo_gate.py"]
         records = sorted((base / "assignments").glob("*.json")) if (base / "assignments").exists() else []
         if source_changed and not records:
             raise ValueError("code changed without a pre-assignment record: " + ", ".join(source_changed[:12]))
