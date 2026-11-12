@@ -248,6 +248,10 @@ def csv_export(doc):
     def row(kind, identity, state, direction, value):
         writer.writerow((kind, identity, state, direction, _digest(value), _canonical(value).decode()))
 
+    if doc["schema"] == RETROSPECTIVE_SCHEMA:
+        row("retrospective-review", doc["sha256"], "", "", doc)
+        return out.getvalue()
+
     header = {key: value for key, value in doc.items()
               if key not in ("samples", "candidates", "alerts", "contexts")}
     row("review", doc["sha256"], "", "", header)
@@ -274,6 +278,9 @@ def import_csv(text, expected):
         kind, identity, _, _, digest, raw = record
         value = parse(raw)
         need(_digest(value) == digest, "CSV_ROW_DIGEST")
+        if kind == "retrospective-review":
+            need(body is None and csv_export(value) == text, "CSV_CANONICAL")
+            return _verify_retrospective_projection(value, expected)
         if kind == "review":
             need(body is None, "CSV_HEADER_DUPLICATE")
             body = {**value, **{key: [] for key in targets.values()}, "contexts": {}}
@@ -288,6 +295,17 @@ def import_csv(text, expected):
 
 
 def weekly_report(doc):
+    if doc["schema"] == RETROSPECTIVE_SCHEMA:
+        counts = doc["counts"]
+        return "\n".join((
+            "# Retrospective research review",
+            f"Source {doc['source_sha256']} · review {doc['sha256']}",
+            f"Scanner slots {counts['scanner_slots']} · Factory trials {counts['factory_trials']}",
+            "Outcomes " + json.dumps(doc["outcomes"], sort_keys=True),
+            f"{doc['core']} / {doc['known_at']} / {doc['lab']} / {doc['paper']}",
+            "Modeled results · zero actual fills · authority NONE",
+            "", "```json", _canonical(doc).decode(), "```", "",
+        ))
     week = doc["week"]
     def date(value):
         return (datetime(1970, 1, 1, tzinfo=timezone.utc) +
@@ -307,3 +325,119 @@ def weekly_report(doc):
     lines.extend(f"- {a['symbol']} {a['direction']} at {a['onset']} ms · {a['sample_sha256']}"
                  for a in doc["alerts"])
     return "\n".join(lines) + "\n"
+
+
+RETROSPECTIVE_SCHEMA = "aql.discoverer.retrospective-review.v1"
+
+
+def retrospective_review(result, plan, source, factory, readbacks, *, pins):
+    """Project an externally pinned, independently verified detached research run."""
+    checked(result, pins["result"])
+    checked(factory, pins["factory"])
+    need(_digest(plan) == pins["plan"] == result["plan_sha256"]
+         and _digest(source) == pins["source"], "RETROSPECTIVE_PROVENANCE")
+    need(result["schema"] == "aql.first-cycle.actual-market-result.v1"
+         and result["source_class"] == "RETAINED_ACTUAL_MARKET_RETROSPECTIVE_NON_PIT"
+         and result["science"] == "REAL_PIT_OOS_BLOCKED"
+         and result["actual_fills"] is None and result["trading_authority"] == "NONE"
+         and source["evidence_class"] == "RETROSPECTIVE_NON_PIT"
+         and source["known_at"] == "UNKNOWN" and source["publisher_first_available_at_ms"] is None
+         and source["rights_status"] == "VERIFIED_FOR_EXACT_USE"
+         and source["archive_sha256"] == result["source"][0]["sha256"]
+         and len(result["source"]) == len(plan["archives"]) == 1
+         and source["archive_sha256"] == plan["archives"][0]["sha256"]
+         and source["start_ms"] == plan["first_open_ms"]
+         and source["end_exclusive_ms"] == plan["end_exclusive_ms"], "RETROSPECTIVE_SOURCE")
+    need(factory["sha256"] == result["factory_experiment_sha256"]
+         and factory["parent_receipt_sha256"] == result["candidate_package_sha256"]
+         and factory["strategy_definition_sha256"] == plan["strategy"]["digest"]
+         and factory["config_sha256"] == _digest(plan["strategy"])
+         and factory["actual_fills"] is None and factory["trading_authority"] == "NONE"
+         and factory["orders_created"] == factory["paper_positions"] == 0
+         and factory["lab_receipt_sha256"] is None
+         and factory["attempt_count"] == len(factory["attempts"]) == 1
+         and result["populations"]["factory_trials"] == result["discoverer"]["total_attempts"] == 1,
+         "RETROSPECTIVE_FACTORY")
+    attempt = factory["attempts"][0]
+    need(0 < len(readbacks) <= 64 and len(readbacks) == len(pins["entries"]), "RETROSPECTIVE_ENTRY_COUNT")
+    entries = {}
+    for readback in readbacks:
+        member = readback["scanner_membership"]
+        link = member["opportunity"]
+        identity = link["entry_id"]
+        need(identity not in entries and identity in pins["entries"], "RETROSPECTIVE_DUPLICATE_OR_FOREIGN_ENTRY")
+        checked(readback, pins["entries"][identity])
+        row = link["decision"]
+        position = link["position"]
+        need(readback["schema"] == "aql.first-cycle.independent-verification.v1"
+             and readback["result_sha256"] == result["sha256"]
+             and readback["trading_authority"] == "NONE" and readback["actual_fills"] is None
+             and readback["native_experiments"] == readback["native_result_packages"] == 1
+             and readback["verified_cost_rows"] == result["populations"]["cost_rows"]
+             and member["receipt_sha256"] == result["scanner_receipt_sha256"]
+             and member["status"] == "LINK_PROVED_RETROSPECTIVE_NON_PIT"
+             and member["core"] == "SOURCE_BLOCKED" and member["known_at"] == "KNOWN_AT_UNATTESTED"
+             and link["attempt_id"] == attempt["attempt_id"] and link["candidate_id"] == attempt["candidate_id"]
+             and link["experiment_id"] == factory["experiment_id"] and link["decision_sha256"] == _digest(row)
+             and type(position) is int and position >= 0 and identity == f"entry{position}"
+             and row["open_ms"] == plan["first_open_ms"] + position * 900_000
+             and row["decision_cutoff_ms"] == row["open_ms"] + 900_000 < plan["validation_end_ms"]
+             and row["state"] == "ENTRY_SIGNAL" and row["known_at_ms"] is None
+             and row["availability"] == "RETROSPECTIVE_NON_PIT"
+             and row["strategy_sha256"] == plan["strategy"]["digest"], "RETROSPECTIVE_MEMBERSHIP")
+        entries[identity] = link
+    return seal({
+        "schema": RETROSPECTIVE_SCHEMA, "grade": "RETROSPECTIVE_NON_PIT", "authority": "NONE",
+        "source_sha256": source["archive_sha256"], "source_manifest_sha256": pins["source"],
+        "plan_sha256": pins["plan"], "census_sha256": result["decision_census_sha256"],
+        "result_sha256": result["sha256"], "factory_sha256": factory["sha256"],
+        "core": "CORE_SOURCE_BLOCKED", "known_at": "KNOWN_AT_UNATTESTED", "lab": "LAB_LINK_BLOCKED",
+        "paper": "PAPER_BLOCKED", "actual_fills": None, "access_ms": plan["frozen_at_ms"],
+        "counts": result["populations"], "outcomes": result["outcome_status_counts"],
+        "comparisons": result["comparisons"], "entries": entries,
+    })
+
+
+def read_retrospective_review(path, expected):
+    with Path(path).open("rb") as stream:
+        raw = stream.read(MAX_REVIEW_BYTES + 1)
+    need(len(raw) <= MAX_REVIEW_BYTES, "REVIEW_BYTE_BUDGET")
+    return _verify_retrospective_projection(parse(raw), expected)
+
+
+def _verify_retrospective_projection(doc, expected):
+    checked(doc, expected)
+    need(doc["schema"] == RETROSPECTIVE_SCHEMA and doc["grade"] == "RETROSPECTIVE_NON_PIT"
+         and doc["authority"] == "NONE" and doc["actual_fills"] is None
+         and doc["core"] == "CORE_SOURCE_BLOCKED" and doc["lab"] == "LAB_LINK_BLOCKED"
+         and doc["known_at"] == "KNOWN_AT_UNATTESTED" and doc["paper"] == "PAPER_BLOCKED",
+         "RETROSPECTIVE_PROJECTION_AUTHORITY")
+    return doc
+
+
+def retrospective_dashboard_section(existing, path, expected, *, search="", state=None, as_of_ms, max_age_ms):
+    """Reuse the Promotion dashboard envelope without invoking promotion."""
+    need(existing.get("schema") == "aql.promotion.dashboard.v1"
+         and "retrospective_research" not in existing, "DASHBOARD_HOST_SCHEMA")
+    need(type(search) is str and len(search) <= 160 and state in (None, "ENTRY_SIGNAL")
+         and type(as_of_ms) is int and type(max_age_ms) is int and max_age_ms >= 0, "DASHBOARD_QUERY")
+    doc = read_retrospective_review(path, expected)
+    need(as_of_ms >= doc["access_ms"], "DASHBOARD_FUTURE")
+    entries = {
+        key: row for key, row in doc["entries"].items()
+        if search.casefold() in key.casefold() and (state is None or row["decision"]["state"] == state)
+    }
+    return {**existing, "retrospective_research": {
+        **{k: v for k, v in doc.items() if k not in ("sha256", "entries")},
+        "review_sha256": expected, "entries": entries,
+        "freshness": "FRESH" if as_of_ms - doc["access_ms"] <= max_age_ms else "STALE",
+    }}
+
+def import_retrospective_markdown(text, expected):
+    """Reopen a canonical Markdown export using its sealed JSON block."""
+    need(len(text.encode()) <= 2 * MAX_REVIEW_BYTES, "REVIEW_BYTE_BUDGET")
+    _, marker, block = text.rpartition("\n```json\n")
+    need(marker and block.endswith("\n```\n"), "MARKDOWN_REVIEW_BLOCK")
+    doc = _verify_retrospective_projection(parse(block.removesuffix("\n```\n")), expected)
+    need(weekly_report(doc) == text, "MARKDOWN_CANONICAL")
+    return doc
