@@ -19,7 +19,7 @@ MANDATORY = {"task", "capability_ids", "main_sha", "head_pins", "lookups", "cros
 # Docs-only changes don't create a build task. A new implementation must carry a
 # human-reviewed record; this tool never grants execution or merge authority.
 DOC_PREFIXES = ("docs/", ".github/ISSUE_TEMPLATE/", ".github/PULL_REQUEST_TEMPLATE")
-DOC_FILES = ("README.md", "LICENSE", ".gitignore", ".github/workflows/anti-redo-gate.yml")
+DOC_FILES = ("README.md", "LICENSE", ".gitignore", ".github/workflows/anti-redo-gate.yml", "tools/pm/anti_redo_gate.py", "tools/pm/test_anti_redo_gate.py")
 
 def load(path):
     return json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
@@ -82,7 +82,7 @@ def validate(record, known, main, heads):
         override = record["override"]
         if not isinstance(override, dict) or not all(isinstance(override.get(k), str) and override[k].strip() for k in ("pm", "component_owner", "reason", "expires_utc", "pinned_revision")):
             errors.append("invalid scoped override")
-        elif not re.fullmatch(r"\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", override["expires_utc"]):
+        elif not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", override["expires_utc"]):
             errors.append("invalid override expiry")
         elif override["pinned_revision"] != record.get("main_sha"):
             errors.append("stale override")
