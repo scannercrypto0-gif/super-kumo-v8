@@ -103,9 +103,10 @@ def fixture():
 
 def check_package_2(raw, pin):
     # Executed against the actual pinned #288 source staged outside this checkout.
-    from aql.promotion import assess_factory, seal
+    from aql.promotion import assess_factory, read_factory_receipt, seal
 
-    receipt = read_handoff(raw, pin)
+    receipt = read_factory_receipt(raw)
+    assert verify_handoff(receipt, pin) == receipt
     shadow = receipt["shadow"]
     families = receipt["exit_families"]
     policy = seal({

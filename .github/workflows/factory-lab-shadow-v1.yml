@@ -27,12 +27,13 @@ jobs:
           python-version: '3.12'
       - uses: actions/checkout@v4
         with:
-          ref: 947382acf898ef5d0d978c8f7e9c6c4dcd3ca5aa
+          ref: 3e7afd10497365dbbfb2a0760bf5f6d0a4591fd1
           path: package-2-fixture
       - name: Verify SHA, test and replay in fresh processes
         shell: bash
         env:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          FIXTURE_PIN: 91996cbc83e0ae2f77923d116888805f66ad4ef92a214f2ab182475a53ec34d4
         run: |
           set -o pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
@@ -42,9 +43,11 @@ jobs:
           python -B tests/test_aql_factory_lab_shadow_v1.py --receipt "$RUNNER_TEMP/shadow-fixture.sqlite" > shadow-replay.json
           cmp shadow-first.json shadow-replay.json
           pin=$(python -B -c 'import json; print(json.load(open("shadow-first.json"))["sha256"])')
-          echo "$pin"
-          test "$(git -C package-2-fixture rev-parse HEAD)" = 947382acf898ef5d0d978c8f7e9c6c4dcd3ca5aa
-          PYTHONPATH="./package-2-fixture/src" python -B tests/test_aql_factory_lab_shadow_v1.py --consumer shadow-first.json "$pin" > shadow-consumer.json
+          test "$pin" = "$FIXTURE_PIN"
+          echo "$FIXTURE_PIN"
+          test "$(git -C package-2-fixture rev-parse HEAD)" = 3e7afd10497365dbbfb2a0760bf5f6d0a4591fd1
+          export PYTHONPATH="$(python -c 'import os; print(os.pathsep.join((".", "package-2-fixture/src")))')"
+          python -B tests/test_aql_factory_lab_shadow_v1.py --consumer shadow-first.json "$FIXTURE_PIN" > shadow-consumer.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
