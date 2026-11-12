@@ -1,0 +1,49 @@
+{
+  "schema": "aql.g3.offline-soak.v1",
+  "grade": "SYNTHETIC_TESTED",
+  "requested_max_seconds": 30,
+  "requested_max_signals": 128,
+  "measured_active_seconds": 30.299284199994872,
+  "elapsed_including_readback": 30.545470099998056,
+  "stop_reason": "DURATION_BOUND",
+  "signals": 32,
+  "terminal_closed": 32,
+  "events": 128,
+  "fills": 64,
+  "duplicate_commands_verified": 128,
+  "unexplained_missing": 0,
+  "duplicate_fills": 0,
+  "simulated_census": {
+    "WATCH": 32,
+    "ARMED": 32,
+    "TRIGGERED": 32,
+    "CLOSED": 32
+  },
+  "file_bytes": 121750,
+  "replay_ms": 240.96759999520145,
+  "command_latency_ms": {
+    "median": 70.44390000373824,
+    "p95": 822.2206999926129,
+    "max": 1406.8527000054019
+  },
+  "platform": "Windows-11-10.0.22000-SP0",
+  "source_head": "3d1efe26454de0cfd674a37ae13832a15b392ccd",
+  "source_sha256": {
+    "__init__.py": "dd55c562d705e19d8c1507489d865d95eecbf0e8a2ae2b8174f46794ac3ddb70",
+    "adapter.py": "bf45f735dcb34b4271257f334d7747e425ff537d5b296aedf4dacc3146634ae4",
+    "contracts.py": "afb879cb2ff91057f24609eae6ced59022aaadaa24c37c13e4c63941e0266082",
+    "engine.py": "5cd42be813d644fcae9071e8803b4b2ab1321c817691f7757e3536fbc96cf934",
+    "measure.py": "b167a5c33e54e840fde10a446cd42b09ad05bad9e96facc6ed39818f4dd63380"
+  },
+  "fixture_sha256": "413a4b760cde5542bc9a443fa614f599f71f10bc163f8a34baf257332473a2f1",
+  "http_requests": 0,
+  "remote_db_writes": 0,
+  "trading_authority": "NONE",
+  "limits": [
+    "Measured bounded local synthetic workload, not production or 72h soak",
+    "Same-symbol instances are independent simulated books, not shared real capital",
+    "Configured fees/spread/depth/queue/adverse costs are assumptions, not venue observations",
+    "Native fsync-return evidence is not hardware power-loss or independent custody certification",
+    "Native journal replay is bounded here; no real-time host-wide resource guarantee"
+  ]
+}
