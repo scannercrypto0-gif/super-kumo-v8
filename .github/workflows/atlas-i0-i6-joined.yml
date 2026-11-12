@@ -38,7 +38,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -B tools/atlas_i0_i6.py evidence scanner-stage factory-pinned paper-pinned | tee joined.log
+          python -B tools/atlas_i0_i6.py joined-evidence scanner-stage factory-pinned paper-pinned | tee joined.log
           grep -Fx 'JOIN_PROOF_SHA256=ec457308481f7bc39718e46e2667105d5df76b19c31fdc0e5fa6afbd5fc2321a' joined.log
       - uses: actions/upload-artifact@v4
         if: always()
@@ -46,4 +46,4 @@ jobs:
           name: atlas-i0-i6-${{ matrix.os }}
           path: |
             joined.log
-            evidence/**/*.json
+            joined-evidence/**/*.json
