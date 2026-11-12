@@ -15,6 +15,7 @@ from calendar import monthrange
 from datetime import datetime, timezone
 from hashlib import sha256
 import inspect
+import math
 from pathlib import Path
 
 from research_wp_r0.aql_core_backbone_local_v1 import query_local
@@ -62,10 +63,21 @@ def _code_sha():
 
 def _eval_strategy(definition,bars):
     """Confirmed-close AST only, no lookahead, no selection/profit scoring."""
+    def indicator_input(value):
+        # Core's monitor view preserves decimal text; indicator kernels use numbers.
+        if isinstance(value, str):
+            try:
+                value = float(value)
+            except ValueError as exc:
+                raise ValueError("SCANNER_INDICATOR_INPUT") from exc
+        if type(value) not in (int, float) or not math.isfinite(value):
+            raise ValueError("SCANNER_INDICATOR_INPUT")
+        return value
+
     shaped=[
         {"open_ms":x["bar_open_ms"],"close_ms":x["bar_close_ms"],
-         "open":x["open"],"high":x["high"],"low":x["low"],
-         "close":x["close"],"volume":x["volume"],"known_at_ms":None,
+         **{key:indicator_input(x[key]) for key in ("open","high","low","close","volume")},
+         "known_at_ms":None,
          "quality":"FINAL"} for x in bars
     ]
     values=_vectors(definition,shaped)
