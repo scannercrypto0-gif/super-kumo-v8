@@ -2,30 +2,42 @@ name: anti-redo-gate
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  workflow_dispatch:
-permissions:
-  contents: read
+    paths:
+      - '.github/workflows/anti-redo-gate.yml'
+      - 'tools/pm/anti_redo_gate.py'
+      - 'tools/pm/test_anti_redo_gate.py'
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions: {}
 jobs:
-  pre-assignment:
+  focused-adversarial-tests:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Test candidate code in unprivileged CI
+        run: python3 -m unittest discover -s tools/pm -p 'test_anti_redo_gate.py' -v
+
+  trusted-base-validation:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - name: Focused offline gate tests
-        run: python -m unittest discover -s tools/pm -p 'test_anti_redo_gate.py' -v
-      - name: Validate existing assignment records and changed source paths
+      - name: Read PR objects and reviews with the trusted base validator
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        shell: bash
-        run: |
-          if [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ]; then
-            mapfile -t changed < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
-          else
-            changed=()
-          fi
-          python tools/pm/anti_redo_gate.py --root . --changed "${changed[@]}"
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -I tools/pm/anti_redo_gate.py
