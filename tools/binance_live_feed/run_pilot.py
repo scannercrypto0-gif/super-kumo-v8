@@ -8,6 +8,7 @@ import ssl
 import time
 from uuid import uuid4
 
+from tools.binance_live_feed.ephemeral import EphemeralFeed, MODE
 from tools.binance_live_feed.feed import Feed, canonical, hash_bytes, need, normalize
 from tools.binance_live_feed.quota import Limits, Quota, STREAMS
 from tools.binance_live_feed.session import Session
@@ -150,17 +151,29 @@ def metrics(feed):
     return {key: distribution(values) for key, values in series.items()}
 
 
-def capture(preflight, output, quota_path, *, transport=None, clock=None):
-    evidence_mode = "PUBLIC_WS_PILOT_NON_PIT" if transport is None else "INJECTED_TRANSPORT_TEST_ONLY"
+def capture(preflight, output, quota_path, *, transport=None, clock=None, ephemeral=False):
+    live_transport = transport is None
+    evidence_mode = "PUBLIC_WS_PILOT_NON_PIT" if live_transport else "INJECTED_TRANSPORT_TEST_ONLY"
     transport = transport or PublicTransport()
     clock = clock or Clock()
     limits, deadline = validate_preflight(preflight, clock.now())
+    if ephemeral:
+        need(preflight.get("capture_mode") == MODE, "EPHEMERAL_MODE_NOT_PINNED")
+        # Raw buffers still exist in process memory. Real hosts must establish
+        # control of swap, dumps and tracing before an ephemeral activation.
+        need(isinstance(preflight.get("memory_safety_ref"), str)
+             and preflight["memory_safety_ref"].strip(), "MISSING_MEMORY_SAFETY_REF")
+        if live_transport:
+            import websocket
+            websocket.enableTrace(False)
+    else:
+        need(preflight.get("capture_mode") != MODE, "EPHEMERAL_FLAG_REQUIRED")
     # A stable output path is the single-use reservation. A crash leaves it occupied.
     output.mkdir(mode=0o700)
     (output / "activation.json").write_bytes(canonical({
         "preflight_sha256": hash_bytes(canonical(preflight)), "start_ms": preflight["start_ms"]
     }))
-    feed = Feed(output / "capture", pilot=True)
+    feed = EphemeralFeed() if ephemeral else Feed(output / "capture", pilot=True)
     quota = Quota(quota_path, limits)
     session = Session(feed, quota)
     report = dict(evidence_mode=evidence_mode, status="STOPPED", rest_calls=0, rest_weight=0, ws_attempts=0, frames=0,
@@ -228,8 +241,9 @@ def capture(preflight, output, quota_path, *, transport=None, clock=None):
                 if channel in ("1m", "15m"):
                     need(received - record["material"]["end_ms_exclusive"] <= 5000, "STALE_FINAL_STOP")
                 # Use a conservative pre-write reserve for SQLite and its journal.
-                need(sum(p.stat().st_size for p in feed.path.parent.iterdir()) <= CUSTODY_BYTES - 1_048_576,
-                     "CUSTODY_CAP")
+                if not ephemeral:
+                    need(sum(p.stat().st_size for p in feed.path.parent.iterdir()) <= CUSTODY_BYTES - 1_048_576,
+                         "CUSTODY_CAP")
                 if session.receive(raw, received, clock.now) == "STORED":
                     if channel in ("trade", "bbo"):
                         price[channel] = received
@@ -238,15 +252,37 @@ def capture(preflight, output, quota_path, *, transport=None, clock=None):
         report["stop_reason"] = "FRAME_CAP" if report["frames"] == 4096 else "DEADLINE"
         report["status"] = "COMPLETE"
     except Exception as exc:
-        report["stop_reason"] = str(exc) if isinstance(exc, ValueError) else type(exc).__name__
+        if ephemeral:
+            # Never persist provider-derived exception text. Keep known fixed stop codes.
+            text = str(exc) if isinstance(exc, ValueError) else ""
+            report["stop_reason"] = text if text in {
+                "REST_STATUS_OR_HEADROOM", "SEQUENCE_GAP", "STALE_PRICE_STOP", "MISSING_FINAL_STOP",
+                "STALE_TRADE_STOP", "STALE_FINAL_STOP", "EPHEMERAL_BACKPRESSURE", "SOURCE_IDENTITY",
+                "OUT_OF_ORDER", "REVISION_QUARANTINE", "EVENT_CLOCK_FUTURE", "LOCAL_CLOCK_STEP",
+                "WS_BUDGET_DENIED", "PONG_BUDGET_DENIED", "REST_WINDOW_MISMATCH",
+            } else "EPHEMERAL_INPUT_OR_TRANSPORT_STOP"
+        else:
+            report["stop_reason"] = str(exc) if isinstance(exc, ValueError) else type(exc).__name__
     finally:
         try:
             if session.socket is not None:
                 session.disconnect(clock.now(), failed=report["status"] != "COMPLETE")
-            report["metrics"] = metrics(feed)
+            report["metrics"] = feed.metrics() if ephemeral else metrics(feed)
         except Exception as exc:
             report.update(status="STOPPED", custody_error=type(exc).__name__)
+        if ephemeral:
+            report.update(capture_mode=MODE, raw_persisted=False, custody="RAW_CUSTODY_NOT_AVAILABLE",
+                          native_research=feed.read(None), channel_counts=dict(feed.counts))
+            feed.dispose()
         report["quality"] = quality(report)
+        if ephemeral:
+            report["timing_basis"] = "MEMORY_PROCESSING_NOT_DURABLE_COMMIT"
+            report["metrics"] = {
+                {"commit": "processing", "bbo_commit_age": "bbo_processing_age"}.get(key, key): value
+                for key, value in report.get("metrics", {}).items()
+            }
+            if report["quality"] == "PASS_FEED_QUALITY_NON_PIT":
+                report["quality"] = "PASS_EPHEMERAL_FEED_QUALITY_NON_PIT"
         (output / "report.json").write_bytes(canonical(report))
     return report
 
@@ -269,10 +305,12 @@ def main():
     parser.add_argument("preflight", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("shared_quota_db", type=Path)
+    parser.add_argument("--ephemeral-research", action="store_true")
     args = parser.parse_args()
-    report = capture(json.loads(args.preflight.read_text(encoding="utf-8")), args.output, args.shared_quota_db)
+    report = capture(json.loads(args.preflight.read_text(encoding="utf-8")), args.output, args.shared_quota_db,
+                     ephemeral=args.ephemeral_research)
     print(json.dumps(report, sort_keys=True))
-    return 0 if report["quality"] == "PASS_FEED_QUALITY_NON_PIT" else 1
+    return 0 if report["quality"] in ("PASS_FEED_QUALITY_NON_PIT", "PASS_EPHEMERAL_FEED_QUALITY_NON_PIT") else 1
 
 
 if __name__ == "__main__":

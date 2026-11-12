@@ -136,3 +136,24 @@ samples. The output report distinguishes an incomplete sample, a failed stop
 and quality PASS for the admitted non-PIT feed. The isolated capture journal
 keeps original bytes and durable ACKs, and exposes no strategy view. Preserve
 the raw journal and preflight privately under the verified retention scope.
+
+### Opt-in ephemeral research
+
+The same one-shot CLI accepts `--ephemeral-research`. Pin
+`"capture_mode": "EPHEMERAL_RESEARCH"` in the private preflight and supply a
+verified `memory_safety_ref` covering paging, crash dumps, tracing and host
+access. Existing source/region, clock, egress, quota and custody references
+are still required. The custody reference describes allowed aggregate receipts,
+not raw-event custody.
+
+The output contains activation and aggregate report JSON only. The shared quota
+SQLite remains active and stores quota metadata, including stream names. Raw
+frames and normalized prices are not written. Fixed-size material fingerprints
+and timing samples are bounded to the existing frame cap and disposed at stop.
+There is no reconnect or recovery under the same one-shot reservation. Timing
+is memory processing time. The report exposes `RAW_CUSTODY_NOT_AVAILABLE` for
+durable research consumers and `EVALUATION_PENDING` for Factory. No durable
+event chain, real strategy evaluation, or PIT is asserted. The normal CLI path
+retains its existing durable behavior.
+
+Focused offline check: `python -B -m pytest tools/binance_live_feed/test_ephemeral.py -q`.

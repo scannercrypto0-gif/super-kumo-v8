@@ -127,6 +127,21 @@ class Gap(ValueError):
         self.channel, self.first, self.stop, self.step = channel, previous+step, following, step
 
 
+def check_sequence(record, previous):
+    channel = record["channel"]
+    if channel == "trade":
+        need(record["sequence"] > previous["sequence"], "OUT_OF_ORDER")
+        if record["sequence"] != previous["sequence"]+1:
+            raise Gap(channel, previous["sequence"], record["sequence"], 1)
+    elif channel == "bbo":
+        need(record["sequence"] > previous["sequence"], "OUT_OF_ORDER")
+    elif channel in INTERVALS:
+        old, new = previous["material"]["open_ms"], record["material"]["open_ms"]
+        need(new > old, "OUT_OF_ORDER")
+        if new != previous["material"]["end_ms_exclusive"]:
+            raise Gap(channel, old, new, INTERVALS[channel])
+
+
 class Feed:
     """Own fixture journal. Records lacking observed data COMMIT remain unreadable."""
 
@@ -251,17 +266,7 @@ class Feed:
             last_doc = db.execute("SELECT doc FROM records WHERE channel=? ORDER BY rowid DESC LIMIT 1", (channel,)).fetchone()
             if last_doc:
                 previous = json.loads(last_doc[0])
-                if channel == "trade":
-                    need(record["sequence"] > previous["sequence"], "OUT_OF_ORDER")
-                    if record["sequence"] != previous["sequence"]+1:
-                        raise Gap(channel, previous["sequence"], record["sequence"], 1)
-                elif channel == "bbo":
-                    need(record["sequence"] > previous["sequence"], "OUT_OF_ORDER")
-                elif channel in INTERVALS:
-                    old, new = previous["material"]["open_ms"], record["material"]["open_ms"]
-                    need(new > old, "OUT_OF_ORDER")
-                    if new != previous["material"]["end_ms_exclusive"]:
-                        raise Gap(channel, old, new, INTERVALS[channel])
+                check_sequence(record, previous)
             need(db.execute("SELECT COUNT(*) FROM records").fetchone()[0] < self.max_rows, "STORAGE_FULL")
             db.execute("INSERT INTO records VALUES (?,?,?,?,NULL,NULL,?,?,?)",
                        (channel,key,generation,received,hash_bytes(raw_doc),raw,raw_doc))
