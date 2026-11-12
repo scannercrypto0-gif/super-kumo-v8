@@ -18,6 +18,14 @@ MIN_WIN_RATE_N=10
 MIN_RISK_N=30
 
 
+def evaluate_execution_exit_comparison(packet):
+    """Opt-in synthetic A/B/C scenarios; preserve the accepted H ledger path."""
+    from research_wp_r0.aql_factory_h_execution_comparison_v1 import (
+        evaluate_execution_exit_comparison as evaluate,
+    )
+    return evaluate(packet)
+
+
 def _need(ok,reason):
     if not ok:
         raise ResultsStoreError("FACTORY_H_LAB_"+reason)
