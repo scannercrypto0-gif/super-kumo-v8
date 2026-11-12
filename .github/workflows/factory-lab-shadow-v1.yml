@@ -1,0 +1,57 @@
+name: Factory Lab Shadow v1
+on:
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_factory_lab_shadow_v1.py'
+      - 'research_wp_r0/aql_factory_shadow_exits_v1.py'
+      - 'tests/test_aql_factory_lab_shadow_v1.py'
+      - '.github/workflows/factory-lab-shadow-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/checkout@v4
+        with:
+          ref: 947382acf898ef5d0d978c8f7e9c6c4dcd3ca5aa
+          path: package-2-fixture
+      - name: Verify SHA, test and replay in fresh processes
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -o pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          git rev-parse HEAD | tee shadow-head.txt
+          python -B -m unittest discover -s tests -p test_aql_factory_lab_shadow_v1.py -v 2>&1 | tee shadow-tests.txt
+          python -B tests/test_aql_factory_lab_shadow_v1.py --receipt "$RUNNER_TEMP/shadow-fixture.sqlite" > shadow-first.json
+          python -B tests/test_aql_factory_lab_shadow_v1.py --receipt "$RUNNER_TEMP/shadow-fixture.sqlite" > shadow-replay.json
+          cmp shadow-first.json shadow-replay.json
+          pin=$(python -B -c 'import json; print(json.load(open("shadow-first.json"))["sha256"])')
+          echo "$pin"
+          test "$(git -C package-2-fixture rev-parse HEAD)" = 947382acf898ef5d0d978c8f7e9c6c4dcd3ca5aa
+          PYTHONPATH="./package-2-fixture/src" python -B tests/test_aql_factory_lab_shadow_v1.py --consumer shadow-first.json "$pin" > shadow-consumer.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: factory-shadow-${{ matrix.os }}
+          path: |
+            shadow-head.txt
+            shadow-tests.txt
+            shadow-first.json
+            shadow-replay.json
+            shadow-consumer.json
