@@ -1,0 +1,38 @@
+[
+  {
+    "pr": 46,
+    "path": "research_wp_r0/strategy_factory.py",
+    "sha": "c823c0377807286c43915598834bb3a1913b6637",
+    "head": "a4c106a02c55ee012eedf4c55c1488d71d850203"
+  },
+  {
+    "pr": 78,
+    "path": "research_wp_r0/attempt_ledger.py",
+    "sha": "e54055f3e37bf744d14b0eabb9b55d04c9bd1346",
+    "head": "4104221085746455547257cc1876705d427cf641"
+  },
+  {
+    "pr": 73,
+    "path": "src/aql/archive/local.py",
+    "sha": "9a07b4fbb1ef6c72006564e0ec6d67104229ec44",
+    "head": "cb7829e3e3c13c6b6433b6625f2df35d1991a65d"
+  },
+  {
+    "pr": 73,
+    "path": "src/aql/archive/backup.py",
+    "sha": "40187ac4f7897ac8acf9b131c9f5f424da6bdfd6",
+    "head": "cb7829e3e3c13c6b6433b6625f2df35d1991a65d"
+  },
+  {
+    "pr": 12,
+    "path": "09_DATA_SCHEMAS.md",
+    "sha": "6a218a80ac8343b5d2e5da2a98a0771a10a2a62f",
+    "head": "1948132315ee6a5b3174c56f767c84d1063251cd"
+  },
+  {
+    "pr": 308,
+    "path": "src/aql/archive/source_view.py",
+    "sha": "704aa845e9c50ead039cb432acd96a3e2507d2fe",
+    "head": "84649a323613bf4415c7abc41e774381aa379428"
+  }
+]
