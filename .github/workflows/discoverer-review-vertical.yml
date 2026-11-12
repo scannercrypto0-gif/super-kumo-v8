@@ -1,0 +1,73 @@
+name: Discoverer research to review vertical
+on:
+  pull_request:
+    paths:
+      - tools/strategy_discoverer_offline/review_vertical.py
+      - tools/strategy_discoverer_offline/tests/test_review_vertical.py
+      - .github/workflows/discoverer-review-vertical.yml
+permissions:
+  contents: read
+jobs:
+  bounded:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/checkout@v4
+        with:
+          ref: 84649a323613bf4415c7abc41e774381aa379428
+          path: review-stage/core
+      - uses: actions/checkout@v4
+        with:
+          ref: 203289f7cac191dca92df2f4d8fa84ec9cf369cc
+          path: review-stage/factory
+      - uses: actions/checkout@v4
+        with:
+          ref: 3e7afd10497365dbbfb2a0760bf5f6d0a4591fd1
+          path: review-stage/paper
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify exact pins and test only the new boundary
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -o pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test "$(git -C review-stage/core rev-parse HEAD)" = 84649a323613bf4415c7abc41e774381aa379428
+          test "$(git -C review-stage/factory rev-parse HEAD)" = 203289f7cac191dca92df2f4d8fa84ec9cf369cc
+          test "$(git -C review-stage/paper rev-parse HEAD)" = 3e7afd10497365dbbfb2a0760bf5f6d0a4591fd1
+          git rev-parse HEAD | tee review-head.txt
+          python -m pip install pytest==8.4.2
+          export DISCOVERER_REVIEW_STAGE="review-stage"
+          export PYTHONPATH="$(python -c 'import os; print(os.pathsep.join(("review-stage/core/src", ".")))')"
+          case=tools/strategy_discoverer_offline/tests/test_review_vertical.py
+          python -B -m pytest "$case" -q -p no:cacheprovider --basetemp "$RUNNER_TEMP/review-tests" 2>&1 | tee review-tests.txt
+          python -B "$case" "$RUNNER_TEMP/review-first" | tee review-first.txt
+          python -B "$case" "$RUNNER_TEMP/review-first" | tee review-restart.txt
+          python -B "$case" "$RUNNER_TEMP/review-second" | tee review-second.txt
+          cmp review-first.txt review-restart.txt
+          cmp review-first.txt review-second.txt
+          for file in weekly-review.json weekly-review.csv weekly-review.md discoverer-dashboard.json; do
+            cmp "$RUNNER_TEMP/review-first/$file" "$RUNNER_TEMP/review-second/$file"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: discoverer-review-${{ matrix.os }}
+          path: |
+            review-head.txt
+            review-tests.txt
+            review-first.txt
+            review-restart.txt
+            review-second.txt
+            ${{ runner.temp }}/review-first/weekly-review.json
+            ${{ runner.temp }}/review-first/weekly-review.csv
+            ${{ runner.temp }}/review-first/weekly-review.md
+            ${{ runner.temp }}/review-first/discoverer-dashboard.json
