@@ -1,0 +1,31 @@
+name: Discoverer continuous research D1–D6
+on:
+  pull_request:
+    paths:
+      - tools/strategy_discoverer_offline/continuous_research.py
+      - tools/strategy_discoverer_offline/tests/test_continuous_research.py
+      - .github/workflows/discoverer-continuous-d1-d6.yml
+permissions:
+  contents: read
+jobs:
+  focused-delta:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install pytest==9.0.2
+      - run: python -B -m pytest tools/strategy_discoverer_offline/tests/test_continuous_research.py -q --junitxml=discoverer-tests.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: discoverer-delta-${{ matrix.os }}
+          path: discoverer-tests.xml

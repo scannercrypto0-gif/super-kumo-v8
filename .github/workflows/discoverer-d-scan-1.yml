@@ -1,0 +1,76 @@
+name: Discoverer D-SCAN-1 synthetic candidate bridge
+
+on:
+  push:
+    branches:
+      - feat/discoverer-package-f4-original-cohort-contract-20261105
+    paths:
+      - tools/strategy_discoverer_offline/synthetic_scanner_candidate_bridge.py
+      - tools/strategy_discoverer_offline/tests/test_d_scan_1_candidate_bridge.py
+      - tools/strategy_discoverer_offline/g4_candidate_preregistration.py
+      - tools/strategy_discoverer_offline/tests/test_g4_candidate_preregistration.py
+      - tools/strategy_discoverer_offline/g4_factory_acceptance_seam.py
+      - tools/strategy_discoverer_offline/tests/test_g4_factory_acceptance_seam.py
+      - .github/workflows/discoverer-d-scan-1.yml
+  pull_request:
+    paths:
+      - tools/strategy_discoverer_offline/synthetic_scanner_candidate_bridge.py
+      - tools/strategy_discoverer_offline/tests/test_d_scan_1_candidate_bridge.py
+      - tools/strategy_discoverer_offline/g4_candidate_preregistration.py
+      - tools/strategy_discoverer_offline/tests/test_g4_candidate_preregistration.py
+      - tools/strategy_discoverer_offline/g4_factory_acceptance_seam.py
+      - tools/strategy_discoverer_offline/tests/test_g4_factory_acceptance_seam.py
+      - .github/workflows/discoverer-d-scan-1.yml
+jobs:
+  d-scan-1:
+    name: D-SCAN-1 (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 3c82448702c9ae35783716e4e2c3b640010db97c, path: _scanner_h, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8, path: _work235, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 30c37ae56851488b882998c7fa0085ec51dbfc92, path: _scanner_b, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 1659713c80d1934f3c08af1af422b89cd5706360, path: _scanner_c, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: a2aa9c195095bcfe852fdc760e385ccb2acf3d5d, path: _scanner_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 52504ad59d75976ce45fb8f75c1b278c3d1b0975, path: _factory_h, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 99c27ea2c1a4d41aaae361141301a8a9ea3b33c3, path: _core_h, persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install focused test dependency
+        run: python -m pip install pytest
+      - name: Overlay exact pinned owner dependencies, CI only
+        shell: python
+        run: |
+          from pathlib import Path
+          from shutil import copyfile
+          for owner in ('_work235','_scanner_b','_scanner_c','_scanner_e','_scanner_h','_factory_h','_core_h'):
+              for folder in ('research_wp_r0','tools','src'):
+                  src=Path(owner)/folder
+                  if not src.is_dir(): continue
+                  for item in src.rglob('*.py'):
+                      dest=Path(folder)/item.relative_to(src)
+                      dest.parent.mkdir(parents=True,exist_ok=True)
+                      copyfile(item,dest)
+          src=Path('_work235/tools/strategy_service_offline/fixtures/strategies.json')
+          if src.is_file():
+              dst=Path('tools/strategy_service_offline/fixtures/strategies.json')
+              dst.parent.mkdir(parents=True,exist_ok=True)
+              copyfile(src,dst)
+      - name: Test only new Discoverer synthetic candidate seam
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tools/strategy_discoverer_offline/tests/test_d_scan_1_candidate_bridge.py tools/strategy_discoverer_offline/tests/test_g4_candidate_preregistration.py tools/strategy_discoverer_offline/tests/test_g4_factory_acceptance_seam.py
