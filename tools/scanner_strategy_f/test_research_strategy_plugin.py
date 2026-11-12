@@ -1,0 +1,482 @@
+"""Package H focused synthetic-only plug-in, causality and Factory boundaries."""
+from __future__ import annotations
+
+import copy
+import json
+import unittest
+from unittest.mock import patch
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from io import BytesIO
+from zipfile import ZipFile, ZIP_DEFLATED
+import hashlib
+
+from research_wp_r0.aql_archive_custody_bridge_v1 import digest
+from research_wp_r0.indicator_library_v2 import IndicatorRegistryV2
+from research_wp_r0.strategy_definition import StrategyDefinition
+from tools.strategy_service_offline.common import Frozen
+from tools.strategy_service_offline.run import FIXTURES
+from tools.scanner_strategy_f import research_strategy_plugin as h
+
+
+START=1735689600000  # Synthetic Jan 2025 range, NOT owner original 2024 F2.
+
+
+def synthetic_query(n=64, missing_index=None):
+    expected=list(range(START,START+n*900000,900000))
+    bars=[]
+    missing=[]
+    for i,t in enumerate(expected):
+        if i==missing_index:
+            missing.append(t)
+            continue
+        px=98.0+(i%17)*0.3
+        bars.append({
+            "bar_open_ms":t,"bar_close_ms":t+899999,
+            "open":px,"high":px+1,"low":px-1,"close":px,
+            "volume":float(i),"bar_checksum":digest({"test_bar":i}),
+            "observation_lower_bound_ms":START+n*900000,
+            "historical_known_at_ms":None,
+        })
+    body={
+        "schema":"aql.core.local-history-query.v1",
+        "dataset_id":"TEST-ONLY-H-BTC-15M",
+        "version":1,"source_bytes_sha256":"a"*64,
+        "manifest_integrity_sha256":"b"*64,
+        "start_ms":START,"end_exclusive_ms":START+n*900000,
+        "decision_cutoff_ms":START+n*900000+1000,
+        "coverage":"COMPLETE" if not missing else
+                   "PARTIAL" if bars else "UNKNOWN",
+        "missing_bar_opens":missing,
+        "required_bar_count":n,"available_bar_count":len(bars),
+        "bars":bars,"source_availability":"RETROSPECTIVE_NON_PIT",
+        "historical_pit":"NOT_ATTESTED","universe":"NOT_ATTESTED",
+    }
+    return {**body,"query_sha256":digest(body)}
+
+
+def reseal_query(q):
+    q["query_sha256"]=digest({k:v for k,v in q.items()
+                              if k!="query_sha256"})
+    return q
+
+
+class ResearchStrategyPlugin(unittest.TestCase):
+    def setUp(self):
+        self.work=json.loads((FIXTURES/"strategies.json").read_text())
+        self.policy=h.research_signal_policy()
+        self.original=synthetic_query()
+        self.receipt=self.work[0]["payload"]["definition"]
+        self.plugin=h.register_strategy_plugin(
+            self.receipt,
+            config_digest=self.work[0]["payload"]["config_digest"],
+            source_spec_receipt=self.work[0])
+
+    def evaluate(self, plugin=None, query=None, policy=None, replay=None):
+        q=self.original if query is None else query
+        with patch.object(h,"query_local",return_value=(
+            q if replay is None else replay)) as local:
+            out=h.evaluate_strategy_plugin(
+                self.plugin if plugin is None else plugin,q,
+                warehouse_root="/synthetic-unmounted",
+                policy=self.policy if policy is None else policy)
+        self.assertEqual(local.call_count,1)
+        self.assertTrue(local.call_args.kwargs["sqlite_immutable"])
+        self.assertFalse(local.call_args.kwargs["require_complete"])
+        return out
+
+    def test_frozen_two_and_distinct_manual_strategy_shared_adapter(self):
+        loaded=[]
+        for fixture in self.work:
+            plug=h.register_strategy_plugin(
+                fixture["payload"]["definition"],
+                config_digest=fixture["payload"]["config_digest"],
+                source_spec_receipt=fixture)
+            out=self.evaluate(plugin=plug)
+            body=h.verify_factory_signal_batch(out).data
+            self.assertEqual(body["event_count"],64)
+            self.assertEqual(body["expected_bar_count"],64)
+            self.assertEqual(sum(body["signal_counts"].values()),64)
+            self.assertEqual(body["economic_attestation"],"NOT_ATTESTED")
+            self.assertFalse(body["cost_or_pnl_computed"])
+            self.assertEqual(body["factory_interface"],
+                             "SIGNAL_ONLY_NEXT_ELIGIBLE_OPEN_NO_FILLS")
+            self.assertTrue(all(e["next_open_is_fill"] is False
+                                for e in body["events"]))
+            loaded.append(Frozen.restore(plug).sha256)
+
+        changed=copy.deepcopy(self.receipt["definition"])
+        changed["strategy_id"]="h_manual_distinct_test"
+        changed["indicators"][0]["parameters"]["period"]=5
+        changed["entry"]["right"]["value"]=99
+        new=StrategyDefinition(changed,registry=IndicatorRegistryV2())
+        manual=h.register_strategy_plugin(
+            new.to_dict(),config_digest=h.manual_config_digest(new.to_dict()),
+            origin="MANUAL")
+        self.assertNotIn(Frozen.restore(manual).sha256,loaded)
+        self.assertIsNone(Frozen.restore(manual).data["source_spec_sha256"])
+        third=h.verify_factory_signal_batch(self.evaluate(plugin=manual))
+        self.assertEqual(third.data["strategy_id"],"h_manual_distinct_test")
+        self.assertEqual(third.data["event_count"],64)
+
+    def test_replay_is_deterministic_and_causal_without_lookahead(self):
+        first=self.evaluate()
+        second=self.evaluate()
+        self.assertEqual(first,second)
+        a=h.verify_factory_signal_batch(first).data
+        self.assertEqual([e["bar_open_ms"] for e in a["events"]],
+                         list(range(START,START+64*900000,900000)))
+        self.assertTrue(all(e["bar_close_ms"]<a["decision_cutoff_ms"]
+                            and e["historical_known_at_ms"] is None
+                            for e in a["events"]))
+        future=synthetic_query(n=65)
+        future["bars"][-1]["close"]=future["bars"][-1]["open"]+0.5
+        future=reseal_query(future)
+        b=h.verify_factory_signal_batch(
+            self.evaluate(query=future)).data
+        self.assertEqual([e["signal_state"] for e in a["events"]],
+                         [e["signal_state"] for e in b["events"][:64]])
+
+    def test_parameter_and_definition_hash_drift_rejected(self):
+        altered=copy.deepcopy(self.plugin)
+        altered["payload"]["config_digest"]="0"*64
+        with self.assertRaises(ValueError):
+            self.evaluate(plugin=altered)
+        forged=Frozen.build(altered["payload"]).receipt()
+        # Even a re-sealed Work235 config change must fail its frozen pin.
+        with self.assertRaises(ValueError):
+            self.evaluate(plugin=forged)
+        altered=copy.deepcopy(self.plugin)
+        altered["payload"]["definition_digest"]="0"*64
+        forged=Frozen.build(altered["payload"]).receipt()
+        with self.assertRaises(ValueError):
+            self.evaluate(plugin=forged)
+        changed=copy.deepcopy(self.receipt)
+        changed["definition"]["indicators"][0]["parameters"]["period"]=50
+        with self.assertRaises(ValueError):
+            h.register_strategy_plugin(changed,config_digest="f"*64)
+
+    def test_independent_policy_approval_and_trading_never_self_granted(self):
+        for key,value in (
+            ("independent_owner_approval_sha256","a"*64),
+            ("historical_pit","ATTESTED"),
+            ("trading_authority","LIVE"),
+            ("holdout","OPEN"),
+            ("economic_attestation","APPROVED"),
+        ):
+            with self.subTest(key=key):
+                changed=copy.deepcopy(self.policy["payload"])
+                changed[key]=value
+                with self.assertRaises(ValueError):
+                    self.evaluate(policy=Frozen.build(changed).receipt())
+        with self.assertRaises(ValueError):
+            h.register_strategy_plugin(self.receipt,
+                config_digest="f"*64,origin="DISCOVERER_CANDIDATE")
+        candidate=h.register_strategy_plugin(
+            self.receipt,
+            config_digest=self.work[0]["payload"]["config_digest"],
+            source_spec_receipt=self.work[0],
+            origin="DISCOVERER_CANDIDATE",candidate_sha256="a"*64)
+        self.assertEqual(Frozen.restore(candidate).data["policy_status"],
+                         "RESEARCH_ONLY_NO_INDEPENDENT_APPROVAL")
+
+    def test_closed_envelopes_reject_extra_fields_and_forged_candidate(self):
+        bad=copy.deepcopy(self.plugin["payload"])
+        bad["private_data_passthrough"]="should-never-cross-boundary"
+        with self.assertRaises(ValueError):
+            self.evaluate(plugin=Frozen.build(bad).receipt())
+        bad=copy.deepcopy(self.plugin["payload"])
+        bad["input_origin"]="DISCOVERER_CANDIDATE"
+        with self.assertRaises(ValueError):
+            self.evaluate(plugin=Frozen.build(bad).receipt())
+        batch=self.evaluate()
+        bad=copy.deepcopy(batch["payload"])
+        bad["f5_signed_approval_sha256"]="a"*64
+        with self.assertRaises(ValueError):
+            h.verify_factory_signal_batch(Frozen.build(bad).receipt())
+        bad=copy.deepcopy(batch["payload"])
+        bad["research_asof_basis"]="PIT_ATTESTED"
+        with self.assertRaises(ValueError):
+            h.verify_factory_signal_batch(Frozen.build(bad).receipt())
+        bad=copy.deepcopy(batch["payload"])
+        bad["events"][0]["private_price"]=100.0
+        bad["events"][0]["event_sha256"]=digest({
+            k:v for k,v in bad["events"][0].items()
+            if k!="event_sha256"})
+        with self.assertRaises(ValueError):
+            h.verify_factory_signal_batch(Frozen.build(bad).receipt())
+
+    def test_missing_bars_quarantined_and_not_miscounted_as_no_signal(self):
+        partial=synthetic_query(missing_index=2)
+        out=h.verify_factory_signal_batch(self.evaluate(query=partial)).data
+        self.assertEqual(out["coverage"],"PARTIAL")
+        self.assertEqual(out["missing_bar_count"],1)
+        self.assertEqual(out["observed_bar_count"],63)
+        self.assertEqual(out["signal_counts"]["UNKNOWN"],64)
+        self.assertEqual(out["signal_counts"]["NO_SIGNAL"],0)
+        self.assertEqual(out["quarantine"],"ALL_EVENTS_UNKNOWN_SOURCE_GAP")
+        self.assertTrue(all(not e["source_observed"] for e in out["events"]))
+
+    def test_pre_end_cutoff_partial_future_slots_quarantined(self):
+        """A source query can end after cutoff; no future bar is observed."""
+        q=synthetic_query()
+        q["decision_cutoff_ms"]=START+2*900000
+        q["bars"]=q["bars"][:2]
+        q["missing_bar_opens"]=list(range(
+            START+2*900000,START+64*900000,900000))
+        q["available_bar_count"]=2
+        q["coverage"]="PARTIAL"
+        reseal_query(q)
+        batch=h.verify_factory_signal_batch(self.evaluate(query=q)).data
+        self.assertEqual(batch["event_count"],64)
+        self.assertEqual(batch["observed_bar_count"],2)
+        self.assertEqual(batch["missing_bar_count"],62)
+        self.assertEqual(batch["signal_counts"]["UNKNOWN"],64)
+        self.assertEqual(batch["signal_counts"]["NO_SIGNAL"],0)
+        self.assertEqual(batch["signal_counts"]["ENTRY_SIGNAL"],0)
+        self.assertEqual(batch["signal_counts"]["EXIT_SIGNAL"],0)
+        self.assertEqual(batch["quarantine"],"ALL_EVENTS_UNKNOWN_SOURCE_GAP")
+        self.assertTrue(all(e["signal_state"]=="UNKNOWN"
+                            and e["next_eligible_open_ms"] is None
+                            and e["source_observed"] is False
+                            and e["next_open_is_fill"] is False
+                            for e in batch["events"]))
+        self.assertEqual(batch["historical_pit"],"NOT_ATTESTED")
+        self.assertIsNone(batch["source_ack_sha256"])
+        self.assertIsNone(batch["strategy_approval_sha256"])
+        self.assertIsNone(batch["factory_consumer_ack_sha256"])
+        self.assertEqual(batch["trading_authority"],"NONE")
+        self.assertGreater(batch["events"][-1]["bar_open_ms"],
+                           batch["decision_cutoff_ms"])
+
+    def test_partial_future_no_observed_future_or_fake_coverage(self):
+        base=synthetic_query()
+        base["decision_cutoff_ms"]=START+2*900000
+        base["bars"]=base["bars"][:2]
+        base["missing_bar_opens"]=list(range(
+            START+2*900000,START+64*900000,900000))
+        base["available_bar_count"]=2
+        base["coverage"]="PARTIAL"
+        reseal_query(base)
+        variants=[]
+        future=copy.deepcopy(base)
+        future["bars"].append(synthetic_query()["bars"][2])
+        future["available_bar_count"]=3
+        future["missing_bar_opens"].remove(START+2*900000)
+        variants.append(("observed_future",future))
+        missing=copy.deepcopy(base)
+        missing["missing_bar_opens"].remove(START+2*900000)
+        variants.append(("unlisted_future",missing))
+        complete=copy.deepcopy(base)
+        complete["coverage"]="COMPLETE"
+        variants.append(("forged_complete",complete))
+        cutoff=copy.deepcopy(base)
+        cutoff["decision_cutoff_ms"]=START
+        variants.append(("cutoff_before_start",cutoff))
+        for label,q in variants:
+            reseal_query(q)
+            with self.subTest(label=label),self.assertRaises(ValueError):
+                self.evaluate(query=q)
+        # A re-sealed but drifted query cannot bypass immutable Core253 re-read.
+        forged=copy.deepcopy(base)
+        forged["bars"][0]["close"]=forged["bars"][0]["open"]+0.1
+        reseal_query(forged)
+        with self.assertRaises(ValueError):
+            self.evaluate(query=forged,replay=base)
+
+    def test_factory_rejects_future_signal_even_if_receipt_resealed(self):
+        q=synthetic_query()
+        q["decision_cutoff_ms"]=START+2*900000
+        q["bars"]=q["bars"][:2]
+        q["missing_bar_opens"]=list(range(
+            START+2*900000,START+64*900000,900000))
+        q["available_bar_count"]=2
+        q["coverage"]="PARTIAL"
+        reseal_query(q)
+        normal=self.evaluate(query=q)
+        for status in ("ENTRY_SIGNAL","EXIT_SIGNAL","NO_SIGNAL"):
+            changed=copy.deepcopy(normal["payload"])
+            event=changed["events"][5]
+            event["signal_state"]=status
+            if status in ("ENTRY_SIGNAL","EXIT_SIGNAL"):
+                event["next_eligible_open_ms"]=event["bar_close_ms"]+1
+            event["event_sha256"]=digest({
+                k:v for k,v in event.items() if k!="event_sha256"})
+            changed["signal_counts"]["UNKNOWN"]-=1
+            changed["signal_counts"][status]+=1
+            with self.subTest(status=status),self.assertRaises(ValueError):
+                h.verify_factory_signal_batch(Frozen.build(changed).receipt())
+
+    def test_partial_cutoff_with_actual_disposable_core253_sqlite(self):
+        """Real Core253 admission/query/readback; no mocked source receipt."""
+        from research_wp_r0.aql_core_backbone_local_v1 import (
+            admit_local_original,query_local,BackboneError,
+        )
+        from research_wp_r0.aql_authenticated_historical_admission_v1 import PIN_SCHEMA
+        from research_wp_r0.aql_archive_custody_bridge_v1 import digest
+        start=1709251200000
+        step=900000
+        n=64
+        basename="BTCUSDT-15m-2024-03"
+        rows=[]
+        for i in range(n):
+            t=start+i*step
+            px=98.0+(i%17)*0.3
+            rows.append(",".join((
+                str(t),str(px),str(px+1),str(px-1),str(px),
+                str(float(i+1)),str(t+step-1),"505",str(2+i),
+                "2","202","0",
+            )))
+        csv=("\n".join(rows)+"\n").encode()
+        out=BytesIO()
+        with ZipFile(out,"w",compression=ZIP_DEFLATED) as z:
+            z.writestr(basename+".csv",csv)
+        raw=out.getvalue()
+        sha=hashlib.sha256(raw).hexdigest()
+        checksum=(sha+"  "+basename+".zip\n").encode()
+        end=start+n*step
+        pin={
+            "schema":PIN_SCHEMA,"source_kind":"BINANCE_KLINES_ZIP",
+            "original_object_id":"TEST_SCANNER_PARTIAL_RAW_ZIP",
+            "original_sha256":sha,"provenance_reference":"SYNTHETIC_TEST_ONLY",
+            "captured_at_ms":end+10000,"claimed_available_at_ms":None,
+            "expected_inventory_sha256":None,"vault_object_metadata":None,
+            "universe_manifest_sha256":None,"universe_member_count":None,
+            "test_only":True,"archive_name":basename+".zip",
+            "csv_member_name":basename+".csv",
+            "csv_member_sha256":hashlib.sha256(csv).hexdigest(),
+            "checksum_file_sha256":hashlib.sha256(checksum).hexdigest(),
+        }
+        spec={
+            "dataset_id":"TEST-ONLY-H-BTC-15M","version":1,
+            "symbol":"BTCUSDT","interval":"15m","exchange":"BINANCE",
+            "market":"SPOT","source_label":"native-monthly-zip",
+            "start_ms":start,"end_exclusive_ms":end,"as_of_ms":end+5000,
+            "parent_source_sha256":None,"correction_reason":None,
+            "test_only":True,
+        }
+        with TemporaryDirectory(prefix="scanner-h-core253-only-") as tmp:
+            root=Path(tmp)
+            admit_local_original(
+                root,raw,checksum,pin,spec,decision_cutoff_ms=end+2000)
+            cutoff=start+2*step+2000
+            query=query_local(
+                root,spec["dataset_id"],1,start,end,cutoff,
+                required_source_sha256=sha,
+                require_complete=False,sqlite_immutable=True)
+            self.assertEqual(query["coverage"],"PARTIAL")
+            self.assertGreaterEqual(query["available_bar_count"],1)
+            self.assertLess(query["available_bar_count"],query["required_bar_count"])
+            self.assertEqual(query["required_bar_count"],64)
+            self.assertEqual(len(query["missing_bar_opens"]),64-query["available_bar_count"])
+            batch=h.evaluate_strategy_plugin(
+                self.plugin,query,warehouse_root=str(root),
+                policy=self.policy)
+            body=h.verify_factory_signal_batch(batch).data
+            self.assertEqual(body["signal_counts"]["UNKNOWN"],64)
+            self.assertEqual(body["signal_counts"]["NO_SIGNAL"],0)
+            self.assertEqual(body["signal_counts"]["ENTRY_SIGNAL"],0)
+            self.assertEqual(body["signal_counts"]["EXIT_SIGNAL"],0)
+            self.assertEqual(body["missing_bar_count"],64-query["available_bar_count"])
+            self.assertEqual(body["observed_bar_count"],query["available_bar_count"])
+            self.assertEqual(body["quarantine"],
+                             "ALL_EVENTS_UNKNOWN_SOURCE_GAP")
+            self.assertEqual(body["trading_authority"],"NONE")
+            self.assertEqual(body["historical_pit"],"NOT_ATTESTED")
+            self.assertTrue(all(e["next_eligible_open_ms"] is None
+                                and not e["source_observed"]
+                                for e in body["events"]))
+            with self.assertRaisesRegex(
+                    BackboneError,"WAREHOUSE_INCOMPLETE_OR_FUTURE"):
+                query_local(
+                    root,spec["dataset_id"],1,start,end,cutoff,
+                    required_source_sha256=sha,
+                    require_complete=True,sqlite_immutable=True)
+            complete=query_local(
+                root,spec["dataset_id"],1,start,end,end+2000,
+                required_source_sha256=sha,
+                require_complete=True,sqlite_immutable=True)
+            self.assertEqual(complete["coverage"],"COMPLETE")
+            real_complete=h.verify_factory_signal_batch(
+                h.evaluate_strategy_plugin(
+                    self.plugin,complete,warehouse_root=str(root),
+                    policy=self.policy)).data
+            self.assertEqual(real_complete["event_count"],64)
+            self.assertEqual(real_complete["coverage"],"COMPLETE")
+            # Re-sealing a bad future actual bar cannot bypass physical readback.
+            forged=copy.deepcopy(query)
+            forged["bars"][0]["close"]=forged["bars"][0]["open"]+0.25
+            forged["query_sha256"]=digest({
+                k:v for k,v in forged.items() if k!="query_sha256"})
+            with self.assertRaises(ValueError):
+                h.evaluate_strategy_plugin(
+                    self.plugin,forged,warehouse_root=str(root),
+                    policy=self.policy)
+
+    def test_absent_policy_and_receipts_fail_closed(self):
+        with self.assertRaisesRegex(ValueError,"H_POLICY_REQUIRED"):
+            h.evaluate_strategy_plugin(
+                self.plugin,self.original,warehouse_root="/synthetic",
+                policy=None)
+        with self.assertRaisesRegex(ValueError,"H_PLUGIN_RECEIPT_REQUIRED"):
+            h.evaluate_strategy_plugin(
+                None,self.original,warehouse_root="/synthetic",
+                policy=self.policy)
+        with self.assertRaisesRegex(ValueError,
+                                    "H_FACTORY_BATCH_RECEIPT_REQUIRED"):
+            h.verify_factory_signal_batch(None)
+        owner_policy=h.research_signal_policy(
+            source_class="OWNER_LOCAL_RECOVERY_DIAGNOSTIC")
+        batch=self.evaluate(policy=owner_policy)
+        self.assertEqual(batch["payload"]["source_class"],
+                         "OWNER_LOCAL_RECOVERY_DIAGNOSTIC")
+        self.assertEqual(batch["payload"]["trading_authority"],"NONE")
+
+    def test_adversarial_grid_source_future_and_replay_rejected(self):
+        for label,mutate in (
+            ("duplicate",lambda q: q["bars"].__setitem__(1,
+                                          dict(q["bars"][0]))),
+            ("future",lambda q: q["bars"][0].__setitem__(
+                "bar_close_ms",q["decision_cutoff_ms"])),
+            ("no_pit",lambda q: q.__setitem__("historical_pit","ATTESTED")),
+            ("bad_prices",lambda q: q["bars"][0].__setitem__("low",-1.0)),
+            ("bad_cutoff",lambda q: q.__setitem__(
+                "decision_cutoff_ms",q["start_ms"])),
+            ("missing",lambda q: q["missing_bar_opens"].append(START)),
+        ):
+            q=copy.deepcopy(self.original)
+            mutate(q)
+            reseal_query(q)
+            with self.subTest(label=label),self.assertRaises(ValueError):
+                self.evaluate(query=q)
+        forged=synthetic_query()
+        forged["bars"][4]["close"]=forged["bars"][4]["open"]+0.5
+        reseal_query(forged)
+        with self.assertRaises(ValueError):
+            self.evaluate(query=forged,replay=self.original)
+
+    def test_factory_rejects_duplicates_event_seals_and_approval(self):
+        original=self.evaluate()
+        for key,value in (
+            ("selected",True),
+            ("source_ack_sha256","c"*64),
+            ("cost_or_pnl_computed",True),
+        ):
+            bad=copy.deepcopy(original["payload"])
+            bad[key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError):
+                h.verify_factory_signal_batch(Frozen.build(bad).receipt())
+        for change in ("duplicate","future","unsealed"):
+            bad=copy.deepcopy(original["payload"])
+            if change=="duplicate":
+                bad["events"][1]=copy.deepcopy(bad["events"][0])
+            elif change=="future":
+                bad["events"][-1]["bar_close_ms"]=bad["decision_cutoff_ms"]
+            else:
+                bad["events"][0]["signal_state"]="ENTRY_SIGNAL"
+            with self.subTest(change=change),self.assertRaises(ValueError):
+                h.verify_factory_signal_batch(Frozen.build(bad).receipt())
+
+
+if __name__=="__main__":
+    unittest.main()

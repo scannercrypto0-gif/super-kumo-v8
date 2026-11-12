@@ -1,0 +1,72 @@
+name: Scanner P0 integrated readiness
+on:
+  push:
+    branches: [feat/scanner-f-bulk-historical-research-policy-20261105]
+permissions:
+  contents: read
+jobs:
+  fixture:
+    name: Scanner P0 / ${{ matrix.os }} / Python 3.13
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            pythonpath: "src:."
+          - os: windows-latest
+            pythonpath: "src;."
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install pytest==9.0.2
+      - run: python -B tools/scanner_strategy_f/p0_stage.py p0-ci --fetch
+      - name: Focused H and P0 acceptance and two clean replays
+        working-directory: p0-ci
+        env:
+          PYTHONPATH: ${{ matrix.pythonpath }}
+        shell: bash
+        run: |
+          python -B -m pytest tools/scanner_strategy_f/test_p0_slice.py tools/scanner_strategy_f/test_research_strategy_plugin.py --basetemp fixture-tests --junitxml ../p0-evidence/junit.xml -q
+          python -B -m tools.scanner_strategy_f.p0_evidence ../p0-evidence --head "$GITHUB_SHA"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scanner-p0-${{ matrix.os }}
+          path: p0-evidence/
+  compare:
+    needs: fixture
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: scanner-p0-*
+          path: p0-evidence
+      - name: Compare canonical replay proof across runners
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          digests = set()
+          root = Path("p0-evidence")
+          for platform in ("ubuntu", "windows"):
+              directory = root / f"scanner-p0-{platform}-latest"
+              summary = json.loads((directory / "summary.json").read_bytes())
+              assert summary["head"] == os.environ["GITHUB_SHA"], summary
+              for i in (1, 2):
+                  result = json.loads((directory / f"replay-{i}.json").read_bytes())
+                  canonical = json.dumps(result["proof"], sort_keys=True, separators=(",", ":"), allow_nan=False)
+                  digest = hashlib.sha256(canonical.encode()).hexdigest()
+                  assert digest == result["proof_sha256"] == summary["proof_sha256"]
+                  digests.add(digest)
+          assert len(digests) == 1, digests
+          print("Verified four identical canonical replay proofs:", digests.pop())
+          PY

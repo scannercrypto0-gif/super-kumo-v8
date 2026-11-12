@@ -1,0 +1,151 @@
+name: Scanner F historical research-only policy owner gate
+on:
+  push:
+    branches:
+      - feat/scanner-f-bulk-historical-research-policy-20261105
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  scanner-g1-g2-windows-handle-regression:
+    name: Scanner B SQLite handle / ${{ matrix.os }} / py${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Run all eight real SQLite Scanner positive and negative tests
+        run: python -m unittest -v tools.scanner_strategy_f.test_g1_g2_explicit_opportunity
+  scanner-e-focused:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: project
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: a86a590a5e2c32c18e03522f52896dbcf50c60ff
+          path: upstream/core-d
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: 759507ea97548ae56e228b034dfb37a1d94f186f
+          path: upstream/core-f
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: 40ad0b4cf3b4b75b8ba55f524e79af3928b0673f
+          path: upstream/core-c
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8
+          path: upstream/work235
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: 30c37ae56851488b882998c7fa0085ec51dbfc92
+          path: upstream/scanner-b
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46
+          path: upstream/raw
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: b9c9ff8602e79c534402f44bce83c56ec2fa6bb9
+          path: upstream/scanner227
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: ef8d41b6ff273e4228e6b90210f4610dccf54251
+          path: upstream/factory-f
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: 99c27ea2c1a4d41aaae361141301a8a9ea3b33c3
+          path: upstream/core-h-current
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Stage exactly pinned Core and frozen Work dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -a upstream/work235/tools/strategy_service_offline project/tools/
+          cp upstream/core-f/research_wp_r0/aql_core_f_bulk_source_v1.py project/research_wp_r0/
+          cp upstream/core-f/research_wp_r0/aql_core_f_private_f2_v1.py project/research_wp_r0/
+          cp upstream/core-f/research_wp_r0/aql_core_f_ntfs_acl_v1.py project/research_wp_r0/
+          cp upstream/core-h-current/research_wp_r0/aql_core_backbone_local_v1.py project/research_wp_r0/
+          cp upstream/factory-f/research_wp_r0/aql_factory_historical_rule_projection.py project/research_wp_r0/
+          cp upstream/factory-f/research_wp_r0/strategy_definition.py project/research_wp_r0/
+          cp upstream/factory-f/research_wp_r0/indicator_library_v2.py project/research_wp_r0/
+          cp upstream/factory-f/research_wp_r0/aql_factory_authentic_research_admission.py project/research_wp_r0/
+          cp upstream/factory-f/research_wp_r0/aql_p2_factory_real_development.py project/research_wp_r0/
+          cp upstream/factory-f/research_wp_r0/aql_p2_factory_lab.py project/research_wp_r0/
+          cp -a upstream/scanner-b/tools/scanner_strategy_b project/tools/
+          cp -a upstream/scanner227/tools/scanner_engine_offline project/tools/
+          cp -a upstream/raw/tools/raw_vault_offline project/tools/
+          for file in upstream/core-c/research_wp_r0/aql_*.py; do
+            cp "$file" project/research_wp_r0/
+          done
+          # Core-c overlay may supply an older Core253 API. Restore exact H head last.
+          cp upstream/core-h-current/research_wp_r0/aql_core_backbone_local_v1.py project/research_wp_r0/
+          for file in upstream/core-d/research_wp_r0/aql_core_d_*.py; do
+            cp "$file" project/research_wp_r0/
+          done
+          cp upstream/core-c/tests/test_aql_core_dual_query_identity_map_v1.py project/tests/
+          cp upstream/core-c/tests/test_aql_core_authorized_source_transfer_v1.py project/tests/
+          cp upstream/core-d/tests/test_aql_core_d_permitted_cohort_v1.py project/tests/
+          cp upstream/core-d/tests/test_aql_core_d_canonical_secretary_v1.py project/tests/
+      - name: Install trusted Ed25519 verifier for Scanner F tests
+        shell: bash
+        run: python -m pip install 'cryptography>=43,<48'
+      - name: New Scanner F policy + Core F1 preflight consumer tests
+        working-directory: project
+        shell: bash
+        run: |
+          PYTHONPATH=.:tests python -m unittest -v tools.scanner_strategy_f.test_retrospective_policy tools.scanner_strategy_f.test_bulk_census tools.scanner_strategy_f.test_policy_activation_request tools.scanner_strategy_f.test_independent_policy_verification tools.scanner_strategy_f.test_source_bound_intake tools.scanner_strategy_f.test_secretary_factory_handoff tools.scanner_strategy_f.test_strategy_specific_decision tools.scanner_strategy_f.test_independent_evaluator_nomination tools.scanner_strategy_f.test_private_operator_bundle tools.scanner_strategy_f.test_research_e2e_diagnostic tools.scanner_strategy_f.test_recovery_diagnostic_adapter tools.scanner_strategy_f.test_research_strategy_plugin
+      - name: Bounded G1 receipt to explicit TEST_ONLY G2 opportunity smoke
+        working-directory: project
+        shell: bash
+        run: |
+          PYTHONPATH=.:src python -m unittest -v tools.scanner_strategy_f.test_g1_g2_explicit_opportunity
+      - name: Scan no operational route or new synthetic issuer
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          src=Path("project/tools/scanner_strategy_e/historical_core_screening.py").read_text()
+          assert "query_local(" in src
+          assert "bind_dual_query_identities(" in src
+          assert "create_permitted_synthetic_cohort" not in src
+          assert "enqueue_scanner_d_strategy(" not in src
+          assert "ack_scanner_d_strategy_consumer(" not in src
+          assert "WAIT_HISTORICAL_PIT_NOT_ATTESTED" in src
+          assert '"trading_authority": "NONE"' in src
+          PY
