@@ -230,8 +230,20 @@ def register_experiment(path, record):
     })
 
 
-def read_experiment(path, experiment_id):
-    con = _connect(path)
+def read_experiment(path, experiment_id, *, detached_snapshot=False):
+    """Read a sealed experiment without initializing or migrating its store.
+
+    Detached snapshots must be immutable copies with all WAL data checkpointed.
+    Never use detached_snapshot on an active store.
+    """
+    p = Path(path)
+    _need(p.suffix == ".sqlite" and p.is_file(), "STORE_PATH")
+    options = "?mode=ro"
+    if detached_snapshot:
+        wal = p.with_name(p.name + "-wal")
+        _need(not wal.exists() or wal.stat().st_size == 0, "SNAPSHOT_WAL_NOT_CHECKPOINTED")
+        options += "&immutable=1"
+    con = sqlite3.connect(p.resolve().as_uri() + options, uri=True, timeout=15)
     try:
         row = con.execute("SELECT sha, document FROM experiments WHERE experiment_id=?",
                           (experiment_id,)).fetchone()
@@ -239,6 +251,8 @@ def read_experiment(path, experiment_id):
         obj = json.loads(row[1])
         _check_seal(obj)
         _need(obj["sha256"] == row[0], "DATABASE_SHA_TAMPER")
+        _need(obj["experiment_id"] == experiment_id and obj["schema"] == SCHEMA
+              and obj["schema_version"] == 1, "EXPERIMENT_SCHEMA_OR_ID")
         return obj
     finally:
         con.close()
