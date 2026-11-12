@@ -1,0 +1,48 @@
+name: Scanner P0 receiver compatibility
+on:
+  push:
+    branches: [integration/scanner-p0-receiver-compat]
+permissions:
+  contents: read
+jobs:
+  joined:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install pytest==9.0.2
+      - name: Stage exact Scanner and Core/Factory dependency graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          pin=33c3b1c410035077ae5a5296c7703938addc62b4
+          git fetch --no-tags origin "$pin"
+          git worktree add --detach scanner-pinned "$pin"
+          python -B scanner-pinned/tools/scanner_strategy_f/p0_stage.py joined --fetch
+          mkdir -p joined/tests
+          cp tools/atlas_scanner_p0_receivers.py joined/tools/
+          cp tests/test_atlas_scanner_p0_receivers.py joined/tests/
+      - name: Run joined receiver proof twice against exact pins
+        working-directory: joined
+        shell: bash
+        env:
+          PYTHONPATH: src${{ matrix.os == 'windows-latest' && ';' || ':' }}.
+        run: |
+          set -euo pipefail
+          python -B -m pytest tests/test_atlas_scanner_p0_receivers.py -q -s --junitxml receiver-junit.xml
+          python -c "import hashlib,pathlib; h=hashlib.sha256(pathlib.Path('receiver-proof.json').read_bytes()).hexdigest(); print(h); assert h == 'a510f7c843b7533cccae81b1b1719315c155e91fa859467e222c241b44773d0a'"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scanner-receiver-${{ matrix.os }}
+          path: |
+            joined/receiver-proof.json
+            joined/receiver-junit.xml
