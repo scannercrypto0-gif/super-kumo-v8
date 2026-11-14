@@ -16,6 +16,7 @@ from tools.binance_live_feed.simulation import distribution
 
 REST_HOST = "data-api.binance.vision"
 WS_URL = "wss://data-stream.binance.vision/stream?streams=" + "/".join(sorted(STREAMS))
+SINGLE_KLINE_WS_URL = "wss://data-stream.binance.vision/ws/btcusdt@kline_15m"
 CUSTODY_BYTES = 64 * 1024 * 1024
 
 
@@ -43,13 +44,14 @@ class PublicTransport:
             conn.close()
 
     @contextmanager
-    def stream(self, timeout):
+    def stream(self, timeout, *, endpoint=WS_URL):
+        need(endpoint in (WS_URL, SINGLE_KLINE_WS_URL), "WS_ENDPOINT_NOT_ALLOWED")
         import websocket
 
         connection = websocket.WebSocket(sslopt={"cert_reqs": ssl.CERT_REQUIRED, "check_hostname": True})
         try:
             connection.settimeout(timeout)
-            connection.connect(WS_URL, redirect_limit=0, http_no_proxy=["data-stream.binance.vision"])
+            connection.connect(endpoint, redirect_limit=0, http_no_proxy=["data-stream.binance.vision"])
             need(connection.getstatus() == 101, "WS_UPGRADE")
             receive = connection.frame_buffer.recv_strict
 
