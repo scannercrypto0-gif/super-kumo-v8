@@ -1,0 +1,387 @@
+{
+  "schema": "atlas.pm.coverage.v1",
+  "snapshot_utc_date": "2026-11-12",
+  "main_sha": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+  "coverage": {
+    "branch_pages": [
+      100,
+      100,
+      11,
+      0
+    ],
+    "pr_partitions": [
+      {
+        "label": "2026-10-23",
+        "query": "2026-10-23",
+        "ok": true,
+        "count": 2
+      },
+      {
+        "label": "2026-10-21",
+        "query": "2026-10-21",
+        "ok": true,
+        "count": 4
+      },
+      {
+        "label": "2026-10-26",
+        "query": "2026-10-26",
+        "ok": true,
+        "count": 9
+      },
+      {
+        "label": "2026-10-25",
+        "query": "2026-10-25",
+        "ok": true,
+        "count": 23
+      },
+      {
+        "label": "2026-10-24",
+        "query": "2026-10-24",
+        "ok": true,
+        "count": 15
+      },
+      {
+        "label": "2026-10-22",
+        "query": "2026-10-22",
+        "ok": true,
+        "count": 30
+      },
+      {
+        "label": "early",
+        "query": "<2026-10-20",
+        "ok": true,
+        "count": 0
+      },
+      {
+        "label": "2026-10-20",
+        "query": "2026-10-20",
+        "ok": true,
+        "count": 11
+      },
+      {
+        "label": "2026-10-30",
+        "query": "2026-10-30",
+        "ok": true,
+        "count": 0
+      },
+      {
+        "label": "2026-11-01",
+        "query": "2026-11-01",
+        "ok": true,
+        "count": 1
+      },
+      {
+        "label": "2026-10-27",
+        "query": "2026-10-27",
+        "ok": true,
+        "count": 4
+      },
+      {
+        "label": "2026-11-03",
+        "query": "2026-11-03",
+        "ok": true,
+        "count": 11
+      },
+      {
+        "label": "2026-10-28",
+        "query": "2026-10-28",
+        "ok": true,
+        "count": 11
+      },
+      {
+        "label": "2026-10-31",
+        "query": "2026-10-31",
+        "ok": true,
+        "count": 6
+      },
+      {
+        "label": "2026-10-29",
+        "query": "2026-10-29",
+        "ok": true,
+        "count": 23
+      },
+      {
+        "label": "2026-11-02",
+        "query": "2026-11-02",
+        "ok": true,
+        "count": 2
+      },
+      {
+        "label": "2026-11-08",
+        "query": "2026-11-08",
+        "ok": true,
+        "count": 0
+      },
+      {
+        "label": "2026-11-09",
+        "query": "2026-11-09",
+        "ok": true,
+        "count": 7
+      },
+      {
+        "label": "2026-11-10",
+        "query": "2026-11-10",
+        "ok": true,
+        "count": 7
+      },
+      {
+        "label": "2026-11-11",
+        "query": "2026-11-11",
+        "ok": true,
+        "count": 7
+      },
+      {
+        "label": "2026-11-05",
+        "query": "2026-11-05",
+        "ok": true,
+        "count": 15
+      },
+      {
+        "label": "2026-11-06",
+        "query": "2026-11-06",
+        "ok": true,
+        "count": 0
+      },
+      {
+        "label": "2026-11-04",
+        "query": "2026-11-04",
+        "ok": true,
+        "count": 6
+      },
+      {
+        "label": "2026-11-07",
+        "query": "2026-11-07",
+        "ok": true,
+        "count": 0
+      },
+      {
+        "label": "late",
+        "query": ">=2026-11-13",
+        "ok": true,
+        "count": 0
+      },
+      {
+        "label": "2026-11-12",
+        "query": "2026-11-12",
+        "ok": true,
+        "count": 1
+      }
+    ],
+    "issue_partitions": [
+      {
+        "label": "early",
+        "ok": true,
+        "count": 0
+      },
+      {
+        "label": "2026-10-26",
+        "ok": true,
+        "count": 1
+      },
+      {
+        "label": "2026-10-25",
+        "ok": true,
+        "count": 3
+      },
+      {
+        "label": "2026-10-21",
+        "ok": true,
+        "count": 0
+      },
+      {
+        "label": "2026-10-22",
+        "ok": true,
+        "count": 4
+      },
+      {
+        "label": "2026-10-20",
+        "ok": true,
+        "count": 1
+      },
+      {
+        "label": "2026-10-23",
+        "ok": true,
+        "count": 5
+      },
+      {
+        "label": "2026-10-24",
+        "ok": true,
+        "count": 22
+      },
+      {
+        "label": "2026-11-03",
+        "ok": true,
+        "count": 1
+      },
+      {
+        "label": "2026-11-02",
+        "ok": true,
+        "count": 0
+      },
+      {
+        "label": "2026-11-01",
+        "ok": true,
+        "count": 1
+      },
+      {
+        "label": "2026-10-27",
+        "ok": true,
+        "count": 4
+      },
+      {
+        "label": "2026-10-31",
+        "ok": true,
+        "count": 7
+      },
+      {
+        "label": "2026-10-28",
+        "ok": true,
+        "count": 16
+      },
+      {
+        "label": "2026-10-29",
+        "ok": true,
+        "count": 13
+      },
+      {
+        "label": "2026-10-30",
+        "ok": true,
+        "count": 0
+      },
+      {
+        "label": "2026-11-09",
+        "ok": true,
+        "count": 0
+      },
+      {
+        "label": "2026-11-05",
+        "ok": true,
+        "count": 4
+      },
+      {
+        "label": "2026-11-10",
+        "ok": true,
+        "count": 2
+      },
+      {
+        "label": "2026-11-07",
+        "ok": true,
+        "count": 0
+      },
+      {
+        "label": "2026-11-08",
+        "ok": true,
+        "count": 3
+      },
+      {
+        "label": "2026-11-04",
+        "ok": true,
+        "count": 22
+      },
+      {
+        "label": "2026-11-06",
+        "ok": true,
+        "count": 0
+      },
+      {
+        "label": "2026-11-11",
+        "ok": true,
+        "count": 5
+      },
+      {
+        "label": "late",
+        "ok": true,
+        "count": 0
+      },
+      {
+        "label": "2026-11-12",
+        "ok": true,
+        "count": 0
+      }
+    ],
+    "state_partitions": [
+      {
+        "state": "merged",
+        "label": "older",
+        "ok": true,
+        "count": 37
+      },
+      {
+        "state": "merged",
+        "label": "middle",
+        "ok": true,
+        "count": 10
+      },
+      {
+        "state": "merged",
+        "label": "newer",
+        "ok": true,
+        "count": 3
+      },
+      {
+        "state": "closed-unmerged",
+        "label": "older",
+        "ok": true,
+        "count": 12
+      },
+      {
+        "state": "closed-unmerged",
+        "label": "middle",
+        "ok": true,
+        "count": 10
+      },
+      {
+        "state": "closed-unmerged",
+        "label": "newer",
+        "ok": true,
+        "count": 1
+      },
+      {
+        "state": "open",
+        "label": "older",
+        "ok": true,
+        "count": 36
+      },
+      {
+        "state": "open",
+        "label": "middle",
+        "ok": true,
+        "count": 47
+      },
+      {
+        "state": "open",
+        "label": "newer",
+        "ok": true,
+        "count": 39
+      }
+    ],
+    "releases_returned": 0,
+    "tags_status": "INVALID_ARGUMENT",
+    "limitations": [
+      "Remote branch HEAD and PR changed-path inventory only for remote-only trees; historical deleted refs and private sessions are outside coverage.",
+      "Stack parent PRs are inferred from base ref names; exact ancestry is separately cited where verified. PR base SHA and branch snapshot SHA can legitimately differ.",
+      "Comments are full paginated reads for five selected governance/integration/audit threads. Other issues have title, URL and links from searchable bodies, with no exhaustive discussion review.",
+      "CI links harvested from accessible text are leads unless explicitly ledgered and verified. GitHub release result applies to accessible releases only."
+    ]
+  },
+  "counts": {
+    "branches": 211,
+    "prs": 195,
+    "issues": 114,
+    "comments": {
+      "134": 534,
+      "202": 26,
+      "205": 188,
+      "271": 353,
+      "305": 4
+    },
+    "main_tree_entries": 321,
+    "local_repositories": 12,
+    "local_trees": 34,
+    "local_python_blobs": 538
+  },
+  "snapshot_files": {
+    "coverage.json": "1de492e63ec43a5e9b2396f882c6062dcfe499272fb977236294bb587405f18c",
+    "LOCAL_CODE_INDEX.json": "0118aa953650a61ca8d1b3f68985daccb1045567330beae540bf87cd49ce5341"
+  }
+}

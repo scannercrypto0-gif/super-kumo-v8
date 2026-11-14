@@ -240,3 +240,7 @@ Owner provisionally approved G1-ARCH-29–44, all option C, since last actually 
 ## G0-REV-01 / C — Review remediation state
 
 Draft PR #15 documentation clarification authorized and applied on its existing branch: test fixture/trigger/expected/forbidden cases T29–T44; revision-safe notification/restart protocol; clock-aware stage latency acceptance and evidence fields. Documentary clarification only, executable tests NOT TESTED, no merge, no final G0. Last owner-actually-submitted Work handoff remains AQL-HO-20261021-002 / PR #14; PR #15 is directly authorized GitHub documentation work.
+
+## Architecture v1 review package — 2026-11-11
+
+[Architecture v1](docs/architecture-v1.md) and its linked contracts and coverage matrix specify the owner-selected provisional target in [#306](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/306). Main snapshot 90af9794880cbeb00e7e974bfa906ff5e9666183. The target applies automated science and Paper gates with independent owner-only Telegram and LIVE grants. Earlier owner-only promotion wording is tracked for scoped reconciliation before adoption. Historical baseline G0 approval remains recorded in #1. Architecture v1 freeze and runtime activation remain separate. The #306 proposal leaves the existing G2 observation and #305 pilot boundaries in place.
