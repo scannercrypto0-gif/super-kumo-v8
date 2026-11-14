@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from aql.observation.contracts import digest
 from tools.atlas_single_receipt_runner import (
-    BinanceReceiptTransport, ENDPOINT, STEP, prepare, run, verify_controlled_egress,
+    BinanceReceiptTransport, ENDPOINT, STEP, preflight, prepare, run, verify_controlled_egress,
 )
 from tools.binance_live_feed.quota import Limits, Quota
 
@@ -147,6 +147,18 @@ class RunnerTests(unittest.TestCase):
         reader = types.SimpleNamespace(read_verified_reservation=lambda **_: evidence)
         self.assertEqual(verify_controlled_egress(self.plan, pin, now=now, verifier=reader),
                          "fixture-reservation")
+
+    def test_owner_waiver_is_live_only_and_bound_to_the_plan(self):
+        pin = digest(self.plan)
+        options = dict(now=self.clock.slot, clock_checked_ms=self.clock.slot)
+        with self.assertRaisesRegex(ValueError, "SHARED_EGRESS_UNVERIFIED"):
+            preflight(self.plan, pin, offline=False, owner_waiver="wrong", **options)
+        with self.assertRaisesRegex(ValueError, "OFFLINE_WAIVER_NOT_ALLOWED"):
+            preflight(self.plan, pin, offline=True, owner_waiver=pin, **options)
+        self.assertEqual(
+            preflight(self.plan, pin, offline=False, owner_waiver=pin, **options),
+            "OWNER_WAIVED_SHARED_IP_HEADROOM_UNVERIFIED",
+        )
 
     def test_rate_limit_and_bad_frames_consume_only_one_attempt(self):
         for bad, status, reason in (

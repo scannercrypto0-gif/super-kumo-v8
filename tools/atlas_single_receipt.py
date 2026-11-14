@@ -6,6 +6,7 @@ import math
 from pathlib import Path
 import sqlite3
 from time import time_ns
+from time import sleep
 
 from aql.journal.durable_journal import DurableJournal
 from aql.models.bar import MarketBar
@@ -53,13 +54,16 @@ def parse_final(raw, slot, received, uncertainty):
     need(kline["x"] is True, "CANDLE_NOT_FINAL")
     need(type(data["E"]) is int and data["E"] >= end and
          data["E"] <= received + uncertainty, "EVENT_CLOCK")
-    need(received - uncertainty > end and received + uncertainty <= end + 300000,
-         "RECEIPT_OUTSIDE_WINDOW")
+    need(received + uncertainty > end and received + uncertainty <= end + 300000,
+         f"RECEIPT_OUTSIDE_WINDOW received_ms={received} close_ms={end} "
+         f"uncertainty_ms={uncertainty} latest_ms={end + 300000}")
     bar = MarketBar.from_binance_ws_kline(kline)
     need(all(math.isfinite(x) for x in (bar.open, bar.high, bar.low, bar.close, bar.volume)) and
          0 < bar.low <= min(bar.open, bar.close) <= max(bar.open, bar.close) <= bar.high
          and bar.volume >= 0, "CANDLE_VALUES")
-    bar.ingested_at = received
+    # The raw receipt keeps the observed timestamp. Core's availability time
+    # must be strictly beyond close even at the low end of the clock interval.
+    bar.ingested_at = max(received, end + uncertainty + 1)
     return data["E"], bar.with_checksum()
 
 
@@ -111,13 +115,19 @@ def observer(root, synthetic, *, write):
 
 def materialize(root, *, synthetic):
     meta, _, bar = load_frame(root)
+    while (remaining := bar.ingested_at - time_ns() // 1000000) > 0:
+        sleep(remaining / 1000)
     obs = observer(root, synthetic, write=True)
     obs.journal.commit(bar)
     obs.store.upsert(bar)
     obs.journal.mark_persisted(bar.stable_key())
     ack = obs.journal.commit_receipt(bar.stable_key())
     committed = ack["commit_return_observed_at_ms"]
-    need(ack["status"] == "SQLITE_COMMIT_RETURN_OBSERVED" and committed >= meta["received"]
+    if not synthetic:
+        remaining = committed + meta["uncertainty"] - time_ns() // 1000000
+        if remaining > 0:
+            sleep(remaining / 1000)
+    need(ack["status"] == "SQLITE_COMMIT_RETURN_OBSERVED" and committed >= bar.ingested_at
          and time_ns() // 1000000 >= committed + meta["uncertainty"], "CUTOFF_CLOCK_OVERLAP")
     obs.tick()
 

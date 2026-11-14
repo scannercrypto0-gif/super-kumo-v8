@@ -67,7 +67,8 @@ try {
         $index++
     }
     # When the release files include the tested delta, overlay only those files.
-    foreach ($name in @('atlas_single_receipt_runner.py', 'test_atlas_single_receipt.py', 'test_atlas_single_receipt_runner.py')) {
+    foreach ($path in $receiptFiles) {
+        $name = Split-Path -Leaf $path
         $overlay = Join-Path $PSScriptRoot $name
         if (!(Test-Path -LiteralPath $overlay -PathType Leaf)) {
             throw "MISSING_WINDOWS_PACKAGE_FILE $name"

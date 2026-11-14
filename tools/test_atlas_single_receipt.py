@@ -72,6 +72,21 @@ class ReceiptTests(unittest.TestCase):
             with self.subTest(reason=reason), self.assertRaisesRegex(ValueError, reason):
                 adapt.parse_final(frame, SLOT, receive, uncertainty)
 
+    def test_near_close_preserves_receipt_time_and_delays_core_availability(self):
+        raw = payload()
+        received = END - 10
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            adapt.persist_frame(root, raw, slot=SLOT, received=received, uncertainty=31,
+                                monotonic_ns=1, session="offline-boundary")
+            meta, _, bar = adapt.load_frame(root)
+            self.assertEqual(meta["received"], received)
+            self.assertEqual(bar.ingested_at, END + 32)
+            adapt.materialize(root, synthetic=True)
+            result = adapt.readback(root, cutoff_ms=time_ns() // 1000000 + 1000, synthetic=True)
+            self.assertGreaterEqual(result["committed_ms"], bar.ingested_at)
+            self.assertEqual(result["receipt"]["received"], received)
+
     def test_local_reservation_and_provider_stop(self):
         with tempfile.TemporaryDirectory() as tmp:
             quota = Quota(Path(tmp) / "budget.sqlite", Limits(rest_weight=40))

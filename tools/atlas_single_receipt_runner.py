@@ -61,27 +61,36 @@ def verify_controlled_egress(plan, pin, *, now, verifier):
     return record["reservation_ref"]
 
 
-def preflight(plan, pin, *, now, clock_checked_ms, offline, egress_evidence=None):
+def preflight(plan, pin, *, now, clock_checked_ms, offline, egress_evidence=None,
+              owner_waiver=None):
     need(plan == prepare(plan["slot"], plan["uncertainty_ms"]) and digest(plan) == pin, "PLAN_PIN")
     need(0 <= now - clock_checked_ms <= 300000, "CLOCK_STALE")
     need(plan["slot"] <= now <= plan["slot"] + 5000, "OUTSIDE_START")
-    # Until a real controlled-egress evidence verifier is integrated, there is
-    # no caller input that can turn this rehearsal into a live authorization.
+    # This path records an explicit plan-bound waiver, never verified headroom.
     need(egress_evidence is None, "EGRESS_VERIFIER_UNAVAILABLE")
-    need(offline is True, "SHARED_EGRESS_UNVERIFIED")
-    return "SHARED_EGRESS_UNVERIFIED"
+    if offline is True:
+        need(owner_waiver is None, "OFFLINE_WAIVER_NOT_ALLOWED")
+        return "SHARED_EGRESS_UNVERIFIED"
+    need(offline is False and owner_waiver == pin, "SHARED_EGRESS_UNVERIFIED")
+    return "OWNER_WAIVED_SHARED_IP_HEADROOM_UNVERIFIED"
 
 
-def run(root, *, plan, pin, clock, clock_checked_ms, quota, transport, offline):
+def run(root, *, plan, pin, clock, clock_checked_ms, quota, transport, offline,
+        owner_waiver=None):
     """One attempt; the transport must honor the supplied absolute budget."""
     start, monotonic = clock.now(), clock.monotonic_ns()
-    egress = preflight(plan, pin, now=start, clock_checked_ms=clock_checked_ms, offline=offline)
-    need(not isinstance(transport, BinanceReceiptTransport), "OFFLINE_TRANSPORT_REQUIRED")
-    root = dedicated_root(root, "atlas-single-receipt-offline")
+    egress = preflight(plan, pin, now=start, clock_checked_ms=clock_checked_ms,
+                       offline=offline, owner_waiver=owner_waiver)
+    if offline:
+        need(not isinstance(transport, BinanceReceiptTransport), "OFFLINE_TRANSPORT_REQUIRED")
+    else:
+        need(type(transport) is BinanceReceiptTransport, "LIVE_TRANSPORT_REQUIRED")
+    root = dedicated_root(root, "atlas-single-receipt-offline" if offline else "atlas-single-receipt-live")
     # Filesystem creation is atomic and keeps the run consumed across restarts,
     # including a crash or a failure before the first frame.
     with (root / "attempt.json").open("x", encoding="utf-8") as stream:
-        json.dump({"plan": plan, "pin": pin, "egress": egress}, stream, sort_keys=True)
+        json.dump({"plan": plan, "pin": pin, "egress": egress,
+                   "started_ms": start, "clock_checked_ms": clock_checked_ms}, stream, sort_keys=True)
         stream.flush()
         os.fsync(stream.fileno())
     reserve_once(quota, start)
@@ -94,6 +103,7 @@ def run(root, *, plan, pin, clock, clock_checked_ms, quota, transport, offline):
         need(abs(now - start - elapsed) <= plan["uncertainty_ms"], "CLOCK_STEP")
         return now
 
+    quota_time = start
     try:
         with transport.stream(plan["endpoint"], min(5, (end - check_window()) / 1000)) as connection:
             ws_upgrade_status(connection.getstatus())
@@ -102,6 +112,7 @@ def run(root, *, plan, pin, clock, clock_checked_ms, quota, transport, offline):
                 kind, raw = transport.frame(connection, (end - now) / 1000)
                 received = check_window()
                 if kind == "ping":
+                    quota_time = received
                     need(quota.ws("receipt-15m", received, "PONG"), "PONG_QUOTA")
                     connection.pong(raw)
                     continue
@@ -109,6 +120,9 @@ def run(root, *, plan, pin, clock, clock_checked_ms, quota, transport, offline):
                      "INVALID_FRAME")
                 data = json.loads(raw, object_pairs_hook=unique_json_keys)
                 kline = data["k"]
+                if (not offline and kline["s"] == "BTCUSDT" and kline["i"] == "15m"
+                        and kline["t"] == plan["slot"] - STEP and received < plan["slot"] + 5000):
+                    continue
                 need(kline["s"] == "BTCUSDT" and kline["i"] == "15m" and
                      kline["t"] == plan["slot"], "CANDLE_IDENTITY")
                 if kline["x"] is False:
@@ -118,9 +132,9 @@ def run(root, *, plan, pin, clock, clock_checked_ms, quota, transport, offline):
                               session=pin[:24])
                 break
     finally:
-        quota.disconnect("receipt-15m", clock.now(), failed=False)
+        quota.disconnect("receipt-15m", quota_time, failed=False)
     check_window()
-    materialize(root, synthetic=True)
+    materialize(root, synthetic=offline)
     cutoff = check_window()
     _, seal, _ = load_frame(root)
-    return readback(root, cutoff_ms=cutoff, synthetic=True, expected_receipt_sha256=seal)
+    return readback(root, cutoff_ms=cutoff, synthetic=offline, expected_receipt_sha256=seal)
