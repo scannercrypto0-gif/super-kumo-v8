@@ -1,0 +1,62 @@
+{
+  "schema": "aql.binance.spot.owner-pilot.v1",
+  "status": "BLOCKED_SOURCE_RIGHTS_AND_HOST_PREFLIGHT",
+  "collection": "NOT_ACTIVATED",
+  "real_feed": "NOT_RUN",
+  "real_pit_oos": "BLOCKED",
+  "owner_inputs": {
+    "jurisdiction_and_binance_entity": null,
+    "terms_version_url_sha256_and_effective_utc": null,
+    "applicable_endpoint_research_capture_retention_and_review_rights_ref": null,
+    "verified_ip_quota_windows_and_all_egress_workers": null,
+    "future_utc_start_on_15m_boundary": null,
+    "future_utc_end": null,
+    "independent_prefreeze_and_custody_pins": null,
+    "one_shot_activation": null
+  },
+  "proposal": {
+    "market": ["BINANCE", "SPOT", "BTCUSDT", "BTC", "USDT", "UTC"],
+    "public_stream_endpoint": "wss://data-stream.binance.vision/stream",
+    "public_rest_endpoint": "https://data-api.binance.vision",
+    "streams": ["btcusdt@trade", "btcusdt@bookTicker", "btcusdt@kline_1m", "btcusdt@kline_15m"],
+    "max_duration_seconds": 1200,
+    "max_raw_frames": 4096,
+    "max_single_frame_bytes": 4096,
+    "max_custody_bytes": 67108864,
+    "max_rest_calls": 20,
+    "max_rest_weight": 80,
+    "max_simultaneous_connections": 1,
+    "max_connection_attempts": 3,
+    "max_outbound_frames_per_rolling_second": 2,
+    "max_subscriptions": 4,
+    "recovery_rest_min_spacing_ms": 1000,
+    "recovery_slots_max_per_gap": 32,
+    "minimum_shared_quota_headroom_percent": 50,
+    "spend_usd": 0
+  },
+  "stop": {
+    "any_418_429_or_unverifiable_used_weight": true,
+    "any_unknown_egress_client_or_applicable_quota": true,
+    "any_foreign_source_or_revision_or_unreconciled_gap": true,
+    "any_missing_commit_or_custody_failure": true,
+    "max_abs_independently_measured_clock_error_ms": 250,
+    "max_trade_or_local_quote_age_ms_for_research": 2000,
+    "max_final_close_delay_ms_for_research": 5000,
+    "max_stale_wall_time_before_stop_ms": 30000,
+    "max_consecutive_transport_failures": 3,
+    "any_budget_cap_reached": true
+  },
+  "quality_gate": {
+    "trade_event_to_receipt_p95_ms": 500,
+    "trade_event_to_receipt_p99_ms": 1500,
+    "local_bbo_age_p95_ms": 1000,
+    "final_1m_close_to_receipt_max_ms": 5000,
+    "final_15m_close_to_receipt_max_ms": 5000,
+    "min_eligible_trade_samples": 100,
+    "min_eligible_bbo_samples": 100,
+    "min_final_1m_samples": 15,
+    "min_final_15m_samples": 1,
+    "max_unresolved_gaps": 0,
+    "bbo_exchange_event_latency": "NOT_ESTIMABLE_FOR_BOOKTICKER"
+  }
+}

@@ -1,0 +1,46 @@
+name: Binance Spot feed rehearsal (#303)
+on:
+  pull_request:
+    paths: ['tools/binance_live_feed/**', '.github/workflows/binance-live-feed-303.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-acceptance:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: src${{ matrix.os == 'windows-latest' && ';' || ':' }}.
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - if: github.event_name == 'workflow_dispatch'
+        run: git fetch --no-tags origin e0e08a8381a8cceaaa44d6ae2721e9cb0d004648
+      - run: python -m pip install pytest==9.0.2 websocket-client==1.9.2
+      - if: github.event_name == 'workflow_dispatch'
+        run: python -B -m pytest tools/binance_live_feed/test_feed.py tools/binance_live_feed/test_run_pilot.py -q --junitxml=feed-tests.xml
+      - if: github.event_name == 'workflow_dispatch'
+        run: python -B -m tools.binance_live_feed.simulation feed-evidence
+      - if: github.event_name == 'workflow_dispatch'
+        name: Record source and evidence hashes
+        run: python -B -m tools.binance_live_feed.manifest feed-evidence
+      - run: python -B -m pytest tools/binance_live_feed/test_ephemeral.py -q --junitxml=ephemeral-tests.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: binance-feed-${{ matrix.os }}
+          path: |
+            ephemeral-tests.xml
+            feed-tests.xml
+            feed-evidence/
+            tools/binance_live_feed/pilot.json
