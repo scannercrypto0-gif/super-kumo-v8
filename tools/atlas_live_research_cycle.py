@@ -76,7 +76,8 @@ def report(root, fixture, cutoff, *, synthetic=False):
             "discoverer": "NO_MATCHING_LINEAGE", "rest_requests": 0}
 
 
-def run(root, plan, pin, fixture, *, verifier, clock, transport, wait=time.sleep, synthetic=False):
+def run(root, plan, pin, fixture, *, verifier, clock, transport, wait=time.sleep, synthetic=False,
+        stop_after_first=False):
     need(synthetic or type(transport) is BinanceReceiptTransport, "LIVE_TRANSPORT_REQUIRED")
     need(not synthetic or not isinstance(transport, BinanceReceiptTransport), "OFFLINE_TRANSPORT_REQUIRED")
     need(plan == make_plan(plan["slot"], fixture) and digest(plan) == pin, "LIVE_PLAN_PIN")
@@ -102,7 +103,8 @@ def run(root, plan, pin, fixture, *, verifier, clock, transport, wait=time.sleep
     with closing(sqlite3.connect(root / "lock.sqlite", timeout=0)) as lock:
         lock.execute("BEGIN EXCLUSIVE")
         try:
-            result = observe(root, plan, pin, fixture, clock, transport, wait, uncertainty, synthetic)
+            result = observe(root, plan, pin, fixture, clock, transport, wait, uncertainty, synthetic,
+                             stop_after_first)
         except Exception as exc:
             emit(root, "STOPPED_ERROR", error=type(exc).__name__,
                  provider_status=getattr(exc, "status_code", None))
@@ -111,7 +113,7 @@ def run(root, plan, pin, fixture, *, verifier, clock, transport, wait=time.sleep
         return result
 
 
-def observe(root, plan, pin, fixture, clock, transport, wait, uncertainty, synthetic):
+def observe(root, plan, pin, fixture, clock, transport, wait, uncertainty, synthetic, stop_after_first):
     journal = DurableJournal(str(root / "journal.sqlite"))
     store = OperationalStore(str(root / "market.sqlite"))
     observer = ProspectiveObserver(root / "g2.sqlite", journal, store, fixture, synthetic=synthetic)
@@ -125,7 +127,8 @@ def observe(root, plan, pin, fixture, clock, transport, wait, uncertainty, synth
             os.fsync(stream.fileno())
     need(json.loads(manifest.read_text(encoding="utf-8")) == plan, "STATE_PLAN_MISMATCH")
     rows = recover(root, journal, store, observer, first, clock.now, wait)
-    if len(rows) == 2:
+    target = 1 if stop_after_first else 2
+    if len(rows) >= target:
         return {**report(root, fixture, clock.now(), synthetic=synthetic), "bars": rows}
 
     quota = Quota(root / "quota.sqlite", Limits(rest_weight=2, connections=4))
@@ -151,11 +154,11 @@ def observe(root, plan, pin, fixture, clock, transport, wait, uncertainty, synth
             quota.set(db, "research_connection_attempts", used + 1)
         need(quota.connect(socket_id, now, ["btcusdt@kline_15m"]), "LOCAL_WS_BUDGET_STOP")
         try:
-            emit(root, "CONNECTING", utc_ms=now, attempt=attempt + 1, plan_sha256=pin)
+            emit(root, "CONNECTING", utc_ms=now, attempt=used + 1, plan_sha256=pin)
             with transport.stream(ENDPOINT, min(5, left)) as connection:
                 need(connection.getstatus() == 101, "WS_UPGRADE")
                 heartbeat = now
-                while len(rows) < 2:
+                while len(rows) < target:
                     now, left = time_left()
                     expected_close = first + (len(rows) + 1) * STEP - 1
                     need(now + uncertainty <= expected_close + 300_000, "FINALIZED_SOURCE_GAP")
@@ -177,11 +180,11 @@ def observe(root, plan, pin, fixture, clock, transport, wait, uncertainty, synth
                         emit(root, "DURABLE_RESEARCH_BAR", **row)
         except (TimeoutError, ConnectionError) as exc:
             emit(root, "TRANSPORT_INTERRUPTED", error=type(exc).__name__)
-            if attempt or len(rows) == 2:
+            if attempt or len(rows) == target:
                 raise
         finally:
-            quota.disconnect(socket_id, clock.now(), failed=len(rows) < 2)
-        if len(rows) == 2:
+            quota.disconnect(socket_id, clock.now(), failed=len(rows) < target)
+        if len(rows) == target:
             return {**report(root, fixture, clock.now(), synthetic=synthetic), "bars": rows}
         wait(3)
     raise ValueError("SOURCE_OUTAGE")
@@ -239,6 +242,7 @@ def main():
     parser.add_argument("--slot", type=int)
     parser.add_argument("--pin")
     parser.add_argument("--authority-module", help="Trusted operator-installed local authority module")
+    parser.add_argument("--stop-after-first", action="store_true")
     args = parser.parse_args()
     fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))[0]
     now = lambda: time.time_ns() // 1_000_000
@@ -270,7 +274,7 @@ def main():
         if delay_ms > 0:
             time.sleep(delay_ms / 1000)
         result = run(args.state, plan, args.pin, fixture, verifier=authority, clock=HostClock(),
-                     transport=BinanceReceiptTransport())
+                     transport=BinanceReceiptTransport(), stop_after_first=args.stop_after_first)
     print(json.dumps(result, sort_keys=True))
 
 

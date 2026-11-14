@@ -4,7 +4,8 @@ param(
     [ValidateSet('plan','live','status','recover')][string]$Mode = 'plan',
     [string]$Pin,
     [long]$Slot,
-    [string]$AuthorityModule
+    [string]$AuthorityModule,
+    [switch]$StopAfterFirst
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
@@ -33,6 +34,7 @@ try {
     if ($Slot) { $arguments += @('--slot', $Slot) }
     if ($Pin) { $arguments += @('--pin', $Pin) }
     if ($AuthorityModule) { $arguments += @('--authority-module', $AuthorityModule) }
+    if ($StopAfterFirst) { $arguments += '--stop-after-first' }
     Push-Location -LiteralPath $tree
     try {
         & $Python @arguments

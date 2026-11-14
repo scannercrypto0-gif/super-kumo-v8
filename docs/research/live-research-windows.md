@@ -18,3 +18,13 @@ Invoke the following at the selected boundary. The launcher stages pinned files 
 ```
 
 Keep local health.jsonl and the sealed raw receipts private. The upstream market-data stream is the single public BTCUSDT Spot 15m endpoint. Missing closes fail closed, without historical REST recovery. Factory output is a research census with admission WAIT; no matching Discoverer/Lab lineage is asserted.
+
+For a controlled restart proof, add `-StopAfterFirst` to the first live
+invocation. After it exits successfully, refresh the host clock qualification
+and confirm the same reservation still covers the remaining window. Invoke the
+same live command with the same state, slot, and pin, omitting
+`-StopAfterFirst`. The second process recovers the first receipt before
+connecting and shares the persisted two-attempt budget. If the budget is
+exhausted or the window has elapsed, use offline recovery to read retained
+receipts. Compare the first run's bar row with the second run and offline
+recovery; Factory census should agree, while its time-bound digest can differ.
