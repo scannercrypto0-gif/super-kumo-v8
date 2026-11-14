@@ -37,6 +37,30 @@ def prepare(slot, uncertainty_ms):
                 grace_ms=300000, wall_ms=1500000, rest_requests=0)
 
 
+def verify_controlled_egress(plan, pin, *, now, verifier):
+    """Read a reservation from an independently trusted local egress authority.
+
+    The injected authority must authenticate current ingress to its shared ledger,
+    including the host's route and the reservation. Caller JSON is not an authority.
+    """
+    need(verifier is not None, "CONTROLLED_EGRESS_AUTHORITY_UNAVAILABLE")
+    record = verifier.read_verified_reservation(plan_pin=pin, endpoint=plan["endpoint"])
+    need(isinstance(record, dict), "CONTROLLED_EGRESS_EVIDENCE_INVALID")
+    need(record.get("plan_pin") == pin and record.get("endpoint") == plan["endpoint"],
+         "CONTROLLED_EGRESS_SCOPE_MISMATCH")
+    need(all(isinstance(record.get(key), str) and record[key].strip()
+             for key in ("authority_ref", "egress_identity", "reservation_ref")),
+         "CONTROLLED_EGRESS_EVIDENCE_INVALID")
+    observed, expires = record.get("observed_ms"), record.get("expires_ms")
+    need(type(observed) is int and type(expires) is int and
+         0 <= now - observed <= 5000 and expires >= now + plan["wall_ms"],
+         "CONTROLLED_EGRESS_EVIDENCE_STALE")
+    used, limit = record.get("reserved_and_used"), record.get("limit")
+    need(type(used) is int and type(limit) is int and 1 <= used <= limit // 2,
+         "CONTROLLED_EGRESS_HEADROOM_UNVERIFIED")
+    return record["reservation_ref"]
+
+
 def preflight(plan, pin, *, now, clock_checked_ms, offline, egress_evidence=None):
     need(plan == prepare(plan["slot"], plan["uncertainty_ms"]) and digest(plan) == pin, "PLAN_PIN")
     need(0 <= now - clock_checked_ms <= 300000, "CLOCK_STALE")

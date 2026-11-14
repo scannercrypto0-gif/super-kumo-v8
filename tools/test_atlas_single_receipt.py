@@ -1,4 +1,5 @@
 """Focused integration checks; never opens a socket."""
+from contextlib import closing
 import json
 import os
 from pathlib import Path
@@ -55,7 +56,7 @@ class ReceiptTests(unittest.TestCase):
             self.assertEqual(json.loads(reopened), result)
             with self.assertRaisesRegex(ValueError, "CUTOFF_CLOCK_OVERLAP"):
                 adapt.readback(root, cutoff_ms=result["committed_ms"], synthetic=True)
-            with sqlite3.connect(root / "receipt.sqlite") as db:
+            with closing(sqlite3.connect(root / "receipt.sqlite")) as db, db:
                 db.execute("UPDATE frame SET raw=?", (payload(c="102"),))
             with self.assertRaisesRegex(ValueError, "CUSTODY_TAMPER"):
                 adapt.readback(root, cutoff_ms=cutoff, synthetic=True)

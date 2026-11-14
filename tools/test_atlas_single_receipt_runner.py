@@ -12,7 +12,9 @@ import unittest
 from unittest.mock import patch
 
 from aql.observation.contracts import digest
-from tools.atlas_single_receipt_runner import BinanceReceiptTransport, ENDPOINT, STEP, prepare, run
+from tools.atlas_single_receipt_runner import (
+    BinanceReceiptTransport, ENDPOINT, STEP, prepare, run, verify_controlled_egress,
+)
 from tools.binance_live_feed.quota import Limits, Quota
 
 
@@ -124,6 +126,27 @@ class RunnerTests(unittest.TestCase):
             self.execute(wire, offline=False)
         self.assertFalse(self.root.exists())
         self.assertEqual(wire.attempts, 0)
+
+    def test_egress_authority_rejects_missing_stale_or_over_budget_reservation(self):
+        pin = digest(self.plan)
+        now = self.clock.slot
+        evidence = dict(plan_pin=pin, endpoint=ENDPOINT, authority_ref="fixture-authority",
+                        egress_identity="fixture-egress", reservation_ref="fixture-reservation",
+                        observed_ms=now, expires_ms=now + self.plan["wall_ms"],
+                        reserved_and_used=1, limit=2)
+        with self.assertRaisesRegex(ValueError, "CONTROLLED_EGRESS_AUTHORITY_UNAVAILABLE"):
+            verify_controlled_egress(self.plan, pin, now=now, verifier=None)
+        for changes, reason in (
+            ({"plan_pin": "other"}, "SCOPE_MISMATCH"),
+            ({"observed_ms": now - 5001}, "EVIDENCE_STALE"),
+            ({"reserved_and_used": 2}, "HEADROOM_UNVERIFIED"),
+        ):
+            reader = types.SimpleNamespace(read_verified_reservation=lambda **_: evidence | changes)
+            with self.subTest(reason=reason), self.assertRaisesRegex(ValueError, reason):
+                verify_controlled_egress(self.plan, pin, now=now, verifier=reader)
+        reader = types.SimpleNamespace(read_verified_reservation=lambda **_: evidence)
+        self.assertEqual(verify_controlled_egress(self.plan, pin, now=now, verifier=reader),
+                         "fixture-reservation")
 
     def test_rate_limit_and_bad_frames_consume_only_one_attempt(self):
         for bad, status, reason in (
