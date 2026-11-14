@@ -235,15 +235,30 @@ def revision_of(pr):
             "base_ref": pr["base"]["ref"], "base_sha": pr["base"]["sha"], "head_sha": pr["head"]["sha"]}
 
 
+def expected_revision(event, event_name, read_pr):
+    if event_name == "pull_request_target":
+        expected = revision_of(event["pull_request"])
+        require(revision_of(read_pr(expected["pr"])) == expected, "stale event base or head")
+        return expected
+    require(event_name == "workflow_dispatch", "trusted event unavailable")
+    inputs = event["inputs"]
+    number = inputs["pr_number"]
+    require(isinstance(number, str) and re.fullmatch(r"[1-9][0-9]{0,9}", number),
+            "invalid PR input")
+    expected = revision_of(read_pr(int(number)))
+    require(expected["head_sha"] == inputs["head_sha"] and
+            expected["base_sha"] == inputs["base_sha"], "stale dispatch base or head")
+    return expected
+
+
 def live():
     event = decode(Path(os.environ["GITHUB_EVENT_PATH"]).read_bytes())
-    require(os.environ["GITHUB_EVENT_NAME"] == "pull_request_target", "trusted event unavailable")
-    expected = revision_of(event["pull_request"])
+    expected = expected_revision(event, os.environ["GITHUB_EVENT_NAME"],
+                                 lambda number: api(f"/pulls/{number}"))
     number = expected["pr"]
     base, head = expected["base_sha"], expected["head_sha"]
     require(git("rev-parse", "HEAD").decode().strip() == base == os.environ["GITHUB_WORKFLOW_SHA"],
             "validator checkout or workflow is not the pinned trusted base")
-    require(revision_of(api(f"/pulls/{number}")) == expected, "stale event base or head")
     policy_blob = object_at(base, POLICY)
     require(policy_blob is not None and policy_blob[0] == "100644", "trusted base policy is absent")
     policy = decode(git("cat-file", "blob", policy_blob[1]))
@@ -258,7 +273,9 @@ def live():
     result = validate(policy, expected, changed_paths(base, head), reviews, object_at, ref_at, verified_run, dt.datetime.now(dt.timezone.utc))
     require(revision_of(api(f"/pulls/{number}")) == expected and review_pages(number) == reviews,
             "revision or review state changed during check")
-    print(f"TRUSTED_VALIDATION_PASS: {result[0]} assignment records; {result[1]} changed paths")
+    receipt = dict(expected, records=result[0], changed_paths=result[1],
+                   approvals_sha256=manifest_digest({"reviews": reviews}))
+    print("TRUSTED_VALIDATION_PASS " + json.dumps(receipt, sort_keys=True))
 
 
 if __name__ == "__main__":

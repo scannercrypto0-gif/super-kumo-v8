@@ -6,8 +6,21 @@ on:
       - '.github/workflows/anti-redo-gate.yml'
       - 'tools/pm/anti_redo_gate.py'
       - 'tools/pm/test_anti_redo_gate.py'
+      - 'tools/pm/test_anti_redo_deploy.py'
+      - '.github/anti-redo-policy.json'
   pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        required: true
+        type: string
+      base_sha:
+        required: true
+        type: string
+      head_sha:
+        required: true
+        type: string
 permissions: {}
 jobs:
   focused-adversarial-tests:
@@ -22,10 +35,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
       - name: Test candidate code in unprivileged CI
-        run: python3 -m unittest discover -s tools/pm -p 'test_anti_redo_gate.py' -v
+        run: python3 -m unittest discover -s tools/pm -p 'test_anti_redo_deploy.py' -v
 
   trusted-base-validation:
-    if: github.event_name == 'pull_request_target'
+    if: github.event_name == 'pull_request_target' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -35,7 +48,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.workflow_sha }}
           fetch-depth: 0
       - name: Read PR objects and reviews with the trusted base validator
         env:
