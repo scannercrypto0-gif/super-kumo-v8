@@ -12,6 +12,21 @@ from tools.atlas_single_receipt import (
 ENDPOINT = "wss://data-stream.binance.vision/ws/btcusdt@kline_15m"
 
 
+class BinanceReceiptTransport:
+    """Use the pinned #305 TLS and framing implementation for one native stream."""
+
+    def __init__(self):
+        from tools.binance_live_feed.run_pilot import PublicTransport
+        self.transport = PublicTransport()
+
+    def stream(self, endpoint, timeout):
+        need(endpoint == ENDPOINT, "WS_ENDPOINT_NOT_ALLOWED")
+        return self.transport.stream(timeout, endpoint=endpoint)
+
+    def frame(self, connection, timeout):
+        return self.transport.frame(connection, timeout)
+
+
 def prepare(slot, uncertainty_ms):
     need(type(slot) is int and slot >= 0 and slot % STEP == 0, "SLOT_GRID")
     need(type(uncertainty_ms) is int and 0 <= uncertainty_ms <= 250, "CLOCK_UNCERTAINTY")
@@ -37,6 +52,7 @@ def run(root, *, plan, pin, clock, clock_checked_ms, quota, transport, offline):
     """One attempt; the transport must honor the supplied absolute budget."""
     start, monotonic = clock.now(), clock.monotonic_ns()
     egress = preflight(plan, pin, now=start, clock_checked_ms=clock_checked_ms, offline=offline)
+    need(not isinstance(transport, BinanceReceiptTransport), "OFFLINE_TRANSPORT_REQUIRED")
     root = dedicated_root(root, "atlas-single-receipt-offline")
     # Filesystem creation is atomic and keeps the run consumed across restarts,
     # including a crash or a failure before the first frame.

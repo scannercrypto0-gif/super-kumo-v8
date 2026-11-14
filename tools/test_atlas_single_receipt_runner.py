@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import socket
 import subprocess
+import types
 import sys
 import tempfile
 import time
@@ -11,7 +12,7 @@ import unittest
 from unittest.mock import patch
 
 from aql.observation.contracts import digest
-from tools.atlas_single_receipt_runner import ENDPOINT, STEP, prepare, run
+from tools.atlas_single_receipt_runner import BinanceReceiptTransport, ENDPOINT, STEP, prepare, run
 from tools.binance_live_feed.quota import Limits, Quota
 
 
@@ -97,6 +98,25 @@ class RunnerTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             self.execute(wire)
         self.assertEqual(wire.attempts, 1)
+
+    def test_production_binding_uses_one_pinned_endpoint_without_opening_socket(self):
+        from unittest.mock import Mock
+
+        ws = Mock()
+        ws.getstatus.return_value = 101
+        module = types.SimpleNamespace(WebSocket=Mock(return_value=ws))
+        transport = BinanceReceiptTransport()
+        with patch.dict(sys.modules, {"websocket": module}):
+            with transport.stream(ENDPOINT, 2) as connection:
+                self.assertIs(connection, ws)
+            ws.connect.assert_called_once_with(
+                ENDPOINT, redirect_limit=0, http_no_proxy=["data-stream.binance.vision"])
+            self.assertTrue(module.WebSocket.call_args.kwargs["sslopt"]["check_hostname"])
+            with self.assertRaisesRegex(ValueError, "WS_ENDPOINT_NOT_ALLOWED"):
+                transport.stream("wss://example.invalid", 2)
+        with self.assertRaisesRegex(ValueError, "OFFLINE_TRANSPORT_REQUIRED"):
+            self.execute(transport)
+        self.assertFalse(self.root.exists())
 
     def test_unqualified_egress_stops_before_reservation(self):
         wire = Wire(self.clock)
