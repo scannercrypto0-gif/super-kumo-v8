@@ -1,9 +1,10 @@
 param(
     [string]$State,
     [Parameter(Mandatory = $true)][string]$Python,
-    [ValidateSet('plan','live','status','recover')][string]$Mode = 'plan',
+    [ValidateSet('plan','live','status','recover','stop','rearm','preflight')][string]$Mode = 'plan',
     [string]$Pin,
     [long]$Slot,
+    [ValidateRange(2,96)][int]$Bars = 2,
     [string]$AuthorityModule,
     [switch]$StopAfterFirst
 )
@@ -25,11 +26,11 @@ try {
     git -C $repo archive --format=zip "--output=$transportZip" 0a45cb6de6027b6fba54320e07b0faf3317a5382 tools/binance_live_feed
     if ($LASTEXITCODE -ne 0) { throw 'PINNED_305_OBJECT_REQUIRED' }
     Expand-Archive -LiteralPath $transportZip -DestinationPath $tree -Force
-    foreach ($name in @('atlas_live_research_cycle.py', 'atlas_single_receipt.py', 'atlas_single_receipt_runner.py')) {
+    foreach ($name in @('atlas_live_research_cycle.py', 'atlas_research_lease.py', 'atlas_single_receipt.py', 'atlas_single_receipt_runner.py')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $tree 'tools')
     }
     $env:PYTHONPATH = "$tree\src;$tree"
-    $arguments = @('-B', '-m', 'tools.atlas_live_research_cycle', $Mode)
+    $arguments = @('-B', '-m', 'tools.atlas_live_research_cycle', $Mode, '--bars', $Bars)
     if ($State) { $arguments += @('--state', $State) }
     if ($Slot) { $arguments += @('--slot', $Slot) }
     if ($Pin) { $arguments += @('--pin', $Pin) }
