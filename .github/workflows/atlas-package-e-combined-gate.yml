@@ -1,0 +1,496 @@
+name: ATLAS Package E One Pinned Cross-Owner Combined Gate
+on:
+  push:
+    branches:
+      - integration/package-e-g1-g12-pinned-20261105
+    paths:
+      - 'tools/atlas_e_combined_gate_manifest.py'
+      - 'tools/atlas_f_research_diagnostic_operator.py'
+      - 'tools/atlas_f2_recovery_evidence_v1.py'
+      - 'tools/atlas_f2_owner_private_preflight.ps1'
+      - 'tools/atlas_f2_owner_provenance_v1.py'
+      - 'tools/atlas_f2_owner_factory_packet_v1.py'
+      - 'tools/atlas_f2_owner_execute.py'
+      - 'tools/atlas_integration_collect_all_gate.py'
+      - 'tools/atlas_integration_comprehensive_preflight.py'
+      - 'tests/test_atlas_integration_comprehensive_preflight.py'
+      - 'tools/atlas_f2_stage_owner_overlay.py'
+      - 'tools/atlas_f2_owner_run.ps1'
+      - 'tests/test_atlas_f2_owner_execute_v1.py'
+      - 'docs/research/owner-f2-recovery-real-one-command-20261107.md'
+      - 'tools/atlas_f2_recovery_research_operator.py'
+      - 'tests/test_atlas_f2_recovery_evidence_v1.py'
+      - 'tests/test_atlas_f2_recovery_research_operator.py'
+      - 'tests/test_atlas_f_research_diagnostic_operator.py'
+      - 'docs/research/integration-f-research-diagnostic-one-command-20261107.md'
+      - 'docs/research/package-e-combined-gate-evidence-scope.md'
+      - 'docs/research/package-f-original-cohort-one-run-e2e-runbook-v1.md'
+      - '.github/workflows/atlas-package-e-combined-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bounded-e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11','3.12','3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with: {ref: 0ec35238de6cf48db07c5c977e1f0d04bc299f58, path: _pinned_factory_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 998e3bcca8ca6f1150964dfa9d94726fec96b846, path: _pinned_core_f, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: aa9c23a620a8e10cdc7077c14d58401c26c54d48, path: _pinned_scanner_f, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 1cb70f1212283fe34117882d18e0501fc6409fe7, path: _pinned_discoverer_f, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: a86a590a5e2c32c18e03522f52896dbcf50c60ff, path: _pinned_core_d, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 3af5b66d2b381b853a6b5be32c38b3d3d02e1ea7, path: _pinned_core_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: a91e370ae7e5197e9af71f8300eeaff4a7aff022, path: _pinned_scanner_d, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: a2aa9c195095bcfe852fdc760e385ccb2acf3d5d, path: _pinned_scanner_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 1659713c80d1934f3c08af1af422b89cd5706360, path: _pinned_scanner_c, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 30c37ae56851488b882998c7fa0085ec51dbfc92, path: _pinned_scanner_b, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 149ca90c09b96abb45d3bc2839b657711c9826ac, path: _pinned_discoverer_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: f2006c0e431690ccea8b0532095bf4f2a2dc88ba, path: _pinned_discoverer_base, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8, path: _pinned_work235, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46, path: _pinned_raw211, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: b9c9ff8602e79c534402f44bce83c56ec2fa6bb9, path: _pinned_scanner227, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: e368dd491a0d80618bdc6c6e8f731a195d763dda, path: _pinned_raw_windows_lock, persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Stage pinned read-only owner dependencies and exact tests
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from shutil import copyfile, copytree
+          owners=('_pinned_core_f','_pinned_scanner_f','_pinned_discoverer_f',
+                  '_pinned_core_e','_pinned_core_d','_pinned_scanner_e',
+                  '_pinned_scanner_d','_pinned_scanner_c','_pinned_scanner_b',
+                  '_pinned_discoverer_e','_pinned_discoverer_base',
+                  '_pinned_work235','_pinned_raw211','_pinned_scanner227')
+          for owner in owners:
+              for folder in ('research_wp_r0','tools','src'):
+                  source=Path(owner)/folder
+                  if not source.is_dir(): continue
+                  for item in source.rglob('*.py'):
+                      target=Path(folder)/item.relative_to(source)
+                      if not target.exists():
+                          target.parent.mkdir(parents=True,exist_ok=True)
+                          copyfile(item,target)
+          # Exact pinned owner HEADs are mandatory before importing any operator.
+          from tools.atlas_e_combined_gate_manifest import PINS
+          for key in ('factory_e','core_f','scanner_f'):
+              import subprocess
+              actual=subprocess.check_output(['git','-C','_pinned_'+key,'rev-parse','HEAD'],text=True).strip()
+              assert actual==PINS[key], ('OWNER_HEAD_PIN_DRIFT',key,actual,PINS[key])
+          # F HEAD precedence: fail closed if a stale base or historical overlay
+          # shadows the pinned F modules. Historical owners fill missing paths only.
+          import hashlib
+          authoritative = {
+              '_pinned_core_f': (
+                  'research_wp_r0/aql_core_f_bulk_source_v1.py',
+                  'research_wp_r0/aql_core_f5_secretary_authority_v1.py',
+                  'research_wp_r0/aql_core_f_research_diagnostic_query_v1.py',
+                  'research_wp_r0/aql_core_f_recovery_readonly_v1.py',
+                  'research_wp_r0/aql_core_backbone_local_v1.py',
+                  'tests/test_aql_core_f_recovery_readonly_v1.py',
+                  'tests/test_aql_core_f_research_diagnostic_query_v1.py',
+                  'tests/test_aql_core_f5_secretary_authority_v1.py',
+              ),
+              '_pinned_scanner_f': (
+                  'tools/scanner_strategy_f/independent_policy_verification.py',
+                  'tools/scanner_strategy_f/source_bound_intake.py',
+                  'tools/scanner_strategy_f/secretary_factory_handoff.py',
+                  'tools/scanner_strategy_f/strategy_specific_decision.py',
+                  'tools/scanner_strategy_f/secretary_ack_requirements.py',
+                  'tools/scanner_strategy_f/independent_evaluator_nomination.py',
+                  'tools/scanner_strategy_f/test_independent_evaluator_nomination.py',
+                  'tools/scanner_strategy_f/private_operator_bundle.py',
+                  'tools/scanner_strategy_f/research_e2e_diagnostic.py',
+                  'tools/scanner_strategy_f/recovery_diagnostic_adapter.py',
+                  'tools/scanner_strategy_f/frozen_diagnostic_contracts.py',
+                  'tools/scanner_strategy_f/test_recovery_diagnostic_adapter.py',
+                  'tools/scanner_strategy_f/test_research_e2e_diagnostic.py',
+                  'tools/scanner_strategy_f/test_private_operator_bundle.py',
+                  'tools/scanner_strategy_f/test_strategy_specific_decision.py',
+              ),
+              '_pinned_discoverer_f': (
+                  'tools/strategy_discoverer_offline/historical_f4_intake.py',
+              ),
+          }
+          for owner, paths in authoritative.items():
+              for relative in paths:
+                  source, target = Path(owner)/relative, Path(relative)
+                  assert source.is_file(), ('MISSING_PINN_F_FILE', owner, relative)
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  copyfile(source, target)
+                  digest = hashlib.sha256(source.read_bytes()).hexdigest()
+                  assert hashlib.sha256(target.read_bytes()).hexdigest() == digest, (
+                      'STALE_F_OVERLAY', owner, relative)
+                  print('PINNED_F_FILE_SHA256', owner, relative, digest)
+          # RawVault Windows fix is an explicitly separate, pinned dependency.
+          # Stage the entire canonical package (not a standalone vault.py).
+          raw_base=Path('_pinned_raw211/tools/raw_vault_offline')
+          raw_fixed=Path('_pinned_raw_windows_lock/tools/raw_vault_offline')
+          assert raw_base.is_dir() and raw_fixed.is_dir(), 'RAW_VAULT_PACKAGE_MISSING'
+          for relative in ('__init__.py','schema.py','vault.py'):
+              src=raw_fixed/relative
+              assert src.is_file(), ('RAW_VAULT_PIN_MISSING',relative)
+              dst=Path('tools/raw_vault_offline')/relative
+              dst.parent.mkdir(parents=True,exist_ok=True)
+              copyfile(src,dst)
+              assert hashlib.sha256(dst.read_bytes()).hexdigest()==hashlib.sha256(src.read_bytes()).hexdigest(), ('RAW_VAULT_BYTES_MISMATCH',relative)
+          # Historical #211 helpers stay from canonical parent; verify those
+          # dependencies share the same Git blob, rather than merging branches.
+          for relative in ('__init__.py','schema.py'):
+              assert (raw_base/relative).read_bytes()==(raw_fixed/relative).read_bytes(), ('RAW_VAULT_API_DIVERGENCE',relative)
+          assert hashlib.sha1(b'blob '+str((raw_fixed/'vault.py').stat().st_size).encode()+bytes([0])+(raw_fixed/'vault.py').read_bytes()).hexdigest()=='6b5bcc1d684088934f5ed7110064380b8d2bc0cd', 'RAW_VAULT_BLOB_MISMATCH'
+          # Exact Factory E owner HEAD is the source for its own modules/tests;
+          # integration branch never changes the Factory owner branch.
+          for name in ('aql_factory_e_research_results_store_v1.py',
+                       'aql_factory_e_discoverer_consumer_v1.py',
+                       'aql_factory_e_historical_source_boundary_v1.py',
+                       'aql_factory_e_core_scanner_historical_wait_v1.py',
+                       'aql_factory_e_durable_discoverer_consumer_v1.py',
+                       'aql_factory_f_batch_ledger_v1.py',
+                       'aql_factory_f_scanner_bulk_consumer_v1.py',
+                       'aql_factory_f_private_original_cohort_v1.py',
+                       'aql_factory_f_role_authority_v1.py',
+                       'aql_factory_f_research_e2e_diagnostic_v1.py',
+                       'aql_factory_f_f2_recovery_diagnostic_v1.py',
+                       'aql_factory_f_f2_recovery_research_v2.py',
+                       'aql_factory_historical_rule_projection.py',
+                       'strategy_definition.py',
+                       'indicator_library_v2.py'):
+              source=Path('_pinned_factory_e')/'research_wp_r0'/name
+              target=Path('research_wp_r0')/name
+              assert source.is_file(), ('PINNED_FACTORY_MODULE_MISSING',name)
+              copyfile(source,target)
+              assert hashlib.sha256(source.read_bytes()).digest()==hashlib.sha256(target.read_bytes()).digest(), ('PINNED_FACTORY_BYTES_DRIFT',name)
+          copyfile(Path('_pinned_scanner_e')/'tools/scanner_strategy_e/historical_policy_approval_request.py',
+                   Path('tools/scanner_strategy_e/historical_policy_approval_request.py'))
+          copyfile(Path('_pinned_factory_e')/'tools/atlas_factory_e_bounded_perf.py',
+                   Path('tools/atlas_factory_e_bounded_perf.py'))
+          for name in ('test_aql_factory_e_research_results_store_v1.py',
+                       'test_aql_factory_e_discoverer_consumer_v1.py',
+                       'test_aql_factory_e_historical_source_boundary_v1.py',
+                       'test_aql_factory_e_core_scanner_historical_wait_v1.py',
+                       'test_aql_factory_e_durable_discoverer_consumer_v1.py',
+                       'test_aql_factory_e_migration_v1.py',
+                       'test_aql_factory_e_bounded_perf_v1.py',
+                       'test_aql_factory_f_batch_ledger_v1.py',
+                       'test_aql_factory_f_scanner_bulk_consumer_v1.py',
+                       'test_aql_factory_f_private_original_cohort_v1.py',
+                       'test_aql_factory_f_role_authority_v1.py',
+                       'test_aql_factory_f_research_e2e_diagnostic_v1.py',
+                       'test_aql_factory_f_f2_recovery_diagnostic_v1.py',
+                       'test_aql_factory_f_f2_recovery_research_v2.py'):
+              source=Path('_pinned_factory_e')/'tests'/name
+              target=Path('tests')/name
+              assert source.is_file(), ('PINNED_FACTORY_TEST_MISSING',name)
+              copyfile(source,target)
+              assert hashlib.sha256(source.read_bytes()).digest()==hashlib.sha256(target.read_bytes()).digest(), ('PINNED_FACTORY_TEST_BYTES_DRIFT',name)
+          copytree(Path('_pinned_work235')/'tools/strategy_service_offline/fixtures',
+                   Path('tools/strategy_service_offline/fixtures'),dirs_exist_ok=True)
+          for name in ('test_aql_core_d_same_source_v1.py',
+                       'test_aql_core_d_permitted_cohort_v1.py',
+                       'test_aql_core_d_canonical_secretary_v1.py'):
+              copyfile(Path('_pinned_core_d')/'tests'/name,Path('tests')/name)
+          copyfile(Path('_pinned_core_e')/'tests/test_aql_core_e_historical_boundary_v1.py',
+                   Path('tests/test_aql_core_e_historical_boundary_v1.py'))
+          copyfile(Path('_pinned_core_e')/'tests/test_aql_core_e_status_evidence_v1.py',
+                   Path('tests/test_aql_core_e_status_evidence_v1.py'))
+          assert Path('research_wp_r0/aql_core_f_bulk_source_v1.py').is_file()
+          assert Path('tools/scanner_strategy_f/retrospective_policy.py').is_file()
+          assert Path('tools/strategy_discoverer_offline/historical_f4_intake.py').is_file()
+          assert Path('tools/scanner_strategy_e/test_historical_core_screening.py').is_file()
+          assert Path('tools/strategy_discoverer_offline/tests/test_package_e_membership.py').is_file()
+          import importlib
+          imported=importlib.import_module('tools.raw_vault_offline.vault')
+          imported_path=Path(imported.__file__).resolve()
+          pinned_path=Path('tools/raw_vault_offline/vault.py').resolve()
+          assert imported_path==pinned_path, ('RAW_VAULT_IMPORT_SHADOW',str(imported_path))
+          assert hashlib.sha256(imported_path.read_bytes()).hexdigest()==hashlib.sha256((raw_fixed/'vault.py').read_bytes()).hexdigest(), 'RAW_VAULT_IMPORT_BYTES_MISMATCH'
+          print('RAW_VAULT_WINDOWS_FIX_PINNED',imported_path,hashlib.sha256(imported_path.read_bytes()).hexdigest())
+          print('All E owner interfaces staged read-only from exact SHA heads')
+          PY
+      - name: Install test-only pytest and Scanner Ed25519 verifier dependency
+        run: python -m pip install pytest cryptography
+      - name: ONE collect-all 42-suite diagnostic report (no first-failure abort)
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD:$PWD/tests:$PWD/_pinned_raw211"
+          python -m tools.atlas_integration_collect_all_gate
+          python tools/atlas_factory_e_bounded_perf.py --strategies 12 --symbols 8 --per-pair 4 --max-seconds 30 --max-peak-mib 96 --output e-factory-performance.json
+          python tools/atlas_e_combined_gate_manifest.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e-gate-${{ matrix.python-version }}
+          path: |
+            e-gate-evidence.json
+            e-factory-performance.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload combined bounded suite report even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aql-collect-all-${{ matrix.python-version }}
+          path: aql-comprehensive-suite-report.json
+          if-no-files-found: warn
+
+
+  windows-owner-operator-syntax:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 0ec35238de6cf48db07c5c977e1f0d04bc299f58, path: _pinned_factory_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 998e3bcca8ca6f1150964dfa9d94726fec96b846, path: _pinned_core_f, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 7d97b09c0c6ee2650a61d523acb8d8c771a99c46, path: _pinned_raw211, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: e368dd491a0d80618bdc6c6e8f731a195d763dda, path: _pinned_raw_windows_lock, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8, path: _pinned_work235, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: aa9c23a620a8e10cdc7077c14d58401c26c54d48, path: _pinned_scanner_f, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: a2aa9c195095bcfe852fdc760e385ccb2acf3d5d, path: _pinned_scanner_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: a91e370ae7e5197e9af71f8300eeaff4a7aff022, path: _pinned_scanner_d, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 1659713c80d1934f3c08af1af422b89cd5706360, path: _pinned_scanner_c, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 30c37ae56851488b882998c7fa0085ec51dbfc92, path: _pinned_scanner_b, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 1cb70f1212283fe34117882d18e0501fc6409fe7, path: _pinned_discoverer_f, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 149ca90c09b96abb45d3bc2839b657711c9826ac, path: _pinned_discoverer_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: f2006c0e431690ccea8b0532095bf4f2a2dc88ba, path: _pinned_discoverer_base, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: 3af5b66d2b381b853a6b5be32c38b3d3d02e1ea7, path: _pinned_core_e, persist-credentials: false}
+      - uses: actions/checkout@v4
+        with: {ref: a86a590a5e2c32c18e03522f52896dbcf50c60ff, path: _pinned_core_d, persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Stage SHA-verified Factory v2 and Core in isolated Windows CI
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, subprocess, shutil
+          owners={
+            '_pinned_factory_e':'0ec35238de6cf48db07c5c977e1f0d04bc299f58',
+            '_pinned_core_f':'998e3bcca8ca6f1150964dfa9d94726fec96b846',
+            '_pinned_raw211':'7d97b09c0c6ee2650a61d523acb8d8c771a99c46',
+            '_pinned_raw_windows_lock':'e368dd491a0d80618bdc6c6e8f731a195d763dda',
+            '_pinned_work235':'6acbcc7fc243b132f58170df4c6469bbf7f4eff8',
+            '_pinned_scanner_f':'aa9c23a620a8e10cdc7077c14d58401c26c54d48',
+            '_pinned_scanner_e':'a2aa9c195095bcfe852fdc760e385ccb2acf3d5d',
+            '_pinned_scanner_d':'a91e370ae7e5197e9af71f8300eeaff4a7aff022',
+            '_pinned_scanner_c':'1659713c80d1934f3c08af1af422b89cd5706360',
+            '_pinned_scanner_b':'30c37ae56851488b882998c7fa0085ec51dbfc92',
+            '_pinned_discoverer_f':'1cb70f1212283fe34117882d18e0501fc6409fe7',
+            '_pinned_discoverer_e':'149ca90c09b96abb45d3bc2839b657711c9826ac',
+            '_pinned_discoverer_base':'f2006c0e431690ccea8b0532095bf4f2a2dc88ba',
+            '_pinned_core_e':'3af5b66d2b381b853a6b5be32c38b3d3d02e1ea7',
+            '_pinned_core_d':'a86a590a5e2c32c18e03522f52896dbcf50c60ff',
+          }
+          for owner,expected in owners.items():
+              actual=subprocess.check_output(['git','-C',owner,'rev-parse','HEAD'],text=True).strip()
+              assert actual==expected, ('PINNED_HEAD_DRIFT',owner)
+          # Fill missing transitive Core dependencies from the SAME pinned
+          # exact source tree, never by loading loose PYTHONPATH wheels.
+          core=Path('_pinned_core_f')
+          for folder in ('research_wp_r0','tools','src'):
+              parent=core/folder
+              if not parent.is_dir():
+                  continue
+              for source in parent.rglob('*.py'):
+                  dest=Path(folder)/source.relative_to(parent)
+                  if not dest.exists():
+                      dest.parent.mkdir(parents=True,exist_ok=True)
+                      shutil.copyfile(source,dest)
+                      assert source.read_bytes()==dest.read_bytes(), ('PINNED_CORE_DEP_BYTES',str(dest))
+          # Complete exact-SHA historical owner overlay for transitive imports.
+          # Never overwrite an already staged Integration or authoritative F file.
+          for key in ('scanner_d','scanner_c','scanner_b','discoverer_f',
+                      'discoverer_e','discoverer_base','core_e','core_d'):
+              owner=Path('_pinned_'+key)
+              for folder in ('research_wp_r0','tools','src'):
+                  parent=owner/folder
+                  if not parent.is_dir():
+                      continue
+                  for source in parent.rglob('*.py'):
+                      dest=Path(folder)/source.relative_to(parent)
+                      if not dest.exists():
+                          dest.parent.mkdir(parents=True,exist_ok=True)
+                          shutil.copyfile(source,dest)
+                          assert source.read_bytes()==dest.read_bytes(), ('PINNED_TRANSITIVE_OWNER_BYTES',key,str(dest))
+          # Work235 owns the frozen strategy engine API and fixtures.
+          # Only fill missing code from exact pin; never override Integration.
+          strategy_root=Path('_pinned_work235/tools/strategy_service_offline')
+          assert strategy_root.is_dir(), 'PINNED_WORK235_STRATEGY_SERVICE_MISSING'
+          for source in strategy_root.rglob('*.py'):
+              dest=Path('tools/strategy_service_offline')/source.relative_to(strategy_root)
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copyfile(source,dest)
+              assert dest.read_bytes()==source.read_bytes(), ('PINNED_WORK235_MODULE_BYTES',str(dest))
+          for source in (strategy_root/'fixtures').rglob('*'):
+              if source.is_file():
+                  dest=Path('tools/strategy_service_offline/fixtures')/source.relative_to(strategy_root/'fixtures')
+                  dest.parent.mkdir(parents=True,exist_ok=True)
+                  shutil.copyfile(source,dest)
+                  assert dest.read_bytes()==source.read_bytes(), ('PINNED_WORK235_FIXTURE_BYTES',str(dest))
+          scanner_root=Path('_pinned_scanner_f/tools/scanner_strategy_f')
+          assert scanner_root.is_dir(), 'PINNED_SCANNER_F_MODULES_MISSING'
+          for source in scanner_root.rglob('*.py'):
+              dest=Path('tools/scanner_strategy_f')/source.relative_to(scanner_root)
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copyfile(source,dest)
+              assert dest.read_bytes()==source.read_bytes(), ('PINNED_SCANNER_F_BYTES',str(dest))
+          scanner_e_root=Path('_pinned_scanner_e/tools/scanner_strategy_e')
+          assert scanner_e_root.is_dir(), 'PINNED_SCANNER_E_MODULES_MISSING'
+          for source in scanner_e_root.rglob('*.py'):
+              dest=Path('tools/scanner_strategy_e')/source.relative_to(scanner_e_root)
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copyfile(source,dest)
+              assert dest.read_bytes()==source.read_bytes(), ('PINNED_SCANNER_E_BYTES',str(dest))
+          # RawVault Windows blob is a verified distinct locked dependency.
+          rawbase=Path('_pinned_raw211/tools/raw_vault_offline')
+          rawfixed=Path('_pinned_raw_windows_lock/tools/raw_vault_offline')
+          for name in ('__init__.py','schema.py'):
+              assert (rawbase/name).read_bytes()==(rawfixed/name).read_bytes(), ('RAW_VAULT_API_DIVERGENCE',name)
+          for name in ('__init__.py','schema.py','vault.py'):
+              source=rawfixed/name
+              dest=Path('tools/raw_vault_offline')/name
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copyfile(source,dest)
+              assert source.read_bytes()==dest.read_bytes(), ('RAW_VAULT_WINDOWS_BYTES',name)
+          # Windows checkout may CRLF-convert this canonical raw blob.
+          # Rehydrate EXACT bytes using git cat-file, as the owner runner does.
+          vault_blob='6b5bcc1d684088934f5ed7110064380b8d2bc0cd'
+          original=subprocess.check_output(['git','-C','_pinned_raw_windows_lock',
+                                            'cat-file','blob',vault_blob])
+          actual_blob=hashlib.sha1(b'blob '+str(len(original)).encode()+
+                                   bytes([0])+original).hexdigest()
+          assert actual_blob==vault_blob, 'RAW_VAULT_WINDOWS_BLOB_DRIFT'
+          vault_dest=Path('tools/raw_vault_offline/vault.py')
+          vault_dest.write_bytes(original)
+          assert vault_dest.read_bytes()==original, 'RAW_VAULT_EXACT_BYTES_DRIFT'
+          names={
+            '_pinned_factory_e':(
+              'aql_factory_e_research_results_store_v1.py',
+              'aql_factory_f_research_e2e_diagnostic_v1.py',
+              'aql_factory_f_f2_recovery_diagnostic_v1.py',
+              'aql_factory_f_f2_recovery_research_v2.py',
+              'aql_factory_historical_rule_projection.py',
+              'strategy_definition.py','indicator_library_v2.py',
+            ),
+            '_pinned_core_f':(
+              'aql_core_f_bulk_source_v1.py',
+              'aql_core_f_research_diagnostic_query_v1.py',
+              'aql_core_f_recovery_readonly_v1.py',
+              'aql_core_backbone_local_v1.py',
+              'aql_core_dual_query_identity_map_v1.py',
+            ),
+          }
+          for owner,files in names.items():
+              for name in files:
+                  source=Path(owner)/'research_wp_r0'/name
+                  dest=Path('research_wp_r0')/name
+                  assert source.is_file(), ('PINNED_MODULE_MISSING',name)
+                  shutil.copyfile(source,dest)
+                  assert source.read_bytes()==dest.read_bytes(), ('PINNED_MODULE_BYTES',name)
+                  print('PINNED_WINDOWS_MODULE_SHA256',name,hashlib.sha256(dest.read_bytes()).hexdigest())
+          source=Path('_pinned_factory_e/tests/test_aql_factory_f_f2_recovery_research_v2.py')
+          dest=Path('tests/test_aql_factory_f_f2_recovery_research_v2.py')
+          assert source.is_file(), 'PINNED_WINDOWS_FACTORY_V2_TEST_MISSING'
+          shutil.copyfile(source,dest)
+          assert source.read_bytes()==dest.read_bytes(), 'PINNED_WINDOWS_FACTORY_V2_TEST_BYTES'
+          PY
+      - name: Verify Windows one-command PowerShell syntax and Python import syntax
+        shell: pwsh
+        run: |
+          $parseErrors = $null
+          $tokens = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'tools/atlas_f2_owner_run.ps1'),
+            [ref]$tokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count -gt 0) {
+            throw 'PINNED_OWNER_POWERSHELL_SYNTAX_INVALID'
+          }
+          python -m py_compile tools/atlas_f2_owner_provenance_v1.py tools/atlas_f2_owner_factory_packet_v1.py tools/atlas_f2_owner_execute.py tools/atlas_f2_stage_owner_overlay.py
+          if ($LASTEXITCODE -ne 0) {
+            throw 'OWNER_PYTHON_MODULE_SYNTAX_INVALID'
+          }
+      - name: Execute Windows pinned Factory v2 SQLite first-replay and owner negative operator tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD:$PWD/tests"
+          python -m unittest discover -s tests -p 'test_aql_factory_f_f2_recovery_research_v2.py' -v
+          python -m unittest discover -s tests -p 'test_atlas_f2_owner_execute_v1.py' -v
+  normalized-parity:
+    needs: [bounded-e,windows-owner-operator-syntax]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: e-gate-*
+          path: evidence
+      - name: Verify normalized SHA across 3 Python interpreters
+        run: |
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          paths=sorted(Path('evidence').glob('*/e-gate-evidence.json'))
+          assert len(paths)==3, paths
+          reports=[json.loads(p.read_text()) for p in paths]
+          perf_paths=sorted(Path('evidence').glob('*/e-factory-performance.json'))
+          assert len(perf_paths)==3, perf_paths
+          performances=[json.loads(p.read_text()) for p in perf_paths]
+          assert all(q['threshold_pass'] and q['experiment_count']==96 and
+                     q['attempts_count']==384 and q['strategy_count']==12 and
+                     q['symbol_count']==8 and q['orders_created']==0 and
+                     q['trading_authority']=='NONE' for q in performances)
+          perf_shas={q['document_set_sha256'] for q in performances}
+          assert len(perf_shas)==1, perf_shas
+          print('ATLAS_E_CROSS_VERSION_BENCHMARK_SHA256='+next(iter(perf_shas)))
+          versions={x['python'].split('.')[0]+'.'+x['python'].split('.')[1] for x in reports}
+          assert versions=={'3.11','3.12','3.13'}, versions
+          sha={x['normalized_sha256'] for x in reports}
+          assert len(sha)==1, sha
+          for x in reports:
+              body=json.dumps(x['normalized'],sort_keys=True,separators=(',',':'),
+                              ensure_ascii=True,allow_nan=False).encode()
+              assert hashlib.sha256(body).hexdigest()==x['normalized_sha256']
+              assert x['normalized']['historical_source']=='HISTORICAL_SOURCE_BLOCKED'
+              assert x['normalized']['final_package_e']=='CLOSED_ENGINEERING_WITH_EXTERNAL_HISTORICAL_BLOCKERS'
+          print('ATLAS_E_CROSS_VERSION_NORMALIZED_SHA256='+next(iter(sha)))
+          print('E_ENGINEERING_BOUNDED_PASS_WITH_HISTORICAL_BLOCKERS')
+          PY

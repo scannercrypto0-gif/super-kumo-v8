@@ -1,0 +1,193 @@
+name: ATLAS H2 Local One-Shot Operator Gate (Synthetic Only)
+on:
+  push:
+    branches: [integration/package-e-g1-g12-pinned-20261105]
+    paths:
+      - 'tools/atlas_h2_owner_local_one_shot_v1.py'
+      - 'tests/test_atlas_h2_owner_local_one_shot_v1.py'
+      - 'tools/atlas_h2_windows_one_shot.ps1'
+      - 'tools/atlas_h2_windows_batch.ps1'
+      - 'tools/atlas_h2_private_batch_bootstrap_v1.py'
+      - 'tools/atlas_h2_binance_public_lane_v1.py'
+      - 'tests/test_atlas_h2_binance_public_lane_v1.py'
+      - 'tests/test_atlas_h2_private_batch_bootstrap_v1.py'
+      - 'tools/atlas_h2_owner_research_authority_v1.py'
+      - 'tests/test_atlas_h2_owner_research_authority_v1.py'
+      - 'tools/atlas_h2_owner_personal_batch_v1.py'
+      - 'tests/test_atlas_h2_owner_personal_batch_v1.py'
+      - 'tools/atlas_h2_owner_identity_v2.py'
+      - 'tools/atlas_h2_owner_evidence_recovery_v2.py'
+      - 'tools/atlas_h2_owner_local_prepare_v2.ps1'
+      - 'tools/atlas_h2_owner_recovery_bundle_v2.ps1'
+      - 'tests/test_atlas_h2_owner_identity_v2.py'
+      - 'tests/test_atlas_h2_owner_evidence_recovery_v2.py'
+      - 'tools/atlas_h2_owner_overlay_smoke_v2.py'
+      - 'tools/atlas_h2_owner_readiness_v2.py'
+      - 'tools/atlas_h2_owner_readiness_bundle_v2.ps1'
+      - 'tools/atlas_h2_owner_execution_overlay_smoke_v2.py'
+      - 'tests/test_atlas_h2_owner_readiness_v2.py'
+      - 'tools/atlas_h2_owner_diagnose_all_v2.py'
+      - 'tools/atlas_h2_owner_diagnose_all_bundle_v2.ps1'
+      - 'tests/test_atlas_h2_owner_diagnose_all_v2.py'
+      - '.github/workflows/atlas-h2-owner-local-one-shot.yml'
+      - 'docs/research/integration-r1-first-original-test-readiness-v1.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  local-operator-synthetic:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.11', '3.14']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Fail-closed authorization and local source denial tests (NO ORIGINAL DATA)
+        shell: python
+        run: |
+          import sys,unittest
+          from pathlib import Path
+          sys.path.insert(0,str(Path.cwd()))
+          sys.path.insert(0,str(Path.cwd()/'tests'))
+          suite=unittest.defaultTestLoader.loadTestsFromNames((
+              'test_atlas_h2_owner_local_one_shot_v1',
+              'test_atlas_h2_private_batch_bootstrap_v1',
+              'test_atlas_h2_owner_research_authority_v1',
+              'test_atlas_h2_owner_personal_batch_v1',
+              'test_atlas_h2_owner_identity_v2',
+              'test_atlas_h2_owner_evidence_recovery_v2',
+              'test_atlas_h2_owner_readiness_v2',
+              'test_atlas_h2_owner_diagnose_all_v2',
+              'test_atlas_h2_binance_public_lane_v1'))
+          result=unittest.TextTestRunner(verbosity=2).run(suite)
+          if not result.wasSuccessful():
+              raise SystemExit(1)
+
+      - name: Reproduce exact pinned owner R2 source overlay module imports (NO ORIGINAL)
+        shell: bash
+        run: |
+          python tools/atlas_h2_owner_overlay_smoke_v2.py --repo . --code-commit 19f24baf32e11b846a4fdf57e90837beb4f72cc0
+
+      - name: Actual Windows owner original H2 and readiness stage parity (NO E SOURCE)
+        shell: bash
+        run: |
+          python tools/atlas_h2_owner_execution_overlay_smoke_v2.py .
+      - name: Windows PowerShell launcher parse and no-manifest denial
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path (Get-Location) 'tools/atlas_h2_windows_one_shot.ps1'),
+            [ref]$tokens, [ref]$parseErrors) | Out-Null
+          $newErrors = $null
+          $newTokens = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path (Get-Location) 'tools/atlas_h2_windows_batch.ps1'),
+            [ref]$newTokens, [ref]$newErrors) | Out-Null
+          if ($newErrors.Count -ne 0) { $newErrors | Out-String | Write-Host; exit 1 }
+          if ($parseErrors.Count -ne 0) {
+            $parseErrors | Out-String | Write-Host
+            exit 1
+          }
+          try {
+            & ./tools/atlas_h2_windows_one_shot.ps1 -PrivateManifest 'NOT_PRESENT' -OwnerHmacKey 'NOT_PRESENT' -AuditOutput 'NOT_PRESENT'
+            throw 'FAIL_OPEN_MISSING_MANIFEST'
+          } catch {
+            if ($_.Exception.Message -notmatch 'OWNER_PRIVATE_MANIFEST_MISSING') { throw }
+            Write-Host 'PASS: no manifest -> no local code fetch or source access'
+          }
+
+      - name: Windows one-command batch smoke without any private evidence
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $evidence = Join-Path $env:TEMP ('aql-h2-ci-empty-' + [guid]::NewGuid().ToString('N'))
+          $out = Join-Path $env:LOCALAPPDATA ('ATLAS/H2-Local-Batch/run-ci-' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+          & pwsh -NoProfile -File ./tools/atlas_h2_windows_batch.ps1 -EvidenceDir $evidence -OutputDir $out -ConfirmOneRun
+          $rc = $LASTEXITCODE
+          if ($rc -ne 2) { throw "FAIL_OPEN_EXPECTED_BLOCKED_EXIT_2_BUT_$rc" }
+          $reportFile = Join-Path $out 'h2-batch-summary.json'
+          if (-not (Test-Path -LiteralPath $reportFile)) {
+            throw 'BATCH_MISSING_CONSOLIDATED_REPORT'
+          }
+          $r = Get-Content -LiteralPath $reportFile -Raw | ConvertFrom-Json
+          if ($r.status -ne 'BLOCKED' -or $r.source_read_status -ne 'NOT_ATTEMPTED') {
+            throw 'BATCH_WRONG_PRIVATE_NO_SOURCE_BOUNDARY'
+          }
+          if ($r.reasons[0] -notmatch 'MISSING_PRIVATE_EVIDENCE') {
+            throw 'BATCH_MISSING_EXACT_EVIDENCE_REASON'
+          }
+          Write-Host 'PASS: one Windows command, exact pinned code, one BLOCKED receipt, no source read'
+          exit 0
+
+      - name: Windows opt-in official Binance lane smoke missing private prerequisites
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $evidence = Join-Path $env:TEMP ('aql-h2-public-empty-' + [guid]::NewGuid().ToString('N'))
+          $out = Join-Path $env:LOCALAPPDATA ('ATLAS/H2-Local-Batch/run-public-ci-' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+          & pwsh -NoProfile -File ./tools/atlas_h2_windows_batch.ps1 -Mode official-binance -EvidenceDir $evidence -OutputDir $out -ConfirmOneRun
+          $rc = $LASTEXITCODE
+          if ($rc -ne 2) { throw "OFFICIAL_LANE_FAIL_OPEN_$rc" }
+          $report = Get-Content -LiteralPath (Join-Path $out 'h2-batch-summary.json') -Raw | ConvertFrom-Json
+          if ($report.status -ne 'BLOCKED' -or $report.source_read_status -ne 'NOT_ATTEMPTED') {
+            throw 'OFFICIAL_LANE_REPORT_UNSAFE'
+          }
+          if ($report.reasons[0] -notmatch 'MISSING_PUBLIC_LANE_EVIDENCE') {
+            throw 'OFFICIAL_LANE_EXPECTED_EVIDENCE_GAP'
+          }
+          Write-Host 'PASS: official opt-in Windows source gate fail closed before E access'
+          exit 0
+
+      - name: Windows personal research lane empty-evidence safe denial (NO ORIGINAL)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $evidence = Join-Path $env:TEMP ('aql-h2-personal-empty-' + [guid]::NewGuid().ToString('N'))
+          $out = Join-Path $env:LOCALAPPDATA ('ATLAS/H2-Local-Batch/run-personal-ci-' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+          & pwsh -NoProfile -File ./tools/atlas_h2_windows_batch.ps1 -Mode owner-personal -EvidenceDir $evidence -OutputDir $out -ConfirmOneRun
+          $rc = $LASTEXITCODE
+          if ($rc -ne 2) { throw "PERSONAL_LANE_FAIL_OPEN_$rc" }
+          $reportFile = Join-Path $out 'h2-batch-summary.json'
+          if (-not (Test-Path -LiteralPath $reportFile)) { throw 'PERSONAL_REPORT_MISSING' }
+          $report = Get-Content -LiteralPath $reportFile -Raw | ConvertFrom-Json
+          if ($report.status -ne 'BLOCKED' -or $report.source_read_status -ne 'NOT_ATTEMPTED') {
+            throw 'PERSONAL_EVIDENCE_FAIL_OPEN'
+          }
+          if ($report.reasons[0] -notmatch 'MISSING_OWNER_PERSONAL_EVIDENCE') {
+            throw 'PERSONAL_MISSING_EXACT_EVIDENCE_REASON'
+          }
+          Write-Host 'PASS: personal mode blocked with missing authenticated evidence, no original source IO'
+          exit 0
+
+      - name: Owner v2 Windows PowerShell 5.1 parser (NO KEY ENROLLMENT)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          if ($PSVersionTable.PSVersion.Major -ne 5) { throw 'WINDOWS_POWERSHELL_51_NOT_USED' }
+          $files = @(
+            'tools/atlas_h2_owner_local_prepare_v2.ps1',
+            'tools/atlas_h2_owner_recovery_bundle_v2.ps1',
+            'tools/atlas_h2_owner_readiness_bundle_v2.ps1',
+            'tools/atlas_h2_owner_diagnose_all_bundle_v2.ps1'
+          )
+          foreach ($f in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Join-Path (Get-Location) $f), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -ne 0) { throw ('OWNER_V2_WINDOWS_SYNTAX_' + $f) }
+          }
+          Write-Host 'PASS: owner v2 enrol/prepare scripts syntactically valid; no key/source operation'
