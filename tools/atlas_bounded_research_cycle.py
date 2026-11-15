@@ -25,22 +25,34 @@ def require(ok, reason):
         raise ValueError(reason)
 
 
-def execute(root, *, fixture, prices=PRICES, interrupt=False, expected_plan=None):
+def execute(root, *, fixture, prices=PRICES, interrupt=False, expected_plan=None, admission=None,
+            start=START):
     require(len(prices) == 4 and all(p is not None for p in prices), "FIXTURE_SOURCE_OUTAGE")
     bars = []
     for index, price in enumerate(prices):
-        opening = START + index * STEP
+        opening = start + index * STEP
         close = opening + STEP - 1
         bars.append(MarketBar("BTCUSDT", "15m", opening, close, price, price + 1,
                               price - 1, price, 4., True, "binance_ws", close + 1).with_checksum())
+    if admission is not None:
+        rows = admission["records"]
+        require(len(rows) == 4 and not admission["missing_opens_ms"] and
+                all(row["evidence_class"] == "TEST_ONLY" and row["is_final"] is True
+                    and row["interval"] == "15m" for row in rows), "DELAYED_FIXTURE_REQUIRED")
+        bars = [MarketBar("BTCUSDT", "15m", row["open_ms"], row["end_exclusive_ms"] - 1,
+                          float(row["open"]), float(row["high"]), float(row["low"]),
+                          float(row["close"]), float(row["base_volume"]), True,
+                          "binance_ws", row["end_exclusive_ms"]).with_checksum() for row in rows]
 
     plan = {
         "grade": "TEST_ONLY", "inputs_sha256": digest([bar.to_dict() for bar in bars]),
         "strategy_fixture_sha256": fixture["sha256"],
         "config_sha256": fixture["payload"]["config_digest"],
-        "first_open_ms": START, "bar_count": len(bars), "step_ms": STEP,
+        "first_open_ms": bars[0].bar_open, "bar_count": len(bars), "step_ms": STEP,
         "clock": "SIMULATED_UTC", "provider_budget": 0,
     }
+    if admission is not None:
+        plan["archive_manifest_sha256"] = admission["manifest_sha256"]
     pin = digest(plan)
     require(expected_plan is None or pin == expected_plan, "RESEARCH_PLAN_MISMATCH")
     root = dedicated_root(root, "atlas-bounded-research-test-only")
@@ -93,7 +105,8 @@ def execute(root, *, fixture, prices=PRICES, interrupt=False, expected_plan=None
     require(factory["g2_sha256"] == core["sha256"] and factory["trading_authority"] == "NONE" and
             not factory["orders_enabled"] and not factory["secretary_enqueued"], "RESEARCH_ONLY")
     census = dict(Counter(row["decision"]["state"] for row in rows))
-    require(census == factory["decision_counts"] == {"UNKNOWN": 3, "NO_SIGNAL": 1}, "FIXTURE_CENSUS")
+    require(census == factory["decision_counts"] and
+            (admission is not None or census == {"UNKNOWN": 3, "NO_SIGNAL": 1}), "FIXTURE_CENSUS")
     # Native receipts carry a per-store journal instance ID. This digest is
     # stable on reopen; distinct stores are compared via their ordered census.
     result = {
