@@ -236,6 +236,10 @@ def signed_fixture(tmp_path_factory):
     ("duplicate_roles", "INDEPENDENT_ROLE_KEYS"),
     ("wrong_signature", "SIGNATURE_INVALID_PUBLISHER"),
     ("late_prefreeze", "PROSPECTIVE_CHRONOLOGY"),
+    ("early_release", "PROSPECTIVE_CHRONOLOGY"),
+    ("broken_receiver", "RECEIVER_BINDING"),
+    ("missing_custodian", "PROOF_POPULATION"),
+    ("holdout_disclosure", "CUSTODY_ACK_BINDING"),
     ("correction", "CORRECTION_QUARANTINE"),
     ("fake_ack", "CUSTODY_ACK_BINDING"),
 ])
@@ -246,11 +250,18 @@ def test_future_signed_proof_contract(signed_fixture, case, reason):
         plan_sha256=owner["plan_sha256"], witnessed_ms=2*r.STEP if case == "late_prefreeze" else 4000))
     if case == "correction":
         release.update(version=2, correction_of="prior")
+    if case == "early_release":
+        release["first_available_ms"] = 1000
     bundle["publisher"] = sign("publisher", release)
-    bundle["receiver"] = sign("receiver", dict(release_sha256=r.digest(bundle["publisher"]), received_ms=2*r.STEP+1))
+    bundle["receiver"] = sign("receiver", dict(
+        release_sha256="0"*64 if case == "broken_receiver" else r.digest(bundle["publisher"]),
+        received_ms=2*r.STEP+1))
     bundle["custodian"] = sign("custodian", dict(received_sha256=r.digest(bundle["receiver"]),
         content_sha256=release["content_sha256"], custody_sha256=owner["custody_sha256"],
-        committed_ms=2*r.STEP+2, immutable_ack=case != "fake_ack", holdout="SEALED_UNOPENED"))
+        committed_ms=2*r.STEP+2, immutable_ack=case != "fake_ack",
+        holdout="0"*64 if case == "holdout_disclosure" else "SEALED_UNOPENED"))
+    if case == "missing_custodian":
+        del bundle["custodian"]
     if case == "wrong_signature":
         release["content_sha256"] = "8"*64
     if case == "duplicate_roles":
@@ -263,3 +274,60 @@ def test_future_signed_proof_contract(signed_fixture, case, reason):
         result = proof.verify_bundle(bundle, keys, pin, plan)
         assert result["status"] == "SIGNED_PROOF_CONTRACT_VERIFIED_RELATIVE_TO_SUPPLIED_PINS"
         assert result["real_science"] == "REAL_PIT_OOS_BLOCKED" and result["collection"] == "NOT_ACTIVATED"
+
+
+@pytest.fixture(scope="module")
+def ordered_fixture(tmp_path_factory):
+    root = tmp_path_factory.mktemp("ordered-fixture") / "rehearsal"
+    result = r.run(root)
+    receipt = json.loads((root / "scanner-census.json").read_bytes())
+    assert result["scanner_receipt_sha256"] == receipt["sha256"]
+    assert result["holdout"] == "SEALED_UNOPENED" and result["cohort_prices_opened"] == 0
+    protocol, packet = r.configuration()
+    return receipt, dict(protocol=protocol, packet=packet, plan=(root / "plan.json").read_bytes(),
+                         plan_sha=result["plan_sha256"], freeze_sha=result["freeze_sha256"])
+
+
+@pytest.mark.parametrize("attack,reason", [
+    ("valid", None),
+    ("missing", "SCANNER_POPULATION"),
+    ("reordered", "SCANNER_ORDER_OR_DECISION"),
+    ("duplicate", "SCANNER_ORDER_OR_DECISION"),
+    ("protocol", "SCANNER_FROZEN_PROTOCOL"),
+    ("source", "SCANNER_PARENTS"),
+    ("core", "SCANNER_CORE_ACK"),
+])
+def test_ordered_fixture_scanner_receipt(ordered_fixture, attack, reason):
+    receipt, parents = deepcopy(ordered_fixture)
+    rows = receipt["decisions"]
+    if attack == "missing":
+        rows.pop()
+    elif attack == "reordered":
+        rows[0], rows[1] = rows[1], rows[0]
+    elif attack == "duplicate":
+        rows[1] = rows[0]
+    elif attack == "protocol":
+        parents["protocol"]["alpha"] = "0.10"
+        receipt["protocol_sha256"] = r.digest(parents["protocol"])
+    elif attack == "source":
+        receipt["source_sha256"] = "0" * 64
+    elif attack == "core":
+        ack = rows[0]["ack"]
+        ack["content_sha256"] = "0" * 64
+        del ack["receipt_sha256"]
+        ack["receipt_sha256"] = r.digest(ack)
+    del receipt["sha256"]
+    receipt["sha256"] = r.digest(receipt)
+    if reason:
+        with pytest.raises(ValueError, match=reason):
+            r.verify_scanner_receipt(receipt, **parents)
+    else:
+        r.verify_scanner_receipt(receipt, **parents)
+
+
+def test_real_evaluation_stops_before_any_custody_access(tmp_path):
+    root = tmp_path / "must-not-exist"
+    with r.patch.object(r, "verify", side_effect=AssertionError("execution started")):
+        with pytest.raises(ValueError, match="REAL_PIT_OOS_BLOCKED"):
+            r.run(root, scientific=True)
+    assert not root.exists()

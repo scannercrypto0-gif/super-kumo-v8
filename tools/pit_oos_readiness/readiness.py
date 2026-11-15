@@ -131,11 +131,15 @@ def configuration():
     return protocol, packet
 
 
+def protocol_bindings(protocol):
+    return dict(evaluator_sha256=digest(FACTORY), search_space_sha256=digest(protocol),
+                all_attempt_inventory_sha256=digest(protocol["candidates"]),
+                risk_exit_sha256=digest(protocol["risk_exit"]))
+
+
 def prepare(root, protocol):
     source, times = protocol["source"], protocol["times"]
-    bindings = dict(evaluator_sha256=digest(FACTORY), search_space_sha256=digest(protocol),
-                    all_attempt_inventory_sha256=digest(protocol["candidates"]),
-                    risk_exit_sha256=digest(protocol["risk_exit"]))
+    bindings = protocol_bindings(protocol)
     plan, plan_sha = commit_research_plan(
         "mock-prospective-299", [(r["candidate_id"], digest(r)) for r in protocol["candidates"]],
         protocol_digest=digest(bindings), dataset_digest=digest(source), split_digest=digest(times),
@@ -241,6 +245,42 @@ def opportunities(protocol, packet):
         yield market_bar(slot, values), state, slot in placebo
 
 
+def verify_scanner_receipt(receipt, *, protocol, packet, plan, plan_sha, freeze_sha):
+    """Check the existing fixture decisions against their frozen slots and Core ACKs."""
+    native_plan = verify_research_plan(plan, plan_sha)
+    source_sha = digest(protocol["source"])
+    require(native_plan["dataset_digest"] == source_sha, "SCANNER_SOURCE_PARENT")
+    require(native_plan["protocol_digest"] == digest(protocol_bindings(protocol)),
+            "SCANNER_FROZEN_PROTOCOL")
+    body = {k: v for k, v in receipt.items() if k != "sha256"}
+    require(receipt.get("sha256") == digest(body), "SCANNER_SEAL")
+    require(body.get("schema") == "aql.pit-oos.fixture-scanner-receipt.v1"
+            and body.get("protocol_sha256") == digest(protocol)
+            and body.get("plan_sha256") == plan_sha
+            and body.get("freeze_sha256") == freeze_sha
+            and body.get("strategy_sha256") == digest(protocol["features"])
+            and body.get("source_sha256") == source_sha
+            and packet["sha256"] == protocol["model_inputs_sha256"], "SCANNER_PARENTS")
+    samples = list(opportunities(protocol, packet))
+    rows = body.get("decisions")
+    require(isinstance(rows, list) and len(rows) == len(samples) == protocol["opportunity_budget"],
+            "SCANNER_POPULATION")
+    for row, (bar, state, placebo) in zip(rows, samples):
+        require(row["open_ms"] == bar.bar_open and row["state"] == state
+                and row["placebo"] is placebo, "SCANNER_ORDER_OR_DECISION")
+        ack = row["ack"]
+        require(ack["receipt_sha256"] == digest({k: v for k, v in ack.items() if k != "receipt_sha256"})
+                and ack["freeze_sha256"] == freeze_sha and ack["stable_key"] == bar.stable_key()
+                and ack["content_sha256"] == fingerprint(content(bar))
+                and ack["status"] == "PASS_SYNTHETIC_ADMISSION_ONLY"
+                and ack["available_at_ms"] == bar.bar_close + 1
+                and ack["observed_at_ms"] == bar.bar_close + 2
+                and ack["commit_return_observed_at_ms"] == bar.ingested_at + 1
+                and ack["partition"] == ("TRAIN" if bar.bar_open < protocol["times"]["train_end_ms"]
+                                         else "VALIDATION")
+                and ack["trading_authority"] == "NONE", "SCANNER_CORE_ACK")
+
+
 def validate_report(report, packet):
     require(report["sha256"] == digest({k: v for k, v in report.items() if k != "sha256"}), "REPORT_SEAL")
     require(report["input_sha256"] == packet["sha256"] and report["actual_fills"] is None
@@ -287,7 +327,8 @@ def verify_journal_scope(root, expected):
         require(observed == expected, "MISSING_FINAL_CUSTODY")
 
 
-def run(root, crash=False):
+def run(root, crash=False, *, scientific=False):
+    require(not scientific, "REAL_PIT_OOS_BLOCKED")
     verify()
     root = Path(root).absolute()
     for path in (root, *root.parents):
@@ -315,7 +356,14 @@ def run(root, crash=False):
         rows.append(dict(open_ms=bar.bar_open, state=state, placebo=placebo, ack=ack))
         if crash:
             os._exit(73)
-    require(len(rows) == protocol["opportunity_budget"] == len({r["open_ms"] for r in rows}), "OPPORTUNITY_CENSUS")
+    plan_sha = witness["payload"]["plan_sha256"]
+    scanner = dict(schema="aql.pit-oos.fixture-scanner-receipt.v1", protocol_sha256=digest(protocol),
+                   plan_sha256=plan_sha, freeze_sha256=freeze, source_sha256=digest(protocol["source"]),
+                   strategy_sha256=digest(protocol["features"]), decisions=rows)
+    scanner["sha256"] = digest(scanner)
+    verify_scanner_receipt(scanner, protocol=protocol, packet=packet, plan=plan,
+                           plan_sha=plan_sha, freeze_sha=freeze)
+    immutable(root / "scanner-census.json", canonical(scanner))
     require(len(journal.replay(symbol="BTC-USD", interval="15m", limit=51)) == len(rows), "JOURNAL_CENSUS")
     acks = {r["open_ms"]: r["ack"] for r in rows}
     for entry in packet["entries"] + packet["null_entries"]:
@@ -324,8 +372,6 @@ def run(root, crash=False):
         for mark in entry["bars"]:
             bar = market_bar(mark["open_ms"], mark)
             require(acks[mark["open_ms"]]["content_sha256"] == fingerprint(content(bar)), "MODEL_SOURCE_SWAP")
-    verify_research_plan(plan, witness["payload"]["plan_sha256"])
-    require(packet["sha256"] == protocol["model_inputs_sha256"], "UNAPPROVED_MODEL_OR_TRIAL")
     store = root / "factory.sqlite"
     if not store.exists():
         migrate_store_v2(store)
@@ -350,7 +396,7 @@ def run(root, crash=False):
     body = dict(schema="aql.pit-oos.readiness-receipt.v1", status="PIT_OOS_READINESS_ARMED",
                 real_science="REAL_PIT_OOS_BLOCKED", collection="NOT_ACTIVATED", authority="NONE",
                 protocol_sha256=digest(protocol), freeze_sha256=freeze,
-                plan_sha256=witness["payload"]["plan_sha256"], report_sha256=report["sha256"],
+                plan_sha256=plan_sha, scanner_receipt_sha256=scanner["sha256"], report_sha256=report["sha256"],
                 package_sha256=package["sha256"],
                 holdout="SEALED_UNOPENED", cohort_prices_opened=0,
                 opportunities=rows, opportunity_census=dict(Counter(r["state"] for r in rows)),
@@ -367,8 +413,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", type=Path)
     parser.add_argument("--crash", action="store_true")
+    parser.add_argument("--scientific", action="store_true", help="Fail closed: real evaluation is unavailable")
     args = parser.parse_args()
-    result = run(args.root, args.crash)
+    result = run(args.root, args.crash, scientific=args.scientific)
     print(json.dumps({k: v for k, v in result.items() if k != "opportunities"}, sort_keys=True))
 
 
