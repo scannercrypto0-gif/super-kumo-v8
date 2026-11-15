@@ -1,0 +1,36 @@
+# Package H — canonical historical-research interface v1 (Integration owns)
+
+Status: **PROVISIONAL RESEARCH_ONLY**, owner Package H mandate [#205/6707637665](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/205#issuecomment-6707637665), Integration [#271/6707641935](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/271#issuecomment-6707641935). No G0, merge, F5, Paper, holdout release or trading. This is the one joint contract across owners, not permission to create another Warehouse/evaluator/Secretary engine.
+
+## G0-GOV-01 handoff and pinned ownership
+Last actual owner-delivered evidence is #271/6707587050 on exact Integration fd3c047cc1e383af3d416a4d8a1e5c7a0d2df6b3: 17 pinned heads; private original 29,376 bars in ten months; 24 attempts = 20 evaluated + four Feb/Aug UNKNOWN; REPLAY_IDENTICAL; research E2E diagnostic PASS; F5 blocked, trading NONE; temporary ZERO-COST policy is *engineering-only*. **Do not rerun or represent this as scientific or economic validation.** All listed PRs are open/Draft/unmerged on inspection.
+
+| Owner / existing source | Reuse in H | Gap / owner deliverable |
+|---|---|---|
+| Core #226 and #275 (Core read-only local query, raw custody, independent #245/#253 and dual readbacks) | Existing local-first portable Warehouse and exact parent receipt SHAs | Core: versioned research-query read-only adapter reporting coverage, cutoff, source and query SHAs, null known-at and NOT_ATTESTED PIT; no duplicate warehouse |
+| Work #235; Scanner #257, #259, #277; `strategy_definition.py`, `indicator_library_v2.py` | Versioned declarative strategy/indicator AST, frozen Work235 reference and Scanner retrospective diagnostics | Scanner: one strategy-neutral, frozen digest and config-checked signal input with a genuinely new TEST_ONLY strategy; reject future/unknown and AST drift |
+| Factory #229, #255, #260, #267; `aql_factory_historical_rule_projection.py`, `aql_factory_f_f2_recovery_research_v2.py` | Existing Decimal costs, causal rule evaluator, immutable SQLite receipt, 24-attempt diagnostic only | Factory: reusable multi-strategy experiment runner, event ledger, economic-attestation separation; scientific Lab *consumes immutable results* |
+| Core Secretary #261/#264 and Factory C/D ACKs | Durable route outbox, idempotency and distinct source/strategy/consumer ACKs | Core + Integration: research-only result handoff adapter, never reusing synthetic AAA APPROVE_TEST_ONLY as historical approval |
+| Discoverer #276 | Optional pinned provenance-aware candidate intake | Optional adapter only, manual strategy research input must work |
+| Audit #256 | Existing independent review process | Final consolidated exact-head adversarial/lineage review; not an automatic approval |
+| Integration #271 | SHA-verified isolated overlay, combined 42-suite collector, exact head parity CI, successful prior owner read-only diagnostic | Own contract, field collision resolution, new H CLI orchestration, one final gate and privacy-safe manifest |
+
+## Canonical envelopes — all top-level objects sealed via SHA-256 of sorted compact ASCII JSON excluding their own `sha256`
+
+**H1 `aql.integration.h.research-experiment.v1`**: `schema`, `experiment_id`, `strategy_id`, `strategy_version`, `strategy_definition_sha256`, `config_sha256`, `code_sha256`, `environment_sha256`, `source_receipt_sha256`, `core_245_query_sha256`, `core_253_query_sha256`, `source_months`, `symbol`, `timeframe`, `decision_cutoff_ms`, `coverage` (admitted / unknown / omitted), `historical_pit` (`NOT_ATTESTED`), `research_window` (train / embargo / sealed holdout boundaries), `cost_policy_sha256`, `economic_status` (`ECONOMIC_NOT_ATTESTED` until independent policy), `execution_scope` (`RESEARCH_ONLY`), `holdout` (`SEALED_UNOPENED`), `trading_authority` (`NONE`), `sha256`. Provenance is never inferred from the frozen fixture.
+
+**H2 `aql.integration.h.immutable-result.v1`**: `schema`, `experiment_sha256`, `factory_store_receipt_sha256`, `trade_event_ledger_sha256`, `attempts_evaluated`, `attempts_unknown`, `attempts_not_evaluated`, `coverage`, `cost_policy_sha256`, `execution_assumptions` (`CONFIRMED_CLOSE`, `NEXT_ELIGIBLE_OPEN`, `UNKNOWN_ON_INTRABAR_TOUCH`), `historical_pit`, `economic_status`, `holdout`, `trading_authority`, `sha256`. Factory owns event generation and writes; consumers read only. No new evaluator implementation in Integration.
+
+**H3 `aql.integration.h.lab-research-evaluation.v1`**: `schema`, `experiment_sha256`, `immutable_result_sha256`, `metrics` (defined gross/net return, drawdown, exposure, turnover, costs only when evidenced), `comparability`, `sample_count`, `unknown_count`, `sensitivity`, `confidence_status`, `economic_status`, `source_status`, `scientific_limitations`, `trading_authority`, `sha256`. Undefined metrics must be null plus explicit reason. Lab does not recompute fills or mutate the result store.
+
+**H4 `aql.integration.h.secretary-research-route.v1`**: `schema`, `event` (`RESEARCH_RESULT_READY` or `RESEARCH_WAIT`), `experiment_sha256`, `immutable_result_sha256` (nullable on WAIT), `lab_report_sha256` (nullable on WAIT), `source_receipt_sha256`, `strategy_definition_sha256`, `config_sha256`, `cost_policy_sha256`, `code_sha256`, `source_ack_sha256` (nullable), `strategy_approval_sha256` (nullable, never inferred), `factory_consumer_ack_sha256` (nullable), `historical_pit`, `economic_status`, `missing_evidence`, `research_only` (true), `f5` (`BLOCKED_EXTERNAL_INPUT`), `paper` (`NOT_ACTIVATED`), `trading_authority` (`NONE`), `sha256`. Consumer cannot manufacture ACKs; research result is never SELECTED, APPROVED_TEST_ONLY or signed F5.
+
+## Non-negotiable admission / compatibility
+- Refuse missing SHA parents, aliasing #245 and #253 query digests, unexpected strategy versions, misbound `strategy_definition_sha256`, future or unclosed candles, inconsistent UTC cutoff, and mutation of an immutable result.
+- Publish **evaluated + unknown + not-evaluated** denominators across complete cohort and Feb/Aug missing-month placeholders. Never convert absence to 0, win, selected or a successful trade.
+- A costless research diagnostic cannot produce a credible net profit claim. Actual economic metrics require a distinct signed/approved nonzero-or-zero *realistic* cost policy; otherwise `ECONOMIC_NOT_ATTESTED`.
+- Original BTCUSDT retrospective 15m cannot inherit synthetic AAA TEST_ONLY strategy approval. `NOT_ATTESTED` PIT and sealed holdout remain explicit.
+- One complete **synthetic** strategy-neutral dual-strategy, Linux/Windows/parity, negative-case gate is the engineering acceptance. Owner-private E: already passed its bounded F2 E2E gate; any **new** original-source execution needs independent owner approval and is not an H completion prerequisite.
+
+## Execution acceptance
+One pinned isolated overlay of exact Core/Scanner/Factory/Discoverer/Integration Draft HEADs, one entrypoint, immutable first/read/replay, Lab read-only consumption, H4 Secretary WAIT/READY delivery, and ONE sanitized SHA-sealed consolidated H evidence manifest with scientific blockers and no authority claims. Owners implement their own modules; Integration reconciles field names, runs final gate and reports actual SHA/status. Avoid serial repeat of older 42 gates and any owner-private probes.

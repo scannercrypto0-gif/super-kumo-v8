@@ -1,0 +1,41 @@
+name: ATLAS F-LAB-3 Integrated Synthetic Research Lifecycle
+on:
+  push:
+    branches: [integration/package-e-g1-g12-pinned-20261105]
+    paths:
+      - 'tools/atlas_f_lab_3_lifecycle_v1.py'
+      - 'tools/atlas_f_lab_3_ci_stage.py'
+      - 'tests/test_atlas_f_lab_3_lifecycle_v1.py'
+      - 'tests/test_atlas_f_lab_3_actual_warehouse_restart_v1.py'
+      - '.github/workflows/atlas-f-lab-3-lifecycle.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-modules-synthetic-lifecycle:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.11', '3.12']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Stage exact role SHA overlays only in disposable CI tree
+        run: python tools/atlas_f_lab_3_ci_stage.py
+      - name: Real Scanner H -> Factory H -> Lab -> Factory F-LAB index -> Core Secretary -> paired Lab
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p test_atlas_f_lab_3_lifecycle_v1.py -v
+
+      - name: Actual disposable Core253 SQLite and real process death recovery
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p test_atlas_f_lab_3_actual_warehouse_restart_v1.py -v

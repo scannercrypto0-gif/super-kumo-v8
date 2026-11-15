@@ -1,0 +1,42 @@
+name: ATLAS operator release readiness
+on:
+  pull_request:
+    branches: [factory/package-e-historical-research-results-20261105]
+    paths:
+      - '.github/workflows/atlas-operator-release-readiness.yml'
+      - 'tools/atlas_operator_*.py'
+      - 'tools/atlas_strategy_operations.py'
+      - 'tools/atlas_saved_research_disposition.py'
+      - 'tools/atlas_recurring_schedule_windows.ps1'
+      - 'tests/check_atlas_operator_release.py'
+permissions:
+  contents: read
+jobs:
+  saved-only:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify saved-only operator contract
+        shell: pwsh
+        run: |
+          git fetch --no-tags origin dd3e149afe73d9d04c9892ad35005b04fb675fff
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Write-Output "Tested merge commit: $(git rev-parse HEAD)"
+          $runtime = Join-Path $env:RUNNER_TEMP 'atlas-operator-runtime'
+          python -B tools/atlas_operator_stage.py $runtime
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $env:PYTHONPATH = "$runtime/src$([IO.Path]::PathSeparator)$runtime"
+          $test = Join-Path $PWD 'tests/check_atlas_operator_release.py'
+          Set-Location $runtime
+          python -B $test
+          exit $LASTEXITCODE

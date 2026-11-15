@@ -1,0 +1,36 @@
+name: ATLAS H2 Option C Historical Policy Gate (Synthetic Only)
+on:
+  push:
+    branches: [integration/package-e-g1-g12-pinned-20261105]
+    paths:
+      - 'tools/atlas_h2_historical_policy_v2.py'
+      - 'tests/test_atlas_h2_historical_policy_v2.py'
+      - '.github/workflows/atlas-h2-option-c-policy-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-policy:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: H2 C explicit PIT and non-PIT boundary (NO ORIGINAL SOURCE)
+        shell: python
+        run: |
+          import sys,unittest
+          from pathlib import Path
+          sys.path.insert(0,str(Path.cwd()))
+          sys.path.insert(0,str(Path.cwd()/'tests'))
+          suite=unittest.defaultTestLoader.loadTestsFromName('test_atlas_h2_historical_policy_v2')
+          result=unittest.TextTestRunner(verbosity=2).run(suite)
+          if not result.wasSuccessful():
+              raise SystemExit(1)
