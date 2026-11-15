@@ -1,10 +1,11 @@
 param(
-    [ValidateSet('install','start','status','stop','rearm','recover','tick','remove')][string]$Mode,
+    [ValidateSet('install','start','status','health','stop','rearm','recover','tick','enable','disable','remove')][string]$Mode,
     [Parameter(Mandatory=$true)][string]$Config,
     [string]$Python, [string]$State, [string]$TaskName,
     [string]$AuthorizedPlan, [string]$AuthorizedPlanSha256,
     [ValidateRange(1,60)][int]$IntervalMinutes = 1,
-    [ValidateRange(2,60)][int]$Ticks = 2
+    [ValidateRange(2,60)][int]$Ticks = 2,
+    [switch]$InstallDisabled
 )
 $ErrorActionPreference = 'Stop'
 $Config = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Config)
@@ -22,6 +23,16 @@ function Invoke-Cycle {
         & $Settings.python -B -m tools.atlas_recurring_research @Arguments
     }
     finally { Pop-Location; $env:PYTHONPATH = $previous }
+}
+
+function Test-Runtime {
+    param($Settings)
+    foreach ($item in $Settings.runtime) {
+        if (!(Test-Path -LiteralPath $item.path -PathType Leaf) -or
+            (Get-FileHash -LiteralPath $item.path).Hash -cne $item.sha256) {
+            throw 'RUNTIME_PIN_MISMATCH'
+        }
+    }
 }
 
 if ($Mode -eq 'install') {
@@ -62,6 +73,14 @@ if ($Mode -eq 'install') {
     }
     $launcher = Join-Path $stage 'schedule.ps1'
     Copy-Item -LiteralPath $PSCommandPath -Destination $launcher
+    $runtime = @($launcher, $Python, "$tree/tools/atlas_recurring_research.py",
+                 "$tree/tools/atlas_bounded_research_cycle.py")
+    if ($AuthorizedPlan) {
+        $runtime += @("$tree/tools/atlas_authorized_archive_research.py",
+                      "$tree/tools/historical_source_qa/qa.py",
+                      "$tree/research_wp_r0/aql_native_binance_zip_v1.py",
+                      "$tree/research_wp_r0/aql_factory_e_research_results_store_v1.py")
+    }
     $first = (Get-Date).AddSeconds(35)
     $duration = New-TimeSpan -Minutes ($IntervalMinutes * ($Ticks - 1)) -Seconds 15
     $settings = [ordered]@{
@@ -70,6 +89,7 @@ if ($Mode -eq 'install') {
         deadline_ms = ([DateTimeOffset]$first.Add($duration).AddSeconds(10)).ToUnixTimeMilliseconds()
         pin = $AuthorizedPlanSha256
         authorized_plan = $AuthorizedPlan
+        runtime = @($runtime | ForEach-Object { @{path=$_;sha256=(Get-FileHash -LiteralPath $_).Hash} })
     }
     if ($AuthorizedPlan) {
         $null = Invoke-Cycle $settings @('status','--state',$State)
@@ -90,29 +110,59 @@ if ($Mode -eq 'install') {
     $user = [Security.Principal.WindowsIdentity]::GetCurrent().Name
     $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $policy -Principal $principal | Out-Null
+    if ($InstallDisabled) { Disable-ScheduledTask -TaskName $TaskName | Out-Null }
     [pscustomobject]@{task=$TaskName; first=$first; pin=$settings.pin; log=$settings.log} | ConvertTo-Json
     return
 }
 
 $settings = Get-Content -LiteralPath $Config -Raw | ConvertFrom-Json
 switch ($Mode) {
-    'start' { Start-ScheduledTask -TaskName $settings.task }
+    'start' {
+        if ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -gt $settings.deadline_ms) { throw 'SCHEDULE_EXPIRED' }
+        Test-Runtime $settings
+        Start-ScheduledTask -TaskName $settings.task
+    }
+    'enable' {
+        if ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -gt $settings.deadline_ms) { throw 'SCHEDULE_EXPIRED' }
+        Test-Runtime $settings
+        Enable-ScheduledTask -TaskName $settings.task | Out-Null
+    }
+    'disable' { Disable-ScheduledTask -TaskName $settings.task | Out-Null }
+    'health' {
+        $task = Get-ScheduledTask -TaskName $settings.task -ErrorAction SilentlyContinue
+        $info = if ($task) { $task | Get-ScheduledTaskInfo }
+        $latest = if (Test-Path -LiteralPath $settings.log) {
+            Get-Content -LiteralPath $settings.log -Tail 1 | ConvertFrom-Json
+        }
+        [ordered]@{task=$settings.task; task_state=if ($task) {[string]$task.State} else {'REMOVED'}
+                   last_task_result=$info.LastTaskResult; missed_runs=$info.NumberOfMissedRuns
+                   deadline_ms=$settings.deadline_ms; latest=$latest} | ConvertTo-Json -Depth 8
+    }
     'remove' { Unregister-ScheduledTask -TaskName $settings.task -Confirm:$false }
     'tick' {
         if ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -gt $settings.deadline_ms) { return }
-        $result = Invoke-Cycle $settings @('recover','--state',$settings.state,'--pin',$settings.pin)
-        $exitCode = $LASTEXITCODE
-        $record = [ordered]@{ utc = [DateTimeOffset]::UtcNow.ToString('o'); exit_code = $exitCode }
-        if ($exitCode -eq 0) {
-            $readback = $result | ConvertFrom-Json
-            $record.status = $readback.status
-            if ($readback.reason) { $record.reason = $readback.reason }
-            $record.receipts = @($readback.windows | ForEach-Object { if ($_.receipt) { $_.receipt.sha256 } })
+        $record = [ordered]@{ utc = [DateTimeOffset]::UtcNow.ToString('o'); exit_code = 1; status = 'FAILED' }
+        try {
+            Test-Runtime $settings
+            $result = Invoke-Cycle $settings @('recover','--state',$settings.state,'--pin',$settings.pin)
+            $record.exit_code = $LASTEXITCODE
+            if ($record.exit_code -eq 0) {
+                $readback = $result | ConvertFrom-Json
+                $record.status = $readback.status
+                if ($readback.reason) { $record.reason = $readback.reason }
+                $record.receipts = @($readback.windows | ForEach-Object { if ($_.receipt) { $_.receipt.sha256 } })
+            }
+        } catch {
+            $record.exit_code = 1
+            $record.reason = if ($_.Exception.Message -eq 'RUNTIME_PIN_MISMATCH') {
+                'RUNTIME_PIN_MISMATCH'
+            } else { 'LOCAL_INVOCATION_FAILED' }
         }
         $record | ConvertTo-Json -Compress | Add-Content -LiteralPath $settings.log -Encoding utf8
-        exit $exitCode
+        exit $record.exit_code
     }
     default {
+        Test-Runtime $settings
         $arguments = @($Mode,'--state',$settings.state)
         if ($Mode -eq 'recover') { $arguments += @('--pin',$settings.pin) }
         Invoke-Cycle $settings $arguments

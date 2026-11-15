@@ -1,6 +1,7 @@
 """Manual, socket-free recurring research windows and immutable completion ledger."""
 import argparse
 from contextlib import closing
+import ctypes
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
@@ -22,6 +23,15 @@ DAY = 86_400_000
 ARCHIVE_MARKER = "atlas-authorized-periodic-v1"
 
 
+def local_archive_source(value):
+    path = Path(value)
+    require(path.is_absolute(), "LOCAL_ARCHIVE_SOURCE_REQUIRED")
+    if os.name == "nt":
+        require(ctypes.windll.kernel32.GetDriveTypeW(path.anchor) == 3,
+                "LOCAL_FIXED_ARCHIVE_DRIVE_REQUIRED")
+    return path
+
+
 def archive_queue(root, jobs, pin, mode, *, now=None, runner=None, reader=None):
     require(isinstance(jobs, list) and 1 <= len(jobs) <= 8 and sha(pin)
             and digest(jobs) == pin, "ARCHIVE_QUEUE_PIN")
@@ -37,6 +47,7 @@ def archive_queue(root, jobs, pin, mode, *, now=None, runner=None, reader=None):
         require(job.get("archive") == f"BTCUSDT-1m-{day}.zip" and
                 job.get("experiment") == f"ATLAS-RETROSPECTIVE-BTCUSDT-{day.replace('-', '')}"
                 and all(sha(job.get(key)) for key in ("archive_sha256", "checksum_sha256"))
+                and type(job.get("original_reads")) is int and job["original_reads"] == 1
                 and job.get("host") == os.environ.get("COMPUTERNAME")
                 and bool(job.get("host"))
                 and all(isinstance(job.get(key), str) and job[key].strip()
@@ -88,7 +99,7 @@ def archive_queue(root, jobs, pin, mode, *, now=None, runner=None, reader=None):
                 for job, row in zip(jobs, rows, strict=True):
                     if row["status"] != "READY":
                         continue
-                    source = Path(job["source"])
+                    source = local_archive_source(job["source"])
                     if not all((source / filename).is_file()
                                for filename in (job["archive"], job["archive"] + ".CHECKSUM")):
                         return {"status": "BLOCKED", "reason": "AUTHORIZED_ARCHIVE_NOT_PRESENT", "windows": rows}

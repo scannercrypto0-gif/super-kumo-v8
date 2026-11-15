@@ -31,7 +31,7 @@ class PeriodicArchiveTests(unittest.TestCase):
             self.jobs.append(dict(start_ms=start, end_ms=start + DAY, cutoff_ms=start + DAY,
                 archive=archive, experiment=f"ATLAS-RETROSPECTIVE-BTCUSDT-{date.replace('-', '')}",
                 archive_sha256="a"*64, checksum_sha256="b"*64, source=str(self.source),
-                host="fixture-host", rights_ref="fixture", authorization_ref="fixture",
+                host="fixture-host", rights_ref="fixture", authorization_ref="fixture", original_reads=1,
                 retention_scope="fixture"))
         self.runner = Mock(side_effect=self.fixture_commit)
         self.reader = Mock(side_effect=lambda target, _: json.loads((target / "result.json").read_text()))
@@ -74,4 +74,26 @@ class PeriodicArchiveTests(unittest.TestCase):
         self.jobs[0]["authorization_ref"] = "fixture"
         (self.source / self.jobs[0]["archive"]).unlink()
         self.assertEqual(self.invoke("recover")["reason"], "AUTHORIZED_ARCHIVE_NOT_PRESENT")
+        self.runner.assert_not_called()
+
+    def test_zero_or_repeated_original_read_scope_is_denied(self):
+        for value in (0, 2, True):
+            with self.subTest(original_reads=value):
+                self.jobs[0]["original_reads"] = value
+                with self.assertRaisesRegex(ValueError, "EXACT_ARCHIVE_AUTHORIZATION_REQUIRED"):
+                    self.invoke("recover")
+        self.runner.assert_not_called()
+
+    def test_local_read_denial_is_not_retried(self):
+        self.runner.side_effect = PermissionError("fixture denies original read")
+        with self.assertRaises(PermissionError):
+            self.invoke("recover")
+        self.assertEqual(self.invoke("recover")["status"], "BLOCKED")
+        self.runner.assert_called_once()
+
+    def test_relative_source_is_rejected_before_a_claim(self):
+        self.jobs[0]["source"] = "relative-source"
+        with self.assertRaisesRegex(ValueError, "LOCAL_ARCHIVE_SOURCE_REQUIRED"):
+            self.invoke("recover")
+        self.assertFalse(list(self.state.glob("*.claim")))
         self.runner.assert_not_called()

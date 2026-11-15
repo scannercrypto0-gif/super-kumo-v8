@@ -94,7 +94,8 @@ For each job include `start_ms`, `end_ms` (one full UTC day),
 `cutoff_ms` (after the end and no later than preflight), `archive`
 (`BTCUSDT-1m-YYYY-MM-DD.zip`), `experiment`
 (`ATLAS-RETROSPECTIVE-BTCUSDT-YYYYMMDD`), `archive_sha256`,
-`checksum_sha256`, `source` (absolute local folder), `host` (Windows
+`checksum_sha256`, `original_reads` (exactly the integer 1),
+`source` (absolute folder on a fixed local drive), `host` (Windows
 COMPUTERNAME), `rights_ref`, `authorization_ref`, and `retention_scope`.
 The references must identify actual permission for one original read on the
 specified host. The operator independently seals the JSON with the native
@@ -103,8 +104,9 @@ changes to the approved plan. Keep the plan and runtime under the operator's
 private ACL. Jan 1 and May 6 are excluded from this queue.
 
 ```powershell
-& $ctl -Mode install -Config $config -State $state -Python $python -TaskName ATLAS-Research-Authorized -AuthorizedPlan $planPath -AuthorizedPlanSha256 $approvedPin -IntervalMinutes 15 -Ticks 4
-& $ctl -Mode status -Config $config
+& $ctl -Mode install -Config $config -State $state -Python $python -TaskName ATLAS-Research-Authorized -AuthorizedPlan $planPath -AuthorizedPlanSha256 $approvedPin -IntervalMinutes 15 -Ticks 4 -InstallDisabled
+& $ctl -Mode health -Config $config
+& $ctl -Mode enable -Config $config
 ```
 
 The install preflight imports the exact #226, #304, #286 and #267 runtime
@@ -125,3 +127,16 @@ and derived records under company policy. Do not deploy an authentic task
 until the exact archive, company-host use, retention, and any required
 acquisition permission are established. Outputs are RETROSPECTIVE_NON_PIT
 and NO_CURRENT_ENTRY.
+
+Health reports native task state, last exit, missed-run count and the last
+sanitized tick. Disable prevents new scheduled invocations; use stop as well
+to hold the next original claim in an active invocation. Enable and start
+reject expired schedules. Reinstall a new finite task with a new config and
+the same private state for a separately approved batch; an older day's claim
+remains durable. The wrapper checks critical staged code, executable and
+launcher hashes before dispatch. Treat a runtime mismatch as a deployment
+failure and preserve the state. Scheduled actions use their saved paths,
+without the installing PowerShell session. The registered limited-user task
+survives reboot and requires that user to log on; catch-up applies only while
+the finite schedule is still valid. This workflow does not configure a
+system-account service, reboot trigger or always-on polling.
