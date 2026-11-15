@@ -50,3 +50,28 @@ The output is the same sealed JSON as the standalone reader. Dashboard
 consumers can read the evidence grade, source and split, cost assumptions,
 opportunity and outcome counts, and cells grouped by partition, cohort,
 scenario and exit policy. Only the report output is intended for consumption.
+
+## Strategy Operations read view
+
+Use the same staged runtime and an independently retained SHA for the
+accepted saved strategy report. Keep the operations checkpoint separate
+from the batch checkpoint and source snapshot.
+
+```powershell
+& $python -B -m tools.atlas_strategy_operations --report $report --report-sha256 $reportPin --checkpoint $operationsStore --output $operationsView
+```
+
+The sealed JSON groups versions by strategy ID and version, preserves
+historical report pins, and exposes coverage, research eligibility,
+accounting cells, cost assumptions and unavailable metrics for the future
+Dashboard. A new view that differs from a prior sealed view needs a new
+output path. Field values under accounting cells are modeled comparisons
+and known-subset sums. Actual fills, actual trading duration and equity
+drawdown require separate evidence.
+
+Operation Manager requests use `--action` and a caller-stable
+`--request-id`. REPORT is allowed. REMOVE_PAPER requires owner approval.
+ADD_PAPER and PROMOTE_LIVE require qualification and authority. The read
+view records the denied requests and provides no state-changing route.
+The Telegram record is a deduplicated offline preview with a generic
+message. No account, network transport or scheduler is needed.
