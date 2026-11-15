@@ -93,3 +93,37 @@ evidence contains no private signer keys.
 
 The genuine cohort status is REAL_PIT_OOS_BLOCKED. The engineering receipt
 describes the bounded rehearsal with collection NOT_ACTIVATED.
+## Frozen BTCUSDT delayed-replay preflight
+
+Use the three unchanged owner-retained files and the externally recorded
+plan SHA. The preflight reads only these bounded JSON manifests.
+
+```powershell
+python -B -m tools.pit_oos_readiness.promotion --plan $plan --protocol $protocol --window $window --plan-sha256 $frozenPlanSha
+```
+
+The result lists only the daily train and validation ZIPs and their checksum
+URLs. It preserves the recorded waiver and evidence grade. A denied
+`--action` returns a sealed decision and exit 2. Keep that decision with
+the existing Operation Manager request audit. The command has no state
+transition or Holdout-release path.
+
+For the future delayed replay, start with permission for the specified
+archives, eligible non-commercial use and retention under the terms in
+effect at download. Wait for all listed daily publications. Retain the ZIP
+and checksum pins, retrieval timestamps and versions. Reject malformed,
+missing or duplicate rows. Quarantine revisions. Use the frozen candidate,
+baseline, costs and terminal rules on train and validation only. Validate
+the evaluator's exact compatibility with this delayed protocol before
+dispatch. Preserve the per-window accounting and receipts against the
+frozen plan.
+
+For separate scientific evaluation, retain an independent timing receipt,
+publisher/reception and custody evidence, ordered Scanner evidence and
+independent custodian access evidence for the same exact prospective
+cohort. Use the existing signed-proof verifier on its native contract.
+That verifier checks signatures and chronology relative to the supplied
+trust pin. Audit acceptance and authorization for actual Lab evaluation,
+Holdout release, and any later Paper or Live transition are separate
+decisions. The recorded waiver on the delayed archive plan keeps this
+particular replay outside scientific PIT/OOS.

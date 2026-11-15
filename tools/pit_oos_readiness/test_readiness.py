@@ -244,6 +244,8 @@ def signed_fixture(tmp_path_factory):
     ("fake_ack", "CUSTODY_ACK_BINDING"),
 ])
 def test_future_signed_proof_contract(signed_fixture, case, reason):
+    from tools.pit_oos_readiness.promotion import inspect_prospective_proof
+
     keys, plan, owner, release, sign = deepcopy(signed_fixture)
     bundle = {"owner": sign("owner", owner)}
     bundle["witness"] = sign("witness", dict(owner_sha256=r.digest(bundle["owner"]),
@@ -269,11 +271,12 @@ def test_future_signed_proof_contract(signed_fixture, case, reason):
     pin = "0"*64 if case == "untrusted_keys" else r.digest(keys)
     if reason:
         with pytest.raises(ValueError, match=reason):
-            proof.verify_bundle(bundle, keys, pin, plan)
+            inspect_prospective_proof(bundle, keys, pin, plan)
     else:
-        result = proof.verify_bundle(bundle, keys, pin, plan)
+        result = inspect_prospective_proof(bundle, keys, pin, plan)
         assert result["status"] == "SIGNED_PROOF_CONTRACT_VERIFIED_RELATIVE_TO_SUPPLIED_PINS"
         assert result["real_science"] == "REAL_PIT_OOS_BLOCKED" and result["collection"] == "NOT_ACTIVATED"
+        assert result["promotion"] == "BLOCKED" and result["audit"] == "NOT_REVIEWED"
 
 
 @pytest.fixture(scope="module")
