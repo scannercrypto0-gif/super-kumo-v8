@@ -35,6 +35,44 @@ function Test-Runtime {
     }
 }
 
+function Read-TickHealth {
+    param($Settings, [long]$NowMs)
+    $latest = $null
+    $lastSuccess = $null
+    $ageMs = $null
+    $invalid = $false
+    if (Test-Path -LiteralPath $Settings.log -PathType Leaf) {
+        foreach ($line in (Get-Content -LiteralPath $Settings.log -Tail 64)) {
+            try {
+                $row = $line | ConvertFrom-Json -ErrorAction Stop
+                if (!$row.utc) { throw 'INVALID_TICK' }
+                $stamp = if ($row.utc -is [DateTime]) { ([DateTimeOffset]$row.utc).ToUnixTimeMilliseconds() }
+                         else { [DateTimeOffset]::Parse([string]$row.utc).ToUnixTimeMilliseconds() }
+                if ($stamp -gt $NowMs -or $null -eq $row.exit_code -or !$row.status) { throw 'INVALID_TICK' }
+                $latest = $row
+                $ageMs = $NowMs - $stamp
+                $invalid = $false
+                if ($row.exit_code -eq 0 -and $row.status -eq 'COMPLETE' -and
+                    @($row.receipts | Where-Object { $_ -cmatch '^[0-9a-f]{64}$' }).Count -gt 0) {
+                    $lastSuccess = $row
+                }
+            } catch {
+                $invalid = $true
+            }
+        }
+    }
+    $cadenceMs = [long]$Settings.interval_minutes * 60000
+    $cycle = if ($invalid) { 'LOG_UNREADABLE' }
+             elseif (!$latest) { 'NO_TICK_EVIDENCE' }
+             elseif ($latest.exit_code -ne 0) { 'LAST_TICK_FAILED' }
+             elseif ($cadenceMs -le 0) { 'CADENCE_UNVERIFIED' }
+             elseif ($ageMs -gt $cadenceMs + 30000) { 'LAST_TICK_STALE' }
+             elseif ($latest.status -ne 'COMPLETE') { 'LAST_TICK_INCOMPLETE' }
+             elseif ($lastSuccess -ne $latest) { 'LAST_TICK_RECEIPT_MISSING' }
+             else { 'RECENT_RESEARCH_RECEIPT' }
+    [ordered]@{cycle_evidence=$cycle; tick_age_ms=$ageMs; latest=$latest; last_success=$lastSuccess}
+}
+
 if ($Mode -eq 'install') {
     if ($TaskName -notmatch '^ATLAS-Research-[A-Za-z0-9-]+$' -or !$Python -or !$State) {
         throw 'TASK_NAME_PYTHON_AND_STATE_REQUIRED'
@@ -86,6 +124,7 @@ if ($Mode -eq 'install') {
     $settings = [ordered]@{
         python = $Python; tree = $tree; state = $State; task = $TaskName
         log = Join-Path $stage 'ticks.jsonl'
+        interval_minutes = $IntervalMinutes
         deadline_ms = ([DateTimeOffset]$first.Add($duration).AddSeconds(10)).ToUnixTimeMilliseconds()
         pin = $AuthorizedPlanSha256
         authorized_plan = $AuthorizedPlan
@@ -131,12 +170,20 @@ switch ($Mode) {
     'health' {
         $task = Get-ScheduledTask -TaskName $settings.task -ErrorAction SilentlyContinue
         $info = if ($task) { $task | Get-ScheduledTaskInfo }
-        $latest = if (Test-Path -LiteralPath $settings.log) {
-            Get-Content -LiteralPath $settings.log -Tail 1 | ConvertFrom-Json
-        }
+        $nowMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+        $evidence = Read-TickHealth $settings $nowMs
+        $runtimeState = 'PIN_VERIFIED'
+        try { Test-Runtime $settings } catch { $runtimeState = 'RUNTIME_PIN_MISMATCH' }
+        $schedulerState = if (!$task) { 'REMOVED' }
+                          elseif ($nowMs -gt $settings.deadline_ms) { 'EXPIRED' }
+                          else { [string]$task.State }
         [ordered]@{task=$settings.task; task_state=if ($task) {[string]$task.State} else {'REMOVED'}
                    last_task_result=$info.LastTaskResult; missed_runs=$info.NumberOfMissedRuns
-                   deadline_ms=$settings.deadline_ms; latest=$latest} | ConvertTo-Json -Depth 8
+                   deadline_ms=$settings.deadline_ms; scheduler_state=$schedulerState
+                   runtime_state=$runtimeState; cycle_evidence=$evidence.cycle_evidence
+                   tick_age_ms=$evidence.tick_age_ms; latest=$evidence.latest
+                   last_success=$evidence.last_success; market_feed_health='NOT_MEASURED'
+                   current_entry='NO_CURRENT_ENTRY'; trading_authority='NONE'} | ConvertTo-Json -Depth 8
     }
     'remove' { Unregister-ScheduledTask -TaskName $settings.task -Confirm:$false }
     'tick' {
@@ -151,6 +198,8 @@ switch ($Mode) {
                 $record.status = $readback.status
                 if ($readback.reason) { $record.reason = $readback.reason }
                 $record.receipts = @($readback.windows | ForEach-Object { if ($_.receipt) { $_.receipt.sha256 } })
+            } else {
+                $record.reason = 'CYCLE_EXIT_NONZERO'
             }
         } catch {
             $record.exit_code = 1

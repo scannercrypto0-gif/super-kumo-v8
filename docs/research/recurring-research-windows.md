@@ -129,7 +129,18 @@ acquisition permission are established. Outputs are RETROSPECTIVE_NON_PIT
 and NO_CURRENT_ENTRY.
 
 Health reports native task state, last exit, missed-run count and the last
-sanitized tick. Disable prevents new scheduled invocations; use stop as well
+sanitized tick. It separates task registration/deadline, staged runtime pins,
+recent research receipts and unmeasured market feed state. Use the
+`cycle_evidence` field to distinguish absent, stale, failed, incomplete or
+unreadable ticks. A recent completed tick with receipt pins is evidence
+for local research only. The freshness limit is the configured interval
+plus 30 seconds. Legacy configs without a recorded interval report
+`CADENCE_UNVERIFIED` for otherwise valid ticks. The last successful receipt
+within the bounded log tail remains available after a failure. Before
+recovering from a runtime mismatch, restage the approved bytes and keep
+the same state and plan pin.
+
+Disable prevents new scheduled invocations; use stop as well
 to hold the next original claim in an active invocation. Enable and start
 reject expired schedules. Reinstall a new finite task with a new config and
 the same private state for a separately approved batch; an older day's claim
@@ -140,3 +151,22 @@ without the installing PowerShell session. The registered limited-user task
 survives reboot and requires that user to log on; catch-up applies only while
 the finite schedule is still valid. This workflow does not configure a
 system-account service, reboot trigger or always-on polling.
+
+## Future deployment boundary
+
+- Keep the Windows task and its private NTFS checkpoint as the local
+  runtime. Keep #305 session/quota state separate from the historical
+  research queue and from any read-only reporting host.
+- Netlify can host static presentation for approved, sanitized exports.
+  Its background functions have a finite execution limit of 15 minutes,
+  so a continuously connected market worker needs a separate managed
+  process with a durable checkpoint and a controlled egress identity.
+  See [Netlify Background Functions](https://docs.netlify.com/build/functions/background-functions/).
+- If remote reporting later needs authenticated state, Supabase/Postgres
+  is a candidate for sealed report metadata and access-scoped reads.
+  Import by existing report/plan SHA, preserve idempotency, restrict
+  writes to the worker principal and scope read access with database
+  grants and RLS. Test a logical restore and reconcile receipt counts and
+  SHA pins before moving consumers. Private source material stays on the
+  approved host. See [Supabase access policies](https://supabase.com/docs/guides/database/postgres/row-level-security)
+  and [backups](https://supabase.com/docs/guides/platform/backups).
