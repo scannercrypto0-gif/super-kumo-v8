@@ -2,6 +2,7 @@ param(
     [ValidateSet('install','start','status','stop','rearm','recover','tick','remove')][string]$Mode,
     [Parameter(Mandatory=$true)][string]$Config,
     [string]$Python, [string]$State, [string]$TaskName,
+    [string]$AuthorizedPlan, [string]$AuthorizedPlanSha256,
     [ValidateRange(1,60)][int]$IntervalMinutes = 1,
     [ValidateRange(2,60)][int]$Ticks = 2
 )
@@ -13,7 +14,13 @@ function Invoke-Cycle {
     $previous = $env:PYTHONPATH
     $env:PYTHONPATH = "$($Settings.tree)/src;$($Settings.tree)"
     Push-Location -LiteralPath $Settings.tree
-    try { & $Settings.python -B -m tools.atlas_recurring_research @Arguments }
+    try {
+        if ($Settings.authorized_plan) {
+            $Arguments += @('--authorized-plan',$Settings.authorized_plan,
+                            '--authorized-plan-sha256',$Settings.pin)
+        }
+        & $Settings.python -B -m tools.atlas_recurring_research @Arguments
+    }
     finally { Pop-Location; $env:PYTHONPATH = $previous }
 }
 
@@ -37,6 +44,22 @@ if ($Mode -eq 'install') {
     foreach ($file in 'atlas_bounded_research_cycle.py','atlas_recurring_research.py') {
         Copy-Item "$repo/tools/$file" "$tree/tools"
     }
+    if ($AuthorizedPlan) {
+        if ($AuthorizedPlanSha256 -cnotmatch '^[0-9a-f]{64}$') { throw 'AUTHORIZED_PLAN_PIN_REQUIRED' }
+        $AuthorizedPlan = (Resolve-Path -LiteralPath $AuthorizedPlan).Path
+        $dependencies = @(
+            @{sha='d0782682eba2cf842ec00b75fa85a273c76323be'; path='research_wp_r0/aql_native_binance_zip_v1.py'},
+            @{sha='e0e08a8381a8cceaaa44d6ae2721e9cb0d004648'; path='tools/historical_source_qa'},
+            @{sha='831fe426ea55f6b30fbbb86ddfe01a7ed194eba2'; path='research_wp_r0/aql_factory_e_research_results_store_v1.py'}
+        )
+        foreach ($dependency in $dependencies) {
+            $bundle = Join-Path $stage ($dependency.sha + '.zip')
+            git -C $repo archive --format=zip "--output=$bundle" $dependency.sha $dependency.path
+            if ($LASTEXITCODE) { throw 'PINNED_ARCHIVE_DEPENDENCY_REQUIRED' }
+            Expand-Archive -LiteralPath $bundle -DestinationPath $tree -Force
+        }
+        Copy-Item "$repo/tools/atlas_authorized_archive_research.py" "$tree/tools"
+    }
     $launcher = Join-Path $stage 'schedule.ps1'
     Copy-Item -LiteralPath $PSCommandPath -Destination $launcher
     $first = (Get-Date).AddSeconds(35)
@@ -45,11 +68,17 @@ if ($Mode -eq 'install') {
         python = $Python; tree = $tree; state = $State; task = $TaskName
         log = Join-Path $stage 'ticks.jsonl'
         deadline_ms = ([DateTimeOffset]$first.Add($duration).AddSeconds(10)).ToUnixTimeMilliseconds()
-        pin = $null
+        pin = $AuthorizedPlanSha256
+        authorized_plan = $AuthorizedPlan
     }
-    $plan = Invoke-Cycle $settings @('plan') | ConvertFrom-Json
-    if ($LASTEXITCODE) { throw 'PLAN_FAILED' }
-    $settings.pin = $plan.sha256
+    if ($AuthorizedPlan) {
+        $null = Invoke-Cycle $settings @('status','--state',$State)
+        if ($LASTEXITCODE) { throw 'AUTHORIZED_PLAN_PREFLIGHT_FAILED' }
+    } else {
+        $plan = Invoke-Cycle $settings @('plan') | ConvertFrom-Json
+        if ($LASTEXITCODE) { throw 'PLAN_FAILED' }
+        $settings.pin = $plan.sha256
+    }
     $settings | ConvertTo-Json | Set-Content -LiteralPath $Config -Encoding utf8
     $engine = (Get-Process -Id $PID).Path
     $action = New-ScheduledTaskAction -Execute $engine -Argument (
@@ -61,7 +90,7 @@ if ($Mode -eq 'install') {
     $user = [Security.Principal.WindowsIdentity]::GetCurrent().Name
     $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $policy -Principal $principal | Out-Null
-    [pscustomobject]@{task=$TaskName; first=$first; pin=$plan.sha256; log=$settings.log} | ConvertTo-Json
+    [pscustomobject]@{task=$TaskName; first=$first; pin=$settings.pin; log=$settings.log} | ConvertTo-Json
     return
 }
 
@@ -77,6 +106,7 @@ switch ($Mode) {
         if ($exitCode -eq 0) {
             $readback = $result | ConvertFrom-Json
             $record.status = $readback.status
+            if ($readback.reason) { $record.reason = $readback.reason }
             $record.receipts = @($readback.windows | ForEach-Object { if ($_.receipt) { $_.receipt.sha256 } })
         }
         $record | ConvertTo-Json -Compress | Add-Content -LiteralPath $settings.log -Encoding utf8
