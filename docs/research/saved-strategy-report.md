@@ -75,3 +75,22 @@ ADD_PAPER and PROMOTE_LIVE require qualification and authority. The read
 view records the denied requests and provides no state-changing route.
 The Telegram record is a deduplicated offline preview with a generic
 message. No account, network transport or scheduler is needed.
+
+## Unified operator report
+
+Export health using the current recurring Windows wrapper in `health`
+mode. Supply the SHA-256 of the exact exported file, the saved strategy
+report seal and the Phase 5 preflight seal. Use the same staged runtime as
+Strategy Operations. The explicit as-of time makes the report reproducible
+and allows an old health snapshot to age into stale evidence.
+
+```powershell
+& $python -B -m tools.atlas_operator_report --strategy $report --strategy-sha256 $reportPin --health $health --health-sha256 $healthFilePin --preflight $phase5 --preflight-sha256 $phase5Pin --checkpoint $operationsStore --output $operatorReport --as-of-ms $asOfMs
+```
+
+The single report reuses the existing operations checkpoint. It preserves
+the latest tick, last successful receipt and last failed tick available in
+the bounded log tail. The runtime snapshot may describe fixture execution
+while the strategy projection describes an earlier retained actual cohort.
+Their provenance stays separate. The future scientific plan is reported
+as a separate gate with no operating authority.

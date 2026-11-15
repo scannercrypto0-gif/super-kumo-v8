@@ -39,6 +39,7 @@ function Read-TickHealth {
     param($Settings, [long]$NowMs)
     $latest = $null
     $lastSuccess = $null
+    $lastFailure = $null
     $ageMs = $null
     $invalid = $false
     if (Test-Path -LiteralPath $Settings.log -PathType Leaf) {
@@ -56,6 +57,7 @@ function Read-TickHealth {
                     @($row.receipts | Where-Object { $_ -cmatch '^[0-9a-f]{64}$' }).Count -gt 0) {
                     $lastSuccess = $row
                 }
+                if ($row.exit_code -ne 0) { $lastFailure = $row }
             } catch {
                 $invalid = $true
             }
@@ -70,7 +72,8 @@ function Read-TickHealth {
              elseif ($latest.status -ne 'COMPLETE') { 'LAST_TICK_INCOMPLETE' }
              elseif ($lastSuccess -ne $latest) { 'LAST_TICK_RECEIPT_MISSING' }
              else { 'RECENT_RESEARCH_RECEIPT' }
-    [ordered]@{cycle_evidence=$cycle; tick_age_ms=$ageMs; latest=$latest; last_success=$lastSuccess}
+    [ordered]@{cycle_evidence=$cycle; tick_age_ms=$ageMs; latest=$latest; last_success=$lastSuccess
+               last_failure=$lastFailure; freshness_limit_ms=if ($cadenceMs -gt 0) {$cadenceMs + 30000}}
 }
 
 if ($Mode -eq 'install') {
@@ -177,12 +180,16 @@ switch ($Mode) {
         $schedulerState = if (!$task) { 'REMOVED' }
                           elseif ($nowMs -gt $settings.deadline_ms) { 'EXPIRED' }
                           else { [string]$task.State }
-        [ordered]@{task=$settings.task; task_state=if ($task) {[string]$task.State} else {'REMOVED'}
+        [ordered]@{schema='aql.recurring-runtime.health.v1'; observed_at_ms=$nowMs
+                   task=$settings.task; task_state=if ($task) {[string]$task.State} else {'REMOVED'}
+                   source_mode=if ($settings.authorized_plan) {'AUTHORIZED_RETAINED_ARCHIVE'} else {'TEST_ONLY'}
                    last_task_result=$info.LastTaskResult; missed_runs=$info.NumberOfMissedRuns
                    deadline_ms=$settings.deadline_ms; scheduler_state=$schedulerState
                    runtime_state=$runtimeState; cycle_evidence=$evidence.cycle_evidence
                    tick_age_ms=$evidence.tick_age_ms; latest=$evidence.latest
-                   last_success=$evidence.last_success; market_feed_health='NOT_MEASURED'
+                   freshness_limit_ms=$evidence.freshness_limit_ms
+                   last_success=$evidence.last_success; last_failure=$evidence.last_failure
+                   market_feed_health='NOT_MEASURED'
                    current_entry='NO_CURRENT_ENTRY'; trading_authority='NONE'} | ConvertTo-Json -Depth 8
     }
     'remove' { Unregister-ScheduledTask -TaskName $settings.task -Confirm:$false }

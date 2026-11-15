@@ -133,7 +133,8 @@ def preview(checkpoint, row):
 
 
 def run(report_path, expected, checkpoint, output, *, action="REPORT", request_id=None):
-    report_path, checkpoint, output = map(safe, (report_path, checkpoint, output))
+    report_path, checkpoint = map(safe, (report_path, checkpoint))
+    output = safe(output) if output is not None else None
     require(len({report_path, checkpoint, output}) == 3 and report_path.is_file()
             and report_path.stat().st_size <= 5_000_000, "OPERATIONS_PATH_SCOPE")
     require(action == "REPORT" or request_id is not None, "CHANGE_REQUEST_ID_REQUIRED")
@@ -149,7 +150,8 @@ def run(report_path, expected, checkpoint, output, *, action="REPORT", request_i
                 execution_authority="NONE",
                 notifications=[records[key] for key in sorted(records) if key.startswith("PREVIEW-")])
     view = {**body, "sha256": digest(body)}
-    publish(output, view)
+    if output is not None:
+        publish(output, view)
     return view, event
 
 
