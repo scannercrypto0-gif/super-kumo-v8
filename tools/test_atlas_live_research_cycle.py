@@ -65,6 +65,44 @@ authority = SimpleNamespace(
 def wait(seconds):
     clock.current += round(seconds * 1000)
 class LiveResearchTests(unittest.TestCase):
+    def test_delayed_renewal_cannot_revive_expired_lease(self):
+        clock.current = slot
+
+        def late_renewal(lease_id, **scope):
+            clock.current += 11_000
+            return lease_record(**scope)
+
+        with patch.object(authority, "renew_research_lease", side_effect=late_renewal):
+            with Lease(authority, {"connections": 2}, now=clock.now) as lease:
+                clock.current += 50_000
+                with self.assertRaisesRegex(ValueError, "LEASE_RENEWAL_AFTER_EXPIRY"):
+                    lease.check()
+
+    def test_authority_loss_does_not_reconnect_market_transport(self):
+        clock.current = slot + 100
+        transport = Wire()
+        with tempfile.TemporaryDirectory() as tmp, patch.object(
+            authority, "renew_research_lease", side_effect=TimeoutError("authority offline")
+        ), patch.object(authority, "release_research_lease") as release, patch.object(
+            socket, "socket", side_effect=AssertionError("NETWORK_DISABLED")
+        ):
+            with self.assertRaisesRegex(ValueError, "LEASE_AUTHORITY_LOST"):
+                run(Path(tmp), plan, pin, fixture, verifier=authority, clock=clock,
+                    transport=transport, wait=wait, synthetic=True)
+            self.assertEqual(transport.attempts, 1)
+            release.assert_called_once()
+
+    def test_conflicting_external_reservation_does_not_connect(self):
+        clock.current = slot + 100
+        transport = Wire()
+        with tempfile.TemporaryDirectory() as tmp, patch.object(
+            authority, "acquire_research_lease", side_effect=ValueError("LEASE_CONFLICT")
+        ):
+            with self.assertRaisesRegex(ValueError, "LEASE_CONFLICT"):
+                run(Path(tmp), plan, pin, fixture, verifier=authority, clock=clock,
+                    transport=transport, wait=wait, synthetic=True)
+            self.assertEqual(transport.attempts, 0)
+
     def test_missed_final_and_second_writer_fail_closed(self):
         raw = json.dumps({"k": {"t": slot + STEP, "s": "BTCUSDT", "i": "15m", "x": True}}).encode()
         with self.assertRaisesRegex(ValueError, "FINALIZED_SOURCE_GAP"):

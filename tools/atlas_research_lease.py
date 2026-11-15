@@ -13,22 +13,32 @@ class Lease:
         self.record = self.authority.acquire_research_lease(**self.scope)
         try:
             self.check()
-        except Exception:
-            self.__exit__()
+        except Exception as exc:
+            self.__exit__(type(exc), exc, exc.__traceback__)
             raise
         return self
 
-    def __exit__(self, *_):
+    def __exit__(self, exc_type, exc_value, traceback):
         if isinstance(self.record, dict) and self.record.get("lease_id"):
-            self.authority.release_research_lease(lease_id=self.record["lease_id"], **self.scope)
+            try:
+                self.authority.release_research_lease(lease_id=self.record["lease_id"], **self.scope)
+            except Exception as exc:
+                if exc_type is None:
+                    raise ValueError("LEASE_RELEASE_UNCONFIRMED") from exc
 
     def check(self):
         record = self.record
         now = self.now()
         self.validate(record, now)
         if record["expires_ms"] - now <= 35_000:
-            renewed = self.authority.renew_research_lease(lease_id=record["lease_id"], **self.scope)
-            self.validate(renewed, self.now())
+            try:
+                renewed = self.authority.renew_research_lease(lease_id=record["lease_id"], **self.scope)
+            except Exception as exc:
+                # Authority failure must never enter the market transport retry path.
+                raise ValueError("LEASE_AUTHORITY_LOST") from exc
+            completed = self.now()
+            need(completed < record["expires_ms"], "LEASE_RENEWAL_AFTER_EXPIRY")
+            self.validate(renewed, completed)
             need(renewed["lease_id"] == record["lease_id"] and
                  renewed["expires_ms"] > record["expires_ms"], "LEASE_RENEWAL_INVALID")
             self.record = renewed
