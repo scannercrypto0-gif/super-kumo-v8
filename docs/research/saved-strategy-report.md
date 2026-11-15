@@ -29,3 +29,24 @@ The JSON seals the original lineage, split, strategy, cost assumptions,
 accounting verifier, counts and per-cell known-subset totals. Unknowns stay
 in the denominator. No absolute equity, portfolio return or actionable price
 is inferred. Re-run with the same pins to verify an unchanged report.
+
+## Single-job saved batch
+
+Stage `tools/research_capacity_scale` and its Factory runtime from #297
+`dd3e149afe73d9d04c9892ad35005b04fb675fff` and the bridge tools from #300
+`403e247a807b165bc1d6c63991981ce10bc7f6c7` in the same disposable
+runtime. Keep the explicitly staged #267 saved readers and #309 verifier.
+The archive-dispatch entry point in #300 is for its source-enabled workflow.
+
+```powershell
+& $python -B -m tools.atlas_saved_strategy_batch --saved $snapshot --plan-sha256 $planPin --result-file-sha256 $resultFilePin --store-file-sha256 $storePin --strategy-sha256 $strategyPin --report-sha256 $previouslyAcceptedReportPin --saved-only --output $report --checkpoint $batchStore
+```
+
+Use a dedicated checkpoint outside the snapshot for each job. The native
+store seals one scope and one terminal result. On restart an accepted,
+externally pinned report is published from that checkpoint without another
+accounting pass. Rejected and failed terminal states stay in the checkpoint.
+The output is the same sealed JSON as the standalone reader. Dashboard
+consumers can read the evidence grade, source and split, cost assumptions,
+opportunity and outcome counts, and cells grouped by partition, cohort,
+scenario and exit policy. Only the report output is intended for consumption.
