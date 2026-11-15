@@ -40,17 +40,28 @@ def proof(root):
                    decision_cutoff_ms=START + STEP + 3)
     cutoff = START + 4 * STEP + 3
     ledger = Reconciliation(root / "reconciliation.sqlite")
-    original = ledger.append(item, receipt, manifest=manifest, cutoff_ms=cutoff)
+    receipt_pin = digest(receipt)
+    pins = dict(manifest_sha256=admitted["manifest_sha256"], receipt_sha256=receipt_pin)
+    changed = dict(receipt, decision_sha256="0"*64)
+    try:
+        ledger.append(item, changed, manifest=manifest, cutoff_ms=cutoff, **pins)
+    except ValueError as exc:
+        assert "ORIGINAL_RECEIPT_PIN" in str(exc)
+    else:
+        raise AssertionError("ORIGINAL_RECEIPT_PIN")
+    original = ledger.append(item, receipt, manifest=manifest, cutoff_ms=cutoff, **pins)
     assert original["category"] == "MATCH"
     native_rows[0][2] = "101"
     second, check2, manifest2 = source.archive(native_rows, interval="15m", start=START,
                                                unit="us", version="fixture-v2")
     corrected = qa.admit(second, check2, manifest2, digest(manifest2))
-    revision = ledger.append(corrected["records"][0], receipt, manifest=manifest2, cutoff_ms=cutoff)
+    revision = ledger.append(corrected["records"][0], receipt, manifest=manifest2, cutoff_ms=cutoff,
+                             manifest_sha256=corrected["manifest_sha256"], receipt_sha256=receipt_pin)
     assert revision["category"] == "CORRECTED_ARCHIVE_VERSION"
     assert revision["comparison"] == "DIFFERENCE" and revision["previous"] == original["sha256"]
     assert original["receipt"] == revision["receipt"] == receipt
-    assert Reconciliation(ledger.db).append(item, receipt, manifest=manifest, cutoff_ms=cutoff) == original
+    assert Reconciliation(ledger.db).append(item, receipt, manifest=manifest, cutoff_ms=cutoff,
+                                            **pins) == original
     assert revision["current_entry"] == "NO_CURRENT_ENTRY"
     def rejects(reason, action):
         try:
@@ -64,20 +75,27 @@ def proof(root):
     wrong_unit = dict(manifest, timestamp_unit="ms")
     rejects("TIMESTAMP_UNIT", lambda: qa.admit(archive, checksum, wrong_unit, digest(wrong_unit)))
     rejects("BYTE_PIN", lambda: qa.admit(archive, check2, manifest, digest(manifest)))
-    rejects("RECEIPT_CUTOFF", lambda: ledger.append(item, receipt, manifest=manifest, cutoff_ms=START))
-    rejects("RECEIPT_PARENT", lambda: ledger.append(item, dict(receipt, is_final=False),
-                                                    manifest=manifest, cutoff_ms=cutoff))
-    rejects("ORIGINAL_RECEIPT_CHANGED", lambda: ledger.append(item, dict(receipt, decision_sha256="0"*64),
-                                                             manifest=manifest, cutoff_ms=cutoff))
+    rejects("RECEIPT_CUTOFF", lambda: ledger.append(item, receipt, manifest=manifest,
+                                                    cutoff_ms=START, **pins))
+    nonfinal = dict(receipt, is_final=False)
+    rejects("RECEIPT_PARENT", lambda: ledger.append(item, nonfinal, manifest=manifest, cutoff_ms=cutoff,
+                                                    **(pins | {"receipt_sha256": digest(nonfinal)})))
+    rejects("ORIGINAL_RECEIPT_CHANGED", lambda: ledger.append(item, changed, manifest=manifest,
+            cutoff_ms=cutoff, **(pins | {"receipt_sha256": digest(changed)})))
+    wrong_version = dict(item, source_version="foreign")
+    wrong_version["sha256"] = digest({k: v for k, v in wrong_version.items() if k != "sha256"})
+    rejects("ARCHIVE_PARENT", lambda: ledger.append(wrong_version, receipt, manifest=manifest,
+                                                    cutoff_ms=cutoff, **pins))
     gap_manifest = dict(manifest, source_version="fixture-gap")
-    gap = ledger.append(None, receipt, manifest=gap_manifest, cutoff_ms=cutoff)
+    gap = ledger.append(None, receipt, manifest=gap_manifest, cutoff_ms=cutoff,
+                        manifest_sha256=digest(gap_manifest), receipt_sha256=receipt_pin)
     assert gap["comparison"] == "GAP"
     return {"grade": "TEST_ONLY", "mode": "RESEARCH_DELAYED", "current_entry": "NO_CURRENT_ENTRY",
             "factory_output": research["factory"], "factory_admission": research["factory_admission"],
             "strict_pit_oos": "BLOCKED", "archive_manifest_sha256": digest(manifest),
             "archive_input_sha256": research["plan"]["inputs_sha256"], "research_sha256": research["sha256"],
             "initial": original, "correction": revision, "gap": gap,
-            "negative_cases": 6, "provider_calls": 0}
+            "negative_cases": 8, "provider_calls": 0}
 
 
 def main():

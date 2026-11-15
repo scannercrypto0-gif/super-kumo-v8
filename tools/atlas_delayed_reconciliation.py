@@ -24,8 +24,10 @@ class Reconciliation(DurableG2Bridge):
         _, _, tail = super()._replay(con, prospective=ingest)
         return records, {}, tail
 
-    def append(self, archive, receipt, *, manifest, cutoff_ms):
-        """Use already-verified archive rows and the original retained receipt envelope."""
+    def append(self, archive, receipt, *, manifest, manifest_sha256, receipt_sha256, cutoff_ms):
+        """Require pins from the verified upstream admission and receipt records."""
+        require(sha(manifest_sha256) and digest(manifest) == manifest_sha256, "MANIFEST_PARENT_PIN")
+        require(sha(receipt_sha256) and digest(receipt) == receipt_sha256, "ORIGINAL_RECEIPT_PIN")
         require(manifest["evidence_class"] in ("TEST_ONLY", "RETROSPECTIVE_NON_PIT")
                 and manifest["rights_status"] == {
                     "TEST_ONLY": "TEST_ONLY", "RETROSPECTIVE_NON_PIT": "VERIFIED_FOR_EXACT_USE"
@@ -48,6 +50,11 @@ class Reconciliation(DurableG2Bridge):
             require(all(archive[name] == value for name, value in key.items())
                     and archive["is_final"] is True
                     and archive["source_manifest_sha256"] == manifest_pin
+                    and archive["source_version"] == manifest["source_version"]
+                    and archive["evidence_class"] == manifest["evidence_class"]
+                    and archive["product"] == "BINANCE_VISION"
+                    and archive["publisher_first_available_at_ms"] is None
+                    and archive["pit"] == "NOT_ATTESTED"
                     and archive["sha256"] == digest({k: v for k, v in archive.items() if k != "sha256"}),
                     "ARCHIVE_PARENT")
         archive_sha = archive["sha256"] if archive else None

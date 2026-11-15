@@ -47,7 +47,9 @@ Exact replays return the original record. A different archive version adds a
 linked record, with comparison MATCH, DIFFERENCE or GAP. Changed content under
 the same version or changed original receipt/decision rejects. The retained
 receipt envelope and archive admission must be verified by their original
-consumers before this join. No current-entry route is exposed.
+consumers before this join. Pass their verified receipt-envelope and manifest
+digests as separate pins, including on the first append. No current-entry
+route is exposed.
 
 A real delayed run requires one authorized, locally retained native ZIP,
 companion checksum, and pinned source/version manifest with exact-use and
