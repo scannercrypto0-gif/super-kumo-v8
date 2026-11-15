@@ -53,3 +53,30 @@ to start, expect exit 73, then recover with the same pin. A subsequent
 start and a separate status should match the recovered JSON exactly.
 The original retained archive's result remains RETROSPECTIVE_NON_PIT.
 The recurring path has no Lab, live, orders or current entry output.
+
+## Bounded automatic fixture qualification
+
+The Windows Task Scheduler wrapper stages the same pinned runtime and calls
+its existing recover command. Register under the logged-in user with limited
+rights. Use a fresh state and an existing private directory for configuration.
+Install registers a finite two-tick schedule by default and starts it at the
+first trigger. The staged config remains available for readback after removal.
+
+```powershell
+$ctl = '.\tools\atlas_recurring_schedule_windows.ps1'
+$config = Join-Path $env:LOCALAPPDATA 'atlas-research-proof.json'
+$state = Join-Path $env:LOCALAPPDATA 'atlas-research-proof-state'
+$python = 'C:\Users\dell\Desktop\ATLAS-Quant-Lab\.venv\Scripts\python.exe'
+& $ctl -Mode install -Config $config -State $state -Python $python -TaskName ATLAS-Research-Proof
+& $ctl -Mode status -Config $config
+```
+
+Use the same config with Mode start for an on-demand trigger within the
+deadline, stop to pause fixture windows, rearm to clear the request, recover
+for explicit offline catch-up, and remove to unregister the task. Review
+ticks.jsonl in the staged runtime for exit status and receipt pins. A failed
+tick can be retried by the next scheduled trigger within the finite deadline.
+The task uses the logged-in user session and cannot run while the PC is off.
+Windows may run a missed trigger when available within the deadline. A
+recovery invocation picks up unfinished logical windows and skips committed
+ones. No automatic original-source execution is configured.
