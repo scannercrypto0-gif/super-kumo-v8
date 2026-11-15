@@ -32,6 +32,28 @@ def validate_plan(plan, strategy_pin):
                     for value in costs.values()), "COST_SCOPE")
 
 
+def verify_saved_accounting(root, result):
+    # SQLite can create sidecars even in read-only WAL mode.
+    filenames = ["result.json", "market-plan.json", "factory.sqlite"]
+    ordered = "scanner_receipt_sha256" in result
+    if ordered:
+        for filename in ("scanner-census.json", "candidate.json", "native-plan.json", "discoverer-ledger.json"):
+            source = root / filename
+            require(source.is_file() and not source.is_symlink() and source.stat().st_size <= 5_000_000,
+                    f"SCANNER_PARENT_MISSING_OR_INVALID: {filename}")
+            filenames.append(filename)
+    with TemporaryDirectory() as scratch:
+        staging = Path(scratch)
+        for filename in filenames:
+            shutil.copyfile(root / filename, staging / filename)
+        validated = verify(staging)
+    require(validated["result_sha256"] == result["sha256"], "SAVED_MODEL_PARENT")
+    if ordered:
+        require(validated.get("scanner_membership", {}).get("receipt_sha256")
+                == result["scanner_receipt_sha256"], "SCANNER_VERIFIER_REQUIRED")
+    return validated
+
+
 def build(root, *, plan_pin, result_file_pin, store_file_pin, strategy_pin, saved_only):
     require(saved_only, "SAVED_READ_AUTHORITY_REQUIRED")
     plan = read(root / "market-plan.json")
@@ -39,15 +61,9 @@ def build(root, *, plan_pin, result_file_pin, store_file_pin, strategy_pin, save
     validate_plan(plan, strategy_pin)
     lab = read_saved_lab(root, result_file_sha256=result_file_pin,
                          plan_sha256=plan_pin, store_file_sha256=store_file_pin)
-    # The legacy verifier opens SQLite in read-only WAL mode, which can create
-    # sidecars. Keep those on a disposable copy, away from the pinned snapshot.
-    with TemporaryDirectory() as scratch:
-        staging = Path(scratch)
-        for filename in ("result.json", "market-plan.json", "factory.sqlite"):
-            shutil.copyfile(root / filename, staging / filename)
-        validated = verify(staging)
     result = read(root / "result.json")
-    require(validated["result_sha256"] == lab["result_sha256"] == result["sha256"] and
+    validated = verify_saved_accounting(root, result)
+    require(lab["result_sha256"] == result["sha256"] and
             validated["verified_cost_rows"] == lab["populations"]["cost_rows"]
             and validated["scientific_status"] == lab["scientific_status"] == "REAL_PIT_OOS_BLOCKED",
             "SAVED_MODEL_PARENT")
@@ -89,8 +105,11 @@ def build(root, *, plan_pin, result_file_pin, store_file_pin, strategy_pin, save
                 lab="NOT_ELIGIBLE_FOR_SCIENTIFIC_PIT_OOS", secretary="WAIT", orders=0, actual_fills=None,
                 limitations=["Known subset sums exclude unresolved rows and are not portfolio returns.",
                              "One source population; no survivorship or out-of-sample performance claim.",
-                             "Standalone ordered Scanner receipt is unavailable in the legacy saved schema.",
                              "Workload selection for this report does not constitute a new freeze or trial."])
+    if "scanner_membership" in validated:
+        body["scanner_membership"] = validated["scanner_membership"]
+    else:
+        body["limitations"].insert(2, "Standalone ordered Scanner receipt is unavailable in the legacy saved schema.")
     return {**body, "sha256": digest(body)}
 
 
