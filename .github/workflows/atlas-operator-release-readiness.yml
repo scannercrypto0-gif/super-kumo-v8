@@ -1,7 +1,7 @@
 name: ATLAS operator release readiness
 on:
-  push:
-    branches: [integration/package-e-g1-g12-pinned-20261105]
+  pull_request:
+    branches: [factory/package-e-historical-research-results-20261105]
     paths:
       - '.github/workflows/atlas-operator-release-readiness.yml'
       - 'tools/atlas_operator_*.py'
@@ -31,6 +31,7 @@ jobs:
         run: |
           git fetch --no-tags origin dd3e149afe73d9d04c9892ad35005b04fb675fff
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Write-Output "Tested merge commit: $(git rev-parse HEAD)"
           $runtime = Join-Path $env:RUNNER_TEMP 'atlas-operator-runtime'
           python -B tools/atlas_operator_stage.py $runtime
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
