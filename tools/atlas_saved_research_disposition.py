@@ -32,7 +32,8 @@ def without_seal(doc):
     return digest({key: value for key, value in doc.items() if key != "sha256"})
 
 
-def disposition(root, *, expected_result, plan, expected_plan, as_of_ms, saved_only):
+def disposition(root, *, expected_result, plan, expected_plan, as_of_ms, saved_only,
+                decision_open_ms=None):
     require(saved_only, "SAVED_READ_AUTHORITY_REQUIRED")
     require(digest(plan) == expected_plan, "APPROVED_PLAN_PIN")
     result, source, scanner, ack = (read(root / name) for name in
@@ -54,13 +55,17 @@ def disposition(root, *, expected_result, plan, expected_plan, as_of_ms, saved_o
             and source["rights_status"] == "VERIFIED_FOR_EXACT_USE"
             and source["publisher_first_available_at_ms"] is None
             and source["pit"] == "NOT_ATTESTED"
+            and source["source_version"] == source["archive_sha256"]
             and job["archive_sha256"] == source["archive_sha256"] == result["archive_sha256"]
             and job["checksum_sha256"] == source["checksum_sha256"] == result["checksum_sha256"],
             "SOURCE_SCOPE_DRIFT")
     rows = scanner["decisions"]
     require([row["open_ms"] for row in rows] == list(range(opening, end, STEP))
             and all(row["historical_bar_end_ms"] == row["open_ms"] + STEP
-                    and row["historical_known_at_ms"] is None for row in rows)
+                    and row["historical_known_at_ms"] is None
+                    and isinstance(row["derived_sha256"], str)
+                    and len(row["derived_sha256"]) == 64
+                    and all(c in "0123456789abcdef" for c in row["derived_sha256"]) for row in rows)
             and len(rows) == result["derived_rows"]
             and dict(Counter(row["state"] for row in rows)) == result["census"], "SCANNER_CENSUS_OR_TIME")
     store = root / "factory.sqlite"
@@ -84,7 +89,8 @@ def disposition(root, *, expected_result, plan, expected_plan, as_of_ms, saved_o
             and factory["trading_authority"] == "NONE", "FACTORY_PARENT_DRIFT")
     core = query_local(root / "core", job["experiment"], 1, opening, end, cutoff,
                        required_source_sha256=source["archive_sha256"],
-                       require_complete=True, sqlite_immutable=True)
+                       require_complete=True, sqlite_immutable=True,
+                       expected_saved_query_sha256=scanner["core253"])
     require(core["query_sha256"] == scanner["core253"] and core["coverage"] == "COMPLETE"
             and len(core["bars"]) == result["native_rows"], "CORE_SAVED_QUERY_DRIFT")
     fixture = read(FIXTURE)[0]["payload"]
@@ -118,6 +124,16 @@ def disposition(root, *, expected_result, plan, expected_plan, as_of_ms, saved_o
                   census=result["census"], eligibility=gate, lab=result["lab"],
                   secretary={"disposition": "WAIT_AUTHENTICATED_PARENTS", "dispatch": None},
                   current_entry="NO_CURRENT_ENTRY", orders=0, original_reads=0)
+    if decision_open_ms is not None:
+        require(type(decision_open_ms) is int and opening <= decision_open_ms < end
+                and (decision_open_ms - opening) % STEP == 0, "ORDERED_DECISION_SCOPE")
+        position = (decision_open_ms - opening) // STEP
+        report["scanner_membership"] = {
+            "position": position, "decision": rows[position], "decision_sha256": digest(rows[position]),
+            "ordered_census_sha256": digest(rows), "scanner_receipt_sha256": report["scanner_sha256"],
+            "source_version": source["source_version"], "core253_query_sha256": core["query_sha256"],
+            "discoverer": "NOT_APPLICABLE_SCANNER_LANE", "known_at": "KNOWN_AT_UNATTESTED",
+        }
     return {**report, "sha256": digest(report)}
 
 
@@ -146,12 +162,14 @@ def main():
     parser.add_argument("--result-sha256", required=True)
     parser.add_argument("--as-of-ms", required=True, type=int)
     parser.add_argument("--saved-only", action="store_true")
+    parser.add_argument("--decision-open-ms", type=int)
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     with patch.object(socket, "socket", side_effect=AssertionError("NETWORK_DISABLED")):
         report = disposition(args.saved, expected_result=args.result_sha256,
                              plan=read(args.plan), expected_plan=args.plan_sha256,
-                             as_of_ms=args.as_of_ms, saved_only=args.saved_only)
+                             as_of_ms=args.as_of_ms, saved_only=args.saved_only,
+                             decision_open_ms=args.decision_open_ms)
         publish(args.output, report)
     print(report["sha256"])
 

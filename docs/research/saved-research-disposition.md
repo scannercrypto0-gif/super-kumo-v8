@@ -11,7 +11,11 @@ Use an isolated copy of the pinned periodic runtime (Core #286 and Factory
 reader #267, as staged by the [Windows operator guide](recurring-research-windows.md)).
 Copy `tools/atlas_saved_research_disposition.py` and
 `research_wp_r0/aql_factory_authentic_research_admission.py` from this #271
-checkout into their matching paths in that isolated runtime. Run from the
+checkout into their matching paths in that isolated runtime. Overlay
+`research_wp_r0/aql_core_backbone_local_v1.py` from #286
+`9e868b8bdad898b8bf266748868d1b62646c3b62`. This Core read requires the
+saved query pin and validates Bridge metadata and the checkpointed index.
+Run from the
 staged runtime with its root and src on PYTHONPATH, and supply the originally
 recorded plan and result pins. Use only quiescent, checkpointed saved state.
 
@@ -27,3 +31,9 @@ that path. Output carries trace ID, both Core pins, Scanner and Factory
 pins, scientific refusal, Lab ineligibility and Secretary WAIT with null
 dispatch. The Core245 receipt is preserved by its existing parent pin;
 the saved readback invokes Core253. Historical entries remain NO_CURRENT_ENTRY.
+
+Supply `--decision-open-ms` with an on-grid UTC epoch-millisecond opening
+to include an individual decision, its position and hash, the ordered
+census hash and its existing Scanner and Core253 parent hashes. Use a new
+output path for this form. The May 8 Scanner lane holds the ordered
+census inline and does not use a Discoverer candidate.
