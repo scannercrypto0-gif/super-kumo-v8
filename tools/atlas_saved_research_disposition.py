@@ -11,10 +11,6 @@ import tempfile
 from unittest.mock import patch
 
 from aql.observation.contracts import digest
-from research_wp_r0.aql_core_backbone_local_v1 import query_local
-from research_wp_r0.aql_factory_authentic_research_admission import assess_research_admission, seal
-from research_wp_r0.aql_factory_e_research_results_store_v1 import read_experiment
-from tools.atlas_prospective_observe import FIXTURE
 
 STEP = 900_000
 
@@ -35,6 +31,11 @@ def without_seal(doc):
 def disposition(root, *, expected_result, plan, expected_plan, as_of_ms, saved_only,
                 decision_open_ms=None):
     require(saved_only, "SAVED_READ_AUTHORITY_REQUIRED")
+    from research_wp_r0.aql_core_backbone_local_v1 import query_local
+    from research_wp_r0.aql_factory_authentic_research_admission import assess_research_admission, seal
+    from research_wp_r0.aql_factory_e_research_results_store_v1 import read_experiment
+    from tools.atlas_prospective_observe import FIXTURE
+
     require(digest(plan) == expected_plan, "APPROVED_PLAN_PIN")
     result, source, scanner, ack = (read(root / name) for name in
                                     ("result.json", "source.json", "scanner.json", "factory-ack.json"))
