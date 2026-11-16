@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 
 from aql.observation.contracts import digest
 from research_wp_r0.aql_factory_e_research_results_store_v1 import migrate_store_v2
+from tools.atlas_operator_report import runtime_view
 from tools.atlas_operator_readback import publish
 from tools.research_capacity_scale.runtime import catalog, store
 
@@ -144,6 +145,15 @@ def accept(root):
     invoke((("--stage2-evidence", foreign_path),), "STAGE2_EVIDENCE_PIN")
     invoke((("--stage2-evidence", foreign_path), ("--stage2-evidence-sha256", foreign["sha256"])),
             "STAGE2_REPORT_PARENT")
+
+    daily_path = root / "daily-health.json"
+    publish(daily_path, {**health, "source_mode": "AUTHORIZED_RETAINED_ARCHIVE",
+                         "source_cadence": "DAILY_UTC", "cycle_evidence": "WAIT_FOR_SOURCE",
+                         "tick_age_ms": None, "freshness_limit_ms": 86_430_000,
+                         "last_success": None, "last_failure": None, "next_check_ms": 200_000})
+    daily_pin = sha256(daily_path.read_bytes()).hexdigest()
+    assert runtime_view(daily_path, daily_pin, 100_000)["cycle_evidence"] == "WAIT_FOR_SOURCE"
+    assert runtime_view(daily_path, daily_pin, 230_001)["cycle_evidence"] == "LAST_TICK_STALE"
     assert {path.name: path.read_bytes() for path in inputs_on_disk} == before
     print("SYNTHETIC_RELEASE_CONTRACT_PASS", result["sha256"])
     print("STAGE2_OPERATOR_VISIBILITY_PASS", joined["sha256"])

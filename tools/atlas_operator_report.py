@@ -31,8 +31,13 @@ def runtime_view(path, pin, as_of_ms):
             and health["current_entry"] == "NO_CURRENT_ENTRY", "RUNTIME_HEALTH_CONTRACT")
     observed, limit, tick_age = (health[key] for key in (
         "observed_at_ms", "freshness_limit_ms", "tick_age_ms"))
+    daily = health.get("source_cadence") == "DAILY_UTC"
+    require(health.get("source_cadence") is None or
+            (daily and health["source_mode"] == "AUTHORIZED_RETAINED_ARCHIVE"
+             and type(limit) is int and limit == 86_430_000), "RUNTIME_CADENCE")
+    max_limit = 86_430_000 if daily else 3_630_000
     require(type(observed) is type(as_of_ms) is int and 0 <= observed <= as_of_ms
-            and (limit is None or (type(limit) is int and 0 < limit <= 3_630_000))
+            and (limit is None or (type(limit) is int and 0 < limit <= max_limit))
             and (tick_age is None or (type(tick_age) is int and tick_age >= 0)),
             "RUNTIME_CLOCK")
     snapshot_age = as_of_ms - observed
@@ -41,6 +46,19 @@ def runtime_view(path, pin, as_of_ms):
     state = health["cycle_evidence"]
     if state == "RECENT_RESEARCH_RECEIPT" and freshness != "RECENT":
         state = "LAST_TICK_STALE" if freshness == "STALE" else "CADENCE_UNVERIFIED"
+    if daily:
+        next_check = health.get("next_check_ms")
+        require(next_check is None or (type(next_check) is int and next_check > 0), "RUNTIME_NEXT_CHECK")
+        if state == "WAIT_FOR_SOURCE" and (freshness == "STALE"
+                or (next_check is not None and as_of_ms > next_check + 30_000)):
+            state, freshness = "LAST_TICK_STALE", "STALE"
+        success = health["last_success"]
+        if success is not None:
+            day = success["source_day_ms"]
+            require(type(day) is int and day > 0 and day % 86_400_000 == 0
+                    and day + 86_400_000 <= observed, "RUNTIME_SOURCE_DAY")
+            last_due = ((as_of_ms - 21_600_000) // 86_400_000 - 1) * 86_400_000
+            health["source_freshness"] = "STALE" if day < last_due else "LATEST_DUE_DAY_RECEIVED"
     return {**health, "cycle_evidence": state, "tick_freshness": freshness,
             "tick_age_at_report_ms": age, "snapshot_age_ms": snapshot_age, "health_file_sha256": pin}
 
