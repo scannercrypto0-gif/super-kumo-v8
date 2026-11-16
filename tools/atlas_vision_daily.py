@@ -194,14 +194,14 @@ def main():
     elif args.mode == "status":
         result = {"status": "STOPPED" if (state / "stop.request").exists() else "AVAILABLE",
                   "completed_days": len(list(daily.glob("*.done.json")))}
+    elif args.mode == "stop":
+        (state / "stop.request").touch()
+        result = {"status": "STOPPED"}
     else:
         daily.mkdir(exist_ok=True)
         with closing(sqlite3.connect(daily / "writer.sqlite", timeout=0)) as lock:
             lock.execute("BEGIN EXCLUSIVE")
-            if args.mode == "stop":
-                (state / "stop.request").touch()
-                result = {"status": "STOPPED"}
-            elif args.mode == "rearm":
+            if args.mode == "rearm":
                 (state / "stop.request").unlink(missing_ok=True)
                 result = {"status": "AVAILABLE"}
             else:
