@@ -30,7 +30,7 @@ jobs:
           git fetch --no-tags origin refs/pull/297/head refs/pull/288/head refs/pull/300/head refs/pull/309/head refs/pull/305/head
           stage="$RUNNER_TEMP/binance-ws-receive"
           python -B tools/atlas_sma_paper_stage.py "$stage"
-          git archive 0a45cb6de6027b6fba54320e07b0faf3317a5382 tools/binance_live_feed | tar -xf - -C "$stage"
+          python -B -c 'import sys; from pathlib import Path; sys.path.insert(0,"tools"); from atlas_sma_paper_stage import extract; extract(Path(sys.argv[1]),"0a45cb6de6027b6fba54320e07b0faf3317a5382","tools/binance_live_feed")' "$stage"
           cp tools/{atlas_ws_receive_diagnostics,test_atlas_ws_receive_diagnostics}.py "$stage/tools/"
           cd "$stage"
           python -m pip install websocket-client==1.9.2
