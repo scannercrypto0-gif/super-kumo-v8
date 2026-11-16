@@ -50,8 +50,9 @@ def operational_guard(root):
     need(shutil.disk_usage(root).free >= 128 * 1024 * 1024, "DISK_RESERVE_LOW")
 
 
-def consume(root, journal, store, observer, now, wait):
+def consume(root, journal, store, observer, now, wait, *, slot, plan_pin):
     meta, seal, bar = load_frame(root)
+    need(meta["slot"] == slot and meta["session"] == plan_pin[:24], "LIVE_RECEIPT_SESSION")
     remaining = bar.ingested_at - now()
     if remaining > 0:
         wait(remaining / 1000)
@@ -142,7 +143,8 @@ def observe(root, plan, pin, fixture, clock, transport, wait, uncertainty, synth
             stream.flush()
             os.fsync(stream.fileno())
     need(json.loads(manifest.read_text(encoding="utf-8")) == plan, "STATE_PLAN_MISMATCH")
-    rows = recover(root, journal, store, observer, first, clock.now, wait, count=plan["bar_count"])
+    rows = recover(root, journal, store, observer, first, clock.now, wait,
+                   count=plan["bar_count"], plan_pin=pin)
     target = 1 if stop_after_first else plan["bar_count"]
     if len(rows) >= target:
         return {**report(root, fixture, clock.now(), synthetic=synthetic), "bars": rows}
@@ -210,13 +212,14 @@ def observe(root, plan, pin, fixture, clock, transport, wait, uncertainty, synth
     raise ValueError("SOURCE_OUTAGE")
 
 
-def recover(root, journal, store, observer, first, now, wait, *, count=2):
+def recover(root, journal, store, observer, first, now, wait, *, plan_pin, count=2):
     rows = []
     for slot in range(first, first + count * STEP, STEP):
         path = root / str(slot)
         if (path / "receipt.sqlite").is_file():
             need(slot == first + len(rows) * STEP, "RECOVERY_SOURCE_GAP")
-            rows.append(consume(path, journal, store, observer, now, wait))
+            rows.append(consume(path, journal, store, observer, now, wait,
+                                slot=slot, plan_pin=plan_pin))
     need([bar.bar_open for bar in journal.replay("BTCUSDT", "15m", limit=count + 1)] ==
          [row["slot"] for row in rows], "RECOVERY_CUSTODY_MISMATCH")
     return rows
@@ -241,11 +244,12 @@ def ingest(root, raw, rows, first, received, uncertainty, monotonic_ns, pin,
     path = dedicated_root(root / str(slot), "atlas-live-research-bar")
     if slot < expected:
         meta, _, _ = load_frame(path)
+        need(meta["slot"] == slot and meta["session"] == pin[:24], "LIVE_RECEIPT_SESSION")
         need(hashlib.sha256(raw).hexdigest() == meta["payload_sha256"], "CANDLE_REVISION")
         return None
     persist_frame(path, raw, slot=slot, received=received, uncertainty=uncertainty,
                   monotonic_ns=monotonic_ns, session=pin[:24])
-    return consume(path, journal, store, observer, now, wait)
+    return consume(path, journal, store, observer, now, wait, slot=slot, plan_pin=pin)
 
 
 def make_plan(slot, fixture, count=2):
@@ -315,7 +319,7 @@ def main():
             store = OperationalStore(str(root / "market.sqlite"))
             observer = ProspectiveObserver(root / "g2.sqlite", journal, store, fixture, synthetic=False)
             rows = recover(root, journal, store, observer, plan["slot"], now, time.sleep,
-                           count=plan["bar_count"])
+                           count=plan["bar_count"], plan_pin=args.pin)
             result = {**report(root, fixture, now()), "bars": rows}
     else:
         need(args.authority_module is not None, "CONTROLLED_EGRESS_AUTHORITY_UNAVAILABLE")

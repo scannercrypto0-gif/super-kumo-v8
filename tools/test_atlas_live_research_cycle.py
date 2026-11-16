@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 from aql.observation.contracts import digest
 from tools.atlas_research_lease import Lease
+from tools.atlas_single_receipt import persist_frame
 from tools.atlas_live_research_cycle import operational_guard, ingest
 from tools.atlas_live_research_cycle import FIXTURE, STEP, make_plan, run, report, recover, DurableJournal, OperationalStore, ProspectiveObserver
 
@@ -65,6 +66,28 @@ authority = SimpleNamespace(
 def wait(seconds):
     clock.current += round(seconds * 1000)
 class LiveResearchTests(unittest.TestCase):
+    def test_recovery_rejects_foreign_session_before_ack(self):
+        clock.current = slot + STEP + 499
+        close = slot + STEP - 1
+        raw = json.dumps({"E": close + 10, "k": dict(s="BTCUSDT", i="15m",
+            t=slot, T=close, o="100", h="102", l="99", c="101", v="3", x=True)}).encode()
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(socket, "socket", side_effect=AssertionError("NETWORK_DISABLED")), \
+             patch("time.time", side_effect=lambda: clock.now()/1000), \
+             patch("aql.observation.prospective.time_ns", side_effect=lambda: clock.now()*1000000):
+            root = Path(tmp)
+            path = root / str(slot)
+            path.mkdir()
+            foreign_pin = digest(make_plan(slot, fixture, count=3))
+            persist_frame(path, raw, slot=slot, received=clock.now(), uncertainty=10,
+                          monotonic_ns=clock.monotonic_ns(), session=foreign_pin[:24])
+            journal = DurableJournal(str(root / "journal.sqlite"))
+            store = OperationalStore(str(root / "market.sqlite"))
+            observer = ProspectiveObserver(root / "g2.sqlite", journal, store, fixture, synthetic=True)
+            with self.assertRaisesRegex(ValueError, "^LIVE_RECEIPT_SESSION$"):
+                recover(root, journal, store, observer, slot, clock.now, wait, plan_pin=pin)
+            self.assertEqual(journal.replay("BTCUSDT", "15m", limit=3), [])
+
     def test_delayed_renewal_cannot_revive_expired_lease(self):
         clock.current = slot
 
@@ -168,5 +191,6 @@ class LiveResearchTests(unittest.TestCase):
                 journal = DurableJournal(str(root / 'journal.sqlite'))
                 store = OperationalStore(str(root / 'market.sqlite'))
                 observer = ProspectiveObserver(root / 'g2.sqlite', journal, store, fixture, synthetic=True)
-                self.assertEqual(recover(root, journal, store, observer, slot, clock.now, wait), result['bars'])
+                self.assertEqual(recover(root, journal, store, observer, slot, clock.now, wait,
+                                         plan_pin=pin), result['bars'])
                 print("TEST_ONLY reconnect=1 durable_bars=2 duplicate_ignored=1 negative_missing_authority=PASS")
