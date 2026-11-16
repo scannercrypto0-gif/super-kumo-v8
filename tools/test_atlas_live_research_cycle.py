@@ -11,7 +11,9 @@ from unittest.mock import patch
 from aql.observation.contracts import digest
 from tools.atlas_research_lease import Lease
 from tools.atlas_single_receipt import persist_frame
-from tools.atlas_live_research_cycle import operational_guard, ingest, saved_operations_progress, saved_pilot_summary
+from tools.atlas_live_research_cycle import (
+    ingest, operational_guard, read_service_receipt, saved_operations_progress, saved_pilot_summary,
+)
 from tools.atlas_live_research_cycle import FIXTURE, STEP, make_plan, run, report, recover, DurableJournal, OperationalStore, ProspectiveObserver
 
 fixture = json.loads(FIXTURE.read_text())[0]
@@ -66,6 +68,53 @@ authority = SimpleNamespace(
 def wait(seconds):
     clock.current += round(seconds * 1000)
 class LiveResearchTests(unittest.TestCase):
+    def test_sustained_receipts_survive_new_segment_without_filling_gap(self):
+        class SegmentWire(Wire):
+            def __init__(self, root, opening):
+                self.root = root
+                self.opening = opening
+
+            def frame(self, connection, timeout):
+                if self.calls:
+                    (self.root / "stop.request").touch()
+                close = self.opening + STEP - 1
+                clock.current = close + 500
+                self.calls += 1
+                return "text", json.dumps({"E": close + 10, "k": dict(s="BTCUSDT",
+                    i="15m", t=self.opening, T=close, o="100", h="102", l="99", c="101",
+                    v="3", x=True)}).encode()
+
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(socket, "socket", side_effect=AssertionError("NETWORK_DISABLED")), \
+             patch("time.time", side_effect=lambda: clock.now()/1000), \
+             patch("aql.observation.prospective.time_ns", side_effect=lambda: clock.now()*1000000):
+            segments = Path(tmp)
+            receipts = []
+            for opening in (slot, slot + 2 * STEP):
+                clock.current = opening + 60_000
+                root = segments / str(opening)
+                service_plan = make_plan(opening, fixture, 8, sustained_research=True)
+                service_pin = digest(service_plan)
+                qual = dict(plan_sha256=service_pin, endpoint=service_plan["endpoint"], raw_retention_ms=0,
+                            source_rights_ref="fixture", region_ref="fixture", custody_ref="fixture",
+                            network_permission_ref="fixture", clock_checked_ms=clock.now(),
+                            clock_uncertainty_ms=10, state_path=str(root.resolve()))
+                result = run(root, service_plan, service_pin, fixture, verifier=None, clock=clock,
+                             transport=SegmentWire(root, opening), wait=wait, synthetic=True,
+                             pilot_qualification=qual)
+                self.assertEqual(result["status"], "STOPPED_BY_OPERATOR")
+                path = segments / "receipts" / f"{opening}.json"
+                receipt = read_service_receipt(path)
+                receipts.append(receipt)
+                self.assertEqual(receipt["current_entry"], "NO_CURRENT_ENTRY")
+                self.assertNotIn('"100"', path.read_text())
+            self.assertIsNone(receipts[0]["previous_sha256"])
+            self.assertEqual(receipts[1]["previous_sha256"], receipts[0]["sha256"])
+            self.assertEqual(receipts[1]["missing_slots"], 1)
+            self.assertEqual(len(list((segments / "receipts").iterdir())), 2)
+            for name in ("receipt.sqlite", "journal.sqlite", "market.sqlite", "g2.sqlite"):
+                self.assertFalse(any(segments.rglob(name)))
+
     def test_operations_reconnect_cap_and_saved_stop_state(self):
         clock.current = slot + 100
         operation = make_plan(slot, fixture, 2, bounded_operations=True)

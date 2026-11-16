@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import shutil
 import sqlite3
+from tempfile import NamedTemporaryFile
 import time
 from uuid import uuid4
 
@@ -99,18 +100,23 @@ def factory_report(observer, cutoff):
 def run(root, plan, pin, fixture, *, verifier, clock, transport, wait=time.sleep, synthetic=False,
         stop_after_first=False, pilot_qualification=None):
     pilot = pilot_qualification is not None
-    operations = plan.get("bounded_operations") is True
+    sustained = plan.get("sustained_research") is True
+    operations = plan.get("bounded_operations") is True or sustained
     need(synthetic or type(transport) is BinanceReceiptTransport, "LIVE_TRANSPORT_REQUIRED")
     need(not synthetic or not isinstance(transport, BinanceReceiptTransport), "OFFLINE_TRANSPORT_REQUIRED")
     need(plan == make_plan(plan["slot"], fixture, plan["bar_count"],
-                           bounded_pilot=pilot and not operations, bounded_operations=pilot and operations)
+                           bounded_pilot=pilot and not operations,
+                           bounded_operations=pilot and operations and not sustained,
+                           sustained_research=pilot and sustained)
          and digest(plan) == pin, "LIVE_PLAN_PIN")
     need(not operations or not stop_after_first, "OPERATIONS_REQUIRES_TWO_CYCLES")
     need(verifier is not None or pilot, "CONTROLLED_EGRESS_AUTHORITY_UNAVAILABLE")
     need(not pilot or verifier is None, "PILOT_AUTHORITY_MODE_CONFLICT")
     start = clock.now()
     need(plan["slot"] <= start < plan["slot"] + plan["wall_ms"], "OUTSIDE_DECLARED_START")
-    if start >= plan["slot"] + 5000:
+    if sustained:
+        need(start < plan["slot"] + STEP - 5000, "SERVICE_START_TOO_CLOSE_TO_FINAL")
+    elif start >= plan["slot"] + 5000:
         need((root / MARKER).is_file() and (root / "plan.json").is_file(), "OUTSIDE_DECLARED_START")
     if pilot:
         qualification = pilot_qualification
@@ -136,7 +142,8 @@ def run(root, plan, pin, fixture, *, verifier, clock, transport, wait=time.sleep
     scope = dict(plan_pin=pin, endpoint=ENDPOINT, state_path=str(root.resolve()),
                  connections=plan["max_connections"], rest_requests=0,
                  deadline_ms=plan["slot"] + plan["wall_ms"])
-    with closing(sqlite3.connect(root / "lock.sqlite", timeout=0)) as lock:
+    lock_path = root.parent / "service-writer.sqlite" if sustained else root / "lock.sqlite"
+    with closing(sqlite3.connect(lock_path, timeout=0)) as lock:
         lock.execute("BEGIN EXCLUSIVE")
         try:
             operational_guard(root)
@@ -187,7 +194,8 @@ def saved_pilot_summary(root, plan, expected_pin):
 
 
 def saved_operations_progress(root, plan, expected_pin):
-    need(digest(plan) == expected_pin and plan.get("bounded_operations") is True,
+    need(digest(plan) == expected_pin
+         and (plan.get("bounded_operations") is True or plan.get("sustained_research") is True),
          "LIVE_PLAN_PIN")
     rows, last_status, last_failure = [], None, None
     log = root / "health.jsonl"
@@ -208,6 +216,50 @@ def saved_operations_progress(root, plan, expected_pin):
                 plan_sha256=expected_pin, completed_receipts=rows, current_entry="NO_CURRENT_ENTRY",
                 orders=0, dispatch=None, telegram="NOT_SENT")
     return {**body, "sha256": digest(body)}
+
+
+def read_service_receipt(path):
+    result = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_json_keys)
+    factory = result["factory"]
+    row = result["observation"]
+    need(result["schema"] == "atlas.live-research-service.receipt.v1"
+         and result["sha256"] == digest({k: v for k, v in result.items() if k != "sha256"})
+         and factory["sha256"] == digest({k: v for k, v in factory.items() if k != "sha256"})
+         and row["receipt_sha256"] == digest({k: v for k, v in row.items() if k != "receipt_sha256"})
+         and row["plan_sha256"] == result["plan_sha256"]
+         and path.name == f'{row["slot"]}.json'
+         and result["current_entry"] == "NO_CURRENT_ENTRY"
+         and result["secretary"] == "WAIT" and result["dispatch"] is None
+         and result["telegram"] == "NOT_SENT" and result["orders"] == 0
+         and factory["orders_enabled"] is False and factory["secretary_enqueued"] is False,
+         "SERVICE_RECEIPT_INTEGRITY")
+    return result
+
+
+def save_service_receipt(root, plan, pin, row, observer, now, attempts, last_failure):
+    receipts = root.parent / "receipts"
+    receipts.mkdir(exist_ok=True)
+    slot = row["slot"]
+    previous = max((int(path.stem) for path in receipts.glob("*.json") if path.stem.isdecimal()), default=None)
+    need(previous is None or previous < slot, "SERVICE_DUPLICATE_OR_REORDERED")
+    parent = read_service_receipt(receipts / f"{previous}.json") if previous is not None else None
+    view = factory_report(observer, now)
+    result = dict(schema="atlas.live-research-service.receipt.v1", plan_sha256=pin, endpoint=plan["endpoint"],
+                  observation=row, factory=view["factory"], previous_sha256=parent["sha256"] if parent else None,
+                  missing_slots=0 if previous is None else (slot - previous) // STEP - 1,
+                  connection_attempts=attempts, last_failure=last_failure, heartbeat_ms=now,
+                  retention="SANITIZED_RECEIPTS_ONLY", current_entry="NO_CURRENT_ENTRY",
+                  secretary="WAIT", dispatch=None, orders=0, telegram="NOT_SENT", scientific="REAL_PIT_OOS_BLOCKED")
+    result["sha256"] = digest(result)
+    with NamedTemporaryFile(dir=receipts, delete=False) as stream:
+        scratch = Path(stream.name)
+        stream.write(json.dumps(result, sort_keys=True).encode())
+        stream.flush()
+        os.fsync(stream.fileno())
+    try:
+        os.link(scratch, receipts / f"{slot}.json")
+    finally:
+        scratch.unlink()
 
 
 class MemoryDatabase:
@@ -326,14 +378,16 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
                     row = ingest(root, raw, rows, first, received, uncertainty, clock.monotonic_ns(),
                                  pin, journal, store, observer, clock.now, wait, ephemeral=ephemeral)
                     if row is not None:
-                        if plan.get("bounded_operations"):
+                        if plan.get("bounded_operations") or plan.get("sustained_research"):
                             row = {**row, "plan_sha256": pin}
                             row["receipt_sha256"] = digest(row)
                         rows.append(row)
                         emit(root, "EPHEMERAL_RESEARCH_BAR" if ephemeral else "DURABLE_RESEARCH_BAR", **row)
+                        if plan.get("sustained_research"):
+                            save_service_receipt(root, plan, pin, row, observer, clock.now(), used + 1, last_failure)
         except (TimeoutError, ConnectionError) as exc:
             last_failure = dict(error=type(exc).__name__)
-            if plan.get("bounded_operations"):
+            if plan.get("bounded_operations") or plan.get("sustained_research"):
                 last_failure["utc_ms"] = clock.now()
             emit(root, "TRANSPORT_INTERRUPTED", **last_failure)
             if attempt or len(rows) == target:
@@ -343,7 +397,7 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
         if len(rows) == target:
             view = factory_report(observer, clock.now()) if ephemeral else report(
                 root, fixture, clock.now(), synthetic=synthetic)
-            if plan.get("bounded_operations"):
+            if plan.get("bounded_operations") or plan.get("sustained_research"):
                 view["connection_attempts"] = used + 1
                 view["last_failure"] = last_failure
                 view["last_heartbeat_ms"] = heartbeat
@@ -402,19 +456,24 @@ def ingest(root, raw, rows, first, received, uncertainty, monotonic_ns, pin,
     return consume(path, journal, store, observer, now, wait, slot=slot, plan_pin=pin)
 
 
-def make_plan(slot, fixture, count=2, *, bounded_pilot=False, bounded_operations=False):
+def make_plan(slot, fixture, count=2, *, bounded_pilot=False, bounded_operations=False,
+              sustained_research=False):
     need(type(slot) is int and slot > 0 and slot % STEP == 0, "SLOT_GRID")
     need(type(count) is int and 2 <= count <= 96, "BAR_COUNT_LIMIT")
     need(not bounded_pilot or count == 4, "PILOT_REQUIRES_FOUR_BARS")
     need(not bounded_operations or (not bounded_pilot and 2 <= count <= 8), "OPERATIONS_BAR_CAP")
+    need(not sustained_research or (not bounded_pilot and not bounded_operations and count == 8),
+         "SERVICE_REQUIRES_EIGHT_BAR_SEGMENT")
     plan = {"endpoint": ENDPOINT, "slot": slot, "bar_count": count, "wall_ms": count * STEP + 300_000,
             "max_connections": 2, "rest_requests": 0, "strategy_fixture_sha256": fixture["sha256"],
             "config_sha256": fixture["payload"]["config_digest"]}
-    if bounded_pilot or bounded_operations:
+    if bounded_pilot or bounded_operations or sustained_research:
         plan["egress_budget"] = "LOCAL_PILOT_ONLY"
         plan["retention"] = "SANITIZED_RECEIPTS_ONLY"
     if bounded_operations:
         plan.update(bounded_operations=True, wall_ms=7_200_000)
+    if sustained_research:
+        plan["sustained_research"] = True
     return plan
 
 
@@ -428,16 +487,18 @@ def main():
     parser.add_argument("--authority-module", help="Trusted operator-installed local authority module")
     parser.add_argument("--bounded-pilot", action="store_true")
     parser.add_argument("--bounded-operations", action="store_true")
+    parser.add_argument("--sustained-research", action="store_true")
     parser.add_argument("--pilot-qualification", type=Path)
     parser.add_argument("--pilot-qualification-sha256")
+    parser.add_argument("--service-receipt", type=Path)
     parser.add_argument("--stop-after-first", action="store_true")
     args = parser.parse_args()
-    local = args.bounded_pilot or args.bounded_operations
+    local = args.bounded_pilot or args.bounded_operations or args.sustained_research
     fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))[0]
     now = lambda: time.time_ns() // 1_000_000
     if args.mode == "plan":
         plan = make_plan(args.slot, fixture, args.bars, bounded_pilot=args.bounded_pilot,
-                         bounded_operations=args.bounded_operations)
+                         bounded_operations=args.bounded_operations, sustained_research=args.sustained_research)
         result = {"plan": plan, "sha256": digest(plan)}
     elif args.mode in ("stop", "rearm"):
         need(args.state is not None and (args.state / MARKER).is_file(), "STATE_REQUIRED")
@@ -462,11 +523,14 @@ def main():
             "release_research_lease")), "RENEWABLE_AUTHORITY_REQUIRED")
         result = {"status": "AUTHORITY_INTERFACE_READY", "live_lease_checked": False}
     elif args.mode == "status":
+        if args.service_receipt:
+            print(json.dumps(read_service_receipt(args.service_receipt), sort_keys=True))
+            return
         need(args.state is not None and (args.state / MARKER).is_file(), "STATE_REQUIRED")
         manifest = args.state / "plan.json"
         plan = json.loads(manifest.read_text(encoding="utf-8")) if manifest.is_file() else {}
         if plan.get("retention") == "SANITIZED_RECEIPTS_ONLY":
-            if plan.get("bounded_operations") and not (args.state / "pilot-summary.json").is_file():
+            if (plan.get("bounded_operations") or plan.get("sustained_research")) and not (args.state / "pilot-summary.json").is_file():
                 result = saved_operations_progress(args.state, plan, args.pin)
             else:
                 result = saved_pilot_summary(args.state, plan, args.pin)
@@ -488,11 +552,13 @@ def main():
             plan = json.loads((root / "plan.json").read_text(encoding="utf-8"))
             need(digest(plan) == args.pin and plan == make_plan(
                 plan["slot"], fixture, plan["bar_count"],
-                bounded_pilot=plan.get("egress_budget") == "LOCAL_PILOT_ONLY" and not plan.get("bounded_operations"),
-                bounded_operations=plan.get("bounded_operations") is True),
+                bounded_pilot=plan.get("egress_budget") == "LOCAL_PILOT_ONLY"
+                and not (plan.get("bounded_operations") or plan.get("sustained_research")),
+                bounded_operations=plan.get("bounded_operations") is True,
+                sustained_research=plan.get("sustained_research") is True),
                  "LIVE_PLAN_PIN")
             if plan.get("retention") == "SANITIZED_RECEIPTS_ONLY":
-                if plan.get("bounded_operations") and not (root / "pilot-summary.json").is_file():
+                if (plan.get("bounded_operations") or plan.get("sustained_research")) and not (root / "pilot-summary.json").is_file():
                     result = saved_operations_progress(root, plan, args.pin)
                 else:
                     result = saved_pilot_summary(root, plan, args.pin)
@@ -519,7 +585,7 @@ def main():
                  "PILOT_QUALIFICATION_PIN")
         authority = importlib.import_module(args.authority_module) if args.authority_module else None
         plan = make_plan(args.slot, fixture, args.bars, bounded_pilot=args.bounded_pilot,
-                         bounded_operations=args.bounded_operations)
+                         bounded_operations=args.bounded_operations, sustained_research=args.sustained_research)
         delay_ms = plan["slot"] - now()
         need(delay_ms <= STEP, "START_TOO_FAR_AHEAD")
         if delay_ms > 0:

@@ -80,6 +80,32 @@ verified partial progress and the last failure, with no source replay.
 Use `stop` against the same state for cancellation. A reconnect in the
 same process can resume from its in-memory data, within the same caps.
 
+## Sustained Windows research task
+
+The single limited-user, interactive Windows task invokes
+`atlas_live_research_service_windows.ps1` with a private configuration
+file and its SHA-256. The configuration pins the staged runtime, market
+scope and approval references. Use a repeating trigger without an end
+date, `IgnoreNew`, and `StartWhenAvailable`. A second lock prevents
+parallel live workers. The task runs while that Windows user is logged on.
+
+Each invocation qualifies the clock and direct Ethernet route and starts
+at the current UTC slot before its close. A segment admits up to eight
+finals, then exits cleanly and the same task starts another segment.
+The two-attempt local quota and jittered retry apply per segment. An
+explicit route, clock, source or other terminal guard failure records a
+hold and prevents automatic further market attempts. Following a process
+loss, a new segment retains the preceding sealed receipt and counts any
+missed UTC slots without backfill or simulated decisions. Each final has
+one sanitized Factory receipt in `segments/receipts/<slot>.json`.
+
+For offline readback, run `python -B -m tools.atlas_live_research_cycle
+status --service-receipt <path>` on the staged runtime. To stop, disable
+the task, create the private root's `stop.request`, then issue the
+existing `stop` command for the active segment. Wait for that process to
+exit before unregistering the task. Retain the sanitized receipts and
+inspect any hold before a supervised restart.
+
 ## Saved live and publisher reconciliation
 
 | Path | Reuse or delta | Acceptance |
