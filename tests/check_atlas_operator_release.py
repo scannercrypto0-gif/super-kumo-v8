@@ -106,8 +106,47 @@ def accept(root):
     publish(bad, {**health, "schema": "aql.recurring-runtime.health.v0"})
     invoke((("--health", bad), ("--health-sha256", sha256(bad.read_bytes()).hexdigest())),
             "RUNTIME_HEALTH_CONTRACT")
+
+    stage2 = dict(schema="atlas.stage2.saved-evidence-disposition.v1",
+                  scope="PUBLISHED_SAVED_EVIDENCE_METADATA_ONLY",
+                  status="STAGE2_SAVED_PARTIAL_EVIDENCE_BLOCKED",
+                  scientific_status="REAL_PIT_OOS_BLOCKED",
+                  secretary={"disposition": "WAIT_AUTHENTICATED_PARENTS", "dispatch": None},
+                  orders=0, actual_fills=None, current_entry="NO_CURRENT_ENTRY",
+                  selected=dict(retained_report_sha256=report["sha256"], strategy_sha256=report["strategy_sha256"],
+                                plan_sha256=report["plan_sha256"], ordered_native_scanner_receipt_sha256=None,
+                                native_core245_receipt_sha256=None, native_core253_receipt_sha256=None,
+                                discoverer_membership_verified=False))
+    evidence_path = root / "stage2.json"
+    stage2_output = root / "stage2-output.json"
+    evidence = sealed(stage2)
+    publish(evidence_path, evidence)
+    command.extend(("--stage2-evidence", str(evidence_path), "--stage2-evidence-sha256", evidence["sha256"]))
+    output_choice = (("--output", stage2_output),)
+    assert invoke(output_choice).stdout == invoke(output_choice).stdout
+    joined = json.loads(stage2_output.read_bytes())
+    assert joined["research_disposition"]["status"] == stage2["status"]
+    assert joined["research_disposition"]["evidence_sha256"] == evidence["sha256"]
+    assert joined["research_disposition"]["actionable_now"] is False
+    assert joined["runtime"]["cycle_evidence"] == "LAST_TICK_STALE"
+    assert joined["runtime"]["last_success"] == health["last_success"]
+    assert joined["runtime"]["last_failure"] == health["last_failure"]
+    assert joined["runtime"]["continuous_service"] == "NOT_ATTESTED"
+    assert joined["notification_preview"]["actionable_now"] is False
+    assert joined["notification_preview"]["delivery"] == "OFFLINE_PREVIEW_ONLY"
+    assert joined["dispatch"] is None and joined["telegram_delivery"] == "NOT_SENT"
+    previews = [row for key, row in catalog(root / "operations.sqlite").items() if key.startswith("PREVIEW-")]
+    assert [row["sha256"] for row in previews] == [joined["notification_preview"]["receipt_sha256"]]
+
+    foreign = sealed({**stage2, "selected": {**stage2["selected"], "plan_sha256": "0" * 64}})
+    foreign_path = root / "foreign-stage2.json"
+    publish(foreign_path, foreign)
+    invoke((("--stage2-evidence", foreign_path),), "STAGE2_EVIDENCE_PIN")
+    invoke((("--stage2-evidence", foreign_path), ("--stage2-evidence-sha256", foreign["sha256"])),
+            "STAGE2_REPORT_PARENT")
     assert {path.name: path.read_bytes() for path in inputs_on_disk} == before
     print("SYNTHETIC_RELEASE_CONTRACT_PASS", result["sha256"])
+    print("STAGE2_OPERATOR_VISIBILITY_PASS", joined["sha256"])
 
 
 if __name__ == "__main__":

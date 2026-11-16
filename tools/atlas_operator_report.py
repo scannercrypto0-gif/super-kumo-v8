@@ -45,8 +45,7 @@ def runtime_view(path, pin, as_of_ms):
             "tick_age_at_report_ms": age, "snapshot_age_ms": snapshot_age, "health_file_sha256": pin}
 
 
-def batch_parent(strategy, strategy_pin, checkpoint):
-    _, report = load(strategy, 5_000_000)
+def batch_parent(report, strategy_pin, checkpoint):
     require(report.get("sha256") == strategy_pin == without_seal(report), "REPORT_PIN")
     require(checkpoint.is_file() and checkpoint.stat().st_size <= 32 * 1024**2
             and all(not sidecar.exists() or sidecar.stat().st_size == 0
@@ -71,11 +70,39 @@ def batch_parent(strategy, strategy_pin, checkpoint):
     return item["sha256"]
 
 
+def stage2_view(path, pin, report):
+    _, evidence = load(path, 65_536)
+    require(evidence.get("sha256") == pin == without_seal(evidence), "STAGE2_EVIDENCE_PIN")
+    selected = evidence["selected"]
+    require(evidence["schema"] == "atlas.stage2.saved-evidence-disposition.v1"
+            and evidence["scope"] == "PUBLISHED_SAVED_EVIDENCE_METADATA_ONLY"
+            and evidence["status"] == "STAGE2_SAVED_PARTIAL_EVIDENCE_BLOCKED"
+            and evidence["scientific_status"] == "REAL_PIT_OOS_BLOCKED"
+            and evidence["secretary"] == {"disposition": "WAIT_AUTHENTICATED_PARENTS", "dispatch": None}
+            and type(evidence["orders"]) is int and evidence["orders"] == 0
+            and evidence["actual_fills"] is None and evidence["current_entry"] == "NO_CURRENT_ENTRY"
+            and selected["ordered_native_scanner_receipt_sha256"] is None
+            and selected["native_core245_receipt_sha256"] is None
+            and selected["native_core253_receipt_sha256"] is None
+            and selected["discoverer_membership_verified"] is False, "STAGE2_EVIDENCE_CONTRACT")
+    require(selected["retained_report_sha256"] == report["sha256"]
+            and selected["strategy_sha256"] == report["strategy_sha256"]
+            and selected["plan_sha256"] == report["plan_sha256"], "STAGE2_REPORT_PARENT")
+    return dict(evidence_sha256=pin, grade=evidence["scope"], status=evidence["status"],
+                wait_reason="SAME_COHORT_CORE_SCANNER_DISCOVERER_RECEIPTS_MISSING",
+                actionable_now=False, scientific_qualification="BLOCKED")
+
+
 def build(strategy, strategy_pin, health, health_pin, preflight, preflight_pin, checkpoint, output, as_of_ms,
-          *, batch_checkpoint):
+          *, batch_checkpoint, stage2_evidence=None, stage2_pin=None):
     strategy, health, preflight, checkpoint, output, batch_checkpoint = map(
         safe, (strategy, health, preflight, checkpoint, output, batch_checkpoint))
     require(len({strategy, health, preflight, checkpoint, output, batch_checkpoint}) == 6, "OPERATOR_PATH_SCOPE")
+    require((stage2_evidence is None) == (stage2_pin is None), "STAGE2_PIN_AND_PATH_REQUIRED")
+    if stage2_evidence is not None:
+        stage2_evidence = safe(stage2_evidence)
+        require(stage2_evidence not in {strategy, health, preflight, checkpoint, output, batch_checkpoint},
+                "OPERATOR_PATH_SCOPE")
     runtime = runtime_view(health, health_pin, as_of_ms)
     _, science = load(preflight, 65_536)
     require(science.get("sha256") == preflight_pin == without_seal(science), "SCIENTIFIC_PREFLIGHT_PIN")
@@ -84,7 +111,9 @@ def build(strategy, strategy_pin, health, health_pin, preflight, preflight_pin, 
             and science["collection"] == "NOT_ACTIVATED" and science["holdout"] == "SEALED_UNOPENED"
             and science["trading_authority"] == "NONE" and science["state_changed"] is False,
             "SCIENTIFIC_PREFLIGHT_CONTRACT")
-    batch_pin = batch_parent(strategy, strategy_pin, batch_checkpoint)
+    _, strategy_report = load(strategy, 5_000_000)
+    batch_pin = batch_parent(strategy_report, strategy_pin, batch_checkpoint)
+    stage2 = stage2_view(stage2_evidence, stage2_pin, strategy_report) if stage2_evidence else None
     operations, _ = strategy_operations(strategy, strategy_pin, checkpoint, None)
     rows = [row for row in operations["strategies"] if row["source_report_sha256"] == strategy_pin]
     require(len(rows) == 1, "STRATEGY_OPERATIONS_PARENT")
@@ -95,6 +124,18 @@ def build(strategy, strategy_pin, health, health_pin, preflight, preflight_pin, 
                             "independent_attestation": science["independent_attestation"]},
                 secretary="WAIT", dispatch=None, current_entry="NO_CURRENT_ENTRY",
                 trading_authority="NONE", orders=0, telegram_delivery="NOT_SENT")
+    if stage2 is not None:
+        previews = [event for event in operations["notifications"]
+                    if event["experiment_id"] == "PREVIEW-" + strategy_pin]
+        require(len(previews) == 1 and previews[0]["delivery"] == "OFFLINE_PREVIEW_ONLY",
+                "OPERATOR_PREVIEW_PARENT")
+        body["research_disposition"] = stage2
+        body["runtime"]["continuous_service"] = "NOT_ATTESTED"
+        body["notification_preview"] = dict(
+            receipt_sha256=previews[0]["sha256"], channel="TELEGRAM", delivery="OFFLINE_PREVIEW_ONLY",
+            actionable_now=False,
+            message="Saved modeled research has missing source-to-opportunity evidence. "
+                    "Secretary is waiting. This is an informational research update.")
     report = {**body, "sha256": digest(body)}
     publish(output, report)
     return report
@@ -107,11 +148,14 @@ def main():
     for name in ("strategy", "health", "preflight"):
         parser.add_argument("--" + name + "-sha256", required=True)
     parser.add_argument("--as-of-ms", type=int, required=True)
+    parser.add_argument("--stage2-evidence", type=Path)
+    parser.add_argument("--stage2-evidence-sha256")
     args = parser.parse_args()
     with patch.object(socket, "socket", side_effect=AssertionError("NETWORK_DISABLED")):
         report = build(args.strategy, args.strategy_sha256, args.health, args.health_sha256,
                        args.preflight, args.preflight_sha256, args.checkpoint, args.output, args.as_of_ms,
-                       batch_checkpoint=args.batch_checkpoint)
+                       batch_checkpoint=args.batch_checkpoint, stage2_evidence=args.stage2_evidence,
+                       stage2_pin=args.stage2_evidence_sha256)
     print(report["sha256"])
 
 
