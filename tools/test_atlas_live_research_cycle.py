@@ -81,7 +81,7 @@ class LiveResearchTests(unittest.TestCase):
             root = Path(tmp) / "run"
             transport = Wire()
             qualification = dict(plan_sha256=pilot_pin, endpoint=pilot_plan["endpoint"],
-                                 raw_retention_ms=86_400_000, source_rights_ref="fixture",
+                                 raw_retention_ms=0, source_rights_ref="fixture",
                                  region_ref="fixture", custody_ref="fixture", network_permission_ref="fixture",
                                  clock_checked_ms=clock.now(), clock_uncertainty_ms=10,
                                  state_path=str(root.resolve()))
@@ -103,6 +103,14 @@ class LiveResearchTests(unittest.TestCase):
             self.assertEqual(result["shared_headroom"], "UNVERIFIED")
             self.assertEqual(result["admission"], "WAIT_AUTHENTICATED_PARENTS")
             self.assertFalse(result["factory"]["orders_enabled"])
+            self.assertEqual(result["retention"], "SANITIZED_RECEIPTS_ONLY")
+            self.assertEqual(result["bars"][0]["event_ms"], slot + STEP + 9)
+            self.assertFalse(any(root.rglob("receipt.sqlite")))
+            for name in ("journal.sqlite", "market.sqlite", "g2.sqlite"):
+                self.assertFalse((root / name).exists())
+            for path in (root / "pilot-summary.json", root / "health.jsonl"):
+                self.assertNotIn('"open"', path.read_text())
+                self.assertNotIn('"100"', path.read_text())
 
     def test_recovery_rejects_foreign_session_before_ack(self):
         clock.current = slot + STEP + 499

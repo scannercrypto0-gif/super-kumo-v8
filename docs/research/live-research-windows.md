@@ -52,11 +52,13 @@ For `-Mode live`, supply `-BoundedPilot -PilotQualification <file>
 -PilotQualificationSha256 <canonical-digest>` with the saved plan pin,
 slot, state and `-Bars 4`. Seal the JSON qualification with
 `aql.observation.contracts.digest`. It binds `plan_sha256`, `endpoint`,
-absolute `state_path`, `raw_retention_ms=86400000`, current
+absolute `state_path`, `raw_retention_ms=0`, current
 `clock_checked_ms` and `clock_uncertainty_ms`, and the reviewed
 `source_rights_ref`, `region_ref`, `custody_ref` and
-`network_permission_ref`. Refresh clock evidence before a restart.
-Use the same plan and state to recover. Retain raw material privately
-for at most 24 hours, then remove it from the pilot state and keep
-only the authorized receipt summary. Stop on a denied or degraded route.
+`network_permission_ref`. In this mode, the existing Core and Scanner
+readers use in-memory SQLite. Only timestamps, digests, control telemetry
+and the sealed Factory census are saved. Reconnection within the process
+can use its in-memory state. If the process exits, the one-shot is consumed.
+Use `-Mode status -Pin <plan-pin>` to read a completed summary without
+replaying source data. Stop on a denied or degraded route.
 The sustained mode continues to require its renewable authority module.

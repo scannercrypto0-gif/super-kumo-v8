@@ -1,6 +1,6 @@
 """Bounded BTCUSDT research service using the pinned #286 and #305 APIs."""
 import argparse
-from contextlib import closing, nullcontext
+from contextlib import ExitStack, closing, nullcontext
 import hashlib
 import importlib
 import json
@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 import sqlite3
 import time
+from uuid import uuid4
 
 from aql.journal.durable_journal import DurableJournal
 from aql.observation.contracts import digest
@@ -16,7 +17,7 @@ from aql.observation.prospective import ProspectiveObserver, STEP
 from aql.storage.operational_store import OperationalStore
 from research_wp_r0.aql_factory_prospective_read_v1 import read_prospective_research
 from tools.atlas_prospective_observe import FIXTURE, dedicated_root, read_only_g1
-from tools.atlas_single_receipt import load_frame, need, persist_frame, unique_json_keys
+from tools.atlas_single_receipt import load_frame, need, parse_final, persist_frame, unique_json_keys
 from tools.atlas_single_receipt_runner import ENDPOINT, BinanceReceiptTransport
 from tools.atlas_research_lease import Lease
 from tools.binance_live_feed.quota import Limits, Quota
@@ -53,6 +54,10 @@ def operational_guard(root):
 def consume(root, journal, store, observer, now, wait, *, slot, plan_pin):
     meta, seal, bar = load_frame(root)
     need(meta["slot"] == slot and meta["session"] == plan_pin[:24], "LIVE_RECEIPT_SESSION")
+    return consume_bar(meta, seal, bar, journal, store, observer, now, wait)
+
+
+def consume_bar(meta, seal, bar, journal, store, observer, now, wait):
     remaining = bar.ingested_at - now()
     if remaining > 0:
         wait(remaining / 1000)
@@ -80,6 +85,10 @@ def report(root, fixture, cutoff, *, synthetic=False):
                                    read_only_g1(DurableJournal, root / "journal.sqlite"),
                                    read_only_g1(OperationalStore, root / "market.sqlite"),
                                    fixture, synthetic=synthetic, read_only=True)
+    return factory_report(observer, cutoff)
+
+
+def factory_report(observer, cutoff):
     factory = read_prospective_research(observer, as_of_ms=cutoff)
     need(not factory["orders_enabled"] and not factory["secretary_enqueued"], "RESEARCH_ONLY")
     return {"factory": factory, "admission": "WAIT_AUTHENTICATED_PARENTS",
@@ -104,7 +113,8 @@ def run(root, plan, pin, fixture, *, verifier, clock, transport, wait=time.sleep
         qualification = pilot_qualification
         need(qualification.get("plan_sha256") == pin and qualification.get("endpoint") == ENDPOINT
              and qualification.get("state_path") == str(root.resolve())
-             and qualification.get("raw_retention_ms") == 86_400_000
+             and type(qualification.get("raw_retention_ms")) is int
+             and qualification["raw_retention_ms"] == 0
              and all(isinstance(qualification.get(key), str) and qualification[key].strip()
                      for key in ("source_rights_ref", "region_ref", "custody_ref", "network_permission_ref")),
              "PILOT_QUALIFICATION_SCOPE")
@@ -134,31 +144,99 @@ def run(root, plan, pin, fixture, *, verifier, clock, transport, wait=time.sleep
             if isinstance(exc, ValueError) and str(exc) == "OPERATOR_STOP_REQUESTED":
                 emit(root, "STOPPED_BY_OPERATOR", utc_ms=clock.now())
                 return {"status": "STOPPED_BY_OPERATOR"}
-            emit(root, "STOPPED_ERROR", error=type(exc).__name__,
-                 provider_status=getattr(exc, "status_code", None))
+            status = getattr(exc, "status_code", None)
+            error = str(exc) if type(exc) is ValueError and str(exc).isupper() else type(exc).__name__
+            emit(root, "STOPPED_ERROR", error=error, provider_status=status if type(status) is int else None)
+            if pilot:
+                raise ValueError(f"PILOT_STOP_{error}" + (f"_HTTP_{status}" if type(status) is int else "")) from None
             raise
         if pilot:
-            result = {**result, "egress_budget": "LOCAL_PILOT_ONLY", "shared_headroom": "UNVERIFIED"}
+            result = {**result, "egress_budget": "LOCAL_PILOT_ONLY", "shared_headroom": "UNVERIFIED",
+                      "retention": "SANITIZED_RECEIPTS_ONLY", "plan_sha256": pin}
+            result = {**result, "sha256": digest(result)}
+            write_once(root / "pilot-summary.json", result)
         emit(root, "STOPPED", utc_ms=clock.now(), result_sha256=digest(result))
         return result
 
 
+def write_once(path, value):
+    with path.open("x", encoding="utf-8") as stream:
+        json.dump(value, stream, sort_keys=True)
+        stream.flush()
+        os.fsync(stream.fileno())
+
+
+def saved_pilot_summary(root, plan, expected_pin):
+    need(digest(plan) == expected_pin, "LIVE_PLAN_PIN")
+    path = root / "pilot-summary.json"
+    need(path.is_file(), "EPHEMERAL_PILOT_NO_COMPLETED_SUMMARY")
+    result = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_json_keys)
+    need(result["sha256"] == digest({key: value for key, value in result.items() if key != "sha256"})
+         and result["plan_sha256"] == expected_pin and result["retention"] == "SANITIZED_RECEIPTS_ONLY",
+         "EPHEMERAL_SUMMARY_PIN")
+    return result
+
+
+class MemoryDatabase:
+    def _connect(self):
+        conn = sqlite3.connect(self.memory_uri, uri=True, isolation_level=self.isolation_level)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA temp_store=MEMORY")
+        conn.execute("PRAGMA foreign_keys=ON")
+        return conn
+
+    def _connect_readonly(self):
+        conn = self._connect()
+        conn.execute("PRAGMA query_only=ON")
+        return conn
+
+
+class MemoryJournal(MemoryDatabase, DurableJournal):
+    isolation_level = None
+
+
+class MemoryStore(MemoryDatabase, OperationalStore):
+    isolation_level = ""
+
+
+class MemoryObserver(MemoryDatabase, ProspectiveObserver):
+    isolation_level = ""
+
+
 def observe(root, plan, pin, fixture, clock, transport, wait, uncertainty, synthetic,
             stop_after_first, lease):
+    if plan.get("egress_budget") == "LOCAL_PILOT_ONLY":
+        with ExitStack() as stack:
+            journal, store, observer = [cls.__new__(cls) for cls in
+                                        (MemoryJournal, MemoryStore, MemoryObserver)]
+            for db in (journal, store, observer):
+                db.memory_uri = f"file:atlas-{uuid4().hex}?mode=memory&cache=shared"
+                stack.enter_context(closing(db._connect()))
+            journal.__init__(str(root / "journal.sqlite"))
+            store.__init__(str(root / "market.sqlite"))
+            observer.__init__(root / "g2.sqlite", journal, store, fixture, synthetic=synthetic)
+            return observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
+                                 synthetic, stop_after_first, lease, journal, store, observer, ephemeral=True)
     journal = DurableJournal(str(root / "journal.sqlite"))
     store = OperationalStore(str(root / "market.sqlite"))
     observer = ProspectiveObserver(root / "g2.sqlite", journal, store, fixture, synthetic=synthetic)
+    return observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
+                         synthetic, stop_after_first, lease, journal, store, observer, ephemeral=False)
+
+
+def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty, synthetic,
+                  stop_after_first, lease, journal, store, observer, *, ephemeral):
     first = plan["slot"]
     # A session marker binds isolated custody to this observation window.
     manifest = root / "plan.json"
-    if not manifest.exists():
-        with manifest.open("x", encoding="utf-8") as stream:
-            json.dump(plan, stream, sort_keys=True)
-            stream.flush()
-            os.fsync(stream.fileno())
+    if ephemeral:
+        need(not manifest.exists(), "EPHEMERAL_PILOT_ALREADY_CONSUMED")
+        write_once(manifest, plan)
+    elif not manifest.exists():
+        write_once(manifest, plan)
     need(json.loads(manifest.read_text(encoding="utf-8")) == plan, "STATE_PLAN_MISMATCH")
-    rows = recover(root, journal, store, observer, first, clock.now, wait,
-                   count=plan["bar_count"], plan_pin=pin)
+    rows = [] if ephemeral else recover(root, journal, store, observer, first, clock.now, wait,
+                                        count=plan["bar_count"], plan_pin=pin)
     target = 1 if stop_after_first else plan["bar_count"]
     if len(rows) >= target:
         return {**report(root, fixture, clock.now(), synthetic=synthetic), "bars": rows}
@@ -212,10 +290,10 @@ def observe(root, plan, pin, fixture, clock, transport, wait, uncertainty, synth
                         continue
                     need(kind == "text", "UNEXPECTED_FRAME")
                     row = ingest(root, raw, rows, first, received, uncertainty, clock.monotonic_ns(),
-                                 pin, journal, store, observer, clock.now, wait)
+                                 pin, journal, store, observer, clock.now, wait, ephemeral=ephemeral)
                     if row is not None:
                         rows.append(row)
-                        emit(root, "DURABLE_RESEARCH_BAR", **row)
+                        emit(root, "EPHEMERAL_RESEARCH_BAR" if ephemeral else "DURABLE_RESEARCH_BAR", **row)
         except (TimeoutError, ConnectionError) as exc:
             emit(root, "TRANSPORT_INTERRUPTED", error=type(exc).__name__)
             if attempt or len(rows) == target:
@@ -223,7 +301,9 @@ def observe(root, plan, pin, fixture, clock, transport, wait, uncertainty, synth
         finally:
             quota.disconnect(socket_id, clock.now(), failed=len(rows) < target)
         if len(rows) == target:
-            return {**report(root, fixture, clock.now(), synthetic=synthetic), "bars": rows}
+            view = factory_report(observer, clock.now()) if ephemeral else report(
+                root, fixture, clock.now(), synthetic=synthetic)
+            return {**view, "bars": rows}
         wait(3 + int(pin[:2], 16) / 255)
     raise ValueError("SOURCE_OUTAGE")
 
@@ -242,7 +322,7 @@ def recover(root, journal, store, observer, first, now, wait, *, plan_pin, count
 
 
 def ingest(root, raw, rows, first, received, uncertainty, monotonic_ns, pin,
-           journal, store, observer, now, wait):
+           journal, store, observer, now, wait, *, ephemeral=False):
     need(type(raw) is bytes and 0 < len(raw) <= 65536, "RAW_LIMIT")
     candle = json.loads(raw, object_pairs_hook=unique_json_keys)["k"]
     slot = candle["t"]
@@ -257,6 +337,16 @@ def ingest(root, raw, rows, first, received, uncertainty, monotonic_ns, pin,
         return None
     need(type(candle["x"]) is bool and slot <= expected, "FINALIZED_SOURCE_GAP")
     need(slot >= first, "OUTSIDE_SOURCE_WINDOW")
+    if ephemeral:
+        payload_sha = hashlib.sha256(raw).hexdigest()
+        if slot < expected:
+            need(rows[(slot - first) // STEP]["payload_sha256"] == payload_sha, "CANDLE_REVISION")
+            return None
+        event, bar = parse_final(raw, slot, received, uncertainty)
+        meta = dict(slot=slot, received=received, event=event, uncertainty=uncertainty,
+                    session=pin, payload_sha256=payload_sha)
+        row = consume_bar(meta, digest(meta), bar, journal, store, observer, now, wait)
+        return {**row, "event_ms": event, "payload_sha256": payload_sha}
     path = dedicated_root(root / str(slot), "atlas-live-research-bar")
     if slot < expected:
         meta, _, _ = load_frame(path)
@@ -277,6 +367,7 @@ def make_plan(slot, fixture, count=2, *, bounded_pilot=False):
             "config_sha256": fixture["payload"]["config_digest"]}
     if bounded_pilot:
         plan["egress_budget"] = "LOCAL_PILOT_ONLY"
+        plan["retention"] = "SANITIZED_RECEIPTS_ONLY"
     return plan
 
 
@@ -322,6 +413,11 @@ def main():
         result = {"status": "AUTHORITY_INTERFACE_READY", "live_lease_checked": False}
     elif args.mode == "status":
         need(args.state is not None and (args.state / MARKER).is_file(), "STATE_REQUIRED")
+        manifest = args.state / "plan.json"
+        plan = json.loads(manifest.read_text(encoding="utf-8")) if manifest.is_file() else {}
+        if plan.get("retention") == "SANITIZED_RECEIPTS_ONLY":
+            print(json.dumps(saved_pilot_summary(args.state, plan, args.pin), sort_keys=True))
+            return
         result = report(args.state, fixture, now())
         log = args.state / "health.jsonl"
         if log.is_file():
@@ -339,6 +435,9 @@ def main():
             need(digest(plan) == args.pin and plan == make_plan(
                 plan["slot"], fixture, plan["bar_count"], bounded_pilot=plan.get("egress_budget") == "LOCAL_PILOT_ONLY"),
                  "LIVE_PLAN_PIN")
+            if plan.get("retention") == "SANITIZED_RECEIPTS_ONLY":
+                print(json.dumps(saved_pilot_summary(root, plan, args.pin), sort_keys=True))
+                return
             journal = DurableJournal(str(root / "journal.sqlite"))
             store = OperationalStore(str(root / "market.sqlite"))
             observer = ProspectiveObserver(root / "g2.sqlite", journal, store, fixture, synthetic=False)
