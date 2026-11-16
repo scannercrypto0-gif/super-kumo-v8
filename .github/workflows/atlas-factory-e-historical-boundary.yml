@@ -1,0 +1,37 @@
+name: ATLAS Factory E Core Historical Source Boundary
+on:
+  push:
+    branches:
+      - factory/package-e-historical-research-results-20261105
+    paths:
+      - 'research_wp_r0/aql_factory_e_historical_source_boundary_v1.py'
+      - 'tests/test_aql_factory_e_historical_source_boundary_v1.py'
+      - '.github/workflows/atlas-factory-e-historical-boundary.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  historical-blocked:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11','3.12','3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 3c23ba606c94a2d9e7a95d2dce122adbc7d9e88e
+          path: _pinned_core_e
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Stage exact Core E read-only contract
+        run: |
+          cp _pinned_core_e/research_wp_r0/aql_core_e_historical_boundary_v1.py research_wp_r0/
+      - name: Verify genuine unavailable original fails closed
+        run: |
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_factory_e_historical_source_boundary_v1.py' -v

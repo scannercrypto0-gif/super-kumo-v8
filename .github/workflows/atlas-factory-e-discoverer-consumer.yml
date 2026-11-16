@@ -1,0 +1,58 @@
+name: ATLAS Factory E Discoverer Independent Intake Gate
+on:
+  push:
+    branches:
+      - factory/package-e-historical-research-results-20261105
+    paths:
+      - 'research_wp_r0/aql_factory_e_discoverer_consumer_v1.py'
+      - 'tests/test_aql_factory_e_discoverer_consumer_v1.py'
+      - '.github/workflows/atlas-factory-e-discoverer-consumer.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  factory-e-discoverer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 79adda0b06d4299cde5dec3f14de985014cd330d
+          path: _pinned_discoverer_e
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: f2006c0e431690ccea8b0532095bf4f2a2dc88ba
+          path: _pinned_discoverer_base
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Stage immutable owner interfaces without overwriting Factory
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from shutil import copyfile
+          for root in ('_pinned_discoverer_e', '_pinned_discoverer_base'):
+              for folder in ('tools','research_wp_r0'):
+                  source = Path(root)/folder
+                  if not source.is_dir(): continue
+                  for item in source.rglob('*.py'):
+                      target = Path(folder)/item.relative_to(source)
+                      if not target.exists():
+                          target.parent.mkdir(parents=True, exist_ok=True)
+                          copyfile(item,target)
+          print('Discoverer E and base pinned read-only')
+          PY
+      - name: Install Discoverer test dependency
+        run: python -m pip install pytest
+      - name: Factory-owned independent intake/store negative gate
+        run: |
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_aql_factory_e_discoverer_consumer_v1.py' -v
