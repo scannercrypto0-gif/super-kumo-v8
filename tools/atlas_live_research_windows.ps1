@@ -6,12 +6,16 @@ param(
     [long]$Slot,
     [ValidateRange(2,96)][int]$Bars = 2,
     [string]$AuthorityModule,
+    [switch]$BoundedPilot,
+    [string]$PilotQualification,
+    [string]$PilotQualificationSha256,
     [switch]$StopAfterFirst
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $Python = (Resolve-Path -LiteralPath $Python).Path
 if ($State) { $State = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($State) }
+if ($PilotQualification) { $PilotQualification = (Resolve-Path -LiteralPath $PilotQualification).Path }
 $stage = Join-Path ([IO.Path]::GetFullPath([IO.Path]::GetTempPath())) ('atlas-live-cycle-' + [guid]::NewGuid())
 $null = New-Item -ItemType Directory -Path $stage
 $previous = $env:PYTHONPATH
@@ -35,6 +39,9 @@ try {
     if ($Slot) { $arguments += @('--slot', $Slot) }
     if ($Pin) { $arguments += @('--pin', $Pin) }
     if ($AuthorityModule) { $arguments += @('--authority-module', $AuthorityModule) }
+    if ($BoundedPilot) { $arguments += '--bounded-pilot' }
+    if ($PilotQualification) { $arguments += @('--pilot-qualification', $PilotQualification) }
+    if ($PilotQualificationSha256) { $arguments += @('--pilot-qualification-sha256', $PilotQualificationSha256) }
     if ($StopAfterFirst) { $arguments += '--stop-after-first' }
     Push-Location -LiteralPath $tree
     try {

@@ -66,6 +66,44 @@ authority = SimpleNamespace(
 def wait(seconds):
     clock.current += round(seconds * 1000)
 class LiveResearchTests(unittest.TestCase):
+    def test_bounded_pilot_is_opt_in_and_custody_scoped(self):
+        clock.current = slot + 100
+        pilot_plan = make_plan(slot, fixture, 4, bounded_pilot=True)
+        pilot_pin = digest(pilot_plan)
+        self.assertEqual((pilot_plan["wall_ms"], pilot_plan["max_connections"], pilot_plan["rest_requests"]),
+                         (3_900_000, 2, 0))
+        with self.assertRaisesRegex(ValueError, "^PILOT_REQUIRES_FOUR_BARS$"):
+            make_plan(slot, fixture, 3, bounded_pilot=True)
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(socket, "socket", side_effect=AssertionError("NETWORK_DISABLED")), \
+             patch("time.time", side_effect=lambda: clock.now()/1000), \
+             patch("aql.observation.prospective.time_ns", side_effect=lambda: clock.now()*1000000):
+            root = Path(tmp) / "run"
+            transport = Wire()
+            qualification = dict(plan_sha256=pilot_pin, endpoint=pilot_plan["endpoint"],
+                                 raw_retention_ms=86_400_000, source_rights_ref="fixture",
+                                 region_ref="fixture", custody_ref="fixture", network_permission_ref="fixture",
+                                 clock_checked_ms=clock.now(), clock_uncertainty_ms=10,
+                                 state_path=str(root.resolve()))
+            args = dict(clock=clock, transport=transport, wait=wait, synthetic=True, stop_after_first=True)
+            with self.assertRaisesRegex(ValueError, "^LIVE_PLAN_PIN$"):
+                run(root, pilot_plan, pilot_pin, fixture, verifier=None, **args)
+            with self.assertRaisesRegex(ValueError, "^PILOT_QUALIFICATION_SCOPE$"):
+                run(root, pilot_plan, pilot_pin, fixture, verifier=None, **args,
+                    pilot_qualification={**qualification, "state_path": "wrong"})
+            with self.assertRaisesRegex(ValueError, "^CONTROLLED_EGRESS_AUTHORITY_UNAVAILABLE$"):
+                run(root, plan, pin, fixture, verifier=None, **args)
+            self.assertFalse(root.exists())
+            self.assertEqual(transport.attempts, 0)
+            result = run(root, pilot_plan, pilot_pin, fixture, verifier=None,
+                         pilot_qualification=qualification, **args)
+            self.assertEqual(transport.attempts, 1)
+            self.assertEqual(len(result["bars"]), 1)
+            self.assertEqual(result["egress_budget"], "LOCAL_PILOT_ONLY")
+            self.assertEqual(result["shared_headroom"], "UNVERIFIED")
+            self.assertEqual(result["admission"], "WAIT_AUTHENTICATED_PARENTS")
+            self.assertFalse(result["factory"]["orders_enabled"])
+
     def test_recovery_rejects_foreign_session_before_ack(self):
         clock.current = slot + STEP + 499
         close = slot + STEP - 1

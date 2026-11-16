@@ -1,6 +1,6 @@
 """Bounded BTCUSDT research service using the pinned #286 and #305 APIs."""
 import argparse
-from contextlib import closing
+from contextlib import closing, nullcontext
 import hashlib
 import importlib
 import json
@@ -88,19 +88,31 @@ def report(root, fixture, cutoff, *, synthetic=False):
 
 
 def run(root, plan, pin, fixture, *, verifier, clock, transport, wait=time.sleep, synthetic=False,
-        stop_after_first=False):
+        stop_after_first=False, pilot_qualification=None):
+    pilot = pilot_qualification is not None
     need(synthetic or type(transport) is BinanceReceiptTransport, "LIVE_TRANSPORT_REQUIRED")
     need(not synthetic or not isinstance(transport, BinanceReceiptTransport), "OFFLINE_TRANSPORT_REQUIRED")
-    need(plan == make_plan(plan["slot"], fixture, plan["bar_count"]) and digest(plan) == pin, "LIVE_PLAN_PIN")
-    need(verifier is not None, "CONTROLLED_EGRESS_AUTHORITY_UNAVAILABLE")
+    need(plan == make_plan(plan["slot"], fixture, plan["bar_count"], bounded_pilot=pilot)
+         and digest(plan) == pin, "LIVE_PLAN_PIN")
+    need(verifier is not None or pilot, "CONTROLLED_EGRESS_AUTHORITY_UNAVAILABLE")
+    need(not pilot or verifier is None, "PILOT_AUTHORITY_MODE_CONFLICT")
     start = clock.now()
     need(plan["slot"] <= start < plan["slot"] + plan["wall_ms"], "OUTSIDE_DECLARED_START")
     if start >= plan["slot"] + 5000:
         need((root / MARKER).is_file() and (root / "plan.json").is_file(), "OUTSIDE_DECLARED_START")
-    need(all(callable(getattr(verifier, name, None)) for name in (
-        "read_verified_host", "acquire_research_lease", "renew_research_lease",
-        "release_research_lease")), "RENEWABLE_AUTHORITY_REQUIRED")
-    qualification = verifier.read_verified_host(plan_pin=pin, endpoint=ENDPOINT)
+    if pilot:
+        qualification = pilot_qualification
+        need(qualification.get("plan_sha256") == pin and qualification.get("endpoint") == ENDPOINT
+             and qualification.get("state_path") == str(root.resolve())
+             and qualification.get("raw_retention_ms") == 86_400_000
+             and all(isinstance(qualification.get(key), str) and qualification[key].strip()
+                     for key in ("source_rights_ref", "region_ref", "custody_ref", "network_permission_ref")),
+             "PILOT_QUALIFICATION_SCOPE")
+    else:
+        need(all(callable(getattr(verifier, name, None)) for name in (
+            "read_verified_host", "acquire_research_lease", "renew_research_lease",
+            "release_research_lease")), "RENEWABLE_AUTHORITY_REQUIRED")
+        qualification = verifier.read_verified_host(plan_pin=pin, endpoint=ENDPOINT)
     checked = qualification.get("clock_checked_ms")
     uncertainty = qualification.get("clock_uncertainty_ms")
     need(type(checked) is int and 0 <= start - checked <= 60_000 and
@@ -115,7 +127,7 @@ def run(root, plan, pin, fixture, *, verifier, clock, transport, wait=time.sleep
         lock.execute("BEGIN EXCLUSIVE")
         try:
             operational_guard(root)
-            with Lease(verifier, scope, now=clock.now) as lease:
+            with (nullcontext() if pilot else Lease(verifier, scope, now=clock.now)) as lease:
                 result = observe(root, plan, pin, fixture, clock, transport, wait, uncertainty,
                                  synthetic, stop_after_first, lease)
         except Exception as exc:
@@ -125,6 +137,8 @@ def run(root, plan, pin, fixture, *, verifier, clock, transport, wait=time.sleep
             emit(root, "STOPPED_ERROR", error=type(exc).__name__,
                  provider_status=getattr(exc, "status_code", None))
             raise
+        if pilot:
+            result = {**result, "egress_budget": "LOCAL_PILOT_ONLY", "shared_headroom": "UNVERIFIED"}
         emit(root, "STOPPED", utc_ms=clock.now(), result_sha256=digest(result))
         return result
 
@@ -162,6 +176,8 @@ def observe(root, plan, pin, fixture, clock, transport, wait, uncertainty, synth
         elapsed = (clock.monotonic_ns() - monotonic_start) // 1_000_000
         need(0 <= elapsed and abs(now - started - elapsed) <= 250, "CLOCK_STEP")
         need(now < deadline and elapsed < plan["wall_ms"], "WINDOW_EXPIRED")
+        if lease is None:
+            return now, (deadline - clock.now()) / 1000
         remaining = lease.check()
         need(remaining > 1, "LEASE_BUDGET_TOO_SHORT")
         return now, min((deadline - clock.now()) / 1000, remaining - 1)
@@ -252,12 +268,16 @@ def ingest(root, raw, rows, first, received, uncertainty, monotonic_ns, pin,
     return consume(path, journal, store, observer, now, wait, slot=slot, plan_pin=pin)
 
 
-def make_plan(slot, fixture, count=2):
+def make_plan(slot, fixture, count=2, *, bounded_pilot=False):
     need(type(slot) is int and slot > 0 and slot % STEP == 0, "SLOT_GRID")
     need(type(count) is int and 2 <= count <= 96, "BAR_COUNT_LIMIT")
-    return {"endpoint": ENDPOINT, "slot": slot, "bar_count": count, "wall_ms": count * STEP + 300_000,
+    need(not bounded_pilot or count == 4, "PILOT_REQUIRES_FOUR_BARS")
+    plan = {"endpoint": ENDPOINT, "slot": slot, "bar_count": count, "wall_ms": count * STEP + 300_000,
             "max_connections": 2, "rest_requests": 0, "strategy_fixture_sha256": fixture["sha256"],
             "config_sha256": fixture["payload"]["config_digest"]}
+    if bounded_pilot:
+        plan["egress_budget"] = "LOCAL_PILOT_ONLY"
+    return plan
 
 
 def main():
@@ -268,12 +288,15 @@ def main():
     parser.add_argument("--bars", type=int, default=2)
     parser.add_argument("--pin")
     parser.add_argument("--authority-module", help="Trusted operator-installed local authority module")
+    parser.add_argument("--bounded-pilot", action="store_true")
+    parser.add_argument("--pilot-qualification", type=Path)
+    parser.add_argument("--pilot-qualification-sha256")
     parser.add_argument("--stop-after-first", action="store_true")
     args = parser.parse_args()
     fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))[0]
     now = lambda: time.time_ns() // 1_000_000
     if args.mode == "plan":
-        plan = make_plan(args.slot, fixture, args.bars)
+        plan = make_plan(args.slot, fixture, args.bars, bounded_pilot=args.bounded_pilot)
         result = {"plan": plan, "sha256": digest(plan)}
     elif args.mode in ("stop", "rearm"):
         need(args.state is not None and (args.state / MARKER).is_file(), "STATE_REQUIRED")
@@ -313,7 +336,8 @@ def main():
         with closing(sqlite3.connect(root / "lock.sqlite", timeout=0)) as lock:
             lock.execute("BEGIN EXCLUSIVE")
             plan = json.loads((root / "plan.json").read_text(encoding="utf-8"))
-            need(digest(plan) == args.pin and plan == make_plan(plan["slot"], fixture, plan["bar_count"]),
+            need(digest(plan) == args.pin and plan == make_plan(
+                plan["slot"], fixture, plan["bar_count"], bounded_pilot=plan.get("egress_budget") == "LOCAL_PILOT_ONLY"),
                  "LIVE_PLAN_PIN")
             journal = DurableJournal(str(root / "journal.sqlite"))
             store = OperationalStore(str(root / "market.sqlite"))
@@ -322,16 +346,27 @@ def main():
                            count=plan["bar_count"], plan_pin=args.pin)
             result = {**report(root, fixture, now()), "bars": rows}
     else:
-        need(args.authority_module is not None, "CONTROLLED_EGRESS_AUTHORITY_UNAVAILABLE")
+        need(args.authority_module is not None or args.bounded_pilot, "CONTROLLED_EGRESS_AUTHORITY_UNAVAILABLE")
         need(args.state is not None, "STATE_REQUIRED")
-        authority = importlib.import_module(args.authority_module)
-        plan = make_plan(args.slot, fixture, args.bars)
+        qualification = None
+        if args.bounded_pilot:
+            need(args.authority_module is None and args.pilot_qualification is not None
+                 and args.pilot_qualification_sha256, "PILOT_QUALIFICATION_REQUIRED")
+            with args.pilot_qualification.open("rb") as stream:
+                raw = stream.read(16_385)
+            need(len(raw) <= 16_384, "PILOT_QUALIFICATION_BOUND")
+            qualification = json.loads(raw, object_pairs_hook=unique_json_keys)
+            need(isinstance(qualification, dict) and digest(qualification) == args.pilot_qualification_sha256,
+                 "PILOT_QUALIFICATION_PIN")
+        authority = importlib.import_module(args.authority_module) if args.authority_module else None
+        plan = make_plan(args.slot, fixture, args.bars, bounded_pilot=args.bounded_pilot)
         delay_ms = plan["slot"] - now()
         need(delay_ms <= STEP, "START_TOO_FAR_AHEAD")
         if delay_ms > 0:
             time.sleep(delay_ms / 1000)
         result = run(args.state, plan, args.pin, fixture, verifier=authority, clock=HostClock(),
-                     transport=BinanceReceiptTransport(), stop_after_first=args.stop_after_first)
+                     transport=BinanceReceiptTransport(), stop_after_first=args.stop_after_first,
+                     pilot_qualification=qualification)
     print(json.dumps(result, sort_keys=True))
 
 

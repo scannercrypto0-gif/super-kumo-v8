@@ -37,3 +37,26 @@ Run status and stop from another shell, or recover after the writer exits:
 A stop request closes the wire on the next loop checkpoint (frame wait at most 30 seconds, plus bounded authority latency). To resume an explicitly stopped window, use Mode rearm once the writer exits and repeat the same live command within its deadline. For a controlled restart test, add StopAfterFirst to the first live command and omit it on the second. The persisted connection budget is two attempts for the whole window, including any retry. A missed finalized slot stops the run. No REST or backfill is used.
 
 The service keeps two rotating health logs and stops below 128 MiB free. Each isolated window keeps at most 96 sealed frames, its ACK journal and research SQLite stores. Archive or expire finished window directories according to the host retention policy. Status gives a native read-only Factory census and recent health metadata. Factory stays WAIT; there is no matching Discoverer or Lab lineage in this feed.
+
+## One-shot local-budget pilot
+
+After documenting terms applicable to the collection location and private
+retention, verify the authorized route and current clock before opening
+the socket. Use `-Mode plan -Bars 4 -BoundedPilot` and reserve a single
+private state directory. The plan pins four closed 15-minute bars, at most
+two connections and zero REST within 65 minutes. The existing ledger
+enforces the local budget across restarts. Shared-IP headroom remains
+unverified in this mode.
+
+For `-Mode live`, supply `-BoundedPilot -PilotQualification <file>
+-PilotQualificationSha256 <canonical-digest>` with the saved plan pin,
+slot, state and `-Bars 4`. Seal the JSON qualification with
+`aql.observation.contracts.digest`. It binds `plan_sha256`, `endpoint`,
+absolute `state_path`, `raw_retention_ms=86400000`, current
+`clock_checked_ms` and `clock_uncertainty_ms`, and the reviewed
+`source_rights_ref`, `region_ref`, `custody_ref` and
+`network_permission_ref`. Refresh clock evidence before a restart.
+Use the same plan and state to recover. Retain raw material privately
+for at most 24 hours, then remove it from the pilot state and keep
+only the authorized receipt summary. Stop on a denied or degraded route.
+The sustained mode continues to require its renewable authority module.
