@@ -190,6 +190,27 @@ system-account service, reboot trigger or always-on polling.
 
 ## Future deployment boundary
 
+### Authorized daily Vision polling
+
+Use a private fixed NTFS directory for the policy and the existing durable
+original ledger for state. Seal the policy with `aql.observation.contracts.digest`.
+Its fields are `schema=atlas.vision.daily-research.v1`, `first_open_ms` (the
+first approved complete UTC day), `host` (COMPUTERNAME) and
+`authorization_ref`. Install with `-DailyPolicy` and `-DailyPolicySha256`
+in place of the finite authorized plan, initially disabled for health
+inspection. The daily triggers begin the next day at 06:00 and 12:00 UTC.
+This mode requires a fixed local UTC offset and the limited user's session.
+
+The worker polls the earliest pending day and saves one claim per day.
+It retries a missing publication in the second slot and keeps the same day
+pending if still absent. It verifies the published checksum before any
+processing and retains the daily original and derived data privately for
+30 days. Subsequent ticks purge expired data and keep the compact receipt
+and claim. Local replay runs with sockets disabled. Health distinguishes
+publication wait, source day, last success, last failure and tick freshness.
+Use disable, stop and, after the current invocation exits, remove for
+rollback. A claim without a sealed result requires operator disposition.
+
 - Keep the Windows task and its private NTFS checkpoint as the local
   runtime. Keep #305 session/quota state separate from the historical
   research queue and from any read-only reporting host.

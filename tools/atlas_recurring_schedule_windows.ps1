@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory=$true)][string]$Config,
     [string]$Python, [string]$State, [string]$TaskName,
     [string]$AuthorizedPlan, [string]$AuthorizedPlanSha256,
+    [string]$DailyPolicy, [string]$DailyPolicySha256,
     [ValidateRange(1,60)][int]$IntervalMinutes = 1,
     [ValidateRange(2,60)][int]$Ticks = 2,
     [switch]$InstallDisabled
@@ -16,6 +17,12 @@ function Invoke-Cycle {
     $env:PYTHONPATH = "$($Settings.tree)/src;$($Settings.tree)"
     Push-Location -LiteralPath $Settings.tree
     try {
+        if ($Settings.daily_policy) {
+            $mode = switch ($Arguments[0]) { 'recover' { 'tick' } default { $Arguments[0] } }
+            & $Settings.python -B -m tools.atlas_vision_daily $mode --state $Settings.state `
+                --policy $Settings.daily_policy --pin $Settings.pin
+            return
+        }
         if ($Settings.authorized_plan) {
             $Arguments += @('--authorized-plan',$Settings.authorized_plan,
                             '--authorized-plan-sha256',$Settings.pin)
@@ -66,12 +73,13 @@ function Read-TickHealth {
             }
         }
     }
-    $cadenceMs = [long]$Settings.interval_minutes * 60000
+    $cadenceMs = if ($Settings.daily_policy) { 86400000L } else { [long]$Settings.interval_minutes * 60000 }
     $cycle = if ($invalid) { 'LOG_UNREADABLE' }
              elseif (!$latest) { 'NO_TICK_EVIDENCE' }
              elseif ($latest.exit_code -ne 0) { 'LAST_TICK_FAILED' }
              elseif ($cadenceMs -le 0) { 'CADENCE_UNVERIFIED' }
              elseif ($ageMs -gt $cadenceMs + 30000) { 'LAST_TICK_STALE' }
+             elseif ($latest.status -eq 'WAIT_FOR_SOURCE') { 'WAIT_FOR_SOURCE' }
              elseif ($latest.status -ne 'COMPLETE') { 'LAST_TICK_INCOMPLETE' }
              elseif ($lastSuccess -ne $latest) { 'LAST_TICK_RECEIPT_MISSING' }
              else { 'RECENT_RESEARCH_RECEIPT' }
@@ -83,7 +91,13 @@ if ($Mode -in 'prepare','install') {
     if ($TaskName -notmatch '^ATLAS-Research-[A-Za-z0-9-]+$' -or !$Python -or !$State) {
         throw 'TASK_NAME_PYTHON_AND_STATE_REQUIRED'
     }
-    if ($Mode -eq 'prepare' -and $AuthorizedPlan) { throw 'PREPARE_TEST_ONLY' }
+    if ($Mode -eq 'prepare' -and ($AuthorizedPlan -or $DailyPolicy)) { throw 'PREPARE_TEST_ONLY' }
+    if ($DailyPolicy -and ($AuthorizedPlan -or $DailyPolicySha256 -cnotmatch '^[0-9a-f]{64}$')) {
+        throw 'DAILY_POLICY_SCOPE_PIN_REQUIRED'
+    }
+    if ($DailyPolicy -and [TimeZoneInfo]::Local.SupportsDaylightSavingTime) {
+        throw 'DAILY_UTC_SCHEDULE_REQUIRES_FIXED_LOCAL_OFFSET'
+    }
     if ((Test-Path -LiteralPath $Config) -or
         ($Mode -eq 'install' -and (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue))) {
         throw 'EXISTING_TASK_OR_CONFIG'
@@ -101,9 +115,11 @@ if ($Mode -in 'prepare','install') {
     foreach ($file in 'atlas_bounded_research_cycle.py','atlas_recurring_research.py') {
         Copy-Item "$repo/tools/$file" "$tree/tools"
     }
-    if ($AuthorizedPlan) {
-        if ($AuthorizedPlanSha256 -cnotmatch '^[0-9a-f]{64}$') { throw 'AUTHORIZED_PLAN_PIN_REQUIRED' }
-        $AuthorizedPlan = (Resolve-Path -LiteralPath $AuthorizedPlan).Path
+    if ($AuthorizedPlan -or $DailyPolicy) {
+        if ($AuthorizedPlan) {
+            if ($AuthorizedPlanSha256 -cnotmatch '^[0-9a-f]{64}$') { throw 'AUTHORIZED_PLAN_PIN_REQUIRED' }
+            $AuthorizedPlan = (Resolve-Path -LiteralPath $AuthorizedPlan).Path
+        }
         $dependencies = @(
             @{sha='d0782682eba2cf842ec00b75fa85a273c76323be'; path='research_wp_r0/aql_native_binance_zip_v1.py'},
             @{sha='e0e08a8381a8cceaaa44d6ae2721e9cb0d004648'; path='tools/historical_source_qa'},
@@ -127,11 +143,18 @@ if ($Mode -in 'prepare','install') {
                  "$tree/research_wp_r0/aql_factory_prospective_read_v1.py")
     $runtime += @(Get-ChildItem -LiteralPath "$tree/src/aql" -Recurse -File -Filter '*.py' |
                   Select-Object -ExpandProperty FullName)
-    if ($AuthorizedPlan) {
+    if ($AuthorizedPlan -or $DailyPolicy) {
         $runtime += @("$tree/tools/atlas_authorized_archive_research.py",
                       "$tree/tools/historical_source_qa/qa.py",
                       "$tree/research_wp_r0/aql_native_binance_zip_v1.py",
                       "$tree/research_wp_r0/aql_factory_e_research_results_store_v1.py")
+    }
+    if ($DailyPolicy) {
+        $DailyPolicy = (Resolve-Path -LiteralPath $DailyPolicy).Path
+        $opening = [DateTimeOffset]::FromUnixTimeMilliseconds(
+            (Get-Content -LiteralPath $DailyPolicy -Raw | ConvertFrom-Json).first_open_ms)
+        Copy-Item "$repo/tools/atlas_vision_daily.py" "$tree/tools"
+        $runtime += @("$tree/tools/atlas_vision_daily.py", $DailyPolicy)
     }
     $first = (Get-Date).AddSeconds(35)
     $duration = New-TimeSpan -Minutes ($IntervalMinutes * ($Ticks - 1)) -Seconds 15
@@ -140,13 +163,18 @@ if ($Mode -in 'prepare','install') {
         log = Join-Path $stage 'ticks.jsonl'
         interval_minutes = $IntervalMinutes
         deadline_ms = ([DateTimeOffset]$first.Add($duration).AddSeconds(10)).ToUnixTimeMilliseconds()
-        pin = $AuthorizedPlanSha256
+        pin = if ($DailyPolicy) {$DailyPolicySha256} else {$AuthorizedPlanSha256}
         authorized_plan = $AuthorizedPlan
+        daily_policy = $DailyPolicy
+        daily_first_check_ms = if ($DailyPolicy) {$opening.AddDays(1).AddHours(6).ToUnixTimeMilliseconds()}
         prepared_only = ($Mode -eq 'prepare')
         runtime_pin_version = 2
         runtime = @($runtime | ForEach-Object { @{path=$_;sha256=(Get-FileHash -LiteralPath $_).Hash} })
     }
-    if ($AuthorizedPlan) {
+    if ($DailyPolicy) {
+        $null = Invoke-Cycle $settings @('preflight')
+        if ($LASTEXITCODE) { throw 'DAILY_POLICY_PREFLIGHT_FAILED' }
+    } elseif ($AuthorizedPlan) {
         $null = Invoke-Cycle $settings @('status','--state',$State)
         if ($LASTEXITCODE) { throw 'AUTHORIZED_PLAN_PREFLIGHT_FAILED' }
     } else {
@@ -163,14 +191,21 @@ if ($Mode -in 'prepare','install') {
     $action = New-ScheduledTaskAction -Execute $engine -Argument (
         '-NoProfile -NonInteractive -File "{0}" -Mode tick -Config "{1}"' -f $launcher,$Config
     )
-    $trigger = New-ScheduledTaskTrigger -Once -At $first -RepetitionInterval (
-        New-TimeSpan -Minutes $IntervalMinutes) -RepetitionDuration $duration
+    $trigger = if ($DailyPolicy) {
+        foreach ($hour in 6,12) {
+            New-ScheduledTaskTrigger -Daily -At $opening.AddDays(1).AddHours($hour).LocalDateTime
+        }
+    } else {
+        New-ScheduledTaskTrigger -Once -At $first -RepetitionInterval (
+            New-TimeSpan -Minutes $IntervalMinutes) -RepetitionDuration $duration
+    }
     $policy = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 2)
     $user = [Security.Principal.WindowsIdentity]::GetCurrent().Name
     $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $policy -Principal $principal | Out-Null
     if ($InstallDisabled) { Disable-ScheduledTask -TaskName $TaskName | Out-Null }
-    [pscustomobject]@{task=$TaskName; first=$first; pin=$settings.pin; log=$settings.log} | ConvertTo-Json
+    [pscustomobject]@{task=$TaskName; first=if ($DailyPolicy) {$opening.AddDays(1).AddHours(6)} else {$first}
+                      pin=$settings.pin; log=$settings.log} | ConvertTo-Json
     return
 }
 
@@ -180,12 +215,12 @@ if ($settings.prepared_only -and $Mode -in 'start','enable','disable','remove') 
 }
 switch ($Mode) {
     'start' {
-        if ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -gt $settings.deadline_ms) { throw 'SCHEDULE_EXPIRED' }
+        if (!$settings.daily_policy -and [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -gt $settings.deadline_ms) { throw 'SCHEDULE_EXPIRED' }
         Test-Runtime $settings
         Start-ScheduledTask -TaskName $settings.task
     }
     'enable' {
-        if ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -gt $settings.deadline_ms) { throw 'SCHEDULE_EXPIRED' }
+        if (!$settings.daily_policy -and [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -gt $settings.deadline_ms) { throw 'SCHEDULE_EXPIRED' }
         Test-Runtime $settings
         Enable-ScheduledTask -TaskName $settings.task | Out-Null
     }
@@ -201,32 +236,52 @@ switch ($Mode) {
         try { Test-Runtime $settings } catch { $runtimeState = 'RUNTIME_PIN_MISMATCH' }
         $schedulerState = if ($settings.prepared_only) { 'NOT_REGISTERED' }
                           elseif (!$task) { 'REMOVED' }
-                          elseif ($nowMs -gt $settings.deadline_ms) { 'EXPIRED' }
+                          elseif (!$settings.daily_policy -and $nowMs -gt $settings.deadline_ms) { 'EXPIRED' }
                           else { [string]$task.State }
-        [ordered]@{schema='aql.recurring-runtime.health.v1'; observed_at_ms=$nowMs
+        $view = [ordered]@{schema='aql.recurring-runtime.health.v1'; observed_at_ms=$nowMs
                    task=$settings.task; task_state=if ($task) {[string]$task.State} else {'REMOVED'}
-                   source_mode=if ($settings.authorized_plan) {'AUTHORIZED_RETAINED_ARCHIVE'} else {'TEST_ONLY'}
+                   source_mode=if ($settings.authorized_plan -or $settings.daily_policy) {'AUTHORIZED_RETAINED_ARCHIVE'} else {'TEST_ONLY'}
                    last_task_result=$info.LastTaskResult; missed_runs=$info.NumberOfMissedRuns
-                   deadline_ms=$settings.deadline_ms; scheduler_state=$schedulerState
+                   deadline_ms=if (!$settings.daily_policy) {$settings.deadline_ms}; scheduler_state=$schedulerState
                    runtime_state=$runtimeState; cycle_evidence=$evidence.cycle_evidence
                    tick_age_ms=$evidence.tick_age_ms; latest=$evidence.latest
                    freshness_limit_ms=$evidence.freshness_limit_ms
                    last_success=$evidence.last_success; last_failure=$evidence.last_failure
                    market_feed_health='NOT_MEASURED'
-                   current_entry='NO_CURRENT_ENTRY'; trading_authority='NONE'} | ConvertTo-Json -Depth 8
+                   current_entry='NO_CURRENT_ENTRY'; trading_authority='NONE'}
+        if ($settings.daily_policy) {
+            $view.source_cadence = 'DAILY_UTC'
+            $view.next_check_ms = if ($info.NextRunTime) { ([DateTimeOffset]$info.NextRunTime).ToUnixTimeMilliseconds() }
+                                  elseif ($evidence.latest.next_check_ms) { $evidence.latest.next_check_ms }
+            if ($task -and $task.State -ne 'Disabled' -and !$evidence.latest -and
+                $runtimeState -eq 'PIN_VERIFIED' -and $nowMs -lt $settings.daily_first_check_ms) {
+                $view.cycle_evidence = 'WAIT_FOR_SOURCE'
+            }
+            $today = $nowMs - ($nowMs % 86400000L)
+            $latestDue = $today - 86400000L
+            if (($nowMs - $today) -lt 21600000L) { $latestDue -= 86400000L }
+            $view.source_freshness = if (!$evidence.last_success) {'NOT_AVAILABLE'}
+                                     elseif ($evidence.last_success.source_day_ms -lt $latestDue) {'STALE'}
+                                     else {'LATEST_DUE_DAY_RECEIVED'}
+        }
+        $view | ConvertTo-Json -Depth 8
     }
     'remove' { Unregister-ScheduledTask -TaskName $settings.task -Confirm:$false }
     'tick' {
-        if ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -gt $settings.deadline_ms) { return }
+        if (!$settings.daily_policy -and [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -gt $settings.deadline_ms) { return }
         $record = [ordered]@{ utc = [DateTimeOffset]::UtcNow.ToString('o'); exit_code = 1; status = 'FAILED' }
         try {
             Test-Runtime $settings
             $result = Invoke-Cycle $settings @('recover','--state',$settings.state,'--pin',$settings.pin)
             $record.exit_code = $LASTEXITCODE
-            if ($record.exit_code -eq 0) {
+            if ($record.exit_code -eq 0 -or ($settings.daily_policy -and $result)) {
                 $readback = $result | ConvertFrom-Json
                 $record.status = $readback.status
                 if ($readback.reason) { $record.reason = $readback.reason }
+                if ($settings.daily_policy) {
+                    $record.source_day_ms = $readback.source_day_ms
+                    $record.next_check_ms = $readback.next_check_ms
+                }
                 $record.receipts = @($readback.windows | ForEach-Object { if ($_.receipt) { $_.receipt.sha256 } })
             } else {
                 $record.reason = 'CYCLE_EXIT_NONZERO'
