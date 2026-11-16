@@ -56,6 +56,42 @@ The recurring path has no Lab, live, orders or current entry output.
 
 ## Bounded automatic fixture qualification
 
+### Offline staging, health and rollback
+
+From the reviewed #271 commit, use Windows with Git, Python 3.11+, the
+local Core Git object shown above and a private writable directory on
+local NTFS. Prepare a fresh TEST_ONLY configuration before considering
+installation. The same launcher verifies the staged Core Python files,
+Scanner/Factory entry points, fixture and runner pins on each invocation.
+
+```powershell
+$ctl = '.\tools\atlas_recurring_schedule_windows.ps1'
+$python = (Get-Command python.exe).Source # Select the project interpreter
+$root = Join-Path $env:LOCALAPPDATA ('atlas-stage1-' + [guid]::NewGuid())
+$null = New-Item -ItemType Directory -Path $root
+$config = Join-Path $root 'fixture.json'
+$state = Join-Path $root 'state'
+& $ctl -Mode prepare -Config $config -State $state -Python $python -TaskName ATLAS-Research-Stage1
+& $ctl -Mode tick -Config $config
+& $ctl -Mode health -Config $config
+```
+
+Expect `TEST_ONLY`, `NOT_REGISTERED`, `PIN_VERIFIED` and a recent
+research receipt immediately after a completed tick. For rollback, retain
+the state and logs and discard the disposable staged runtime after review.
+On `RUNTIME_PIN_MISMATCH`, restore the exact staged files using the original
+checkout and Core pin before recovering. A config created by an older
+launcher lacks the expanded pins. Preserve its state and config and use a
+fresh config and staging directory. An existing registered task must be
+disabled separately by its operator before replacing its runtime; a
+prepared config cannot control a registered task.
+
+After separate owner approval, use the install command below with a
+fresh config and task name. Add `-InstallDisabled` for staging review.
+Use `-Mode health` before any approved enable. To roll back a registered
+task, use `-Mode disable` followed by `-Mode remove` and preserve settings,
+logs and durable state.
+
 The Windows Task Scheduler wrapper stages the same pinned runtime and calls
 its existing recover command. Register under the logged-in user with limited
 rights. Use a fresh state and an existing private directory for configuration.

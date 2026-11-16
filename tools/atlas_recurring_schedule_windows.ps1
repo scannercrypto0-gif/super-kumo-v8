@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('install','start','status','health','stop','rearm','recover','tick','enable','disable','remove')][string]$Mode,
+    [ValidateSet('prepare','install','start','status','health','stop','rearm','recover','tick','enable','disable','remove')][string]$Mode,
     [Parameter(Mandatory=$true)][string]$Config,
     [string]$Python, [string]$State, [string]$TaskName,
     [string]$AuthorizedPlan, [string]$AuthorizedPlanSha256,
@@ -27,6 +27,9 @@ function Invoke-Cycle {
 
 function Test-Runtime {
     param($Settings)
+    if ($Settings.runtime_pin_version -ne 2 -or !$Settings.runtime) {
+        throw 'RUNTIME_PIN_MISMATCH'
+    }
     foreach ($item in $Settings.runtime) {
         if (!(Test-Path -LiteralPath $item.path -PathType Leaf) -or
             (Get-FileHash -LiteralPath $item.path).Hash -cne $item.sha256) {
@@ -76,11 +79,13 @@ function Read-TickHealth {
                last_failure=$lastFailure; freshness_limit_ms=if ($cadenceMs -gt 0) {$cadenceMs + 30000}}
 }
 
-if ($Mode -eq 'install') {
+if ($Mode -in 'prepare','install') {
     if ($TaskName -notmatch '^ATLAS-Research-[A-Za-z0-9-]+$' -or !$Python -or !$State) {
         throw 'TASK_NAME_PYTHON_AND_STATE_REQUIRED'
     }
-    if ((Test-Path -LiteralPath $Config) -or (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue)) {
+    if ($Mode -eq 'prepare' -and $AuthorizedPlan) { throw 'PREPARE_TEST_ONLY' }
+    if ((Test-Path -LiteralPath $Config) -or
+        ($Mode -eq 'install' -and (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue))) {
         throw 'EXISTING_TASK_OR_CONFIG'
     }
     $Python = (Resolve-Path -LiteralPath $Python).Path
@@ -115,7 +120,13 @@ if ($Mode -eq 'install') {
     $launcher = Join-Path $stage 'schedule.ps1'
     Copy-Item -LiteralPath $PSCommandPath -Destination $launcher
     $runtime = @($launcher, $Python, "$tree/tools/atlas_recurring_research.py",
-                 "$tree/tools/atlas_bounded_research_cycle.py")
+                 "$tree/tools/atlas_bounded_research_cycle.py",
+                 "$tree/tools/atlas_prospective_observe.py",
+                 "$tree/tools/atlas_april_archive.py",
+                 "$tree/tools/strategy_service_offline/fixtures/strategies.json",
+                 "$tree/research_wp_r0/aql_factory_prospective_read_v1.py")
+    $runtime += @(Get-ChildItem -LiteralPath "$tree/src/aql" -Recurse -File -Filter '*.py' |
+                  Select-Object -ExpandProperty FullName)
     if ($AuthorizedPlan) {
         $runtime += @("$tree/tools/atlas_authorized_archive_research.py",
                       "$tree/tools/historical_source_qa/qa.py",
@@ -131,6 +142,8 @@ if ($Mode -eq 'install') {
         deadline_ms = ([DateTimeOffset]$first.Add($duration).AddSeconds(10)).ToUnixTimeMilliseconds()
         pin = $AuthorizedPlanSha256
         authorized_plan = $AuthorizedPlan
+        prepared_only = ($Mode -eq 'prepare')
+        runtime_pin_version = 2
         runtime = @($runtime | ForEach-Object { @{path=$_;sha256=(Get-FileHash -LiteralPath $_).Hash} })
     }
     if ($AuthorizedPlan) {
@@ -142,6 +155,10 @@ if ($Mode -eq 'install') {
         $settings.pin = $plan.sha256
     }
     $settings | ConvertTo-Json | Set-Content -LiteralPath $Config -Encoding utf8
+    if ($Mode -eq 'prepare') {
+        [pscustomobject]@{status='PREPARED_TEST_ONLY'; pin=$settings.pin; log=$settings.log} | ConvertTo-Json
+        return
+    }
     $engine = (Get-Process -Id $PID).Path
     $action = New-ScheduledTaskAction -Execute $engine -Argument (
         '-NoProfile -NonInteractive -File "{0}" -Mode tick -Config "{1}"' -f $launcher,$Config
@@ -158,6 +175,9 @@ if ($Mode -eq 'install') {
 }
 
 $settings = Get-Content -LiteralPath $Config -Raw | ConvertFrom-Json
+if ($settings.prepared_only -and $Mode -in 'start','enable','disable','remove') {
+    throw 'PREPARED_CONFIG_HAS_NO_TASK'
+}
 switch ($Mode) {
     'start' {
         if ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -gt $settings.deadline_ms) { throw 'SCHEDULE_EXPIRED' }
@@ -171,13 +191,16 @@ switch ($Mode) {
     }
     'disable' { Disable-ScheduledTask -TaskName $settings.task | Out-Null }
     'health' {
-        $task = Get-ScheduledTask -TaskName $settings.task -ErrorAction SilentlyContinue
+        $task = if (!$settings.prepared_only) {
+            Get-ScheduledTask -TaskName $settings.task -ErrorAction SilentlyContinue
+        }
         $info = if ($task) { $task | Get-ScheduledTaskInfo }
         $nowMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
         $evidence = Read-TickHealth $settings $nowMs
         $runtimeState = 'PIN_VERIFIED'
         try { Test-Runtime $settings } catch { $runtimeState = 'RUNTIME_PIN_MISMATCH' }
-        $schedulerState = if (!$task) { 'REMOVED' }
+        $schedulerState = if ($settings.prepared_only) { 'NOT_REGISTERED' }
+                          elseif (!$task) { 'REMOVED' }
                           elseif ($nowMs -gt $settings.deadline_ms) { 'EXPIRED' }
                           else { [string]$task.State }
         [ordered]@{schema='aql.recurring-runtime.health.v1'; observed_at_ms=$nowMs
