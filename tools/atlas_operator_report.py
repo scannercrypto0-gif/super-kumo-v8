@@ -1,5 +1,6 @@
 """Join pinned saved strategy operations, runtime health and scientific preflight."""
 import argparse
+from datetime import datetime
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -41,24 +42,40 @@ def live_windows_view(snapshot):
                     and delta // 900_000 - 1 == receipt["missing_slots"], "LIVE_OPERATOR_RECEIPT_CHAIN")
         missing += receipt["missing_slots"]
         previous = receipt
-    for item in snapshot["supervisor"]:
+    supervisor = snapshot["supervisor"]
+    started = [item for item in supervisor if item["status"] == "STARTED"]
+    completed = [item for item in supervisor if item["status"] == "COMPLETE"]
+
+    def time_ms(item):
+        stamp = datetime.fromisoformat(item["utc"])
+        require(stamp.utcoffset() is not None, "LIVE_OPERATOR_SUPERVISOR_CLOCK")
+        return int(stamp.timestamp() * 1000)
+
+    def later_segment_final(after_ms):
+        return any(time_ms(item) > after_ms
+                   and any(r["observation"]["slot"] >= item["slot_ms"]
+                           and r["heartbeat_ms"] > time_ms(item) for r in receipts)
+                   for item in started)
+
+    for item in supervisor:
         if item["status"] == "FAILED":
+            resumed = later_segment_final(time_ms(item))
             errors.append(dict(reason=item["reason"], at=item["utc"],
-                               recovery="OPERATOR_DIAGNOSIS_REQUIRED", unresolved=True))
+                               recovery="FINAL_RECEIPT_AFTER_NEW_SEGMENT" if resumed
+                               else "OPERATOR_DIAGNOSIS_REQUIRED", unresolved=not resumed))
     interruptions = [item for item in snapshot["transport"] if item["status"] == "TRANSPORT_INTERRUPTED"]
     recovered = False
     for item in interruptions:
         resumed = any(receipt["last_failure"] == {"error": item["error"], "utc_ms": item["utc_ms"]}
                       and receipt["connection_attempts"] > 1 for receipt in receipts)
         recovered |= resumed
+        successor = later_segment_final(item["utc_ms"])
         errors.append(dict(reason=item["error"], at=item["utc_ms"],
-                           recovery="FINAL_RECEIPT_AFTER_RECONNECT" if resumed else "NO_MATCHING_FINAL_RECEIPT",
-                           unresolved=not resumed))
+                           recovery="FINAL_RECEIPT_AFTER_RECONNECT" if resumed else
+                           "FINAL_RECEIPT_AFTER_NEW_SEGMENT" if successor else "NO_MATCHING_FINAL_RECEIPT",
+                           unresolved=not (resumed or successor)))
     heartbeat = snapshot["last_heartbeat_ms"]
-    started = [item["slot_ms"] for item in snapshot["supervisor"] if item["status"] == "STARTED"]
-    completed = [item["slot_ms"] for item in snapshot["supervisor"] if item["status"] == "COMPLETE"]
-    rollover = any(old < new and any(r["observation"]["slot"] >= new for r in receipts)
-                   for old in completed for new in started)
+    rollover = any(later_segment_final(time_ms(item)) for item in completed)
     cadence = "RECENT" if previous and 0 <= now - (previous["observation"]["slot"] + 900_000) <= 930_000 else "STALE_OR_NO_FINAL"
     recent_heartbeat = type(heartbeat) is int and 0 <= now - heartbeat <= 95_000
     hold = snapshot["hold"]
@@ -77,7 +94,7 @@ def live_windows_view(snapshot):
                   accepted_receipts=len(receipts), latest_success=previous, errors=errors,
                   segment_rollover="ATTESTED_BY_FINAL_RECEIPT" if rollover else "NOT_YET_ATTESTED",
                   recovery="REAL_RECONNECT_ATTESTED" if recovered else "REAL_RECOVERY_NOT_ATTESTED",
-                  supervisor_history=snapshot["supervisor"], daily=snapshot["daily"],
+                  supervisor_history=supervisor, daily=snapshot["daily"],
                   source_config_sha256=snapshot["config_sha256"],
                   orders=0, secretary="WAIT", dispatch=None, telegram="NOT_SENT")
     return {**report, "sha256": digest(report)}

@@ -7,6 +7,7 @@ on:
       - 'tools/atlas_strategy_operations.py'
       - 'tools/atlas_operator_report.py'
       - 'tools/atlas_live_operator_windows.ps1'
+      - 'tools/test_atlas_live_operator_recovery.py'
       - '.github/workflows/sma-paper-acceptance.yml'
   push:
     branches: ['integration/package-e-g1-g12-pinned-20261105']
@@ -15,6 +16,7 @@ on:
       - 'tools/atlas_strategy_operations.py'
       - 'tools/atlas_operator_report.py'
       - 'tools/atlas_live_operator_windows.ps1'
+      - 'tools/test_atlas_live_operator_recovery.py'
       - '.github/workflows/sma-paper-acceptance.yml'
 
 permissions:
@@ -43,6 +45,7 @@ jobs:
         run: |
           cd "$RUNNER_TEMP/atlas-sma-paper-stage"
           export PYTHONPATH=src
+          python -B -m unittest tools.test_atlas_live_operator_recovery
           pin="$(python -B -m tools.atlas_sma_paper run acceptance)"
           python -B -m tools.atlas_sma_paper replay acceptance --pin "$pin" > acceptance/operator.json
           python -B -m tools.atlas_sma_paper replay acceptance --pin "$pin" > replay.json

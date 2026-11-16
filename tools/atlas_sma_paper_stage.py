@@ -37,7 +37,8 @@ def stage_package(output):
             "research_wp_r0/aql_core_chronology_universe_evidence_v1.py",
             "research_wp_r0/aql_core_research_query_seam_v1.py",
             "research_wp_r0/aql_native_price_custody_query_v1.py")
-    for name in ("atlas_sma_paper.py", "atlas_live_operator_windows.ps1"):
+    for name in ("atlas_sma_paper.py", "atlas_live_operator_windows.ps1",
+                 "test_atlas_live_operator_recovery.py"):
         shutil.copyfile(ROOT / "tools" / name, output / "tools" / name)
 
 
