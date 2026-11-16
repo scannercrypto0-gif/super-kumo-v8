@@ -62,3 +62,32 @@ can use its in-memory state. If the process exits, the one-shot is consumed.
 Use `-Mode status -Pin <plan-pin>` to read a completed summary without
 replaying source data. Stop on a denied or degraded route.
 The sustained mode continues to require its renewable authority module.
+
+## Saved live and publisher reconciliation
+
+| Path | Reuse or delta | Acceptance |
+| --- | --- | --- |
+| #271 live receipt and #305 transport | Reuse the sealed summary and plan | Bind ordered, final BTCUSDT Spot 15m metadata to the same plan and clocks |
+| #304 Vision and native Core warehouse | Reuse the publisher ZIP/checksum and saved query | Match the original and query pins and retain the separate publisher clock |
+| Factory prospective census and #312 operator | Reuse the Factory parent and daily report | Read the reconciliation receipt alongside them without altering either report |
+| `atlas_live_publisher_reconciliation` | New offline join and readback | Verify status, append-only replay, revision quarantine and absence of prices |
+
+Run `python -B -m tools.atlas_live_publisher_reconciliation` in the staged
+authorized archive runtime with the live helper overlays. Pass the saved
+`--live` and `--plan` files with their respective pins, `--uncertainty`,
+`--as-of-ms`, and a private existing `--output-dir`. Each optional
+`--publisher RUN ORIGINAL RESULT_PIN` points to an already authorized
+publisher result and its original ZIP/checksum directory. The read-only
+CLI consumes no live prices. Separately authorized callers may supply
+comparable WS frames in memory only. A numeric comparison is scoped to
+the native Core numeric projection and requires a known publisher clock.
+
+Read the resulting SHA-named receipt using `--read <file> --receipt-pin
+<sha>`. Use `--previous <file> --previous-pin <sha>` for a successor
+receipt. A changed publisher pin or row quarantines the successor and
+leaves the previous receipt intact. A missing supplied publisher day
+stays pending, and absent live values stay `COMPARISON_NOT_POSSIBLE`.
+The reader exposes both lane identities and always leaves Secretary
+waiting with no current entry. Rollback consists of ceasing to invoke
+the adapter and preserving any already published receipts. The task and
+source stores are outside the adapter's write scope.
