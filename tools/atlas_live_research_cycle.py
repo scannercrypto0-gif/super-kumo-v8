@@ -22,6 +22,7 @@ from tools.atlas_single_receipt import load_frame, need, parse_final, persist_fr
 from tools.atlas_single_receipt_runner import ENDPOINT, BinanceReceiptTransport
 from tools.atlas_research_lease import Lease
 from tools.binance_live_feed.quota import Limits, Quota
+from tools.atlas_ws_receive_diagnostics import receive_timeout_context
 
 MARKER = "atlas-live-research-v1"
 
@@ -354,6 +355,7 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
             need(used < plan["max_connections"], "LOCAL_WS_BUDGET_STOP")
             quota.set(db, "research_connection_attempts", used + 1)
         need(quota.connect(socket_id, now, ["btcusdt@kline_15m"]), "LOCAL_WS_BUDGET_STOP")
+        failure_context = {}
         try:
             emit(root, "CONNECTING", utc_ms=now, attempt=used + 1, plan_sha256=pin)
             with transport.stream(ENDPOINT, min(5, left)) as connection:
@@ -368,7 +370,12 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
                              last_slot=rows[-1]["slot"] if rows else None,
                              last_close_age_ms=now - rows[-1]["slot"] - STEP + 1 if rows else None)
                         heartbeat = now
-                    kind, raw = transport.frame(connection, min(left, 30))
+                    try:
+                        kind, raw = transport.frame(connection, min(left, 30))
+                    except TimeoutError as exc:
+                        if plan.get("sustained_research") and type(transport) is BinanceReceiptTransport:
+                            failure_context = receive_timeout_context(connection, exc)
+                        raise
                     received, _ = time_left()
                     if kind == "ping":
                         need(quota.ws(socket_id, received, "PONG"), "PONG_QUOTA_STOP")
@@ -389,7 +396,7 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
             last_failure = dict(error=type(exc).__name__)
             if plan.get("bounded_operations") or plan.get("sustained_research"):
                 last_failure["utc_ms"] = clock.now()
-            emit(root, "TRANSPORT_INTERRUPTED", **last_failure)
+            emit(root, "TRANSPORT_INTERRUPTED", **last_failure, **failure_context)
             if attempt or len(rows) == target:
                 raise
         finally:

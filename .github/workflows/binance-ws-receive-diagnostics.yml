@@ -1,0 +1,37 @@
+name: Binance WS receive diagnostics
+on:
+  push:
+    branches: ['integration/package-e-g1-g12-pinned-20261105']
+    paths:
+      - 'tools/atlas_ws_receive_diagnostics.py'
+      - 'tools/test_atlas_ws_receive_diagnostics.py'
+      - 'tools/atlas_live_research_cycle.py'
+      - '.github/workflows/binance-ws-receive-diagnostics.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  receive-diagnostics:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test timeout classification against pinned transport
+        shell: bash
+        env:
+          PYTHONPATH: src
+        run: |
+          git fetch --no-tags origin refs/pull/297/head refs/pull/288/head refs/pull/300/head refs/pull/309/head refs/pull/305/head
+          stage="$RUNNER_TEMP/binance-ws-receive"
+          python -B tools/atlas_sma_paper_stage.py "$stage"
+          git archive 0a45cb6de6027b6fba54320e07b0faf3317a5382 tools/binance_live_feed | tar -xf - -C "$stage"
+          cp tools/{atlas_ws_receive_diagnostics,test_atlas_ws_receive_diagnostics}.py "$stage/tools/"
+          cd "$stage"
+          python -m pip install websocket-client==1.9.2
+          python -B -m unittest tools.test_atlas_ws_receive_diagnostics
