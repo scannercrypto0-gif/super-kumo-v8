@@ -1,5 +1,7 @@
 """Read-only strategy operations over a pinned, saved Factory/Lab report."""
 import argparse
+from collections import Counter
+from dataclasses import asdict
 from decimal import Decimal, localcontext
 import os
 from pathlib import Path
@@ -12,6 +14,39 @@ from aql.observation.contracts import digest
 from research_wp_r0.aql_factory_e_research_results_store_v1 import migrate_store_v2
 from tools.atlas_saved_research_disposition import publish, read, require, without_seal
 from tools.research_capacity_scale.runtime import catalog, safe, store
+
+
+def isolated_paper_view(handoff, scanner, states, journal_events, policy):
+    """Project verified, detached TEST_ONLY simulation evidence for operators."""
+    require(handoff["evidence"] == "GENERATED_TEST_ONLY", "PAPER_REPORT_EVIDENCE")
+    phases = Counter(state["phase"] for state in states.values())
+    decisions = Counter(row["decision"]["state"] for row in scanner["rows"])
+    fills = [fill for state in states.values() for fill in state["fills"]]
+    net_pnl = [Decimal(state["net_pnl"]) for state in states.values()
+               if state["net_pnl"] is not None]
+    fees = sum(Decimal(state["fees"]) for state in states.values())
+    spread_slippage_rate = (Decimal(policy.half_spread_bps) + Decimal(policy.slippage_bps)) / 10000
+    require(all(fill["liquidity"] == "ASSUMED_TAKER" for fill in fills), "PAPER_REPORT_FILL_SCOPE")
+    spread_slippage = sum(Decimal(fill["qty"]) * Decimal(fill["price"]) * spread_slippage_rate
+                          / (1 + spread_slippage_rate if fill["side"] == "buy" else 1 - spread_slippage_rate)
+                          for fill in fills)
+    report = dict(schema="atlas.strategy-operations.paper-acceptance.v1",
+                  evidence=handoff["evidence"], run_id=handoff["run_id"],
+                  strategy_sha256=handoff["strategy_sha256"], acceptance_sha256=handoff["sha256"],
+                  scanner_sha256=scanner["sha256"], journal_sha256=handoff["journal_sha256"],
+                  replay_state_sha256=handoff["replay_state_sha256"], decision_states=dict(decisions),
+                  decision_total=sum(decisions.values()), terminal_states=dict(phases),
+                  journal_events=journal_events, virtual_entry_orders=len(states),
+                  virtual_exit_executions=sum(fill["side"] == "sell" for fill in fills),
+                  virtual_fills=len(fills), virtual_closed_positions=phases["CLOSED"],
+                  assumed_fees_quote=str(fees), assumed_spread_slippage_quote=str(spread_slippage),
+                  assumed_total_cost_quote=str(fees + spread_slippage),
+                  modeled_closed_net_pnl_quote=str(sum(net_pnl)), policy=asdict(policy),
+                  errors=handoff["errors"], duplicate=handoff["duplicate"],
+                  current_entry="NO_CURRENT_ENTRY", secretary="WAIT", dispatch=None, orders=0,
+                  telegram="NOT_SENT", trading_authority="NONE",
+                  scientific_status="REAL_PIT_OOS_BLOCKED", continuous_paper="NOT_ACTIVATED")
+    return {**report, "sha256": digest(report)}
 
 
 def project(report, expected):

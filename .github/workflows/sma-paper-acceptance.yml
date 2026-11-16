@@ -1,0 +1,60 @@
+name: SMA3-12 isolated Paper acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'tools/atlas_sma_paper*.py'
+      - 'tools/atlas_strategy_operations.py'
+      - 'tools/atlas_operator_report.py'
+      - 'tools/atlas_live_operator_windows.ps1'
+      - '.github/workflows/sma-paper-acceptance.yml'
+  push:
+    branches: ['integration/package-e-g1-g12-pinned-20261105']
+    paths:
+      - 'tools/atlas_sma_paper*.py'
+      - 'tools/atlas_strategy_operations.py'
+      - 'tools/atlas_operator_report.py'
+      - 'tools/atlas_live_operator_windows.ps1'
+      - '.github/workflows/sma-paper-acceptance.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch draft objects and stage the pinned package
+        shell: bash
+        run: |
+          git fetch --no-tags origin refs/pull/297/head refs/pull/288/head refs/pull/300/head refs/pull/309/head
+          python -B tools/atlas_sma_paper_stage.py "$RUNNER_TEMP/atlas-sma-paper-stage"
+      - name: Test generated decisions, native journal and independent process readback
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/atlas-sma-paper-stage"
+          export PYTHONPATH=src
+          pin="$(python -B -m tools.atlas_sma_paper run acceptance)"
+          python -B -m tools.atlas_sma_paper replay acceptance --pin "$pin" > acceptance/operator.json
+          python -B -m tools.atlas_sma_paper replay acceptance --pin "$pin" > replay.json
+          cmp acceptance/operator.json replay.json
+          cat replay.json
+          cp -r acceptance tampered
+          printf X >> tampered/virtual.jsonl
+          if python -B -m tools.atlas_sma_paper replay tampered --pin "$pin" 2>denial.log; then
+            exit 1
+          fi
+          python -c "from pathlib import Path; assert 'SMA_PAPER_JOURNAL_PIN' in Path('denial.log').read_text()"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sma-paper-acceptance-${{ matrix.os }}
+          path: ${{ runner.temp }}/atlas-sma-paper-stage/acceptance/

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import shutil
 import socket
+import sys
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
@@ -12,6 +13,74 @@ from aql.observation.contracts import digest
 from tools.atlas_saved_research_disposition import publish, require, without_seal
 from tools.atlas_strategy_operations import run as strategy_operations
 from tools.research_capacity_scale.runtime import catalog, safe
+
+
+def live_windows_view(snapshot):
+    """Saved-only Factory E projection, with explicit cadence and recovery evidence."""
+    now = snapshot["as_of_ms"]
+    previous = None
+    receipts = snapshot["receipts"]
+    missing = 0
+    errors = []
+    for receipt in receipts:
+        row = receipt["observation"]
+        slot = row["slot"]
+        require(receipt["sha256"] == without_seal(receipt)
+                and receipt["factory"]["sha256"] == without_seal(receipt["factory"])
+                and receipt["retention"] == "SANITIZED_RECEIPTS_ONLY"
+                and receipt["orders"] == 0 and receipt["dispatch"] is None
+                and receipt["secretary"] == "WAIT" and receipt["telegram"] == "NOT_SENT",
+                "LIVE_OPERATOR_RECEIPT_SCOPE")
+        closed = slot + 900_000
+        require(slot % 900_000 == 0 and closed - 1 <= row["event_ms"]
+                <= row["received_ms"] <= row["committed_ms"] <= receipt["heartbeat_ms"] <= now,
+                "LIVE_OPERATOR_RECEIPT_CLOCK")
+        if previous:
+            delta = slot - previous["observation"]["slot"]
+            require(previous["sha256"] == receipt["previous_sha256"] and delta > 0
+                    and delta // 900_000 - 1 == receipt["missing_slots"], "LIVE_OPERATOR_RECEIPT_CHAIN")
+        missing += receipt["missing_slots"]
+        previous = receipt
+    for item in snapshot["supervisor"]:
+        if item["status"] == "FAILED":
+            errors.append(dict(reason=item["reason"], at=item["utc"],
+                               recovery="OPERATOR_DIAGNOSIS_REQUIRED", unresolved=True))
+    interruptions = [item for item in snapshot["transport"] if item["status"] == "TRANSPORT_INTERRUPTED"]
+    recovered = False
+    for item in interruptions:
+        resumed = any(receipt["last_failure"] == {"error": item["error"], "utc_ms": item["utc_ms"]}
+                      and receipt["connection_attempts"] > 1 for receipt in receipts)
+        recovered |= resumed
+        errors.append(dict(reason=item["error"], at=item["utc_ms"],
+                           recovery="FINAL_RECEIPT_AFTER_RECONNECT" if resumed else "NO_MATCHING_FINAL_RECEIPT",
+                           unresolved=not resumed))
+    heartbeat = snapshot["last_heartbeat_ms"]
+    started = [item["slot_ms"] for item in snapshot["supervisor"] if item["status"] == "STARTED"]
+    completed = [item["slot_ms"] for item in snapshot["supervisor"] if item["status"] == "COMPLETE"]
+    rollover = any(old < new and any(r["observation"]["slot"] >= new for r in receipts)
+                   for old in completed for new in started)
+    cadence = "RECENT" if previous and 0 <= now - (previous["observation"]["slot"] + 900_000) <= 930_000 else "STALE_OR_NO_FINAL"
+    recent_heartbeat = type(heartbeat) is int and 0 <= now - heartbeat <= 95_000
+    hold = snapshot["hold"]
+    status = ("HELD" if hold else "STOP_REQUESTED" if snapshot["stop_requested"]
+              else "ACTIVE_RESEARCH_ONLY" if snapshot["task_state"] == "Running"
+              and recent_heartbeat and cadence == "RECENT" else "CHECK_SCHEDULER_OR_CADENCE")
+    if status == "CHECK_SCHEDULER_OR_CADENCE":
+        errors.append(dict(reason="STALE_OR_MISSING_WORKER_HEARTBEAT" if not recent_heartbeat else
+                           "STALE_OR_MISSING_FINAL" if cadence != "RECENT" else "SCHEDULER_NOT_RUNNING",
+                           recovery="NO_RECOVERY_AT_SNAPSHOT", unresolved=True))
+    report = dict(schema="atlas.factory-e.live-windows-saved-report.v1", as_of_ms=now, status=status,
+                  task_state=snapshot["task_state"], task_enabled=snapshot["task_enabled"],
+                  writer_policy=snapshot["writer_policy"], last_task_result=snapshot["last_task_result"],
+                  hold=hold, rollback_marker_present=snapshot["stop_requested"],
+                  last_heartbeat_ms=heartbeat, final_cadence=cadence, missing_slots_in_window=missing,
+                  accepted_receipts=len(receipts), latest_success=previous, errors=errors,
+                  segment_rollover="ATTESTED_BY_FINAL_RECEIPT" if rollover else "NOT_YET_ATTESTED",
+                  recovery="REAL_RECONNECT_ATTESTED" if recovered else "REAL_RECOVERY_NOT_ATTESTED",
+                  supervisor_history=snapshot["supervisor"], daily=snapshot["daily"],
+                  source_config_sha256=snapshot["config_sha256"],
+                  orders=0, secretary="WAIT", dispatch=None, telegram="NOT_SENT")
+    return {**report, "sha256": digest(report)}
 
 
 def load(path, limit):
@@ -101,6 +170,9 @@ def build(strategy, strategy_pin, health, health_pin, preflight, preflight_pin, 
 
 
 def main():
+    if sys.argv[1:] == ["--live-windows-saved"]:
+        print(json.dumps(live_windows_view(json.load(sys.stdin)), sort_keys=True))
+        return
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("strategy", "health", "preflight", "batch-checkpoint", "checkpoint", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
