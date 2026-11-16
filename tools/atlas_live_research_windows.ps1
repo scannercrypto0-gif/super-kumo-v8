@@ -7,6 +7,7 @@ param(
     [ValidateRange(2,96)][int]$Bars = 2,
     [string]$AuthorityModule,
     [switch]$BoundedPilot,
+    [switch]$BoundedOperations,
     [string]$PilotQualification,
     [string]$PilotQualificationSha256,
     [switch]$StopAfterFirst
@@ -40,6 +41,7 @@ try {
     if ($Pin) { $arguments += @('--pin', $Pin) }
     if ($AuthorityModule) { $arguments += @('--authority-module', $AuthorityModule) }
     if ($BoundedPilot) { $arguments += '--bounded-pilot' }
+    if ($BoundedOperations) { $arguments += '--bounded-operations' }
     if ($PilotQualification) { $arguments += @('--pilot-qualification', $PilotQualification) }
     if ($PilotQualificationSha256) { $arguments += @('--pilot-qualification-sha256', $PilotQualificationSha256) }
     if ($StopAfterFirst) { $arguments += '--stop-after-first' }

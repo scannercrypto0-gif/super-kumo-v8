@@ -11,7 +11,7 @@ from unittest.mock import patch
 from aql.observation.contracts import digest
 from tools.atlas_research_lease import Lease
 from tools.atlas_single_receipt import persist_frame
-from tools.atlas_live_research_cycle import operational_guard, ingest
+from tools.atlas_live_research_cycle import operational_guard, ingest, saved_operations_progress, saved_pilot_summary
 from tools.atlas_live_research_cycle import FIXTURE, STEP, make_plan, run, report, recover, DurableJournal, OperationalStore, ProspectiveObserver
 
 fixture = json.loads(FIXTURE.read_text())[0]
@@ -66,6 +66,44 @@ authority = SimpleNamespace(
 def wait(seconds):
     clock.current += round(seconds * 1000)
 class LiveResearchTests(unittest.TestCase):
+    def test_operations_reconnect_cap_and_saved_stop_state(self):
+        clock.current = slot + 100
+        operation = make_plan(slot, fixture, 2, bounded_operations=True)
+        operation_pin = digest(operation)
+        self.assertEqual((operation["wall_ms"], operation["max_connections"]), (7_200_000, 2))
+        self.assertRaisesRegex(ValueError, "OPERATIONS_BAR_CAP", make_plan, slot, fixture, 9,
+                               bounded_operations=True)
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(socket, "socket", side_effect=AssertionError("NETWORK_DISABLED")), \
+             patch("time.time", side_effect=lambda: clock.now()/1000), \
+             patch("aql.observation.prospective.time_ns", side_effect=lambda: clock.now()*1000000):
+            root = Path(tmp) / "run"
+            transport = Wire()
+            qual = dict(plan_sha256=operation_pin, endpoint=operation["endpoint"], raw_retention_ms=0,
+                        source_rights_ref="fixture", region_ref="fixture", custody_ref="fixture",
+                        network_permission_ref="fixture", clock_checked_ms=clock.now(),
+                        clock_uncertainty_ms=10, state_path=str(root.resolve()))
+            args = dict(verifier=None, clock=clock, transport=transport, wait=wait, synthetic=True,
+                        pilot_qualification=qual)
+            with self.assertRaisesRegex(ValueError, "OPERATIONS_REQUIRES_TWO_CYCLES"):
+                run(root, operation, operation_pin, fixture, stop_after_first=True, **args)
+            result = run(root, operation, operation_pin, fixture, **args)
+            self.assertEqual(result["connection_attempts"], 2)
+            self.assertEqual([r["slot"] for r in result["bars"]], [slot, slot + STEP])
+            self.assertEqual(result["last_failure"]["error"], "TimeoutError")
+            self.assertEqual(result["secretary"], "WAIT")
+            self.assertEqual(saved_pilot_summary(root, operation, operation_pin), result)
+            progress = saved_operations_progress(root, operation, operation_pin)
+            self.assertEqual(progress["completed_receipts"], [r["receipt_sha256"] for r in result["bars"]])
+            self.assertEqual(progress["last_status"], "STOPPED")
+            qual["clock_checked_ms"] = clock.now()
+            with self.assertRaisesRegex(ValueError, "EPHEMERAL_PILOT_ALREADY_CONSUMED"):
+                run(root, operation, operation_pin, fixture, **args)
+            self.assertEqual(transport.attempts, 2)
+            self.assertEqual(saved_pilot_summary(root, operation, operation_pin), result)
+            self.assertFalse(any(root.rglob("receipt.sqlite")))
+            self.assertFalse((root / "market.sqlite").exists())
+
     def test_bounded_pilot_is_opt_in_and_custody_scoped(self):
         clock.current = slot + 100
         pilot_plan = make_plan(slot, fixture, 4, bounded_pilot=True)

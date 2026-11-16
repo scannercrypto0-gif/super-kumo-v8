@@ -99,10 +99,13 @@ def factory_report(observer, cutoff):
 def run(root, plan, pin, fixture, *, verifier, clock, transport, wait=time.sleep, synthetic=False,
         stop_after_first=False, pilot_qualification=None):
     pilot = pilot_qualification is not None
+    operations = plan.get("bounded_operations") is True
     need(synthetic or type(transport) is BinanceReceiptTransport, "LIVE_TRANSPORT_REQUIRED")
     need(not synthetic or not isinstance(transport, BinanceReceiptTransport), "OFFLINE_TRANSPORT_REQUIRED")
-    need(plan == make_plan(plan["slot"], fixture, plan["bar_count"], bounded_pilot=pilot)
+    need(plan == make_plan(plan["slot"], fixture, plan["bar_count"],
+                           bounded_pilot=pilot and not operations, bounded_operations=pilot and operations)
          and digest(plan) == pin, "LIVE_PLAN_PIN")
+    need(not operations or not stop_after_first, "OPERATIONS_REQUIRES_TWO_CYCLES")
     need(verifier is not None or pilot, "CONTROLLED_EGRESS_AUTHORITY_UNAVAILABLE")
     need(not pilot or verifier is None, "PILOT_AUTHORITY_MODE_CONFLICT")
     start = clock.now()
@@ -153,6 +156,12 @@ def run(root, plan, pin, fixture, *, verifier, clock, transport, wait=time.sleep
         if pilot:
             result = {**result, "egress_budget": "LOCAL_PILOT_ONLY", "shared_headroom": "UNVERIFIED",
                       "retention": "SANITIZED_RECEIPTS_ONLY", "plan_sha256": pin}
+            if operations:
+                result["execution"] = dict(
+                    started_ms=start, stopped_ms=clock.now(), window_start_ms=plan["slot"],
+                    deadline_ms=scope["deadline_ms"], recovered_process=False)
+                result.update(secretary="WAIT", dispatch=None, current_entry="NO_CURRENT_ENTRY",
+                              orders=0, telegram="NOT_SENT", scientific="REAL_PIT_OOS_BLOCKED")
             result = {**result, "sha256": digest(result)}
             write_once(root / "pilot-summary.json", result)
         emit(root, "STOPPED", utc_ms=clock.now(), result_sha256=digest(result))
@@ -175,6 +184,30 @@ def saved_pilot_summary(root, plan, expected_pin):
          and result["plan_sha256"] == expected_pin and result["retention"] == "SANITIZED_RECEIPTS_ONLY",
          "EPHEMERAL_SUMMARY_PIN")
     return result
+
+
+def saved_operations_progress(root, plan, expected_pin):
+    need(digest(plan) == expected_pin and plan.get("bounded_operations") is True,
+         "LIVE_PLAN_PIN")
+    rows, last_status, last_failure = [], None, None
+    log = root / "health.jsonl"
+    if log.is_file():
+        with log.open(encoding="utf-8") as stream:
+            for line in stream:
+                row = json.loads(line)
+                last_status = row["status"]
+                if last_status in {"STOPPED_ERROR", "TRANSPORT_INTERRUPTED"}:
+                    last_failure = row
+                if last_status == "EPHEMERAL_RESEARCH_BAR":
+                    body = {key: value for key, value in row.items() if key not in {"receipt_sha256", "status"}}
+                    need(row["receipt_sha256"] == digest(body) and row["plan_sha256"] == expected_pin
+                         and row["slot"] == plan["slot"] + len(rows) * STEP
+                         and len(rows) < plan["bar_count"], "OPERATIONS_PROGRESS_PIN")
+                    rows.append(row["receipt_sha256"])
+    body = dict(status="NO_COMPLETED_SUMMARY", last_status=last_status, last_failure=last_failure,
+                plan_sha256=expected_pin, completed_receipts=rows, current_entry="NO_CURRENT_ENTRY",
+                orders=0, dispatch=None, telegram="NOT_SENT")
+    return {**body, "sha256": digest(body)}
 
 
 class MemoryDatabase:
@@ -247,6 +280,7 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
     monotonic_start = clock.monotonic_ns()
     started = clock.now()
     deadline = first + plan["wall_ms"]
+    last_failure = None
 
     def time_left():
         operational_guard(root)
@@ -292,10 +326,16 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
                     row = ingest(root, raw, rows, first, received, uncertainty, clock.monotonic_ns(),
                                  pin, journal, store, observer, clock.now, wait, ephemeral=ephemeral)
                     if row is not None:
+                        if plan.get("bounded_operations"):
+                            row = {**row, "plan_sha256": pin}
+                            row["receipt_sha256"] = digest(row)
                         rows.append(row)
                         emit(root, "EPHEMERAL_RESEARCH_BAR" if ephemeral else "DURABLE_RESEARCH_BAR", **row)
         except (TimeoutError, ConnectionError) as exc:
-            emit(root, "TRANSPORT_INTERRUPTED", error=type(exc).__name__)
+            last_failure = dict(error=type(exc).__name__)
+            if plan.get("bounded_operations"):
+                last_failure["utc_ms"] = clock.now()
+            emit(root, "TRANSPORT_INTERRUPTED", **last_failure)
             if attempt or len(rows) == target:
                 raise
         finally:
@@ -303,6 +343,10 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
         if len(rows) == target:
             view = factory_report(observer, clock.now()) if ephemeral else report(
                 root, fixture, clock.now(), synthetic=synthetic)
+            if plan.get("bounded_operations"):
+                view["connection_attempts"] = used + 1
+                view["last_failure"] = last_failure
+                view["last_heartbeat_ms"] = heartbeat
             return {**view, "bars": rows}
         wait(3 + int(pin[:2], 16) / 255)
     raise ValueError("SOURCE_OUTAGE")
@@ -358,16 +402,19 @@ def ingest(root, raw, rows, first, received, uncertainty, monotonic_ns, pin,
     return consume(path, journal, store, observer, now, wait, slot=slot, plan_pin=pin)
 
 
-def make_plan(slot, fixture, count=2, *, bounded_pilot=False):
+def make_plan(slot, fixture, count=2, *, bounded_pilot=False, bounded_operations=False):
     need(type(slot) is int and slot > 0 and slot % STEP == 0, "SLOT_GRID")
     need(type(count) is int and 2 <= count <= 96, "BAR_COUNT_LIMIT")
     need(not bounded_pilot or count == 4, "PILOT_REQUIRES_FOUR_BARS")
+    need(not bounded_operations or (not bounded_pilot and 2 <= count <= 8), "OPERATIONS_BAR_CAP")
     plan = {"endpoint": ENDPOINT, "slot": slot, "bar_count": count, "wall_ms": count * STEP + 300_000,
             "max_connections": 2, "rest_requests": 0, "strategy_fixture_sha256": fixture["sha256"],
             "config_sha256": fixture["payload"]["config_digest"]}
-    if bounded_pilot:
+    if bounded_pilot or bounded_operations:
         plan["egress_budget"] = "LOCAL_PILOT_ONLY"
         plan["retention"] = "SANITIZED_RECEIPTS_ONLY"
+    if bounded_operations:
+        plan.update(bounded_operations=True, wall_ms=7_200_000)
     return plan
 
 
@@ -380,14 +427,17 @@ def main():
     parser.add_argument("--pin")
     parser.add_argument("--authority-module", help="Trusted operator-installed local authority module")
     parser.add_argument("--bounded-pilot", action="store_true")
+    parser.add_argument("--bounded-operations", action="store_true")
     parser.add_argument("--pilot-qualification", type=Path)
     parser.add_argument("--pilot-qualification-sha256")
     parser.add_argument("--stop-after-first", action="store_true")
     args = parser.parse_args()
+    local = args.bounded_pilot or args.bounded_operations
     fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))[0]
     now = lambda: time.time_ns() // 1_000_000
     if args.mode == "plan":
-        plan = make_plan(args.slot, fixture, args.bars, bounded_pilot=args.bounded_pilot)
+        plan = make_plan(args.slot, fixture, args.bars, bounded_pilot=args.bounded_pilot,
+                         bounded_operations=args.bounded_operations)
         result = {"plan": plan, "sha256": digest(plan)}
     elif args.mode in ("stop", "rearm"):
         need(args.state is not None and (args.state / MARKER).is_file(), "STATE_REQUIRED")
@@ -416,7 +466,11 @@ def main():
         manifest = args.state / "plan.json"
         plan = json.loads(manifest.read_text(encoding="utf-8")) if manifest.is_file() else {}
         if plan.get("retention") == "SANITIZED_RECEIPTS_ONLY":
-            print(json.dumps(saved_pilot_summary(args.state, plan, args.pin), sort_keys=True))
+            if plan.get("bounded_operations") and not (args.state / "pilot-summary.json").is_file():
+                result = saved_operations_progress(args.state, plan, args.pin)
+            else:
+                result = saved_pilot_summary(args.state, plan, args.pin)
+            print(json.dumps(result, sort_keys=True))
             return
         result = report(args.state, fixture, now())
         log = args.state / "health.jsonl"
@@ -433,10 +487,16 @@ def main():
             lock.execute("BEGIN EXCLUSIVE")
             plan = json.loads((root / "plan.json").read_text(encoding="utf-8"))
             need(digest(plan) == args.pin and plan == make_plan(
-                plan["slot"], fixture, plan["bar_count"], bounded_pilot=plan.get("egress_budget") == "LOCAL_PILOT_ONLY"),
+                plan["slot"], fixture, plan["bar_count"],
+                bounded_pilot=plan.get("egress_budget") == "LOCAL_PILOT_ONLY" and not plan.get("bounded_operations"),
+                bounded_operations=plan.get("bounded_operations") is True),
                  "LIVE_PLAN_PIN")
             if plan.get("retention") == "SANITIZED_RECEIPTS_ONLY":
-                print(json.dumps(saved_pilot_summary(root, plan, args.pin), sort_keys=True))
+                if plan.get("bounded_operations") and not (root / "pilot-summary.json").is_file():
+                    result = saved_operations_progress(root, plan, args.pin)
+                else:
+                    result = saved_pilot_summary(root, plan, args.pin)
+                print(json.dumps(result, sort_keys=True))
                 return
             journal = DurableJournal(str(root / "journal.sqlite"))
             store = OperationalStore(str(root / "market.sqlite"))
@@ -445,10 +505,10 @@ def main():
                            count=plan["bar_count"], plan_pin=args.pin)
             result = {**report(root, fixture, now()), "bars": rows}
     else:
-        need(args.authority_module is not None or args.bounded_pilot, "CONTROLLED_EGRESS_AUTHORITY_UNAVAILABLE")
+        need(args.authority_module is not None or local, "CONTROLLED_EGRESS_AUTHORITY_UNAVAILABLE")
         need(args.state is not None, "STATE_REQUIRED")
         qualification = None
-        if args.bounded_pilot:
+        if local:
             need(args.authority_module is None and args.pilot_qualification is not None
                  and args.pilot_qualification_sha256, "PILOT_QUALIFICATION_REQUIRED")
             with args.pilot_qualification.open("rb") as stream:
@@ -458,7 +518,8 @@ def main():
             need(isinstance(qualification, dict) and digest(qualification) == args.pilot_qualification_sha256,
                  "PILOT_QUALIFICATION_PIN")
         authority = importlib.import_module(args.authority_module) if args.authority_module else None
-        plan = make_plan(args.slot, fixture, args.bars, bounded_pilot=args.bounded_pilot)
+        plan = make_plan(args.slot, fixture, args.bars, bounded_pilot=args.bounded_pilot,
+                         bounded_operations=args.bounded_operations)
         delay_ms = plan["slot"] - now()
         need(delay_ms <= STEP, "START_TOO_FAR_AHEAD")
         if delay_ms > 0:

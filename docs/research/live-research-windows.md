@@ -63,6 +63,23 @@ Use `-Mode status -Pin <plan-pin>` to read a completed summary without
 replaying source data. Stop on a denied or degraded route.
 The sustained mode continues to require its renewable authority module.
 
+## Supervised bounded research operations
+
+Use `-BoundedOperations` in both plan and live modes in place of
+`-BoundedPilot`. Choose 2–8 finalized bars. The worker stops at the
+chosen count or the absolute two-hour ceiling, whichever comes first.
+Actual reception can occur after a slot closes, so eight receipts are
+never assumed at the deadline. The same two-attempt local budget,
+no-REST rule and zero raw retention apply. The launch uses one finite
+Windows process and does not register a task.
+
+The health log seals each ordered observation's sanitized receipt under
+the plan pin. Use `status` or `recover` with that pin for saved digests
+after process exit. An interrupted run without a final summary exposes
+verified partial progress and the last failure, with no source replay.
+Use `stop` against the same state for cancellation. A reconnect in the
+same process can resume from its in-memory data, within the same caps.
+
 ## Saved live and publisher reconciliation
 
 | Path | Reuse or delta | Acceptance |
