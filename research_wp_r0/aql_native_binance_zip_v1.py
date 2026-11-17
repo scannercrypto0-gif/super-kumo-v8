@@ -1,4 +1,4 @@
-"""Core #245: bounded Binance monthly klines ORIGINAL ZIP reader.
+"""Core #245: bounded Binance monthly and daily klines ORIGINAL ZIP reader.
 
 Does not download data, authenticate vendor origin, claim independent PIT, or
 rewrite a 12-column member as a 7-column original. ZIP bytes remain the custody
@@ -53,11 +53,20 @@ def parse_binance_zip(source_raw, spec, meta, *, make_bar):
     _check(_safe_name(meta["archive_name"]) and meta["archive_name"].endswith(".zip")
            and _safe_name(meta["member_name"]) and meta["member_name"].endswith(".csv"),
            "NATIVE_ZIP_MEMBER_NAME")
-    month = datetime.fromtimestamp(spec["start_ms"]/1000,timezone.utc).strftime("%Y-%m")
-    stem = f'{spec["symbol"]}-{spec["interval"]}-{month}'
-    _check(meta["archive_name"] == stem+".zip" and meta["member_name"] == stem+".csv"
+    start = datetime.fromtimestamp(spec["start_ms"] / 1000, timezone.utc)
+    prefix = f'{spec["symbol"]}-{spec["interval"]}-'
+    monthly = prefix + start.strftime("%Y-%m")
+    daily = prefix + start.strftime("%Y-%m-%d")
+    stem = meta["archive_name"][:-4]
+    is_daily = stem == daily
+    _check((stem == monthly or (is_daily and spec["start_ms"] % 86_400_000 == 0
+                                and spec["end_exclusive_ms"] - spec["start_ms"] == 86_400_000))
+           and meta["member_name"] == stem + ".csv"
            and spec["exchange"] == "BINANCE" and spec["market"] == "SPOT",
            "NATIVE_ZIP_SCOPE_OR_IDENTITY")
+    # Daily Spot archives use microseconds from 2025-01-01. Validate original
+    # inclusive endpoints before converting to the HistoricalLibrary ms grid.
+    unit = 1000 if is_daily and spec["start_ms"] >= 1735689600000 else 1
     _check(all(type(meta[k]) is str and _SHA.fullmatch(meta[k])
                for k in ("archive_sha256","member_sha256","checksum_file_sha256")),
            "NATIVE_ZIP_SHA_FIELDS")
@@ -117,11 +126,12 @@ def parse_binance_zip(source_raw, spec, meta, *, make_bar):
             auxiliary = [Decimal(row[k]) for k in (7,9,10,11)]
         except (ValueError, InvalidOperation, IndexError) as exc:
             raise NativeZipError("NATIVE_ZIP_INVALID_NATIVE_ROW") from exc
-        _check(opened == spec["start_ms"] + i*actual_width
-               and closed == opened+actual_width-1
+        _check(opened == (spec["start_ms"] + i*actual_width) * unit
+               and closed == opened + actual_width * unit - 1
                and trades >= 0
                and all(v.is_finite() and v >= 0 for v in auxiliary),
                "NATIVE_ZIP_TIMESTAMP_OR_MARKET_FIELDS")
+        opened, closed = opened // unit, closed // unit
         bar = make_bar(spec,opened,closed,row[1:6],receipt_ms=None)
         bars.append(bar)
         origin.append({
