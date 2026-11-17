@@ -1,0 +1,34 @@
+name: Core source view and recovery
+on:
+  pull_request:
+    paths:
+      - src/aql/archive/source_view.py
+      - src/aql/recovery/gap_recovery.py
+      - tests/test_core_source_view.py
+      - .github/workflows/core-source-view.yml
+permissions:
+  contents: read
+jobs:
+  offline:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHONPATH: src
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify pinned head and run offline tests
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git rev-parse HEAD
+          python -B -m unittest discover -s tests -p test_core_source_view.py -v
