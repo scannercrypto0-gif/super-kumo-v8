@@ -1,0 +1,64 @@
+name: ATLAS frozen consolidation candidate
+on:
+  push:
+    branches: ['review/atlas-repository-consolidation-01']
+    paths:
+      - '.github/workflows/atlas-consolidation-candidate.yml'
+      - 'verify-candidates.py'
+      - 'offline_review.py'
+
+permissions:
+  contents: read
+
+jobs:
+  composed-candidate:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065b
+        with:
+          python-version: '3.13'
+      - name: Reconstruct candidate and rehearse reverse order
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:PYTHONUTF8 = '1'
+          $scratch = Join-Path $env:RUNNER_TEMP 'atlas-consolidation'
+          New-Item -ItemType Directory -Path $scratch | Out-Null
+          $archive = Join-Path $scratch 'frozen.zip'
+          git archive --format=zip "--output=$archive" 522522279d6e6be634830ec9d1a96d0f9d1635e1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python -m zipfile -e $archive (Join-Path $scratch 'dossier')
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python -B verify-candidates.py (Join-Path $scratch 'dossier') (Join-Path $scratch 'tree') (Join-Path $scratch 'upstream') (Join-Path $scratch 'proof.json')
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Get-FileHash (Join-Path $scratch 'proof.json')
+      - name: Focused synthetic candidate seams
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $scratch = Join-Path $env:RUNNER_TEMP 'atlas-consolidation'
+          $tree = Join-Path $scratch 'tree'
+          $env:PYTHONPATH = @((Join-Path $tree 'src'),$tree,$env:GITHUB_WORKSPACE) -join [IO.Path]::PathSeparator
+          $env:G3_UPSTREAM_FILE = Join-Path $scratch 'upstream/prospective.py'
+          $env:BINANCE_LIVE_TEST = '0'
+          python -m pip install pytest==9.0.2
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Set-Location $tree
+          git log -1 --format='%H %T'
+          python -B -m pytest -q -rA -p offline_review --basetemp (Join-Path $scratch 'pytest') `
+            tests/test_g1_foundation_closeout.py::test_failed_store_restart_and_duplicate_delivery_are_idempotent `
+            tools/historical_source_qa/test_qa.py `
+            tests/test_core_discoverer_followup.py `
+            tests/paper_sim/test_upstream_integration.py `
+            -k 'failed_store_restart or native_control_exact_match or core_discoverer_followup or real_pinned_observer'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          if (git status --porcelain --untracked-files=no) { throw 'CANDIDATE_TRACKED_STATE_CHANGED' }
