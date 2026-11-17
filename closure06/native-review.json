@@ -1,0 +1,13 @@
+{
+  "base": "894738437139857be5ee43b90223567b5296c867",
+  "head": "41d2de3341f63fbf8b8f63fc0d3900f8a9b40e45",
+  "tree": "b8c5f4a618a7f76e45690316842e478ff2747361",
+  "paths": [
+    ".github/workflows/atlas-prospective-native-seam.yml",
+    "research_wp_r0/aql_factory_prospective_read_v1.py",
+    "src/aql/observation/durable_bridge_v1.py",
+    "src/aql/observation/forward_evidence.py",
+    "src/aql/observation/prospective.py",
+    "tests/test_atlas_prospective_native_seam.py"
+  ]
+}
