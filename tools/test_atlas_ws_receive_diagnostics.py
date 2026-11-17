@@ -4,20 +4,22 @@ from unittest.mock import Mock, patch
 
 import websocket
 
-from tools.atlas_ws_receive_diagnostics import receive_timeout_context
+from tools.atlas_ws_receive_diagnostics import receive_fault_context
 from tools.binance_live_feed.run_pilot import PublicTransport
 
 
 class ReceiveDiagnostics(unittest.TestCase):
-    def read(self, fragments, *, monotonic):
+    def read(self, fragments, *, monotonic, error=TimeoutError):
         connection = websocket.WebSocket()
         original = Mock(side_effect=fragments)
         connection.frame_buffer.recv = original
         with patch("tools.binance_live_feed.run_pilot.time.monotonic", side_effect=monotonic):
-            with self.assertRaisesRegex(TimeoutError, "^WS_READ_TIMEOUT$") as caught:
+            with self.assertRaises(error) as caught:
                 PublicTransport().frame(connection, 30)
         self.assertIs(connection.frame_buffer.recv, original)
-        return receive_timeout_context(connection, caught.exception)
+        if error is TimeoutError:
+            self.assertEqual(str(caught.exception), "WS_READ_TIMEOUT")
+        return receive_fault_context(connection, caught.exception)
 
     def test_underlying_timeout_at_frame_boundary(self):
         info = self.read([websocket.WebSocketTimeoutException("timed out")], monotonic=(0, 1))
@@ -35,7 +37,25 @@ class ReceiveDiagnostics(unittest.TestCase):
                                 "deadline_origin": "UNDERLYING_RECEIVE_TIMEOUT"})
 
     def test_unrelated_timeout_is_not_attributed_to_frame_reader(self):
-        self.assertEqual(receive_timeout_context(None, TimeoutError()), {})
+        self.assertEqual(receive_fault_context(None, TimeoutError()), {})
+
+    def test_connection_reset_is_distinct_at_boundary_and_mid_frame(self):
+        for fragments, ticks, phase in (
+            ([ConnectionResetError("test reset")], (0, 1), "FRAME_BOUNDARY"),
+            ([b"\x81\x7e", b"\x01", ConnectionResetError("test reset")],
+             (0, 1, 2, 3), "EXTENDED_LENGTH"),
+        ):
+            with self.subTest(phase=phase):
+                self.assertEqual(self.read(fragments, monotonic=ticks, error=ConnectionResetError),
+                                 {"receive_phase": phase, "deadline_origin": "CONNECTION_RESET"})
+
+    def test_unsupported_frame_does_not_become_a_transport_retry(self):
+        connection = websocket.WebSocket()
+        original = Mock(side_effect=[b"\x82\x01", b"x"])
+        connection.frame_buffer.recv = original
+        with self.assertRaisesRegex(ValueError, "WS_CLOSED_OR_UNSUPPORTED_FRAME"):
+            PublicTransport().frame(connection, 30)
+        self.assertIs(connection.frame_buffer.recv, original)
 
 
 if __name__ == "__main__":

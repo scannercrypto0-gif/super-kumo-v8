@@ -22,7 +22,7 @@ from tools.atlas_single_receipt import load_frame, need, parse_final, persist_fr
 from tools.atlas_single_receipt_runner import ENDPOINT, BinanceReceiptTransport
 from tools.atlas_research_lease import Lease
 from tools.binance_live_feed.quota import Limits, Quota
-from tools.atlas_ws_receive_diagnostics import receive_timeout_context
+from tools.atlas_ws_receive_diagnostics import receive_fault_context
 
 MARKER = "atlas-live-research-v1"
 
@@ -372,9 +372,9 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
                         heartbeat = now
                     try:
                         kind, raw = transport.frame(connection, min(left, 30))
-                    except TimeoutError as exc:
+                    except (TimeoutError, ConnectionResetError) as exc:
                         if plan.get("sustained_research") and type(transport) is BinanceReceiptTransport:
-                            failure_context = receive_timeout_context(connection, exc)
+                            failure_context = receive_fault_context(connection, exc)
                         raise
                     received, _ = time_left()
                     if kind == "ping":
