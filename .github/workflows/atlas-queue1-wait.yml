@@ -1,0 +1,48 @@
+name: ATLAS Queue 1 isolated WAIT
+on:
+  pull_request:
+    paths:
+      - tools/atlas_queue1_wait.py
+      - .github/workflows/atlas-queue1-wait.yml
+      - src/aql/paper_sim/**
+permissions:
+  contents: read
+jobs:
+  source-to-wait:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Fetch pinned component revisions
+        run: |
+          python -c 'import subprocess; from tools.atlas_queue1_wait import PINS; subprocess.run(["git", "fetch", "--no-tags", "origin", *PINS], check=True)'
+      - name: Prove same-source WAIT and deterministic replay
+        run: python -B tools/atlas_queue1_wait.py wait.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: queue1-wait
+          path: wait.json
+          if-no-files-found: error
+  simulator-readback:
+    needs: source-to-wait
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: queue1-wait
+      - name: Validate exact-revision receipt and isolated journal readback
+        run: python -B tools/atlas_queue1_wait.py --readback wait.json
