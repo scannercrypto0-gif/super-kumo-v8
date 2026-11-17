@@ -47,9 +47,10 @@ jobs:
           $hold = Join-Path $root 'hold.json'
           $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
           $slot = $now - ($now % 900000L)
-          @{failed_ms=$slot;slot_ms=$slot;config_sha256=$pin} | ConvertTo-Json | Set-Content -LiteralPath $pending
+          @{failed_ms=($slot-3600000L);slot_ms=($slot-3600000L);config_sha256=$pin} | ConvertTo-Json | Set-Content -LiteralPath $pending
           & pwsh -NoProfile -File $script -Config $cfg -ConfigSha256 $pin
-          if ($LASTEXITCODE -or (Test-Path $hold) -or !(Test-Path $pending)) {throw 'SAME_SLOT_SHOULD_DEFER'}
+          if ($LASTEXITCODE -ne 1 -or (Get-Content $hold -Raw | ConvertFrom-Json).reason -cne 'LIVE_SERVICE_RESET_RECOVERY_INVALID_OR_EXPIRED' -or !(Test-Path $pending)) {throw 'EXPIRED_RECOVERY_DID_NOT_HOLD'}
+          Remove-Item -LiteralPath $hold
           Rename-Item -LiteralPath $pending -NewName (Split-Path -Leaf $claimed)
           & pwsh -NoProfile -File $script -Config $cfg -ConfigSha256 $pin
           if ($LASTEXITCODE -ne 1 -or (Get-Content $hold -Raw | ConvertFrom-Json).reason -cne 'LIVE_SERVICE_RESET_RECOVERY_ALREADY_CLAIMED') {throw 'CRASHED_CLAIM_DID_NOT_HOLD'}
