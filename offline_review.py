@@ -7,6 +7,11 @@ def deny(*_args, **_kwargs):
 
 
 def pytest_configure(config):
+    import tools
+
+    # Pytest can change sys.path after fixture setup starts. Retain the
+    # candidate's namespace entries so the pinned fixture overlay can append.
+    tools.__path__ = list(tools.__path__)
     socket.create_connection = deny
     socket.socket.connect = deny
     socket.socket.connect_ex = deny
