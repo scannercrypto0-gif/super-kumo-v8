@@ -1,0 +1,82 @@
+name: Scanner C shared strategy identity TEST_ONLY gate
+on:
+  pull_request:
+    paths:
+      - 'tools/scanner_strategy_c/**'
+      - '.github/workflows/scanner-c-shared-strategy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scanner-c-focused:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: project
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: 6acbcc7fc243b132f58170df4c6469bbf7f4eff8
+          path: upstream/work235
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: 30c37ae56851488b882998c7fa0085ec51dbfc92
+          path: upstream/scanner257
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: 5cde010bac4a087bbed9fbf0791c56fb2e41aa2b
+          path: upstream/core226
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: e66ac39a6443853c60463f7bd5bfaf590bb125a6
+          path: upstream/factory255
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: b9c9ff8602e79c534402f44bce83c56ec2fa6bb9
+          path: upstream/scanner227
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Pin read-only owners into one disposable checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -a upstream/work235/tools/strategy_service_offline project/tools/
+          cp -a upstream/scanner257/tools/scanner_strategy_b project/tools/
+          cp -a upstream/scanner227/tools/scanner_engine_offline project/tools/
+          for module in upstream/core226/research_wp_r0/aql_*.py; do
+            cp "$module" "project/research_wp_r0/"
+          done
+          for module in upstream/factory255/research_wp_r0/aql_*.py; do
+            cp "$module" "project/research_wp_r0/"
+          done
+      - name: ONE C focused contract/negative/replay test suite
+        working-directory: project
+        run: python -m unittest -v tools.scanner_strategy_c.test_contract
+      - name: Static no-trade boundary
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("project/tools/scanner_strategy_c/approval_route.py").read_text()
+          assert '"trading_authority": "NONE"' in p
+          assert '"paper_execution": "NOT_ACTIVATED"' in p
+          assert 'acknowledge_nomination(' not in p
+          assert 'merge_pull_request' not in p
+          PY
