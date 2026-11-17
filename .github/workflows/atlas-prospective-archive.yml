@@ -26,4 +26,9 @@ jobs:
         with:
           python-version: '3.11'
       - run: python -m pip install -e .
-      - run: python -B -m unittest discover -s tests -p test_atlas_prospective_archive.py -v
+      - name: Targeted forward evidence regression
+        if: github.base_ref == 'integration/prospective-observation-plus-archive-01'
+        run: python -B -m unittest discover -s tests -p test_atlas_prospective_archive.py -k ForwardEvidence -k forward_contract -k real_scanner_receipts -v
+      - name: Existing prospective and archive tests
+        if: github.base_ref != 'integration/prospective-observation-plus-archive-01'
+        run: python -B -m unittest discover -s tests -p test_atlas_prospective_archive.py -v

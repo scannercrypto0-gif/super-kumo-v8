@@ -58,12 +58,13 @@ def main():
     mode = p.add_mutually_exclusive_group(required=True)
     mode.add_argument("--public-observation", action="store_true")
     mode.add_argument("--status", action="store_true")
+    mode.add_argument("--forward-evidence", action="store_true")
     p.add_argument("--seconds", type=int, default=4 * 24 * 3600)
     args = p.parse_args()
     if not 1 <= args.seconds <= 4 * 24 * 3600:
         p.error("--seconds must be within the four-day run window")
     fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))[0]
-    if args.status:
+    if args.status or args.forward_evidence:
         root = Path(args.state).absolute()
         if not (root / "atlas-prospective-v1").is_file():
             p.error("Existing isolated observation state required")
@@ -71,8 +72,13 @@ def main():
         store = read_only_g1(OperationalStore, root / "market.sqlite")
         observer = ProspectiveObserver(root / "g2.sqlite", journal, store, fixture,
                                        synthetic=False, read_only=True)
-        print(json.dumps(read_prospective_research(observer, as_of_ms=time_ns() // 1_000_000),
-                         sort_keys=True))
+        if args.forward_evidence:
+            from aql.observation.forward_evidence import read_forward_evidence
+
+            report = read_forward_evidence(observer, as_of_ms=time_ns() // 1_000_000)
+        else:
+            report = read_prospective_research(observer, as_of_ms=time_ns() // 1_000_000)
+        print(json.dumps(report, sort_keys=True))
         return
     from aql.collector.binance_collector import BinanceCollector
 
