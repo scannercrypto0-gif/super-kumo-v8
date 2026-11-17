@@ -1,0 +1,49 @@
+name: CODEX PKG02 Factory synthetic execution delta
+on:
+  push:
+    branches: [codex/pkg02-factory-execution]
+  pull_request:
+    paths:
+      - research_wp_r0/aql_factory_h_execution_comparison_v1.py
+      - research_wp_r0/aql_factory_h_scientific_lab_v1.py
+      - tests/test_aql_factory_pkg02_execution_comparison_v1.py
+      - tools/atlas_factory_pkg02_execution_smoke.py
+      - .github/workflows/atlas-codex-pkg02-execution.yml
+permissions:
+  contents: read
+jobs:
+  synthetic-execution-delta:
+    timeout-minutes: 12
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install pytest pytest-timeout
+      - name: Material delta and adjacent Factory kernel regressions
+        shell: bash
+        env:
+          PYTHONPATH: .
+        run: |
+          mkdir -p artifacts/pkg02
+          git rev-parse HEAD > artifacts/pkg02/tested-head.txt
+          set -o pipefail
+          python -B -m pytest -q -o pythonpath=tests tests/test_aql_factory_pkg02_execution_comparison_v1.py tests/test_aql_factory_h_research_package_v1.py tests/test_aql_factory_f_f2_recovery_research_v2.py tests/test_aql_factory_historical_rule_projection.py tests/test_aql_factory_e_research_results_store_v1.py | tee artifacts/pkg02/tests.txt
+      - name: One-command deterministic fixture and immutable replay
+        run: python -B tools/atlas_factory_pkg02_execution_smoke.py --output-dir artifacts/pkg02
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pkg02-${{ matrix.os }}-py${{ matrix.python }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            artifacts/pkg02/*.json
+            artifacts/pkg02/*.txt

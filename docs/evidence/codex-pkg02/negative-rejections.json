@@ -1,0 +1,54 @@
+{
+  "input_sha256": "25445b37c1c3ca4e04bf202e49f1a2eb862779b6023552d1e5315638ffa1cfa2",
+  "rejected_count": 9,
+  "rejections": [
+    {
+      "case": "real_data",
+      "reason": "FACTORY_H_EXEC_AUTHORITY",
+      "result": "REJECTED"
+    },
+    {
+      "case": "live_authority",
+      "reason": "FACTORY_H_EXEC_AUTHORITY",
+      "result": "REJECTED"
+    },
+    {
+      "case": "opened_oos",
+      "reason": "FACTORY_H_EXEC_AUTHORITY",
+      "result": "REJECTED"
+    },
+    {
+      "case": "no_embargo",
+      "reason": "FACTORY_H_EXEC_CHRONOLOGY",
+      "result": "REJECTED"
+    },
+    {
+      "case": "freeze_after_first_sample",
+      "reason": "FACTORY_H_EXEC_CHRONOLOGY",
+      "result": "REJECTED"
+    },
+    {
+      "case": "spread_double_charge",
+      "reason": "FACTORY_H_EXEC_COST_OR_NULL_CONVENTION",
+      "result": "REJECTED"
+    },
+    {
+      "case": "missing_fee",
+      "reason": "FACTORY_H_EXEC_EXPLICIT_COSTS",
+      "result": "REJECTED"
+    },
+    {
+      "case": "unknown_numeric_fill",
+      "reason": "FACTORY_H_EXEC_UNKNOWN_FILL_FRACTION",
+      "result": "REJECTED"
+    },
+    {
+      "case": "lost_attempt_denominator",
+      "reason": "FACTORY_H_EXEC_GENERATION_DENOMINATOR",
+      "result": "REJECTED"
+    }
+  ],
+  "schema": "aql.factory.h.execution-negative-receipt.v1",
+  "sha256": "fc4118e201885af06a365b1446ec5bf9b449d072a0ed8fe0d71f78f022e890f8",
+  "unexpected_acceptances": 0
+}
