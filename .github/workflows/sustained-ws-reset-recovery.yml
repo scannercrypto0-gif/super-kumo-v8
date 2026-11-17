@@ -1,0 +1,56 @@
+name: Sustained WS reset recovery
+on:
+  pull_request:
+    paths:
+      - 'tools/atlas_live_research_service_windows.ps1'
+      - '.github/workflows/sustained-ws-reset-recovery.yml'
+permissions:
+  contents: read
+jobs:
+  recovery:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check reset evidence and persisted fail-closed transitions without market access
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $script = (Resolve-Path 'tools/atlas_live_research_service_windows.ps1').Path
+          $tokens = $null
+          $errors = $null
+          $ast = [System.Management.Automation.Language.Parser]::ParseFile($script, [ref]$tokens, [ref]$errors)
+          if ($errors.Count) { throw ($errors | Out-String) }
+          $helper = $ast.Find({param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Test-ResetRecovery'}, $true)
+          . ([scriptblock]::Create($helper.Extent.Text))
+          $root = Join-Path $env:RUNNER_TEMP ([guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $root | Out-Null
+          $log = Join-Path $root 'health.jsonl'
+          $reset = @{status='TRANSPORT_INTERRUPTED';error='ConnectionResetError';deadline_origin='CONNECTION_RESET';receive_phase='FRAME_BOUNDARY'}
+          $terminal = @{status='STOPPED_ERROR';error='ConnectionResetError'}
+          $events = @(@{status='CONNECTING';attempt=1},$reset,@{status='CONNECTING';attempt=2},$reset.Clone(),$terminal)
+          function Save-Events { $events | ForEach-Object {ConvertTo-Json -InputObject $_ -Compress} | Set-Content -LiteralPath $log }
+          Save-Events
+          if (-not (Test-ResetRecovery $log 'PILOT_STOP_ConnectionResetError')) {throw 'DOUBLE_RESET_NOT_RECOGNIZED'}
+          if (Test-ResetRecovery $log 'LIVE_SERVICE_CLOCK_UNCERTAINTY') {throw 'CLOCK_ERROR_RETRY_ALLOWED'}
+          $events[3].receive_phase = 'FRAME_PAYLOAD'
+          Save-Events
+          if (Test-ResetRecovery $log 'PILOT_STOP_ConnectionResetError') {throw 'PARTIAL_FRAME_RETRY_ALLOWED'}
+          $events[3].receive_phase = 'FRAME_BOUNDARY'
+          $events[2].attempt = 1
+          Save-Events
+          if (Test-ResetRecovery $log 'PILOT_STOP_ConnectionResetError') {throw 'INVALID_ATTEMPT_SEQUENCE_ALLOWED'}
+          $cfg = Join-Path $root 'config.json'
+          '{}' | Set-Content -LiteralPath $cfg
+          $pin = (Get-FileHash -LiteralPath $cfg).Hash.ToLowerInvariant()
+          $pending = Join-Path $root 'reset-recovery.pending'
+          $claimed = Join-Path $root 'reset-recovery.claimed'
+          $hold = Join-Path $root 'hold.json'
+          $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+          $slot = $now - ($now % 900000L)
+          @{failed_ms=$slot;slot_ms=$slot;config_sha256=$pin} | ConvertTo-Json | Set-Content -LiteralPath $pending
+          & pwsh -NoProfile -File $script -Config $cfg -ConfigSha256 $pin
+          if ($LASTEXITCODE -or (Test-Path $hold) -or !(Test-Path $pending)) {throw 'SAME_SLOT_SHOULD_DEFER'}
+          Rename-Item -LiteralPath $pending -NewName (Split-Path -Leaf $claimed)
+          & pwsh -NoProfile -File $script -Config $cfg -ConfigSha256 $pin
+          if ($LASTEXITCODE -ne 1 -or (Get-Content $hold -Raw | ConvertFrom-Json).reason -cne 'LIVE_SERVICE_RESET_RECOVERY_ALREADY_CLAIMED') {throw 'CRASHED_CLAIM_DID_NOT_HOLD'}
+          exit 0
