@@ -1,0 +1,122 @@
+{
+  "main": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+  "ordered_batches": [
+    {
+      "batch": "B01",
+      "depends_on": null,
+      "base": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+      "candidate": "b6a0fc5ad9fff8204c29fab51a9720e984389d53",
+      "tree": "f2f257e5d8a81fabbaf569a2e56da1727c215253",
+      "source_pr": 287,
+      "source_head": "852f6fcce1dbb4dede6259fe8d0498d19ff19078",
+      "source_commits": [
+        "852f6fcce1dbb4dede6259fe8d0498d19ff19078",
+        "f90f84170598dceb77c6bca361a43647c5c9fc27",
+        "57a0b09da7dae4a86e87ed9a61a097b80a102258"
+      ],
+      "paths": [
+        "docs/evidence/g1_foundation_closeout_ledger.json",
+        "docs/evidence/g1_foundation_closeout_resources.json",
+        "src/aql/foundation/__init__.py",
+        "src/aql/foundation/census.py",
+        "src/aql/foundation/readiness.py",
+        "src/aql/foundation/scheduler.py",
+        "tests/test_g1_foundation_closeout.py",
+        "tools/measure_g1_foundation_closeout.py"
+      ],
+      "scope": "Foundation census, as-of checks, bounded scheduling",
+      "rollback": "Revert this batch in reverse dependency order after approval"
+    },
+    {
+      "batch": "B02",
+      "depends_on": "B01",
+      "base": "b6a0fc5ad9fff8204c29fab51a9720e984389d53",
+      "candidate": "17a8ede53b45c7dcb5c76109bb2e90470adb84ed",
+      "tree": "2466f58c8fd263456ca1c2739c3ca94f66c862ae",
+      "source_pr": 304,
+      "source_head": "e0e08a8381a8cceaaa44d6ae2721e9cb0d004648",
+      "source_commits": [
+        "e0e08a8381a8cceaaa44d6ae2721e9cb0d004648"
+      ],
+      "paths": [
+        "tools/historical_source_qa/interface.json",
+        "tools/historical_source_qa/qa.py",
+        "tools/historical_source_qa/test_qa.py"
+      ],
+      "scope": "Offline fixture/archive validation; no acquisition or scheduling",
+      "rollback": "Revert this batch in reverse dependency order after approval"
+    },
+    {
+      "batch": "B03",
+      "depends_on": "B02",
+      "base": "17a8ede53b45c7dcb5c76109bb2e90470adb84ed",
+      "candidate": "cf10fb7d0a97c830f40b0246b9ed0d6e78f8736d",
+      "tree": "7e253b4c5ee90fa13a1bf15785a8100bf12cb863",
+      "source_pr": 308,
+      "source_head": "84649a323613bf4415c7abc41e774381aa379428",
+      "source_commits": [
+        "84649a323613bf4415c7abc41e774381aa379428",
+        "5ffc005f738751459825ee633c617e15d283d222",
+        "fd39b0189d85e5628ac0fd520368cf48e18d1f8f"
+      ],
+      "paths": [
+        "docs/core/core-c1-c6-source-repository.md",
+        "docs/core/core-discoverer-followup.md",
+        "docs/core/source-coverage-v1.json",
+        "src/aql/archive/discoverer_view.py",
+        "src/aql/archive/scanner_view.py",
+        "src/aql/archive/source_poll.py",
+        "src/aql/archive/source_registry.py",
+        "src/aql/archive/source_view.py",
+        "src/aql/recovery/gap_recovery.py",
+        "tests/test_core_discoverer_followup.py",
+        "tests/test_core_source_view.py"
+      ],
+      "scope": "Read-only projections and fixture-scoped recovery fence",
+      "rollback": "Revert this batch in reverse dependency order after approval"
+    },
+    {
+      "batch": "B04",
+      "depends_on": "B03",
+      "base": "cf10fb7d0a97c830f40b0246b9ed0d6e78f8736d",
+      "candidate": "5b51d984ef02ba73943112267032665d28bb42a1",
+      "tree": "7868843ce51e59fc045132b3fc945b3a8ff6edfd",
+      "source_pr": 288,
+      "source_head": "3e7afd10497365dbbfb2a0760bf5f6d0a4591fd1",
+      "source_commits": [
+        "0ca716eaf1b8ae1a66ed6f3fbcec34f22c73ced7",
+        "3d1efe26454de0cfd674a37ae13832a15b392ccd"
+      ],
+      "paths": [
+        "src/aql/paper_sim/__init__.py",
+        "src/aql/paper_sim/adapter.py",
+        "src/aql/paper_sim/contracts.py",
+        "src/aql/paper_sim/engine.py",
+        "src/aql/paper_sim/measure.py",
+        "tests/paper_sim/evidence/g3-closeout-ledger.json",
+        "tests/paper_sim/evidence/local-soak.json",
+        "tests/paper_sim/fetch_pinned_upstream.py",
+        "tests/paper_sim/test_adapter.py",
+        "tests/paper_sim/test_engine.py",
+        "tests/paper_sim/test_upstream_integration.py"
+      ],
+      "scope": "TEST_ONLY simulator and native position journal; excludes promotion/dashboard",
+      "rollback": "Revert this batch in reverse dependency order after approval"
+    }
+  ],
+  "current_state": "PREPARED_NOT_AUTHORIZED",
+  "test_evidence": {
+    "candidate_final": "Windows fixture suite: 91 passed, 6 setup-dependent cases initially failed and passed once pinned Git object access was supplied. 97 unique passing cases overall. No new hosted candidate CI.",
+    "external_pins": [
+      "9b60eb00aa890ecbd7e617925896e02963c1b5e3",
+      "ccf57ad3db7e71290a8321840e800136567e3af4"
+    ]
+  },
+  "before_merge": [
+    "Independent Audit verdict",
+    "PM decision",
+    "Separate owner approval pinned to exact manifest",
+    "Recheck main and branch policy",
+    "Exact candidate-hosted CI and security acceptance"
+  ]
+}
