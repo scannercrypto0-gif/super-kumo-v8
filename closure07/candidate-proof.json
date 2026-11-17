@@ -1,0 +1,52 @@
+{
+  "main": "8b7f28f27cd960bbc201187f8d4b8390648f5ed2",
+  "composed_tree": "2dcc3111a1cbb12f532b6d4b6c357c695245e7ab",
+  "units": [
+    {
+      "pr": 316,
+      "head": "b73a028f01d2d97025ce264de62750c216f07bf2",
+      "tree": "feaf9cc9b8e27ca9754842158a96ac0c299f3bdb",
+      "paths": [
+        ".github/workflows/atlas-prospective-native-seam.yml",
+        "research_wp_r0/aql_factory_prospective_read_v1.py",
+        "src/aql/observation/durable_bridge_v1.py",
+        "src/aql/observation/forward_evidence.py",
+        "src/aql/observation/prospective.py",
+        "tests/test_atlas_prospective_native_seam.py"
+      ],
+      "original_head": "41d2de3341f63fbf8b8f63fc0d3900f8a9b40e45",
+      "composed_tree": "feaf9cc9b8e27ca9754842158a96ac0c299f3bdb"
+    },
+    {
+      "pr": 317,
+      "head": "872bf1823cfb41c8185ad6199caafb9768780802",
+      "tree": "a79f0363f72e9931a413cb519330e270a8b277a3",
+      "paths": [
+        ".github/workflows/core-discoverer-followup.yml",
+        ".github/workflows/core-source-view.yml",
+        ".github/workflows/g1-foundation-closeout.yml",
+        ".github/workflows/g3-paper-sim.yml"
+      ],
+      "original_head": "8bef66542b5d6d44dbaf0c85089b6755d1169c87",
+      "composed_tree": "50a60615047b3ad48a7928060ad92c3092e50be2"
+    },
+    {
+      "pr": 318,
+      "head": "0cf6428826ac990a918df7843359db8e13c5ce62",
+      "tree": "4144b523afde5fe8e7e889f7bbb1830cc04a2fce",
+      "paths": [
+        ".github/workflows/atlas-offline-source-seams.yml",
+        "research_wp_r0/aql_native_binance_zip_v1.py",
+        "src/aql/collector/research_ws.py",
+        "tests/test_atlas_daily_source_seam.py",
+        "tests/test_atlas_research_ws_seam.py",
+        "tools/atlas_saved_daily_health.py"
+      ],
+      "original_head": null,
+      "composed_tree": "2dcc3111a1cbb12f532b6d4b6c357c695245e7ab"
+    }
+  ],
+  "paths": 16,
+  "fixture_tests_passed": 9,
+  "mode": "LOCAL_GENERATED_AND_MOCKED_ONLY"
+}
