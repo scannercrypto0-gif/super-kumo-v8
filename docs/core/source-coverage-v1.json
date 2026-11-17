@@ -1,0 +1,26 @@
+{
+  "schema": "aql.core.coverage-decision.v1",
+  "version": 1,
+  "authority": "NONE",
+  "activation": "NOT_ACTIVATED",
+  "evidence_boundary": "Existing accepted archive and fixture receipts only. New uses require independently verified source and retention grants.",
+  "coverage": {
+    "BTC": {"status": "ACCEPTED_RETROSPECTIVE_SCOPE_ONLY", "market": "BINANCE/SPOT/BTCUSDT", "historical": "Native 15m retained scope; optional May 6 1m QA", "live": "BLOCKED_SOURCE"},
+    "PAXG": {"status": "BLOCKED_SOURCE", "market": null, "policy": "Token market and spot gold are separate. Freeze venue, quote and vintage."},
+    "TOP_10_ALT": {"status": "OWNER_DECISION_REQUIRED", "rank_metric": null, "stablecoin_exclusion": "PROPOSED", "wrapped_exclusion": "PROPOSED", "membership": "Effective-dated, retain previous universes"},
+    "GAINERS_LOSERS": {"status": "OWNER_DECISION_REQUIRED", "rank_metric": "PROPOSED_WINDOW_RETURN_BPS", "horizon_ms": null, "tie_break": "PROPOSED_ASCENDING_SYMBOL", "unknown": "Retain missing members"},
+    "SECTORS": {"status": "OWNER_DECISION_REQUIRED", "taxonomy": null, "membership": "Version and effective date required"},
+    "NEWS": {"status": "BLOCKED_SOURCE", "provider": null, "required": ["release", "receipt", "commit", "known-at", "vintage", "rights", "retention"]},
+    "GOLD": {"status": "BLOCKED_SOURCE", "provider": null, "required": ["instrument", "currency", "calendar", "rights", "vintage"]},
+    "YIELDS_BONDS": {"status": "BLOCKED_SOURCE", "provider": null, "required": ["curve tenor", "calendar", "release", "vintage", "rights"]},
+    "MACRO": {"status": "BLOCKED_SOURCE", "provider": null, "required": ["series", "calendar", "first release", "revision chain", "rights"]},
+    "LIQUIDITY": {"status": "BLOCKED_SOURCE", "provider": null, "required": ["market", "trade/quote timestamps", "rights", "quote clock uncertainty"]}
+  },
+  "options": {
+    "A": "One approved Spot venue and trailing admitted return/liquidity ranks. Simpler same-market comparisons; thinner cross-asset coverage.",
+    "B": "Fixed effective-dated admitted Spot roster and independently licensed context. Stronger comparability and missingness tracking; more rights and clock dependencies.",
+    "C": "Multi-venue external cap ranking and cross-asset taxonomy. Broadest coverage; higher basis, rights and survivorship risks."
+  },
+  "owner_decision": "Choose and freeze Top 10 rank metric, eligible universe, gain/loss horizon, liquidity floor and versioned sector taxonomy before real rankings.",
+  "incremental_value": "Factory/Lab freezes the same opportunity grid and costs. Compare baseline against one admitted feed at a time, with chronological splits, missing/negative cases, uncertainty and cost/latency reporting. No automatic entry authority."
+}

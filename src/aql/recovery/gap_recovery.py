@@ -22,6 +22,7 @@ Weight accounting:
 from __future__ import annotations
 
 import logging
+import math
 import time
 from dataclasses import dataclass
 from typing import List, Optional
@@ -127,6 +128,8 @@ def _fetch_klines(
             try:
                 retry = float(exc.headers.get("Retry-After", 60))
             except (TypeError, ValueError):
+                retry = 60
+            if not math.isfinite(retry) or retry < 0:
                 retry = 60
             SHARED_REST_BUDGET.cooldown(retry)
         raise RuntimeError(f"Binance public REST HTTP {exc.code}") from None
