@@ -1,0 +1,199 @@
+{
+  "main": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+  "candidate": "5b51d984ef02ba73943112267032665d28bb42a1",
+  "batches": [
+    {
+      "id": "B01",
+      "parent": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+      "candidate": "b6a0fc5ad9fff8204c29fab51a9720e984389d53",
+      "tree": "f2f257e5d8a81fabbaf569a2e56da1727c215253",
+      "source": "852f6fcce1dbb4dede6259fe8d0498d19ff19078",
+      "blobs": {
+        "docs/evidence/g1_foundation_closeout_ledger.json": {
+          "mode": "100644",
+          "blob": "543ae5c2300c8570810c5d98fc4eb104107db2cd"
+        },
+        "docs/evidence/g1_foundation_closeout_resources.json": {
+          "mode": "100644",
+          "blob": "a307b9cfaddd4b9c216b5b270f6a786f058c06f8"
+        },
+        "src/aql/foundation/__init__.py": {
+          "mode": "100644",
+          "blob": "f6a795a17eaca48bae1f4e715eed07d3526919aa"
+        },
+        "src/aql/foundation/census.py": {
+          "mode": "100644",
+          "blob": "1b61c06adf1e86a07048b2bd8e2d9f1259b6031e"
+        },
+        "src/aql/foundation/readiness.py": {
+          "mode": "100644",
+          "blob": "7c4ce4ab4b745223834ab065a501cd930ea8e7d9"
+        },
+        "src/aql/foundation/scheduler.py": {
+          "mode": "100644",
+          "blob": "c7e84a611e1fe4ee08a1f94fccdb1c6ae060f006"
+        },
+        "tests/test_g1_foundation_closeout.py": {
+          "mode": "100644",
+          "blob": "4afb2c29739ea44ff7daab4af78b6090adbc5271"
+        },
+        "tools/measure_g1_foundation_closeout.py": {
+          "mode": "100644",
+          "blob": "d4fa7b6f27d6fd360ffd1893d530d115ac5c3300"
+        }
+      }
+    },
+    {
+      "id": "B02",
+      "parent": "b6a0fc5ad9fff8204c29fab51a9720e984389d53",
+      "candidate": "17a8ede53b45c7dcb5c76109bb2e90470adb84ed",
+      "tree": "2466f58c8fd263456ca1c2739c3ca94f66c862ae",
+      "source": "e0e08a8381a8cceaaa44d6ae2721e9cb0d004648",
+      "blobs": {
+        "tools/historical_source_qa/interface.json": {
+          "mode": "100644",
+          "blob": "f0fcbd5f9557c1725728f7545536ac0984ad87df"
+        },
+        "tools/historical_source_qa/qa.py": {
+          "mode": "100644",
+          "blob": "1a60efa8483e33251c876088306277d70cd0b85c"
+        },
+        "tools/historical_source_qa/test_qa.py": {
+          "mode": "100644",
+          "blob": "c433e15b13fbefb738e1063584ad9b6524acabfd"
+        }
+      }
+    },
+    {
+      "id": "B03",
+      "parent": "17a8ede53b45c7dcb5c76109bb2e90470adb84ed",
+      "candidate": "cf10fb7d0a97c830f40b0246b9ed0d6e78f8736d",
+      "tree": "7e253b4c5ee90fa13a1bf15785a8100bf12cb863",
+      "source": "84649a323613bf4415c7abc41e774381aa379428",
+      "blobs": {
+        "docs/core/core-c1-c6-source-repository.md": {
+          "mode": "100644",
+          "blob": "253fc74874de79ceb97986d52664d1b4f11506d9"
+        },
+        "docs/core/core-discoverer-followup.md": {
+          "mode": "100644",
+          "blob": "9328b3ea316481b7a5e1095ce729b4c29185626b"
+        },
+        "docs/core/source-coverage-v1.json": {
+          "mode": "100644",
+          "blob": "fe46edf632bce101915bc0642d42424aba252a03"
+        },
+        "src/aql/archive/discoverer_view.py": {
+          "mode": "100644",
+          "blob": "553fb7a3e5f294eb3074ecc4c9d15f888a6bfaa6"
+        },
+        "src/aql/archive/scanner_view.py": {
+          "mode": "100644",
+          "blob": "0123914684a0c3dea0eafaad6976d2fe208d0fa8"
+        },
+        "src/aql/archive/source_poll.py": {
+          "mode": "100644",
+          "blob": "b213a3cb6a207142c195bdb5680426427eca5202"
+        },
+        "src/aql/archive/source_registry.py": {
+          "mode": "100644",
+          "blob": "1f095ee1eef6e3db4cbe87fa72409242525fa545"
+        },
+        "src/aql/archive/source_view.py": {
+          "mode": "100644",
+          "blob": "704aa845e9c50ead039cb432acd96a3e2507d2fe"
+        },
+        "src/aql/recovery/gap_recovery.py": {
+          "mode": "100644",
+          "blob": "cb360dc0a74d76e9f760d5609701fac500f65d9f"
+        },
+        "tests/test_core_discoverer_followup.py": {
+          "mode": "100644",
+          "blob": "7310bef29a08abc358a0657bbc0b0bf9bc99f335"
+        },
+        "tests/test_core_source_view.py": {
+          "mode": "100644",
+          "blob": "f189c6ddc301a63f1bcf54d6856c46b76bcbe6e9"
+        }
+      }
+    },
+    {
+      "id": "B04",
+      "parent": "cf10fb7d0a97c830f40b0246b9ed0d6e78f8736d",
+      "candidate": "5b51d984ef02ba73943112267032665d28bb42a1",
+      "tree": "7868843ce51e59fc045132b3fc945b3a8ff6edfd",
+      "source": "3e7afd10497365dbbfb2a0760bf5f6d0a4591fd1",
+      "blobs": {
+        "src/aql/paper_sim/__init__.py": {
+          "mode": "100644",
+          "blob": "d3f563790ce59d399e473e3afb5840bf96673545"
+        },
+        "src/aql/paper_sim/adapter.py": {
+          "mode": "100644",
+          "blob": "b95f7f218b1dde85c346f25cf6e0f7170e911f75"
+        },
+        "src/aql/paper_sim/contracts.py": {
+          "mode": "100644",
+          "blob": "daf15e688938b6077f3d1061f1909dda83e4a888"
+        },
+        "src/aql/paper_sim/engine.py": {
+          "mode": "100644",
+          "blob": "a316c905c802b83aedd0b2b893e7b6f2d24b9cd6"
+        },
+        "src/aql/paper_sim/measure.py": {
+          "mode": "100644",
+          "blob": "335eddd68e0c1ce9d1e738a6b29c80f838906987"
+        },
+        "tests/paper_sim/evidence/g3-closeout-ledger.json": {
+          "mode": "100644",
+          "blob": "41440d19bc8bb34b8ee24f1e974656d17ef1787f"
+        },
+        "tests/paper_sim/evidence/local-soak.json": {
+          "mode": "100644",
+          "blob": "6cf8fe7e5f3e2b26ef5e4417b20e43e0c1657868"
+        },
+        "tests/paper_sim/fetch_pinned_upstream.py": {
+          "mode": "100644",
+          "blob": "48c93f38e3fc8a84df2380964e06b69105419d04"
+        },
+        "tests/paper_sim/test_adapter.py": {
+          "mode": "100644",
+          "blob": "e5767e57fbd02243e71af784d52f37eed688851a"
+        },
+        "tests/paper_sim/test_engine.py": {
+          "mode": "100644",
+          "blob": "cf3865758c9e0b8a4485127123264b32668cb409"
+        },
+        "tests/paper_sim/test_upstream_integration.py": {
+          "mode": "100644",
+          "blob": "93ac10bf3bc2f6519ec9efe3e31206313265a5c7"
+        }
+      }
+    }
+  ],
+  "rollback": [
+    {
+      "undo": "B04",
+      "restored_tree": "7e253b4c5ee90fa13a1bf15785a8100bf12cb863"
+    },
+    {
+      "undo": "B03",
+      "restored_tree": "2466f58c8fd263456ca1c2739c3ca94f66c862ae"
+    },
+    {
+      "undo": "B02",
+      "restored_tree": "f2f257e5d8a81fabbaf569a2e56da1727c215253"
+    },
+    {
+      "undo": "B01",
+      "restored_tree": "c65f34d5e66a47a39af123b289aa87998c331357"
+    }
+  ],
+  "test_dependencies": {
+    "discoverer": "9b60eb00aa890ecbd7e617925896e02963c1b5e3",
+    "factory": "04b63cc9b406b1f3eae2ac7de5d43ebda26dbfdf",
+    "scanner": "ccf57ad3db7e71290a8321840e800136567e3af4",
+    "core": "d072544427d6b08473c88b2e36d5857cfd8581dc"
+  },
+  "frozen_manifest_sha256": "121223a3697877b12408e7cfaa5d0c6fef453baab08ccaa4c5bfa2df331db139"
+}

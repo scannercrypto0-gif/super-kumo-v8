@@ -1,0 +1,7 @@
+{
+  "selected_paths": 33,
+  "credential_pattern_matches": 0,
+  "excluded_path_matches": 0,
+  "scope": "Static candidate-tree screen; no guarantee about private credentials or repository-wide findings.",
+  "existing_rest_change": "Only normalizes invalid negative or nonfinite Retry-After to 60 seconds in the pre-existing client. No changed endpoint, invocation or permissions."
+}
