@@ -1,0 +1,158 @@
+{
+  "accepted_g1_external_receipt_reference": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/205#issuecomment-6760701161",
+  "actual_component_provenance": {
+    "aql.foundation.readiness": {
+      "commit": "852f6fcce1dbb4dede6259fe8d0498d19ff19078",
+      "path": "src/aql/foundation/readiness.py",
+      "role": "g287",
+      "sha256": "e82768a95e70bbfbc49054e68a472497756e30b09f45e7e43684661fe6592f4e"
+    },
+    "aql.journal.durable_journal": {
+      "commit": "852f6fcce1dbb4dede6259fe8d0498d19ff19078",
+      "path": "src/aql/journal/durable_journal.py",
+      "role": "g287",
+      "sha256": "b7a4e3b2a6472d21d902b4535de97987111716c395060f95e58767e7c3c21fa1"
+    },
+    "aql.observation.forward_evidence": {
+      "commit": "1ff3d13a3dfd1337bae0659dd03550b764c8799c",
+      "path": "src/aql/observation/forward_evidence.py",
+      "role": "g289",
+      "sha256": "f4befdcacb3c5c3e24e770e00964daec506f588f7c4f5b3de2e051adaae2d037"
+    },
+    "aql.observation.prospective": {
+      "commit": "d072544427d6b08473c88b2e36d5857cfd8581dc",
+      "path": "src/aql/observation/prospective.py",
+      "role": "g286",
+      "sha256": "3a72abcdf54d5186736562534e0402dfd18dc465981781edc7c0b4404fdf6fa7"
+    },
+    "aql.paper_sim.engine": {
+      "commit": "0ca716eaf1b8ae1a66ed6f3fbcec34f22c73ced7",
+      "path": "src/aql/paper_sim/engine.py",
+      "role": "g288",
+      "sha256": "5cd42be813d644fcae9071e8803b4b2ab1321c817691f7757e3536fbc96cf934"
+    },
+    "tools.scanner_strategy_f.research_strategy_plugin": {
+      "commit": "ccf57ad3db7e71290a8321840e800136567e3af4",
+      "path": "tools/scanner_strategy_f/research_strategy_plugin.py",
+      "role": "scanner277",
+      "sha256": "2568ffe01135ed521a6a3a1dc6ea9bf7bea429e1ab9d891b95fffc9975654763"
+    }
+  },
+  "combined_overlay_sha256": "ed6e7297c7bd8c04dd1999606b54989f5b13dce7c7255afe0250efa864fc6057",
+  "external_probe_repeated": false,
+  "observer_readback_reference": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/271#issuecomment-6764652288",
+  "owner_host_readback": "NOT_ACCESSED_NO_LATER_REAL_MATURITY_ASSERTED",
+  "pins": {
+    "core275_readonly_dependency": "99c27ea2c1a4d41aaae361141301a8a9ea3b33c3",
+    "g286": "d072544427d6b08473c88b2e36d5857cfd8581dc",
+    "g287": "852f6fcce1dbb4dede6259fe8d0498d19ff19078",
+    "g288": "0ca716eaf1b8ae1a66ed6f3fbcec34f22c73ced7",
+    "g289": "1ff3d13a3dfd1337bae0659dd03550b764c8799c",
+    "integration271": "182331b90efdcc31cf04476200fe09b45e16997c",
+    "scanner277": "ccf57ad3db7e71290a8321840e800136567e3af4",
+    "scanner_b_dependency": "30c37ae56851488b882998c7fa0085ec51dbfc92",
+    "work235_readonly": "6acbcc7fc243b132f58170df4c6469bbf7f4eff8"
+  },
+  "processes": [
+    {
+      "mode": "prepare",
+      "returncode": 0
+    },
+    {
+      "mode": "crash",
+      "returncode": 73
+    },
+    {
+      "mode": "replay",
+      "returncode": 0
+    }
+  ],
+  "result": {
+    "assumed_fills": 2,
+    "component_calls": {
+      "actual_prospective_observer_ticks": 24,
+      "earlier_asof_rows": 4,
+      "g1_assess": 24,
+      "g1_finalized_commit_and_store": 24,
+      "g2_readonly_forward_consumer": 2,
+      "g3_durable_commands": 3
+    },
+    "decision_census": {
+      "ENTRY_SIGNAL": 21,
+      "UNKNOWN": 3
+    },
+    "duplicate_fills": 0,
+    "duplicate_retries": 3,
+    "forward_sha256": "2446ea0873a7f14bd7ab3d717c04e2186f924bb6e7ec4131a173058fdc8c3146",
+    "g1_source_unchanged": true,
+    "historical_pit": "NOT_ATTESTED",
+    "independent_custody": "NOT_ATTESTED",
+    "model": "SYNTHETIC_TIME_UUID_DEPTH_AND_ASSUMED_EXECUTION",
+    "negative_count": 10,
+    "negatives": [
+      {
+        "case": "receipt_tamper",
+        "reason": "PAPER_SIM_READ_SEAL"
+      },
+      {
+        "case": "source_revision",
+        "reason": "PAPER_SIM_REVISED_OR_UNVERIFIED_SOURCE"
+      },
+      {
+        "case": "future_cutoff",
+        "reason": "PAPER_SIM_DECISION_ASOF"
+      },
+      {
+        "case": "forged_live_scope",
+        "reason": "PAPER_SIM_PINNED_SYNTHETIC_RUN"
+      },
+      {
+        "case": "provisional_bar",
+        "reason": "PAPER_SIM_BAR_FINAL_CLOCK_SYNTHETIC"
+      },
+      {
+        "case": "future_bar",
+        "reason": "PAPER_SIM_BAR_ASOF"
+      },
+      {
+        "case": "unverified_clock",
+        "reason": "PAPER_SIM_BAR_FINAL_CLOCK_SYNTHETIC"
+      },
+      {
+        "case": "foreign_source_symbol",
+        "reason": "PAPER_SIM_BAR_SYMBOL_MISMATCH"
+      },
+      {
+        "case": "skipped_first_eligible_bar",
+        "reason": "PAPER_SIM_FIRST_BAR_GAP"
+      },
+      {
+        "case": "duplicate_command_conflict",
+        "reason": "PAPER_SIM_COMMAND_CONFLICT"
+      }
+    ],
+    "process_death_exit": 73,
+    "real_4_24_72_horizons": "NOT_OBSERVED_BY_THIS_RUN",
+    "replayed_events": 3,
+    "schema": "aql.integration.pkg03.offline-result.v1",
+    "sha256": "722c4ecefc6fb5a477d7468da294564b95b5fefd96eceb89ad4b593efe7821a4",
+    "simulation_journal_sha256": "be19b1fc97715bda8c8881003b8b4039c03734d1242bb1067c55c876d38921d0",
+    "simulation_population": {
+      "selection": "FIRST_CAUSAL_ENTRY_BOUNDED_SMOKE_NOT_PERFORMANCE_SELECTION",
+      "signals_projected": 21,
+      "simulations_run": 1
+    },
+    "simulation_state_sha256": "ba32f64ee6f1064e5eff4205e947b7ee84e0856aacccd678a490a12732d27dc0",
+    "skipped_commands": 0,
+    "source_read_sha256": "201afec859c9667fcf2a5a17bd110ce7d3177d46b8aae92bb383f9e2bf8eaee1",
+    "stage_signoff": "NOT_GRANTED",
+    "status": "PASS_ENGINEERING_INTEGRATED_OFFLINE",
+    "synthetic_horizon_census": {
+      "mature": 5,
+      "pending": 58
+    },
+    "trading_authority": "NONE"
+  },
+  "schema": "aql.integration.pkg03.delivery.v1",
+  "sha256": "7b3e24246fbd3159f56a21b6696e27806b9d8060e6aef65b8a05afa9893d966a"
+}
