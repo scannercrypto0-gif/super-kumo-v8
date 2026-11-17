@@ -1,0 +1,62 @@
+{
+  "main": "8b7f28f27cd960bbc201187f8d4b8390648f5ed2",
+  "composed_tree": "88cefbc6398adc08c1dd75725073ed10e0a543f9",
+  "units": [
+    {
+      "pr": 316,
+      "head": "b73a028f01d2d97025ce264de62750c216f07bf2",
+      "tree": "feaf9cc9b8e27ca9754842158a96ac0c299f3bdb",
+      "paths": [
+        ".github/workflows/atlas-prospective-native-seam.yml",
+        "research_wp_r0/aql_factory_prospective_read_v1.py",
+        "src/aql/observation/durable_bridge_v1.py",
+        "src/aql/observation/forward_evidence.py",
+        "src/aql/observation/prospective.py",
+        "tests/test_atlas_prospective_native_seam.py"
+      ],
+      "composed_tree": "feaf9cc9b8e27ca9754842158a96ac0c299f3bdb"
+    },
+    {
+      "pr": 318,
+      "head": "0cf6428826ac990a918df7843359db8e13c5ce62",
+      "tree": "4144b523afde5fe8e7e889f7bbb1830cc04a2fce",
+      "paths": [
+        ".github/workflows/atlas-offline-source-seams.yml",
+        "research_wp_r0/aql_native_binance_zip_v1.py",
+        "src/aql/collector/research_ws.py",
+        "tests/test_atlas_daily_source_seam.py",
+        "tests/test_atlas_research_ws_seam.py",
+        "tools/atlas_saved_daily_health.py"
+      ],
+      "composed_tree": "0dc7be0d5a1b5d4bafba1a85ac431590521f5c45"
+    },
+    {
+      "pr": 319,
+      "head": "f54cb5a963a1279b292d42035cc84dce90fa157e",
+      "tree": "8d2b2e78c3810f879ca2aa30ea68e49d132a1ca4",
+      "paths": [
+        ".github/workflows/atlas-saved-retrospective-census.yml",
+        "research_wp_r0/aql_factory_e_research_results_store_v1.py",
+        "tests/test_atlas_saved_retrospective_census.py",
+        "tools/atlas_saved_retrospective_census.py"
+      ],
+      "composed_tree": "7ce75d4f3baa9a191982563df7b8c8e673a3cf76"
+    },
+    {
+      "pr": 317,
+      "head": "872bf1823cfb41c8185ad6199caafb9768780802",
+      "tree": "a79f0363f72e9931a413cb519330e270a8b277a3",
+      "paths": [
+        ".github/workflows/core-discoverer-followup.yml",
+        ".github/workflows/core-source-view.yml",
+        ".github/workflows/g1-foundation-closeout.yml",
+        ".github/workflows/g3-paper-sim.yml"
+      ],
+      "composed_tree": "88cefbc6398adc08c1dd75725073ed10e0a543f9"
+    }
+  ],
+  "paths": 20,
+  "fixture_tests_passed": 15,
+  "reverse_trees_verified": true,
+  "mode": "LOCAL_GENERATED_AND_MOCKED_ONLY"
+}
