@@ -1,0 +1,53 @@
+name: ATLAS Queue 1 native WAIT
+on:
+  pull_request:
+    paths:
+      - .github/workflows/atlas-queue1-native-wait.yml
+      - research_wp_r0/**
+      - tools/atlas_queue1_native_wait.py
+      - tools/raw_vault_offline/**
+      - tools/scanner_strategy_*/**
+      - tools/strategy_service_offline/**
+      - src/aql/observation/**
+      - src/aql/paper_sim/**
+permissions:
+  contents: read
+jobs:
+  native-source-to-wait:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Prove same-source WAIT with the checked-in components
+        run: |
+          python -B tools/atlas_queue1_native_wait.py wait.json
+          python -B tools/atlas_queue1_native_wait.py --readback wait.json
+          python -B -c 'import hashlib,pathlib; print(hashlib.sha256(pathlib.Path("wait.json").read_bytes()).hexdigest())'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: queue1-native-wait
+          path: wait.json
+          if-no-files-found: error
+  native-simulator-readback:
+    needs: native-source-to-wait
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: queue1-native-wait
+      - name: Validate the sealed exact-revision receipt and reopen the isolated journal
+        run: python -B tools/atlas_queue1_native_wait.py --readback wait.json
