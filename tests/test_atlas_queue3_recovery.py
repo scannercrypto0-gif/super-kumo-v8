@@ -1,5 +1,6 @@
 """Native immutable result/journal snapshots, external pins and bounded retry."""
 import os
+import json
 from pathlib import Path
 import shutil
 import sqlite3
@@ -8,6 +9,7 @@ import sys
 import pytest
 
 from aql.observation.position_journal import _exclusive_writer
+from aql.paper_sim.engine import PaperSimulator
 from research_wp_r0 import aql_queue3_recovery_v1 as recovery
 from tools.atlas_queue2_dev import produce as produce_queue2
 from tools.atlas_queue3_recovery import negative_checks, seed_journal
@@ -145,3 +147,19 @@ def test_wrong_expected_source_pin_rejected_without_publishing(source, tmp_path,
             expected_journal_sha256="0" * 64 if which == "journal" else recovery.file_sha(source / "simulation.jsonl"),
         )
     assert not (tmp_path / "blocked").exists()
+
+
+def test_valid_resealed_journal_for_other_source_rejected(source):
+    path = source / "simulation.jsonl"
+    original = PaperSimulator(path)
+    event = next(iter(original.journal.ledger.events.values()))
+    command = json.loads(event.reason)["command"]
+    command["signal"]["source_sha256"] = "f" * 64
+    # Replace only this isolated test fixture with another valid native chain.
+    path.unlink()
+    simulation = PaperSimulator(path)
+    identity = simulation.identity(command)
+    simulation.apply(identity, "watch", command)
+    simulation.apply(identity, "cancel", {"op": "cancel", "at_ms": command["at_ms"] + 1})
+    with pytest.raises(ValueError, match="SIMULATION_SOURCE_BINDING"):
+        recovery.read_consumers(source)

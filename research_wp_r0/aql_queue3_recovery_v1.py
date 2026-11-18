@@ -66,6 +66,17 @@ def read_consumers(root):
     require(state["phase"] == "CANCELLED" and state["filled"] == "0"
             and state["exited"] == "0" and state["fills"] == []
             and state["trading_authority"] == "NONE", "SIMULATION_EXPOSURE")
+    package = json.loads((root / "evidence.json").read_text(encoding="utf-8"))["paired_package"]
+    cutoff = package["schedule"]["pairs"][0]["opportunity"]["decision_cutoff_ms"]
+    signal = state["signal"]
+    require(signal["source_sha256"] == package["cohort_receipt"]["source_zip_sha256"]
+            and signal["definition_sha256"] == package["schedule"]["protocol"]["base_definition_sha256"]
+            and signal["config_sha256"] == package["plan_sha256"]
+            and signal["evaluator_sha256"] == package["code_sha256"]
+            and signal["source_close_ms"] + 1 == signal["available_ms"]
+                == signal["decision_ms"] == cutoff
+            and signal["symbol"] == "AAA" and signal["interval_ms"] == 900000,
+            "SIMULATION_SOURCE_BINDING")
     return {"queue2_evidence_sha256": queue2["evidence_sha256"],
             "paired_package_sha256": queue2["package_sha256"],
             "simulation_state_sha256": digest(states), "simulation_events": 2,

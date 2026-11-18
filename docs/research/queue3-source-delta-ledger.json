@@ -3387,7 +3387,7 @@
   },
   "rollback_manifest": {
     "base_main": "9d6b914f999774853963ff7070b87424dfa6f35d",
-    "method": "Reviewed revert of the single integration commit after separately authorized release",
+    "method": "Reviewed revert of the integration PR merge commit after separately authorized release",
     "modified_baseline_paths": [
       {
         "path": "src/aql/observation/position_journal.py",
