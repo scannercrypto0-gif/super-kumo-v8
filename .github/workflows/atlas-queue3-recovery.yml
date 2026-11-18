@@ -1,0 +1,78 @@
+name: ATLAS Queue 3 bounded recovery
+on:
+  pull_request:
+    paths:
+      - .github/workflows/atlas-queue3-recovery.yml
+      - src/aql/observation/position_journal.py
+      - src/aql/observation/positions.py
+      - src/aql/archive/**
+      - src/aql/paper_sim/**
+      - research_wp_r0/indicator_library.py
+      - research_wp_r0/aql_queue3_recovery_v1.py
+      - research_wp_r0/test_g4_nonnumeric_regression.py
+      - tools/atlas_queue3_recovery.py
+      - tools/offline_custody_kit.py
+      - tests/test_atlas_queue3_recovery.py
+      - tests/test_g2_hardening_journal.py
+      - tests/test_g2_journal_recovery_evidence.py
+      - tests/test_g2_operator_journal_recovery.py
+      - tests/test_sf_ind_01_nan_guard.py
+      - tests/test_p2b_regression.py
+permissions:
+  contents: read
+jobs:
+  snapshot-crash-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: .:src
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install pytest pytest-timeout
+      - name: Verify changed guards, journal crash boundaries and recovery APIs
+        run: python -B -m pytest -q tests/test_sf_ind_01_nan_guard.py tests/test_p2b_regression.py research_wp_r0/test_g4_nonnumeric_regression.py tests/test_atlas_queue3_recovery.py tests/test_g2_hardening_journal.py tests/test_g2_journal_recovery_evidence.py tests/test_g2_operator_journal_recovery.py tests/test_g2_position_journal.py tests/paper_sim/test_engine.py
+      - name: Produce sealed snapshot, damage primary and restore verified consumers
+        run: |
+          python -B tools/atlas_queue3_recovery.py queue3-evidence
+          python -B tools/atlas_queue3_recovery.py --verify queue3-evidence
+          python -c 'import hashlib,pathlib; print(hashlib.sha256(pathlib.Path("queue3-evidence/recovery-evidence.json").read_bytes()).hexdigest())'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: queue3-synthetic-recovery
+          path: |
+            queue3-evidence/snapshot/
+            queue3-evidence/retained-manifest.sha256
+            queue3-evidence/recovery-evidence.json
+          if-no-files-found: error
+  windows-native-restore:
+    needs: snapshot-crash-restore
+    runs-on: windows-latest
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: .;src
+      PYTHONDONTWRITEBYTECODE: '1'
+      AQL_QUEUE3_TEST_SOURCE: ${{ github.workspace }}/queue3-evidence/snapshot
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install pytest pytest-timeout
+      - uses: actions/download-artifact@v4
+        with:
+          name: queue3-synthetic-recovery
+          path: queue3-evidence
+      - name: Verify Ubuntu's sealed artifact and perform a new Windows restore
+        run: python -B tools/atlas_queue3_recovery.py --verify queue3-evidence --restore-to windows-restored
+      - name: Test Windows journal guards and snapshot APIs on the verified cold fixture
+        run: python -B -m pytest -q tests/test_sf_ind_01_nan_guard.py tests/test_p2b_regression.py research_wp_r0/test_g4_nonnumeric_regression.py tests/test_atlas_queue3_recovery.py tests/test_g2_hardening_journal.py tests/test_g2_journal_recovery_evidence.py tests/test_g2_operator_journal_recovery.py tests/test_g2_position_journal.py tests/paper_sim/test_engine.py

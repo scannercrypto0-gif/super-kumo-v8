@@ -1,0 +1,3431 @@
+{
+  "schema": "aql.queue3.source-delta-ledger.v1",
+  "base_main": "9d6b914f999774853963ff7070b87424dfa6f35d",
+  "owner_directive": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/320#issuecomment-6970715684",
+  "queue3_prs": [
+    16,
+    83,
+    93,
+    109,
+    110,
+    111,
+    112,
+    115,
+    116,
+    118,
+    119,
+    165,
+    208,
+    211,
+    213,
+    214,
+    224,
+    275,
+    307
+  ],
+  "source_rows": [
+    {
+      "pr": 16,
+      "source_base": "ee35d3ced5bc570efa411422c595d4b65757a0da",
+      "source_head": "828ed10b7c775dcb56627426789057d73e8c5342",
+      "state": "open",
+      "merged": false,
+      "owner": "Core/PM",
+      "disposition": "NOT_DUE_WITH_TRIGGER",
+      "residual_trigger": "Provisional WP-01/PLAN-01–09 document is a historical proposal. Reopen for an owner-approved documentation reconciliation; current archive, custody-kit and protected Queue 1/2 contracts remain authoritative.",
+      "paths": [
+        {
+          "path": "G1_WP01_PROVISIONAL_PLAN.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "3eb641e40f38b6a1003b2e897bf7badc1067f35b",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 83,
+      "source_base": "df668f487e84abfeb1e0f76decd6d483e2fe6493",
+      "source_head": "5f7423f2d59745364e56a80dc1ac0b60ba3a2b03",
+      "state": "open",
+      "merged": false,
+      "owner": "Operations/Core",
+      "disposition": "NOT_DUE_WITH_TRIGGER",
+      "residual_trigger": "Issue-driven atlas_worker execution requires an explicitly deployed worker and trusted quota telemetry. No current native Queue 1/2 consumer imports this worker, and host/scheduler activation is outside this scope.",
+      "paths": [
+        {
+          "path": "tools/atlas_worker/ISSUE82-REPAIR.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "06957e5f4715d97153a69b0787d87c22a43a00b8",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/atlas_worker/atlas_runner.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "c711d78272dc70578453840b4b27161821f023f7",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/atlas_worker/test_atlas_runner.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "37cf8d57043ec3ffefbcb207cd528f46cabeb48d",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 93,
+      "source_base": "a5a648a9bba2e6935fa69dd93241a6d89ecc62b8",
+      "source_head": "2d53fc0616a4848ce2ee26fc4022aabc075b27fe",
+      "state": "open",
+      "merged": false,
+      "owner": "Core/Integration",
+      "disposition": "SELECTIVE_REUSE",
+      "residual_trigger": "Current PaperSimulator directly imports DurablePositionJournal/PositionEvent. Reuse the two actual hardening modules and three focused crash/operator regression files. Retain standalone replay/throughput/contention benchmarks and older operational documentation until a measured runtime acceptance campaign is authorized.",
+      "paths": [
+        {
+          "path": ".github/workflows/g2-position-journal.yml",
+          "base_blob": {
+            "sha": "ebfbacbd253253a5360c47bdfe32dabb8261995d",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "8e75092fd4cfb85eb15355ec96641612b489793b",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "ebfbacbd253253a5360c47bdfe32dabb8261995d",
+            "mode": "100644"
+          },
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": "ebfbacbd253253a5360c47bdfe32dabb8261995d",
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/core/g2_position_journal.md",
+          "base_blob": {
+            "sha": "0090996b8385c07dad8e0b7b3c5f0d7e2702340c",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "d13277b90f4b90b4a4a44e9bb2c98702f5a75e08",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "0090996b8385c07dad8e0b7b3c5f0d7e2702340c",
+            "mode": "100644"
+          },
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": "0090996b8385c07dad8e0b7b3c5f0d7e2702340c",
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "src/aql/observation/position_journal.py",
+          "base_blob": {
+            "sha": "e83dd672d43f40c1c9b5c209a8bbd4af7ee4d46c",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "0e5ed8b83d529ca66235415415d2403d0f9d1de2",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "e83dd672d43f40c1c9b5c209a8bbd4af7ee4d46c",
+            "mode": "100644"
+          },
+          "baseline_disposition": "DUE_GAP",
+          "candidate_blob": "0e5ed8b83d529ca66235415415d2403d0f9d1de2",
+          "candidate_resolution": "IMPLEMENTED_EXACT_SOURCE_REUSE",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "src/aql/observation/positions.py",
+          "base_blob": {
+            "sha": "8e522e51b77aa29fd5a0dd668cdeb3faa99e4416",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "f0dd3efd1683bd2368cdb88baacd2ab3496ade71",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "8e522e51b77aa29fd5a0dd668cdeb3faa99e4416",
+            "mode": "100644"
+          },
+          "baseline_disposition": "DUE_GAP",
+          "candidate_blob": "f0dd3efd1683bd2368cdb88baacd2ab3496ade71",
+          "candidate_resolution": "IMPLEMENTED_EXACT_SOURCE_REUSE",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_g2_core_journal_contention.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "7539a639fb8817b504ecfb630c53c52e601c38b8",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_g2_hardening_journal.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "ddfac8ac4b356009170fbf0302868155e06e6c3d",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "DUE_GAP",
+          "candidate_blob": "ddfac8ac4b356009170fbf0302868155e06e6c3d",
+          "candidate_resolution": "IMPLEMENTED_EXACT_SOURCE_REUSE",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_g2_journal_recovery_evidence.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "b6d62e13fe7f9f2200ad3f80e85268d8739a5b88",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "DUE_GAP",
+          "candidate_blob": "b6d62e13fe7f9f2200ad3f80e85268d8739a5b88",
+          "candidate_resolution": "IMPLEMENTED_EXACT_SOURCE_REUSE",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_g2_journal_replay_benchmark.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "c38b6e6957a84be766cd1987f4d80e051cb37051",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_g2_operator_journal_recovery.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "cad574b3ee52dffaf46a6167235532f604064ff5",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "DUE_GAP",
+          "candidate_blob": "cad574b3ee52dffaf46a6167235532f604064ff5",
+          "candidate_resolution": "IMPLEMENTED_EXACT_SOURCE_REUSE",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 109,
+      "source_base": "fc94d833dcb6e87064093ca7ccc4efea3a0732e3",
+      "source_head": "9491c334c162cd2527b52f1adfb3144a6935f060",
+      "state": "open",
+      "merged": false,
+      "owner": "Storage/PM",
+      "disposition": "NOT_DUE_WITH_TRIGGER",
+      "residual_trigger": "Retention/custody baseline document remains a retained governance source. Reconcile it when the encrypted job, retention policy and external custody acceptance are explicitly activated; no production custody claim is made by this local fixture.",
+      "paths": [
+        {
+          "path": "docs/operations/custody-backup-policy-71.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "f40839df0852d53de4e5540b83504d2648552021",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 110,
+      "source_base": "fc94d833dcb6e87064093ca7ccc4efea3a0732e3",
+      "source_head": "7ec2ba7f0145ca1c7fcb52191e18a32d95b1e205",
+      "state": "open",
+      "merged": false,
+      "owner": "Tooling/Core",
+      "disposition": "NOT_DUE_WITH_TRIGGER",
+      "residual_trigger": "Ruff/Hypothesis bootstrap and mutation tooling require a selected developer/CI consumer and approved tooling policy. Existing native test entrypoints already run; no due recovery call site depends on this optional toolkit.",
+      "paths": [
+        {
+          "path": ".github/workflows/tooling-trial.yml",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "71b7dcbfd6bd28cf410e662774c82d36fef9b8ca",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/engineering/quality-gates-rollout.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "8d843b5111bde4919d533eadb67e2938e82673a8",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "pyproject.toml",
+          "base_blob": {
+            "sha": "f3dd0559d66b4ec0526d094516c11731f692281f",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "5334ec76a316c202cd7e78485227f92914e9432f",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "f3dd0559d66b4ec0526d094516c11731f692281f",
+            "mode": "100644"
+          },
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": "f3dd0559d66b4ec0526d094516c11731f692281f",
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "ruff.toml",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "3dc9372e83eb274c139378409c2298e34ebcccd4",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "scripts/tooling_pit_mutation_probe.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "339f362a0cbe358ad03bcdb52311e68a9bfa9b66",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "scripts/tooling_ruff_baseline.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "9f377bfcd6672616f0d74d8ba3343e7f7916c0a3",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_g1_wp04_fix01.py",
+          "base_blob": {
+            "sha": "4700d9be47c148086bedf9fef6a4d526ee547e5c",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "e25b79557b34d5355f450f4ceea908e766df0987",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "c75b41d4564f99916bd615e23d7963d5c3c4aa08",
+            "mode": "100644"
+          },
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": "c75b41d4564f99916bd615e23d7963d5c3c4aa08",
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_tooling_properties.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "fc5bf85374c8817d1f46cda1695adb9b65d13366",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 111,
+      "source_base": "fc94d833dcb6e87064093ca7ccc4efea3a0732e3",
+      "source_head": "5f6f2592b3d24592525d48d078c8e4fcaad1299b",
+      "state": "open",
+      "merged": false,
+      "owner": "Storage/Operations/owner",
+      "disposition": "AUTHORITY_BLOCKED",
+      "residual_trigger": "Encrypted job/scheduler integration needs an authorized recovery public/private-key custody setup and Windows scheduler acceptance. No secrets creation/rotation or research-host changes are authorized. Current local synthetic recovery reuses landed backup/custody primitives without claiming encryption.",
+      "paths": [
+        {
+          "path": ".github/workflows/backup71-automation.yml",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "2010ad28e98f98de9f40cf62fcb968ac83a75eff",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/evidence/BACKUP71_AUTOMATION.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "e442c59a8d9f09d3ae30278e626994e77160308f",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/evidence/backup71-automation-windows.json",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "a6ccbf5d1cde67e8752b79a0444a476d085e2bc4",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/operations/backup71-automation.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "25afe8168326085c20d08d49a61330ce2d939448",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "pyproject.toml",
+          "base_blob": {
+            "sha": "f3dd0559d66b4ec0526d094516c11731f692281f",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "74732788ab9fe41405dce9bef6721805697d7282",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "f3dd0559d66b4ec0526d094516c11731f692281f",
+            "mode": "100644"
+          },
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": "f3dd0559d66b4ec0526d094516c11731f692281f",
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "scripts/backup71-task.ps1",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "e3501a60ba1d55f7deca50c8f7fa9fe07c970906",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "scripts/backup71_acceptance.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "0d39a4a2c6f931410db8effd9bf7c55923746337",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "scripts/register-backup71-task.ps1",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "8fa2c70850534c9228c99a8200e7044fcc88167c",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "src/aql/archive/automation.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "04a2b386d06532ebe1eae6f033236176fafe01bf",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "src/aql/archive/encrypted.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "de8b518dcaab0090bc392587dd24c3fe4e0372fd",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_backup71_automation.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "f831335d889ae3a419814d02ceea25fea15b9fd8",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 112,
+      "source_base": "c6851bbaf0664d19490e374d6019687d1c234be7",
+      "source_head": "5341c3a7bb8a19dffae8956c9ada1591070dfcb7",
+      "state": "open",
+      "merged": false,
+      "owner": "Core/CI",
+      "disposition": "NOT_DUE_WITH_TRIGGER",
+      "residual_trigger": "AG-F02 replay/shutdown synchronization is tied to the legacy asynchronous G1 acceptance harness. Reopen on a demonstrated current harness race or an authorized G1 worker change; preserve the accepted G1 path and required CI.",
+      "paths": [
+        {
+          "path": "docs/evidence/WINDOWS_AG_F02.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "54743bdf8d5270f65dd8d5c46f9533c20b4c9c54",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/evidence/windows_ag_f02.json",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "0ae6997af92c0b8129d300eba516e1ac9ab924b8",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_g1_wp04_fix01.py",
+          "base_blob": {
+            "sha": "4700d9be47c148086bedf9fef6a4d526ee547e5c",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "fa31cd11c105bfadd8df8251642e62bfabfd5aa3",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "c75b41d4564f99916bd615e23d7963d5c3c4aa08",
+            "mode": "100644"
+          },
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": "c75b41d4564f99916bd615e23d7963d5c3c4aa08",
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 115,
+      "source_base": "41126d82b29e86311c97ee386d44c4e54b9ad1fa",
+      "source_head": "fa6f38e67c494fb2336e26f2b8ce6e86d5bbd070",
+      "state": "open",
+      "merged": false,
+      "owner": "Core/Operations",
+      "disposition": "NOT_DUE_WITH_TRIGGER",
+      "residual_trigger": "Concurrent G1/G2 callback/shared-filesystem runtime acceptance requires its actual background worker deployment/consumer. This offline snapshot lane changes no live G1 callback; required G1 and changed journal tests provide current compatibility evidence.",
+      "paths": [
+        {
+          "path": ".github/workflows/core-g2-offline-integration.yml",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "6d58d85763b1705d55296371474f83991052a448",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_core_g2_offline_integration_acceptance.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "de184bd3768370d2f57c889098e68857cf83a6a0",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 116,
+      "source_base": "5f6f2592b3d24592525d48d078c8e4fcaad1299b",
+      "source_head": "3d83f1b43d8f735db9684b2baeb10c46104176ca",
+      "state": "open",
+      "merged": false,
+      "owner": "Storage/Operations/owner",
+      "disposition": "AUTHORITY_BLOCKED",
+      "residual_trigger": "Historical encrypted receipt pin/retention trust logic depends on #111's accepted key custody and scheduler/backup generations. Preserve original old-release/rotation/retained-point evidence. Local public-manifest pinning uses the existing custody-kit contract and makes no production custody claim.",
+      "paths": [
+        {
+          "path": ".github/workflows/backup71-automation.yml",
+          "base_blob": {
+            "sha": "2010ad28e98f98de9f40cf62fcb968ac83a75eff",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "1f0fbfce27fbe0149a3a5473426f0345a2bd01ad",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/evidence/BACKUP71_AUTOMATION.md",
+          "base_blob": {
+            "sha": "e442c59a8d9f09d3ae30278e626994e77160308f",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "ab5423eef9e91f607334a0c7cf5eb7fe517ae63e",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/evidence/BACKUP71_TRUST_113.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "c20919d9aa64d6ee3c1fa58942670182f7b0f364",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/operations/backup71-automation.md",
+          "base_blob": {
+            "sha": "25afe8168326085c20d08d49a61330ce2d939448",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "7904752d8a0453efd14cfff025f8849044818e8b",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/operations/backup71-owner-acceptance-113.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "51284f50840c1281a9ac18c8cb1fa81d8b1a2244",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "scripts/backup71_acceptance.py",
+          "base_blob": {
+            "sha": "0d39a4a2c6f931410db8effd9bf7c55923746337",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "c523c8301ed0d27fdaee5011bdffb104258cd6d3",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "src/aql/archive/automation.py",
+          "base_blob": {
+            "sha": "04a2b386d06532ebe1eae6f033236176fafe01bf",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "7f1c603e9716ed10e3ca1074d4e4dbcae3754774",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_backup71_automation.py",
+          "base_blob": {
+            "sha": "f831335d889ae3a419814d02ceea25fea15b9fd8",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "e68a69245203a7cdd364f294d1465cc05172c491",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_backup71_trust.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "96af0f4c12c4905f7a256e37fdfd7cfa089184e1",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 118,
+      "source_base": "8ce639915ef0181d2b899b518759dd0f4c9ca9e1",
+      "source_head": "3b1d02f64f1986eebfa782d368f1f6cd20966147",
+      "state": "open",
+      "merged": false,
+      "owner": "Core/G2",
+      "disposition": "NOT_DUE_WITH_TRIGGER",
+      "residual_trigger": "Background ObservationWorker requires an admitted asynchronous G2 producer and runtime lane. Current Queue 1 uses the direct isolated simulator/journal, not this volatile worker queue.",
+      "paths": [
+        {
+          "path": ".github/workflows/g2-observation-worker.yml",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "dba3e7655a13c06dc92eb497379a52c1d6aedf35",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "src/aql/observation/worker.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "41d093337b4780cc47851d116f07b5a4f6db5edb",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_g2_observation_worker.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "f84856c57f84214e689a3944d5a7fe26067192e5",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 119,
+      "source_base": "3b1d02f64f1986eebfa782d368f1f6cd20966147",
+      "source_head": "621db5d8905608dda1c12c312d1dd79c666735a5",
+      "state": "open",
+      "merged": false,
+      "owner": "Core/G2",
+      "disposition": "NOT_DUE_WITH_TRIGGER",
+      "residual_trigger": "RetainedObservationSource is a distinct bounded G2 event-ingress/ACK API requiring an admitted G2 worker/source consumer. Track A #316 supplies a portable prospective read/replay seam, not full equivalence to this original event queue. No blanket supersession claim.",
+      "paths": [
+        {
+          "path": ".github/workflows/g2-retained-source.yml",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "096652e230a81f3c4412242f5aca6e30c277a2af",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/core/g2_retained_source.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "f5508444cbdbdf6bb7a8b0cc1d53c52806e1bc09",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "src/aql/observation/retained_source.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "3579eb17bd9525abcc029c515b0a61e742bccf58",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_g2_retained_source.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "ed33aca136c64778c2ed6d06f215c22efa92482d",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 165,
+      "source_base": "3fc035b7ae70693e952976e2dcb2fe165a7e1826",
+      "source_head": "01c3932cb703f3ecbdbac3822661d4ce4c1ecd4b",
+      "state": "open",
+      "merged": false,
+      "owner": "Core/Guardian/owner",
+      "disposition": "AUTHORITY_BLOCKED",
+      "residual_trigger": "Guardian signed ACK and launch gates need the separately authorized Guardian identity, custody/clock evidence and host launch consumer; original #144 authority remains blocked. Current cold synthetic recovery neither launches Guardian nor generates keys/approval.",
+      "paths": [
+        {
+          "path": ".github/workflows/observation-authority-acceptance.yml",
+          "base_blob": {
+            "sha": "eae1d5ce42f8adad94912e9567d1e90bc9b32230",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "03b27c7ed0a174254700e5bb8476884a361d0241",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "04_STATE.md",
+          "base_blob": {
+            "sha": "f3432aa940ce3780b4cf46b133f139c230fb1c70",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "7f722a3e823a84acf88f57c02e5d54b9b8b1f86d",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "3c78b74eba7fe33a881ee0a313c382c8272e60a1",
+            "mode": "100644"
+          },
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": "3c78b74eba7fe33a881ee0a313c382c8272e60a1",
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "05_WORK_LOG.md",
+          "base_blob": {
+            "sha": "1940fc19b2a5d2c0ba99aa48d6da90e1460071e5",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "846d921c38f08c5c9de9e8b1f8b73df88cc752cc",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "ee4bce96a9dac0c58622bab70048cb266bb996a6",
+            "mode": "100644"
+          },
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": "ee4bce96a9dac0c58622bab70048cb266bb996a6",
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/core/guardian-launch.template.json",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "35323b2646e0cfd6b1c4666eafa0b694654dc818",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/core/guardian_closure_151.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "1de0602b631e6317fd3aef5a31c323f02d053138",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/core/observation_authority_e2e_001.md",
+          "base_blob": {
+            "sha": "2aaf295155cf5c71f252842408d8d1d25b840d05",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "9b16002ed06a3cfe90bd478baecde70eb34576b7",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/evidence/guardian151/local-tests.json",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "c1cb49eced5f561a9e85f9d53b5c083aa47b8444",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "scripts/evidence_guardian.py",
+          "base_blob": {
+            "sha": "38e1743852f119316bc9fd70a53eafa235a7bef0",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "536747e630cc1c7d28ae0e024df9a017e45908f4",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "scripts/guardian_preflight.ps1",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "e689b32e4a91d96e67f84b1872057e4b57aa8579",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "src/aql/evidence_guardian.py",
+          "base_blob": {
+            "sha": "35efbb65be87c45fa3e670cd44a70397fee5ff91",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "8fcf61243475c6bb5501626956b4775feac80592",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "src/aql/evidence_outbox.py",
+          "base_blob": {
+            "sha": "d73ea6fa852a44819dc62dde6a8b7f761d5fd90e",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "5cf07cb6c6baa03bd885e6f83572965b6e3f5139",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "src/aql/guardian_launch.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "9c4b766850ed48fbe64db8bb869eea32aeaa874f",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "src/aql/guardian_receipt.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "67e8ddb9726fb56999cd05c454eb49f6a70ee3ca",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/guardian_fixtures.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "4793fbbcec283db2dfbf6625683db6494cd03124",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_evidence_outbox.py",
+          "base_blob": {
+            "sha": "a8b65e1e9d99041dcd0f7869d806c308f095ec0d",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "4d268aacd588cf85f9459fab8ceb40ea1fe06433",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_guardian_hardening.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "95e13e30f63e2dfa71a3587fda42f9bb4db39be9",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_guardian_launch.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "ecaa0a9cf3baec4ec159e469ad14c7ade0257fd9",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_observation_operational_e2e.py",
+          "base_blob": {
+            "sha": "9a07d38190c0fb06e5ef37701a8ab23e878c5e7d",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "035ff7a77eb6b7d6244f75ce97ae225afc5bac5a",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_observer_outbox_integration.py",
+          "base_blob": {
+            "sha": "d5d68d5f4813905cde14c99048bae79b408233cb",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "6958152499da9cdf978a1b4665f0ffed639d81b5",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_observer_runtime.py",
+          "base_blob": {
+            "sha": "da1e2e357b3c6f985621702ffbfd1f9e2491ab3a",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "786680c5dc417fc846cb6252c5aebeb9e5960ad1",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 208,
+      "source_base": "dbc191df72f4b4d1ebb7d490926dcad4325dac12",
+      "source_head": "7337e755a9fc154a33bb74975522c43e708921e7",
+      "state": "open",
+      "merged": false,
+      "owner": "Factory/Research",
+      "disposition": "SELECTIVE_REUSE",
+      "residual_trigger": "Land exact indicator finite/nonnumeric guards and three original focused regression files. Native IndicatorRegistryV2 inherits the existing v1 IndicatorLibrary; raw v1 NaN propagation was reproduced before reuse. Preserve remaining overlapping P2-A regression and historical hardening documentation until the full original package is independently reconciled.",
+      "paths": [
+        {
+          "path": ".github/workflows/sf-ind-01-fast.yml",
+          "base_blob": {
+            "sha": "f93202ed31d80581a4154732ee0c00528f90ecda",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "a422bda52ebcb6619e297a285f1ace860df69ac5",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "f93202ed31d80581a4154732ee0c00528f90ecda",
+            "mode": "100644"
+          },
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": "f93202ed31d80581a4154732ee0c00528f90ecda",
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": ".github/workflows/sf-integrity-stage-gate.yml",
+          "base_blob": {
+            "sha": "1eb86e1c5a136e248ea55906e25be8829a83be4a",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "153ccab8db707466fca4c82ccae5610faf0984c3",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "1eb86e1c5a136e248ea55906e25be8829a83be4a",
+            "mode": "100644"
+          },
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": "1eb86e1c5a136e248ea55906e25be8829a83be4a",
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/aql-hardening-001-audit-packet.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "afd6e7b23dd103648235bb617efc33efa20ea374",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "research_wp_r0/indicator_library.py",
+          "base_blob": {
+            "sha": "24d70bcaea70d0fadb13084dd7fca08bb95688df",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "da85d06405760d09140b735992a90fc3fa7ccac2",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "24d70bcaea70d0fadb13084dd7fca08bb95688df",
+            "mode": "100644"
+          },
+          "baseline_disposition": "DUE_GAP",
+          "candidate_blob": "da85d06405760d09140b735992a90fc3fa7ccac2",
+          "candidate_resolution": "IMPLEMENTED_EXACT_SOURCE_REUSE",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "research_wp_r0/test_g4_nonnumeric_regression.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "2d241ca7b2c09fa6f2b94b1c43ebe9c7a8343d93",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "DUE_GAP",
+          "candidate_blob": "2d241ca7b2c09fa6f2b94b1c43ebe9c7a8343d93",
+          "candidate_resolution": "IMPLEMENTED_EXACT_SOURCE_REUSE",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_p2a_regression.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "5540ff863a26cda01eb38bb21369758518408049",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_p2b_regression.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "d883ce781f91287bbb6b2d38349c6a440039a544",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "DUE_GAP",
+          "candidate_blob": "d883ce781f91287bbb6b2d38349c6a440039a544",
+          "candidate_resolution": "IMPLEMENTED_EXACT_SOURCE_REUSE",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_sf_ind_01_nan_guard.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "0b1eb78df320cfd9f5f035a45e2921b3be1a9f46",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "DUE_GAP",
+          "candidate_blob": "0b1eb78df320cfd9f5f035a45e2921b3be1a9f46",
+          "candidate_resolution": "IMPLEMENTED_EXACT_SOURCE_REUSE",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 211,
+      "source_base": "dbc191df72f4b4d1ebb7d490926dcad4325dac12",
+      "source_head": "7d97b09c0c6ee2650a61d523acb8d8c771a99c46",
+      "state": "open",
+      "merged": false,
+      "owner": "Core/Storage",
+      "disposition": "PARTIAL_LANDED_WITH_TRIGGER",
+      "residual_trigger": "Four selected RawVault/schema/corrections/init blobs already match main and are used by Queue 1/2. Remaining standalone archive/coverage/derived-view/retention toolkit needs its admitted consumer. B3 original RAW/Factory handoffs require original source/consumer admission; preserve those authority gates and all source tests.",
+      "paths": [
+        {
+          "path": ".github/workflows/aql-b3-vault-seam.yml",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "4851cee4a124c602b85817104f7d9dbe56db5d2e",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": ".github/workflows/raw-vault-offline.yml",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "1a3967e84eb1d428a7f1bb2c2d71b673d6349174",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/raw_vault_offline/B3_ADMIT_READBACK.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "adbcea964eeeb8e85ce508c09e46cd7efb309387",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/raw_vault_offline/README.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "d1699e73cdf81fc519c933d3045356b54197aa56",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "integration_tests/aql_b3_vault_seam.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "7a722f3c531322420a40d0aa84e34d018fa4f1e3",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "integration_tests/test_aql_b3_vault_seam.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "cf0c98e48d05b14950dfd70f39e9f85495875db0",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/__init__.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "838f1ca49eb39f9f2ab846de3e0cf57321fb4e78",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "838f1ca49eb39f9f2ab846de3e0cf57321fb4e78",
+            "mode": "100644"
+          },
+          "baseline_disposition": "LANDED_EXACT",
+          "candidate_blob": "838f1ca49eb39f9f2ab846de3e0cf57321fb4e78",
+          "candidate_resolution": "ALREADY_LANDED",
+          "duplicate_path_memberships": [
+            275
+          ]
+        },
+        {
+          "path": "tools/raw_vault_offline/archival_sim.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "0f5debf641293e86877bd9e576d44db4d4634695",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/archive_verifier.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "c99939fb4564119fa1ef3d6b6dd7bba9ffdf9966",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/b3_handoff.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "a94ddad63aed65d2c36c9525bbc66c8feb9a60fe",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/corrections.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "3e6beb10e9096e622905823b41c9be68c23f1ac1",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "3e6beb10e9096e622905823b41c9be68c23f1ac1",
+            "mode": "100644"
+          },
+          "baseline_disposition": "LANDED_EXACT",
+          "candidate_blob": "3e6beb10e9096e622905823b41c9be68c23f1ac1",
+          "candidate_resolution": "ALREADY_LANDED",
+          "duplicate_path_memberships": [
+            275
+          ]
+        },
+        {
+          "path": "tools/raw_vault_offline/coverage.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "92fd191ddbee57583330584c2633287d3cfa051e",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/derived_view.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "b8b021248b5ee2645eb20f5d0532b58ed39e2616",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/evidence_report.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "8d84f9f5d2743509f876bda922f7cb7c23410ba8",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/schema.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "ee36d05f4678a61d2163ce3b2e0e6d612a24c01a",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "ee36d05f4678a61d2163ce3b2e0e6d612a24c01a",
+            "mode": "100644"
+          },
+          "baseline_disposition": "LANDED_EXACT",
+          "candidate_blob": "ee36d05f4678a61d2163ce3b2e0e6d612a24c01a",
+          "candidate_resolution": "ALREADY_LANDED",
+          "duplicate_path_memberships": [
+            275
+          ]
+        },
+        {
+          "path": "tools/raw_vault_offline/tests/__init__.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "a36e98e98ccc3efff2259b2e485268ea8bdca8b6",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/tests/_helpers.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "23ce71b366812815b1d722dd1a8956891f248e42",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": [
+            275
+          ]
+        },
+        {
+          "path": "tools/raw_vault_offline/tests/test_archival_sim.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "8228f57d9361589d78d09bc178e0f5320df4c036",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/tests/test_archive_verifier.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "6bf833608e06fbba963986fe91319f777e30a62b",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/tests/test_audit_a3_fail_closed.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "fb8e8cb862c169e0c2bff9fe1d6d73fdbabe78ee",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/tests/test_audit_a3_final_round.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "b6df23e4ca89be203e5c11bee5fa7736343ffb94",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/tests/test_corrections.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "d0ec43da56819ac999f98a2f27d4384882cfed1a",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/tests/test_coverage.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "fff026ba314f0bc01ccd60df399345965cec42f3",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/tests/test_derived_view.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "3135555e38b21430cfc4c5af0886016ec6710f19",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/tests/test_g3_crash_window_regression.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "644658e6eccd7998534c0e37f6d43e0dc5be183c",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/tests/test_g7a_audit_remediation.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "48192dc4d437d58618cdf0a027b69ed20995542d",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/tests/test_g7a_recovery_scan_regression.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "3f1b7e03c3e28b7407a583a27adb556bbbdad043",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/tests/test_p1_regression.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "7c592b5ef6e1e81caea7268b2389a7d72be1f70b",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/tests/test_schema.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "5fce02b9b8aefe769a07a2a4c708fd57a689d534",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/tests/test_vault.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "43c94949565052d64e0219942aacf2a32e2f7485",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/vault.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "41831683a425bab954f4d22c4a217f384c79307c",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "41831683a425bab954f4d22c4a217f384c79307c",
+            "mode": "100644"
+          },
+          "baseline_disposition": "LANDED_EXACT",
+          "candidate_blob": "41831683a425bab954f4d22c4a217f384c79307c",
+          "candidate_resolution": "ALREADY_LANDED",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 213,
+      "source_base": "dbc191df72f4b4d1ebb7d490926dcad4325dac12",
+      "source_head": "9670b9f9062a59fbd5db74b45b0600460492d2f0",
+      "state": "open",
+      "merged": false,
+      "owner": "Integration/PM",
+      "disposition": "NOT_DUE_WITH_TRIGGER",
+      "residual_trigger": "Release-intelligence toolkit requires a declared runtime/CI release-analysis consumer. This package performs exact source reconciliation directly; adding the optional toolkit is not a storage recovery dependency.",
+      "paths": [
+        {
+          "path": ".github/workflows/aql-integration-intel-ci.yml",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "73ad0f1d52d9f1d36f13917c8345512ec519cc95",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/integration_intel_offline/README.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "1d9d063388e2cfc2cde70b4576b773c3a01ef34d",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/integration_intel_offline/__init__.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "4150f11fe69d021ecf31dedbace44bba8b197673",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/integration_intel_offline/fixtures/golden_snapshot.json",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "2b5d6084eb9db47de944ac7146aea49f41c89800",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/integration_intel_offline/test_adversarial.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "dd8530c5feba4ea11a75eb0d87a0546b78ea60d5",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/integration_intel_offline/test_ci_coverage_plan.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "14eb8996370a4859b1968ae48b2fcd4d774a7a55",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/integration_intel_offline/test_claim_firewall.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "e3acbac17fbd458247ad6e3894f2607f07497778",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/integration_intel_offline/test_collision.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "e84b3462b74da6d915aa44330ef0c1150dcc52ba",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/integration_intel_offline/test_dag.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "ee1969e3b71e6c9745ce4f0f32afeeecf8e25f1e",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/integration_intel_offline/test_denylist.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "e94029e45f33569a46539eda91e8b3d0c37c93b8",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/integration_intel_offline/test_evidence_registry.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "8effb4e7e2f0bd375c6a46c8a8e0e2646fe55492",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/integration_intel_offline/test_g2_waived_regression.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "9816d75909b77981c60fe4ba47a21e70f5098db7",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/integration_intel_offline/test_operator_report.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "d3730ab1071d2c107049009f5f40c768e587514e",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/integration_intel_offline/test_p0c_regression.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "23809757b865c09753b3d3b76132820f557ef8d6",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/integration_intel_offline/test_release_readiness.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "ebc9ea5e1fbc7763b645d563ec9e1c2ed812df9b",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/integration_intel_offline/test_schema.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "1baba3e111b04401abad7fc146c520e6eeb56c5e",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/integration_intel_offline/__init__.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "0b7977813fca8f2ba8fc05e75b32d5ce829c16b5",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/integration_intel_offline/ci_coverage_plan.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "030fb10fc06af5ec292715d77dbde46d3b5bfdfa",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/integration_intel_offline/claim_firewall.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "edcce2c14fe423175065f288ee85865941ae075b",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/integration_intel_offline/collision.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "4968296792ccf3dae6332640508837a0b4289a44",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/integration_intel_offline/dag.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "e80e801c0d80ca44a47788947e862a9f0cc7d4e6",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/integration_intel_offline/denylist.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "452f22e84d16008618356b69906b5ae02bdf4a24",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/integration_intel_offline/evidence_registry.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "ed94accade2d83db5ac27c35a819cf376dce48f1",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/integration_intel_offline/operator_report.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "472b2d823e96a22a9f5b6a40991a180edb08f7b2",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/integration_intel_offline/release_readiness.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "100a5223e8d07f7f1fa2d547db0193b425f39260",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/integration_intel_offline/schema.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "eaba473947ecd3e2423937da74091b5642669c30",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 214,
+      "source_base": "dbc191df72f4b4d1ebb7d490926dcad4325dac12",
+      "source_head": "0f0c4377db7682187dca78b2c556b00ae1a81bab",
+      "state": "open",
+      "merged": false,
+      "owner": "Tooling/Integration",
+      "disposition": "NOT_DUE_WITH_TRIGGER",
+      "residual_trigger": "Dev-repro/old-pinned-harness workflows require their own operator consumer and dependency manifest. Current native checkout and protected CI have working explicit entrypoints; no old-draft activation overlay is introduced.",
+      "paths": [
+        {
+          "path": ".github/workflows/dev-repro-offline.yml",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "d2f901c1c8f1ef4ca82d080b4f457bf8ae43f06a",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/dev_repro_offline/README.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "83b14ef1a599335c6f6d8dfc8cb577362a1b24c3",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "integration_tests/aql_shared_contract_inventory_001.json",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "9b20632760e586baf5d61ba5c82b81fd0b81d1d4",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "integration_tests/aql_shared_contract_inventory_001.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "aa4fdeac668077d89ac2708990a74162409d9091",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "integration_tests/option_b_v2_cross_pr_harness.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "fe8908394cc503600c318bbb5d71674e99f657a9",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "integration_tests/option_b_v2_evidence_bundle.json",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "6acd3c92892866c1261ef32281e0ecc024525ed7",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/__init__.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "76aaa9f549da5d3c1b4d4d5c664fec930b3e713b",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/cli.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "d5858eeb4e70d805bd0da5f334768167ff096cae",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/evidence.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "7acec7cc6648ac443874b535ae3e6b6eff4a2f22",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/fingerprint.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "b4d1f5800d3669cc78067cf394fce359a8f8e177",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/manifest.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "b5975761a1fad8819a0ba33a9b52a91cc7bb1ddc",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/portability.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "ca6adddd9d548afc6ff617e8b6ca2cb4cff89d93",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/preflight.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "38edd291125eafc096df624fce2698b065999240",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/runner.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "2120967dce546bc10ad2dc47bc5cd53b64c03fcc",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/tests/__init__.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/tests/test_adversarial.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "1fbecab532e2eae3e2f8574c9800d7460402c4c7",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/tests/test_audit_b_remediation.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "e0043fd989a051459ff8168f5a53892c9c37dc0e",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/tests/test_audit_c_remediation.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "a2126a34a7d4d1ddcb14e9127dc8e419322f8078",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/tests/test_cli.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "dbcc5e0f903c461bc174906ac2a990d741153671",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/tests/test_evidence.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "5b2a11ba175c013976b267981324d455d9489a6d",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/tests/test_fingerprint.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "591132db7229132197b0c9e875c40902fadaef0f",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/tests/test_g1_argv_regression.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "8d43b342efc1faac54794e6ec46ca3a87f01af94",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/tests/test_g5_escalated_gaps_regression.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "0cef90ac5ff2e926d8c7d30b696b0181dc14a7ba",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/tests/test_g7b_sha_wiring_regression.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "bb290b79727fb22dbf68cfb9bc786559cc55b0df",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/tests/test_manifest.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "bf733f39f894812b2a2c8efb5e4b14f110ae4a5a",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/tests/test_p0_regression.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "000b29bc02d3afc7e6a8a28d48c8f8de9bf74e60",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/tests/test_preflight.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "b89f0333ed1fbe42d20dcc420f059f27a5ececa6",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/tests/test_runner.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "31992481e425d4458be6e3a2b3a515b3f3914767",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/tests/test_triage.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "02bace18888b9c99cccc1fdd6ee50a63da00e2f5",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/tests/test_w1_coordinator.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "3baa6978418c08b2cbf54ca06ba2a5b07be33462",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/triage.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "8fc3dfe434008c0e2ef7df412355b02ea5185579",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/dev_repro_offline/w1_coordinator.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "d3b04a24bfc8fa589037a7b93888aa1ef63e7d2c",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 224,
+      "source_base": "dbc191df72f4b4d1ebb7d490926dcad4325dac12",
+      "source_head": "9832b23a6a0e8852801567990f6cbe17429fc42e",
+      "state": "open",
+      "merged": false,
+      "owner": "PM/owner",
+      "disposition": "NOT_DUE_WITH_TRIGGER",
+      "residual_trigger": "External implementer engagement/workflow proposal requires owner adoption and a corresponding collaboration consumer. It contains no due recovery implementation.",
+      "paths": [
+        {
+          "path": "docs/collaboration/AGY_LEAD_IMPLEMENTER_COLLABORATION_PROPOSAL.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "f0cb7f8cae3b53cc0fe01ba31fa09a5047e91d6b",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 275,
+      "source_base": "3af5b66d2b381b853a6b5be32c38b3d3d02e1ea7",
+      "source_head": "99c27ea2c1a4d41aaae361141301a8a9ea3b33c3",
+      "state": "open",
+      "merged": false,
+      "owner": "Core/Storage/owner",
+      "disposition": "PARTIAL_LANDED_AUTHORITY_BLOCKED",
+      "residual_trigger": "Five source path memberships already match main. Private original F1/F2/F5 diagnostics, NTFS custody and Windows RawVault producer require #269 original-source admission plus owner Windows/custody/authority approval. Windows in this package verifies/restores synthetic cold artifacts; no original host or NTFS production writer is activated.",
+      "paths": [
+        {
+          "path": ".github/workflows/aql-core-f-bulk-manifest.yml",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "be1baaaa90f177835cb4e95037770380df24ebdf",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": ".github/workflows/aql-core-h-portable-query.yml",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "9f490dc7f8d245589d60fafd954ac591e6abc47c",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/research/core-f-research-e2e-diagnostic-readonly-contract-20261107.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "09964eaef30fdef87b784ef0b7ab6926e660a90b",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/research/core-f2-recovery-readonly-contract-20261107.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "f0f43300a601b7a24000a620a165cd9950b572d5",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/research/core-f5-custody-secretary-integration-20261107.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "701225e252397b738da05d9bc24bcc6325fd33cc",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/research/core-package-f-bulk-source-handoff-v1.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "6026b785d7a06cce1e754e61cd3bd576057492a1",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/research/core-package-h-portable-query-secretary-v1.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "e42524a95d34831e38294dbaea54c68511bdac75",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "research_wp_r0/aql_core_backbone_local_v1.py",
+          "base_blob": {
+            "sha": "2ca31e4cff373c9950507ac85e4a8ea038a04f37",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "b3289e9e359c3612f58e9d4f618dce70e083cde7",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "b3289e9e359c3612f58e9d4f618dce70e083cde7",
+            "mode": "100644"
+          },
+          "baseline_disposition": "LANDED_EXACT",
+          "candidate_blob": "b3289e9e359c3612f58e9d4f618dce70e083cde7",
+          "candidate_resolution": "ALREADY_LANDED",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "research_wp_r0/aql_core_f5_secretary_authority_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "774adf9b621a53993fa226b2e2b8622f59951e13",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "research_wp_r0/aql_core_f_bulk_source_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "70dd955dcc2b0563271ff2349555634669e2964e",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "research_wp_r0/aql_core_f_ntfs_acl_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "bf6615dd943f4ed5d09c500bd1c8f55910b5051d",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "research_wp_r0/aql_core_f_private_f2_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "310dc75b2886633b7e9f4be9582971e3b3fc0575",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "research_wp_r0/aql_core_f_recovery_readonly_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "89df85d21bed920beec2f26035d0c2f7b3b7d702",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "research_wp_r0/aql_core_f_research_diagnostic_query_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "ee129da558867d195258fc6507fba93be2fd6066",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "research_wp_r0/aql_core_h_portable_query_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "6dedb867aaf2c6f8bcd69b0c983f0063fd07cafc",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "research_wp_r0/aql_core_h_research_secretary_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "861515529d4bb09543634f33b9993a765024de8a",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "861515529d4bb09543634f33b9993a765024de8a",
+            "mode": "100644"
+          },
+          "baseline_disposition": "LANDED_EXACT",
+          "candidate_blob": "861515529d4bb09543634f33b9993a765024de8a",
+          "candidate_resolution": "ALREADY_LANDED",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_aql_core_f5_secretary_authority_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "2c26bc5fe55be091acd83f771fd27804af434eac",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_aql_core_f5_windows_rawvault_release_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "eec2e5ed4fe2ac81cf3e3a746fc02d384451ad76",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_aql_core_f_bulk_source_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "363924097ccd4855932b83c88febd2971e3e3c4e",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_aql_core_f_ntfs_acl_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "4b5b46ceaf16b59f4bb1a271733f88a5c7132640",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_aql_core_f_private_f2_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "f1c97101e61faff47abe1c5c783e3c23048891ce",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_aql_core_f_recovery_readonly_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "225a72a8d90bf5661eb3a8f73f7e55297b6c4d46",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_aql_core_f_research_diagnostic_query_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "829ce77e5828d16cdf40c5861119d215b95199fa",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_aql_core_h_generic_research_secretary_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "21cee0e520a4a8ed7c02e5d8286bf080918b7c30",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_aql_core_h_portable_query_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "dfed80198748fd5cd2c08afefcb42c6ddc602ada",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tests/test_aql_core_h_research_secretary_v1.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "d8059e50eb60eee63bbd82916940dccb9ed941c3",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/atlas_f2_recovery_month_probe.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "d3351cf1bde2a793b3c1f5c1c6248968aad84c0f",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/raw_vault_offline/__init__.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "838f1ca49eb39f9f2ab846de3e0cf57321fb4e78",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "838f1ca49eb39f9f2ab846de3e0cf57321fb4e78",
+            "mode": "100644"
+          },
+          "baseline_disposition": "LANDED_EXACT",
+          "candidate_blob": "838f1ca49eb39f9f2ab846de3e0cf57321fb4e78",
+          "candidate_resolution": "ALREADY_LANDED",
+          "duplicate_path_memberships": [
+            211
+          ]
+        },
+        {
+          "path": "tools/raw_vault_offline/corrections.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "3e6beb10e9096e622905823b41c9be68c23f1ac1",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "3e6beb10e9096e622905823b41c9be68c23f1ac1",
+            "mode": "100644"
+          },
+          "baseline_disposition": "LANDED_EXACT",
+          "candidate_blob": "3e6beb10e9096e622905823b41c9be68c23f1ac1",
+          "candidate_resolution": "ALREADY_LANDED",
+          "duplicate_path_memberships": [
+            211
+          ]
+        },
+        {
+          "path": "tools/raw_vault_offline/schema.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "ee36d05f4678a61d2163ce3b2e0e6d612a24c01a",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "ee36d05f4678a61d2163ce3b2e0e6d612a24c01a",
+            "mode": "100644"
+          },
+          "baseline_disposition": "LANDED_EXACT",
+          "candidate_blob": "ee36d05f4678a61d2163ce3b2e0e6d612a24c01a",
+          "candidate_resolution": "ALREADY_LANDED",
+          "duplicate_path_memberships": [
+            211
+          ]
+        },
+        {
+          "path": "tools/raw_vault_offline/tests/_helpers.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "23ce71b366812815b1d722dd1a8956891f248e42",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": [
+            211
+          ]
+        },
+        {
+          "path": "tools/raw_vault_offline/vault.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "6b5bcc1d684088934f5ed7110064380b8d2bc0cd",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "41831683a425bab954f4d22c4a217f384c79307c",
+            "mode": "100644"
+          },
+          "baseline_disposition": "AUTHORITY_BLOCKED",
+          "candidate_blob": "41831683a425bab954f4d22c4a217f384c79307c",
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        }
+      ]
+    },
+    {
+      "pr": 307,
+      "source_base": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+      "source_head": "e275d6d42aa3775e5e39f362bff9a595f40cca22",
+      "state": "open",
+      "merged": false,
+      "owner": "PM/Architecture",
+      "disposition": "NOT_DUE_WITH_TRIGGER",
+      "residual_trigger": "Architecture proposal and anti-redo deployment tools require the separately approved PM execution/deployment consumer. Current package follows the existing charter and does not rewrite pre-G0 architecture or enable later stages.",
+      "paths": [
+        {
+          "path": ".github/anti-redo-policy.json",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "36d5b66d475313dfada979d6c837f307395ca6f7",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": ".github/workflows/anti-redo-gate.yml",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "d01ce0f0e1e7727bdd1397efb8b9de138092c377",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "04_STATE.md",
+          "base_blob": {
+            "sha": "3c78b74eba7fe33a881ee0a313c382c8272e60a1",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "350888e2dc92140374942681c623dc18f33f2950",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "3c78b74eba7fe33a881ee0a313c382c8272e60a1",
+            "mode": "100644"
+          },
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": "3c78b74eba7fe33a881ee0a313c382c8272e60a1",
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "05_WORK_LOG.md",
+          "base_blob": {
+            "sha": "ee4bce96a9dac0c58622bab70048cb266bb996a6",
+            "mode": "100644"
+          },
+          "head_blob": {
+            "sha": "a8df3f6242762d210b083451edb9b7d8fd8a5381",
+            "mode": "100644"
+          },
+          "landed_main_blob": {
+            "sha": "ee4bce96a9dac0c58622bab70048cb266bb996a6",
+            "mode": "100644"
+          },
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": "ee4bce96a9dac0c58622bab70048cb266bb996a6",
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/architecture-v1-acceptance.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "e23b55cf60d0f8e56bf45ecd325a5a80b63e9714",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/architecture-v1-contracts.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "8c68351a727d1b81908a8210687bbb687aca02b4",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/architecture-v1-intelligence.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "76977c30d5a844acf0039bf402b623f230ee71f6",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/architecture-v1.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "1999b6cfe57ba1e2ab1f932ebd35c474f2a820fd",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/pm/anti-redo/README.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "d2704c595f0fcd5e395a0b6ada5ab53573be666b",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/pm/anti-redo/capabilities.json",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "05053b3b5786cd9064760fab4144692dec65ee76",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/pm/anti-redo/coverage-manifest.json",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "fe4f4572f3c284362ef48cb6f77b4a5d713da821",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/pm/anti-redo/dry-runs.json",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "6028e8c84191fe3a540bdf005b6c6eb39de74e1a",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/pm/anti-redo/duplicate-dispositions.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "c71b49c6a3bae3733179c620db4866aae7151ec5",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/pm/anti-redo/evidence.json",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "cc10bb66dba306c8328325aec2209f373aafbcd4",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/pm/anti-redo/gate.md",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "94aa10f1c73bd937aa40da70e4f494076d1da5e7",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/pm/anti-redo/gate.schema.json",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "c2cc9af4652e3d79e64261d04e046c3ec1b2d81d",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "docs/pm/anti-redo/reviewed-blobs.json",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "c68e4886b05cc65529c0c1b53e0a76a9c34d3af3",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/pm/anti_redo_gate.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "f19b5d08822383f1d64e0d86ea37ddd53e1c14bb",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/pm/test_anti_redo_deploy.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "59f0a24f437b2c75253403dfb2af2dfa894d334c",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        },
+        {
+          "path": "tools/pm/test_anti_redo_gate.py",
+          "base_blob": null,
+          "head_blob": {
+            "sha": "b0126265ac668776781e3ae59dff8accf8c606bd",
+            "mode": "100644"
+          },
+          "landed_main_blob": null,
+          "baseline_disposition": "NOT_DUE_WITH_TRIGGER",
+          "candidate_blob": null,
+          "candidate_resolution": "DEFERRED_WITH_ROW_OWNER_TRIGGER",
+          "duplicate_path_memberships": []
+        }
+      ]
+    }
+  ],
+  "candidate_paths": [
+    "src/aql/observation/position_journal.py",
+    "src/aql/observation/positions.py",
+    "research_wp_r0/indicator_library.py",
+    "tests/test_g2_hardening_journal.py",
+    "tests/test_g2_journal_recovery_evidence.py",
+    "tests/test_g2_operator_journal_recovery.py",
+    "tests/test_sf_ind_01_nan_guard.py",
+    "tests/test_p2b_regression.py",
+    "research_wp_r0/test_g4_nonnumeric_regression.py",
+    "research_wp_r0/aql_queue3_recovery_v1.py",
+    "tools/atlas_queue3_recovery.py",
+    "tests/test_atlas_queue3_recovery.py",
+    ".github/workflows/atlas-queue3-recovery.yml"
+  ],
+  "cross_stage": {
+    "track_a_316": {
+      "head": "b73a028f01d2d97025ce264de62750c216f07bf2",
+      "merged": true,
+      "scope": "Portable prospective read/replay; no full supersession of #119 retained event-ingress API."
+    },
+    "historical_269": {
+      "head": "3af5b66d2b381b853a6b5be32c38b3d3d02e1ea7",
+      "merged": false,
+      "scope": "Original-source preflight is separate and held; no #269→#275 admission inferred."
+    },
+    "queue1_323": "Merged, prior accepted native WAIT preserved",
+    "queue2_324": "Merged, prior accepted descriptive/store/cost contracts preserved",
+    "windows_host": "Separate owner workstream, no access or mutation",
+    "encrypted_backup": "No key creation or encrypted job/scheduler activation; key/custody authority remains external."
+  },
+  "snapshot_contract": {
+    "source": "Generated synthetic Queue 2 results plus one canceled WATCH aggregate with zero exposure",
+    "primitives": "Existing SQLite backup API and offline_custody_kit create/verify/restore; no encryption",
+    "evidence": "Current-revision synthetic test only; separately supplied public manifest hash required; no independent custody attestation"
+  },
+  "rollback_manifest": {
+    "base_main": "9d6b914f999774853963ff7070b87424dfa6f35d",
+    "method": "Reviewed revert of the single integration commit after separately authorized release",
+    "modified_baseline_paths": [
+      {
+        "path": "src/aql/observation/position_journal.py",
+        "base_blob": {
+          "sha": "e83dd672d43f40c1c9b5c209a8bbd4af7ee4d46c",
+          "mode": "100644"
+        }
+      },
+      {
+        "path": "src/aql/observation/positions.py",
+        "base_blob": {
+          "sha": "8e522e51b77aa29fd5a0dd668cdeb3faa99e4416",
+          "mode": "100644"
+        }
+      },
+      {
+        "path": "research_wp_r0/indicator_library.py",
+        "base_blob": {
+          "sha": "24d70bcaea70d0fadb13084dd7fca08bb95688df",
+          "mode": "100644"
+        }
+      }
+    ],
+    "added_paths": [
+      "tests/test_g2_hardening_journal.py",
+      "tests/test_g2_journal_recovery_evidence.py",
+      "tests/test_g2_operator_journal_recovery.py",
+      "tests/test_sf_ind_01_nan_guard.py",
+      "tests/test_p2b_regression.py",
+      "research_wp_r0/test_g4_nonnumeric_regression.py",
+      "research_wp_r0/aql_queue3_recovery_v1.py",
+      "tools/atlas_queue3_recovery.py",
+      "tests/test_atlas_queue3_recovery.py",
+      ".github/workflows/atlas-queue3-recovery.yml",
+      "docs/research/queue3-source-delta-ledger.json"
+    ],
+    "state_policy": "No production migration or host deployment. Preserve original source/partial/corrupt evidence and snapshot outputs; no automatic cleanup."
+  },
+  "context_limitations": "Only GitHub records and retrieved repository source were inspected. No inaccessible private Work chats, original market source, owner-local files, production keys or Windows host were accessed.",
+  "release_state": "AUDIT_AND_NATIVE_REVIEW_REQUIRED_NO_MERGE_OR_SOURCE_CLOSURE_AUTHORITY"
+}
