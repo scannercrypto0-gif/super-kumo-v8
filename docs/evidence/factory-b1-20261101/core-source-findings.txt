@@ -1,0 +1,9 @@
+origin/pr216:examples/aql_f1_b1_emit_controlled_sample.py:1:"""Reproducible B1 CONTROLLED_ONLY signal-to-Factory research sample.
+origin/pr216:examples/aql_f1_b1_emit_controlled_sample.py:68:               not x["directional_outcomes_allowed"] for x in core["signal_rows"])
+origin/pr216:examples/aql_f1_b1_emit_controlled_sample.py:98:    print("CONTROLLED_ONLY SAMPLE SHA256=" + hashlib.sha256(raw).hexdigest())
+origin/pr216:research_wp_r0/aql_f1_prospective_host_v1.py:169:def capture_then_call_f3(
+origin/pr216:research_wp_r0/aql_f1_research_signal_handoff_v1.py:192:                "directional_outcomes_allowed": False,
+origin/pr216:research_wp_r0/aql_p0_c2_producer.py:11:  - RETROSPECTIVE_NON_PIT availability mode throughout
+origin/pr216:research_wp_r0/aql_p0_c2_producer.py:93:    availability_mode: str        # always "RETROSPECTIVE_NON_PIT"
+origin/pr216:research_wp_r0/aql_p0_c2_producer.py:697:            "availability_mode": "RETROSPECTIVE_NON_PIT",
+origin/pr216:research_wp_r0/aql_p0_c2_producer.py:759:            availability_mode="RETROSPECTIVE_NON_PIT",

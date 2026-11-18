@@ -1,0 +1,20 @@
+name: AQL W1 Core isolated contract tests
+on:
+  push:
+    branches:
+      - aql/w1-core-retrospective-outcomes-20261031
+  workflow_dispatch:
+jobs:
+  w1-core-contract:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile W1 research module and tests
+        run: python -m py_compile research_wp_r0/aql_w1_opportunity_outcomes.py tests/test_aql_w1_opportunity_outcomes.py
+      - name: Run focused W1 tests
+        run: PYTHONPATH=. python -m unittest discover -s tests -p test_aql_w1_opportunity_outcomes.py -v

@@ -1,0 +1,27 @@
+name: P0 Core C1-C2 focused verification
+on:
+  push:
+    branches:
+      - p0/aql-p0-historical-decision-v1
+    paths:
+      - "research_wp_r0/aql_p0_c1_source.py"
+      - "research_wp_r0/aql_p0_c1_custody.py"
+      - "research_wp_r0/aql_p0_c2_producer.py"
+      - "tests/test_p0_c1_c2_source_interface.py"
+      - "tests/test_p0_blockers_adversarial.py"
+      - ".github/workflows/aql-p0-core-focused.yml"
+  workflow_dispatch:
+jobs:
+  core-seam:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pytest
+      - name: Core source-to-ACK seam only
+        run: |
+          python -m pytest -q tests/test_p0_c1_c2_source_interface.py -k "not source_bytes_sha_blocked_marker"
+          python -m pytest -q tests/test_p0_blockers_adversarial.py -k "TestC1AdmitSourceBlocker or TestC2DurableJournal or TestC1DefenseInDepthGap1 or TestC2TailRecoveryGap2"
