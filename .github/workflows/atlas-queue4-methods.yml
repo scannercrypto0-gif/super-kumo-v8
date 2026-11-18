@@ -1,0 +1,54 @@
+name: ATLAS Queue 4 synthetic methods
+on:
+  pull_request:
+    paths:
+      - research_wp_r0/aql_queue4_methods_v1.py
+      - research_wp_r0/statistics.py
+      - research_wp_r0/evaluation.py
+      - research_wp_r0/opportunity_clusters.py
+      - research_wp_r0/temporal_contract.py
+      - research_wp_r0/trial_holdout.py
+      - research_wp_r0/durable_journal.py
+      - research_wp_r0/owner_checkpoints.py
+      - tools/atlas_queue4_methods.py
+      - tests/test_research_wp_r*.py
+      - .github/workflows/atlas-queue4-methods.yml
+permissions:
+  contents: read
+jobs:
+  native-methods:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -B -m unittest discover -s tests -p 'test_research_wp_r*.py' -v
+      - run: python -B tools/atlas_queue4_methods.py queue4-evidence
+      - uses: actions/upload-artifact@v4
+        with:
+          name: queue4-synthetic-methods
+          path: queue4-evidence
+          if-no-files-found: error
+  native-windows-readback:
+    needs: native-methods
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: queue4-synthetic-methods
+          path: queue4-evidence
+      - run: python -B -m unittest discover -s tests -p 'test_research_wp_r*.py' -v
+      - run: python -B tools/atlas_queue4_methods.py --readback queue4-evidence
