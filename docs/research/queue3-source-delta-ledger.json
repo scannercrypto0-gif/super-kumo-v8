@@ -1325,8 +1325,10 @@
           "landed_main_blob": null,
           "baseline_disposition": "DUE_GAP",
           "candidate_blob": "2d241ca7b2c09fa6f2b94b1c43ebe9c7a8343d93",
-          "candidate_resolution": "IMPLEMENTED_EXACT_SOURCE_REUSE",
-          "duplicate_path_memberships": []
+          "candidate_resolution": "IMPLEMENTED_EXACT_SOURCE_REUSE_RELOCATED_TEST",
+          "duplicate_path_memberships": [],
+          "candidate_path": "tests/test_g4_nonnumeric_regression.py",
+          "note": "Unchanged test bytes relocated under tests/ so the existing frozen Factory-admission discovery and 61-test gate remain intact. Executed explicitly by Queue 3 focused CI."
         },
         {
           "path": "tests/test_p2a_regression.py",
@@ -3358,7 +3360,7 @@
     "tests/test_g2_operator_journal_recovery.py",
     "tests/test_sf_ind_01_nan_guard.py",
     "tests/test_p2b_regression.py",
-    "research_wp_r0/test_g4_nonnumeric_regression.py",
+    "tests/test_g4_nonnumeric_regression.py",
     "research_wp_r0/aql_queue3_recovery_v1.py",
     "tools/atlas_queue3_recovery.py",
     "tests/test_atlas_queue3_recovery.py",
@@ -3417,7 +3419,7 @@
       "tests/test_g2_operator_journal_recovery.py",
       "tests/test_sf_ind_01_nan_guard.py",
       "tests/test_p2b_regression.py",
-      "research_wp_r0/test_g4_nonnumeric_regression.py",
+      "tests/test_g4_nonnumeric_regression.py",
       "research_wp_r0/aql_queue3_recovery_v1.py",
       "tools/atlas_queue3_recovery.py",
       "tests/test_atlas_queue3_recovery.py",
