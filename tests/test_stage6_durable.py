@@ -88,8 +88,24 @@ def test_manifest_reseal_cannot_change_ack(retained):
 
 def test_independent_process_reopens_original_stores(retained):
     entry = Path(__file__).resolve().parents[1] / "tools/atlas_stage6_durable.py"
-    child = subprocess.run([sys.executable, "-B", str(entry), "readback", str(retained)],
+    pin = json.loads((retained / "manifest.json").read_text())["sha256"]
+    child = subprocess.run([sys.executable, "-B", str(entry), "readback", str(retained),
+                            "--manifest-sha256", pin],
                            check=True, capture_output=True, text=True)
     result = json.loads(child.stdout)
     assert result == replay(retained)
     assert result["source_count"] == 2 and result["secretary"] == "WAIT"
+
+
+def test_external_pin_and_resealed_path_traversal_rejected(retained):
+    with pytest.raises(ValueError, match="EXTERNAL_MANIFEST_PIN"):
+        replay(retained, expected_manifest_sha256="0"*64)
+    path = retained / "manifest.json"
+    doc = json.loads(path.read_text())
+    row = doc["records"][0]
+    row["slot"] = "../foreign"
+    row["sha256"] = digest({k:v for k,v in row.items() if k!="sha256"})
+    doc["sha256"] = digest({k:v for k,v in doc.items() if k!="sha256"})
+    path.write_text(json.dumps(doc))
+    with pytest.raises(ValueError, match="RETAINED_SLOT_PATH"):
+        replay(retained)

@@ -114,6 +114,7 @@ def record(root, raw, received_ms, monotonic_ns):
 def readonly(cls, path):
     # Read-only handles use the existing native reader methods, without running
     # constructors/migrations or allowing the reader to create SQLite files.
+    need(path.is_file() and not path.is_symlink(), "COLD_SOURCE_PATH")
     obj = cls.__new__(cls)
     obj.db_path = str(path)
     def connect():
@@ -124,7 +125,7 @@ def readonly(cls, path):
     return obj
 
 
-def replay(root):
+def replay(root, *, expected_manifest_sha256=None):
     plan = load(root / "plan.json")
     need(plan["endpoint"] == ENDPOINT and plan["authority"] == AUTHORITY
          and plan["target_count"] == 2 and plan["byte_cap"] == CAP
@@ -133,6 +134,8 @@ def replay(root):
     manifest = load(root / "manifest.json")
     need(manifest["sha256"] == digest({k: v for k, v in manifest.items() if k != "sha256"})
          and manifest["plan_sha256"] == digest(plan), "MANIFEST_PIN")
+    if expected_manifest_sha256 is not None:
+        need(manifest["sha256"] == expected_manifest_sha256, "EXTERNAL_MANIFEST_PIN")
     journal = readonly(DurableJournal, root / "journal.sqlite")
     store = readonly(OperationalStore, root / "market.sqlite")
     bars = journal.replay("BTCUSDT", "15m", limit=3)
@@ -140,7 +143,12 @@ def replay(root):
     opens = []
     for row, retained in zip(manifest["records"], bars):
         need(row["sha256"] == digest({k: v for k, v in row.items() if k != "sha256"}), "RECORD_SEAL")
-        raw = (root / f'{row["slot"]}.frame').read_bytes()
+        need(type(row["slot"]) is int and row["slot"] >= 0 and row["slot"] % STEP == 0,
+             "RETAINED_SLOT_PATH")
+        raw_path = root / f'{row["slot"]}.frame'
+        need(raw_path.is_file() and not raw_path.is_symlink()
+             and raw_path.stat().st_size <= 4096, "RETAINED_FRAME_PATH_OR_BOUND")
+        raw = raw_path.read_bytes()
         need(sha(raw) == row["raw_sha256"], "RETAINED_FRAME_DIGEST")
         _, parsed = parse_frame(raw, row["received_ms"])
         need(parsed.compute_checksum() == row["source_checksum"] == retained.compute_checksum(),
@@ -248,6 +256,11 @@ if __name__ == "__main__":
     parser.add_argument("directory", type=Path)
     parser.add_argument("--authority")
     parser.add_argument("--qualification", type=Path)
+    parser.add_argument("--manifest-sha256")
     args = parser.parse_args()
-    result = acquire(args.directory, authority_pin=args.authority, qualification_file=args.qualification) if args.mode == "capture" else replay(args.directory)
+    if args.mode == "capture":
+        result = acquire(args.directory, authority_pin=args.authority, qualification_file=args.qualification)
+    else:
+        need(args.manifest_sha256 is not None, "EXTERNAL_MANIFEST_PIN_REQUIRED")
+        result = replay(args.directory, expected_manifest_sha256=args.manifest_sha256)
     print(json.dumps(result, sort_keys=True))
