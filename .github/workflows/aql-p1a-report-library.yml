@@ -1,0 +1,57 @@
+name: aql-p1a-report-library
+
+# Focused CI for the P1-A pure consumer/renderer library.
+# Runs the 19 negative-case unit tests only.
+# No access to private Work artifacts; TEST_ONLY synthetic fixtures.
+
+on:
+  push:
+    branches:
+      - "aql/p1a-report-library-*"
+    paths:
+      - "research_wp_r0/aql_p1a_report_library.py"
+      - "tests/test_aql_p1a_report_library.py"
+      - ".github/workflows/aql-p1a-report-library.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "research_wp_r0/aql_p1a_report_library.py"
+      - "tests/test_aql_p1a_report_library.py"
+      - ".github/workflows/aql-p1a-report-library.yml"
+
+jobs:
+  test:
+    name: "P1-A report library — unit tests (Python ${{ matrix.python-version }})"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install pytest
+        run: pip install pytest --quiet
+
+      - name: Run P1-A report library unit tests
+        run: |
+          python -m pytest tests/test_aql_p1a_report_library.py -v \
+            --tb=short \
+            -p no:cacheprovider
+        env:
+          PYTHONPATH: "."
+
+      - name: Verify test count (must be exactly 19)
+        run: |
+          COUNT=$(python -m pytest tests/test_aql_p1a_report_library.py \
+            --collect-only -q 2>&1 | grep -E "^[0-9]+ test" | grep -o "^[0-9]*" | head -1)
+          echo "Collected $COUNT tests"
+          [ "$COUNT" = "56" ] || (echo "EXPECTED 56 tests, got $COUNT"; exit 1)
+        env:
+          PYTHONPATH: "."
