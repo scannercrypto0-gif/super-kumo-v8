@@ -4,6 +4,8 @@ on:
     paths:
       - 'tools/atlas_live_research_service_windows.ps1'
       - '.github/workflows/sustained-ws-reset-recovery.yml'
+      - 'tools/atlas_live_research_cycle.py'
+      - 'tools/test_atlas_pong_liveness.py'
 permissions:
   contents: read
 jobs:
@@ -72,3 +74,17 @@ jobs:
           & pwsh -NoProfile -File $script -Config $cfg -ConfigSha256 $pin
           if ($LASTEXITCODE -ne 1 -or (Get-Content $hold -Raw | ConvertFrom-Json).reason -cne 'LIVE_SERVICE_RESET_RECOVERY_ALREADY_CLAIMED') {throw 'CRASHED_CLAIM_DID_NOT_HOLD'}
           exit 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test stale PONG recovery with the original quota implementation
+        shell: pwsh
+        run: |
+          git fetch --no-tags origin refs/pull/305/head
+          if ($LASTEXITCODE) {throw 'PIN_FETCH_FAILED'}
+          $quota = Join-Path $env:RUNNER_TEMP 'pinned-pong-quota.py'
+          $content = git show 0a45cb6de6027b6fba54320e07b0faf3317a5382:tools/binance_live_feed/quota.py
+          if ($LASTEXITCODE) {throw 'PINNED_QUOTA_MISSING'}
+          $content | Set-Content -LiteralPath $quota -Encoding utf8
+          python -B tools/test_atlas_pong_liveness.py tools/atlas_live_research_cycle.py $quota
+          if ($LASTEXITCODE) {throw 'PONG_REGRESSION_FAILED'}
