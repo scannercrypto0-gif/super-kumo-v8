@@ -7,6 +7,7 @@ on:
       - 'tools/atlas_live_research_cycle.py'
       - 'tools/test_atlas_pong_liveness.py'
       - 'tools/atlas_pong_repair_windows.ps1'
+      - 'tools/atlas_mixed_recovery_windows.ps1'
 permissions:
   contents: read
 jobs:
@@ -104,4 +105,11 @@ jobs:
           $tokens=$null
           $errors=$null
           $null=[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'tools/atlas_pong_repair_windows.ps1'),[ref]$tokens,[ref]$errors)
+          if($errors.Count){throw ($errors | Out-String)}
+      - name: Validate mixed recovery installer
+        shell: pwsh
+        run: |
+          $tokens=$null
+          $errors=$null
+          $null=[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'tools/atlas_mixed_recovery_windows.ps1'),[ref]$tokens,[ref]$errors)
           if($errors.Count){throw ($errors | Out-String)}
