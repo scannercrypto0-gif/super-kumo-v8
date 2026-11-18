@@ -1,0 +1,21 @@
+{
+  "evidence_grade": "OWNER_REPORTED_LOCAL",
+  "readback_at": "2026-11-18T09:23:15.6091082Z",
+  "task": "Running",
+  "hold": false,
+  "recovery_pending": false,
+  "recovery_claimed": false,
+  "finalized_receipt_at": "2026-11-18T12:15:00.155+03:00",
+  "finalized_receipt_sha256": "089e0a0ac833e608c6caa27203c948b781be8c76393fa1ae24bc611088a88fc7",
+  "prior_segment": {
+    "id": 1794982500000,
+    "started_at": "2026-11-18T06:21:57.851Z",
+    "completed_at": "2026-11-18T08:15:00.904Z"
+  },
+  "next_segment": {
+    "id": 1794989700000,
+    "started_at": "2026-11-18T08:15:58.294Z"
+  },
+  "reference": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/320#issuecomment-6974424111",
+  "original_receipt_bytes_available": false
+}
