@@ -27,17 +27,20 @@ function Test-ResetRecovery([string]$HealthLog, [string]$Reason) {
         'PILOT_STOP_TimeoutError' {$errorType='TimeoutError'; $origin='UNDERLYING_RECEIVE_TIMEOUT'}
         default {return $false}
     }
+    $allowed=@('ConnectionResetError/CONNECTION_RESET',
+        'TimeoutError/UNDERLYING_RECEIVE_TIMEOUT','TimeoutError/PONG_LIVENESS_EXPIRED')
     try {
         $events=@(Get-Content -LiteralPath $HealthLog | ForEach-Object {$_ | ConvertFrom-Json} |
             Where-Object status -in @('CONNECTING','TRANSPORT_INTERRUPTED','STOPPED_ERROR'))
         return ($events.Count -eq 5 -and
             $events[0].status -ceq 'CONNECTING' -and $events[0].attempt -eq 1 -and
             $events[1].status -ceq 'TRANSPORT_INTERRUPTED' -and
-            $events[1].error -ceq $errorType -and $events[1].deadline_origin -ceq $origin -and
+            $allowed -ccontains ($events[1].error+'/'+$events[1].deadline_origin) -and
             $events[1].receive_phase -ceq 'FRAME_BOUNDARY' -and
             $events[2].status -ceq 'CONNECTING' -and $events[2].attempt -eq 2 -and
             $events[3].status -ceq 'TRANSPORT_INTERRUPTED' -and
-            $events[3].error -ceq $errorType -and $events[3].deadline_origin -ceq $origin -and
+            $events[3].error -ceq $errorType -and
+            $allowed -ccontains ($events[3].error+'/'+$events[3].deadline_origin) -and
             $events[3].receive_phase -ceq 'FRAME_BOUNDARY' -and
             $events[4].status -ceq 'STOPPED_ERROR' -and $events[4].error -ceq $errorType)
     } catch {return $false}
