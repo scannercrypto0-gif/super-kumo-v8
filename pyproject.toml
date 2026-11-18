@@ -15,6 +15,8 @@ dependencies = [
 dev = [
     "pytest>=7.4",
     "pytest-timeout>=2.1",
+    "ruff>=0.9,<1",
+    "hypothesis>=6,<7",
 ]
 
 [tool.setuptools.packages.find]

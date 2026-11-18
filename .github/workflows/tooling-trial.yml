@@ -1,0 +1,41 @@
+name: Tooling trial (Ruff + Hypothesis)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "ruff.toml"
+      - "pyproject.toml"
+      - "tests/test_tooling_properties.py"
+      - "scripts/tooling_ruff_baseline.py"
+      - "scripts/tooling_pit_mutation_probe.py"
+      - ".github/workflows/tooling-trial.yml"
+
+jobs:
+  tooling-trial:
+    name: Tooling trial / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install trial tools
+        run: python -m pip install "ruff>=0.9,<1" "hypothesis>=6,<7" "pytest>=7.4"
+      - name: Ruff trial (no automatic fixes)
+        continue-on-error: true # Legacy lint baseline must not skip property tests.
+        run: python -m ruff check --config ruff.toml src tests
+      - name: Ruff same-config baseline comparison (advisory)
+        run: python scripts/tooling_ruff_baseline.py
+      - name: Hypothesis real archive contracts (trial)
+        env:
+          PYTHONPATH: src
+        run: python -m pytest tests/test_tooling_properties.py -q
+      - name: PIT mutation detection (isolated temp source)
+        run: python scripts/tooling_pit_mutation_probe.py
