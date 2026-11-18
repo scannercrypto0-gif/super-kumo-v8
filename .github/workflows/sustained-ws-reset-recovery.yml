@@ -6,6 +6,7 @@ on:
       - '.github/workflows/sustained-ws-reset-recovery.yml'
       - 'tools/atlas_live_research_cycle.py'
       - 'tools/test_atlas_pong_liveness.py'
+      - 'tools/atlas_pong_repair_windows.ps1'
 permissions:
   contents: read
 jobs:
@@ -88,3 +89,10 @@ jobs:
           $content | Set-Content -LiteralPath $quota -Encoding utf8
           python -B tools/test_atlas_pong_liveness.py tools/atlas_live_research_cycle.py $quota
           if ($LASTEXITCODE) {throw 'PONG_REGRESSION_FAILED'}
+      - name: Validate deployment script syntax
+        shell: pwsh
+        run: |
+          $tokens=$null
+          $errors=$null
+          $null=[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'tools/atlas_pong_repair_windows.ps1'),[ref]$tokens,[ref]$errors)
+          if($errors.Count){throw ($errors | Out-String)}
