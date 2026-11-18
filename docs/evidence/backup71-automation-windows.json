@@ -1,0 +1,56 @@
+{
+  "limits": [
+    "Local unsigned observations; no trusted UTC attestation",
+    "F volume observed ATLAS_BACKUP serial38B211B9 OS fixed-drive type; no independent physical custody attestation",
+    "Old backups and protected-custody ACL unchanged",
+    "Google Drive and Telegram delivery NOT VERIFIED",
+    "No production recovery keys generated"
+  ],
+  "source_hashes": {
+    "scripts/backup71-task.ps1": "1c253c5a672ed5cda945a87fb338403fc0b394c081027cab33115446d439f3bf",
+    "scripts/register-backup71-task.ps1": "f382f66f09064c68b9cb2539856bd30becd3ab3c61bbc71dc12d07bbaf40c478",
+    "scripts/backup71_acceptance.py": "00409cc790b5064775ce6ae2cbcb2da8eaece40bdf3ff35804345e9ced14fe75",
+    "src/aql/archive/encrypted.py": "bebbf5c40ddc19e4bae0f79ea213323851f740422d7fcbce55286ad6f24c54e7",
+    "src/aql/archive/automation.py": "4df289c4b102135166f4dcbc2b7fd368764e2b8ad154073ab09b84d18a8d618b"
+  },
+  "acceptance": {
+    "backup_id": "20261025T104801Z-8cde1fbdb9364bf58b9a743b480f05e5",
+    "cipher_sha256": "7ca70bdc36aea100f3272984655dbc267a6c91bcb21cd57cd8029bb167f46959",
+    "file_count": 2,
+    "health": {
+      "independent_custody_verified": false,
+      "issues": [],
+      "last_success_id": "20261025T104801Z-8cde1fbdb9364bf58b9a743b480f05e5",
+      "status": "LOCAL_BACKUP_OK_NOT_CUSTODY_ACCEPTANCE",
+      "telegram": "NOT_VERIFIED"
+    },
+    "independent_custody_verified": false,
+    "production_schedule": "NOT_ACTIVE",
+    "repeat": "ALREADY_VERIFIED_TODAY",
+    "restore": "ENCRYPTED_RESTORE_VERIFIED",
+    "source_bytes": 114829,
+    "source_commitment": "fe3e151e816a20968f5591cb9feceb201565713115affde7cafcd719389f29c9",
+    "status": "SYNTHETIC_ENCRYPTED_WINDOWS_ACCEPTANCE_PASS"
+  },
+  "scheduler": {
+    "task_name": "ATLAS Backup71 Acceptance 1792925276081",
+    "multiple_instances": "IgnoreNew",
+    "state": "Disabled",
+    "run_level": "Limited",
+    "last_task_result": 0,
+    "production_schedule_active": false,
+    "logon_type": "Interactive",
+    "final_wrapper_rerun_last_task_result": 0
+  },
+  "cryptography": "50.0.2",
+  "observed_at_utc": "2026-10-25T10:49:27.3937619Z",
+  "fixture": "SYNTHETIC_ONLY_NEW_DISPOSABLE_PATHS",
+  "python": "3.14.3",
+  "schema": "atlas-backup71-windows-evidence-1",
+  "local_tests": {
+    "passed": 29,
+    "failed": 0,
+    "skipped": 0,
+    "duration_s": 9.63
+  }
+}
