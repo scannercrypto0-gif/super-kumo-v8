@@ -74,6 +74,7 @@ def _run_gap_recovery(
     inserted = 0
     skipped_dup = 0
     errors = 0
+    ack_pending = 0
 
     for bar in recovered_bars:
         if stop_event is not None and stop_event.is_set():
@@ -122,9 +123,11 @@ def _run_gap_recovery(
             continue
         except Exception as exc:
             logger.warning(
-                "mark_persisted failed for %s (non-fatal): %s",
+                "mark_persisted failed for %s (ACK pending; retry on restart): %s",
                 bar.stable_key(), exc,
             )
+            errors += 1
+            ack_pending += 1
 
         if upserted:
             inserted += 1
@@ -136,7 +139,27 @@ def _run_gap_recovery(
         "recovery_inserted": inserted,
         "recovery_skipped_dup": skipped_dup,
         "recovery_errors": errors,
+        "recovery_ack_pending": ack_pending,
     }
+
+
+
+def _recover_bounded_slices(journal, store, symbol, interval, start_ms, end_ms, stop_event=None, *, max_slices=3):
+    """Bounded continuation; unfinished tail remains visible for next restart."""
+    results = []
+    for _ in range(max_slices):
+        if stop_event is not None and stop_event.is_set():
+            break
+        result = _run_gap_recovery(journal, store, symbol, interval,
+                                   start_ms, end_ms, stop_event)
+        results.append(result)
+        report = result["gap_report"]
+        next_start = getattr(report, "remaining_start_ms", None)
+        if (next_start is None or next_start <= start_ms
+                or result["recovery_errors"] or report.http_error):
+            break
+        start_ms = next_start
+    return results
 
 
 def run_pipeline(
@@ -145,6 +168,7 @@ def run_pipeline(
     duration_s: float = 600,
     data_dir: str = "./data",
     now_ms_fn=None,
+    after_persisted=None,
 ) -> dict:
     """
     Run the full G1-WP01 MVP pipeline.
@@ -152,6 +176,9 @@ def run_pipeline(
 
     Parameters
     ----------
+    after_persisted : callable, optional
+        Opt-in post-ACK observer for committed journal/store bars. Observer
+        failure is isolated and never constitutes provider/PIT evidence.
     now_ms_fn : callable, optional
         ``() -> int`` returning the current epoch-millisecond timestamp.
         Passed through to ``take_snapshot``; defaults to wall clock when
@@ -171,7 +198,8 @@ def run_pipeline(
     startup_max_entry_id = journal.startup_entry_boundary()
     recovery_lane = BackgroundLane()
     startup_ready = threading.Event()
-    consumer = JournalConsumer(journal, store, symbol, interval, ready=startup_ready)
+    consumer = JournalConsumer(journal, store, symbol, interval, ready=startup_ready,
+                               after_persisted=after_persisted)
 
     logger.info(
         "Pipeline start: symbol=%s interval=%s duration=%.0fs",
@@ -222,8 +250,8 @@ def run_pipeline(
             for gap_start, gap_end in startup_gaps:
                 def recover(stop, start=gap_start, end=gap_end):
                     if not stop.is_set():
-                        gr = _run_gap_recovery(journal, store, symbol, interval, start, end, stop)
-                        startup_recovery_results.append(gr)
+                        startup_recovery_results.extend(_recover_bounded_slices(
+                            journal, store, symbol, interval, start, end, stop))
                 recovery_lane.submit(recover)
         except Exception as exc:
             startup_reconcile_error = str(exc)
@@ -258,7 +286,7 @@ def run_pipeline(
         def recover_ws(stop):
             nonlocal ws_recovery_result
             if not stop.is_set():
-                ws_recovery_result = _run_gap_recovery(
+                ws_recovery_result = _recover_bounded_slices(
                     journal, store, symbol, interval,
                     collector.gap_start_ms, collector.gap_end_ms, stop)
         recovery_lane.submit(recover_ws)
@@ -268,7 +296,7 @@ def run_pipeline(
     if (recovery_lane_status['pending'] or recovery_lane_status['rejected']
             or recovery_lane_status['errors'] or consumer_status['worker_alive']
             or any(r['recovery_errors'] for r in startup_recovery_results)
-            or (ws_recovery_result and ws_recovery_result['recovery_errors'])):
+            or (ws_recovery_result and any(r["recovery_errors"] for r in ws_recovery_result))):
         startup_reconcile_error = startup_reconcile_error or "Background work pending/failed; retry from durable journal on restart"
 
     # --- Final counts ---
@@ -282,7 +310,7 @@ def run_pipeline(
     # Fix-3: pass startup_reconcile_error so it surfaces as UNHEALTHY.
     _all_recovery_reports = [r["gap_report"] for r in startup_recovery_results]
     if ws_recovery_result is not None:
-        _all_recovery_reports.append(ws_recovery_result["gap_report"])
+        _all_recovery_reports.extend(r["gap_report"] for r in ws_recovery_result)
     if getattr(collector, "clock_uncertain", False) or getattr(collector, "health_state", "") == "CLOCK_UNCERTAIN":
         startup_reconcile_error = startup_reconcile_error or "Source/local clock divergence; temporal eligibility denied"
     if metrics.error_count:
@@ -314,6 +342,9 @@ def run_pipeline(
             "inserted": recovery_result["recovery_inserted"],
             "skipped_dup": recovery_result["recovery_skipped_dup"],
             "errors": recovery_result["recovery_errors"],
+            "ack_pending": recovery_result.get("recovery_ack_pending", 0),
+            "remaining_start_ms": getattr(gr, "remaining_start_ms", None),
+            "remaining_end_ms": getattr(gr, "remaining_end_ms", None),
         }
 
     result = {
@@ -351,7 +382,10 @@ def run_pipeline(
             # Machine-readable: any non-zero value here means unresolved backlog
             "unresolved_backlog": startup_replay_errors > 0 or startup_reconcile_error is not None,
         },
-        "ws_gap_recovery": _report_from(ws_recovery_result),
+        "ws_gap_recovery": (_report_from(ws_recovery_result[0])
+                            if ws_recovery_result else None),
+        "ws_gap_recovery_slices": ([_report_from(r) for r in ws_recovery_result]
+                                   if ws_recovery_result is not None else []),
         "supabase_status": OperationalStore.SUPABASE_STATUS,
         "background_recovery": recovery_lane_status,
         "background_persistence": consumer_status,
