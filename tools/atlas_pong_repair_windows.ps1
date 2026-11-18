@@ -19,8 +19,14 @@ $cycle=Join-Path $cfg.tree 'tools/atlas_live_research_cycle.py'
 $source=Join-Path $PSScriptRoot 'atlas_live_research_cycle.py'
 if((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ine $expectedNew){throw 'NEW_CYCLE_HASH_MISMATCH'}
 $entry=@($cfg.files | Where-Object {[IO.Path]::GetFullPath($_.path) -ieq [IO.Path]::GetFullPath($cycle)})
-if($entry.Count -ne 1 -or $entry[0].sha256 -ine $expectedOld -or
-   (Get-FileHash -LiteralPath $cycle -Algorithm SHA256).Hash -ine $expectedOld){throw 'CURRENT_CYCLE_PIN_MISMATCH'}
+$actualOld=(Get-FileHash -LiteralPath $cycle -Algorithm SHA256).Hash.ToLowerInvariant()
+$normalized=[IO.File]::ReadAllText($cycle).Replace("`r`n","`n")
+$hasher=[Security.Cryptography.SHA256]::Create()
+try {
+    $normalizedOld=([BitConverter]::ToString($hasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($normalized)))).Replace('-','').ToLowerInvariant()
+} finally {$hasher.Dispose()}
+if($entry.Count -ne 1 -or $entry[0].sha256 -ine $actualOld -or
+   $normalizedOld -cne $expectedOld){throw 'CURRENT_CYCLE_PIN_MISMATCH'}
 foreach($item in $cfg.files){
     if((Get-FileHash -LiteralPath $item.path -Algorithm SHA256).Hash -ine $item.sha256){throw 'RUNTIME_PIN_MISMATCH'}
 }
