@@ -1,7 +1,8 @@
 """Changed-seam synthetic custody, corruption and cold-read regression checks."""
-from copy import deepcopy
 import json
 from pathlib import Path
+import subprocess
+import sys
 import time
 from unittest.mock import patch
 
@@ -83,3 +84,12 @@ def test_manifest_reseal_cannot_change_ack(retained):
     path.write_text(json.dumps(doc))
     with pytest.raises(ValueError,match="RETAINED_ACK_IDENTITY"):
         replay(retained)
+
+
+def test_independent_process_reopens_original_stores(retained):
+    entry = Path(__file__).resolve().parents[1] / "tools/atlas_stage6_durable.py"
+    child = subprocess.run([sys.executable, "-B", str(entry), "readback", str(retained)],
+                           check=True, capture_output=True, text=True)
+    result = json.loads(child.stdout)
+    assert result == replay(retained)
+    assert result["source_count"] == 2 and result["secretary"] == "WAIT"
