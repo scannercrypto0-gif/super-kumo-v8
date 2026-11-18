@@ -58,7 +58,16 @@ jobs:
           if (Test-ResetRecovery $log 'PILOT_STOP_TimeoutError') {throw 'PARTIAL_HEADER_RETRY_ALLOWED'}
           $events[3] = $reset
           Save-Events
-          if (Test-ResetRecovery $log 'PILOT_STOP_TimeoutError') {throw 'MIXED_FAILURE_RETRY_ALLOWED'}
+          $events[4].error = 'ConnectionResetError'
+          Save-Events
+          if (-not (Test-ResetRecovery $log 'PILOT_STOP_ConnectionResetError')) {throw 'MIXED_FAILURE_RECOVERY_REJECTED'}
+          $events[1].receive_phase = 'FRAME_PAYLOAD'
+          Save-Events
+          if (Test-ResetRecovery $log 'PILOT_STOP_ConnectionResetError') {throw 'MIXED_PARTIAL_FRAME_RETRY_ALLOWED'}
+          $events[1].receive_phase = 'FRAME_BOUNDARY'
+          $events[1].deadline_origin = 'PONG_LIVENESS_EXPIRED'
+          Save-Events
+          if (-not (Test-ResetRecovery $log 'PILOT_STOP_ConnectionResetError')) {throw 'STALE_PONG_RESET_RECOVERY_REJECTED'}
           $cfg = Join-Path $root 'config.json'
           '{}' | Set-Content -LiteralPath $cfg
           $pin = (Get-FileHash -LiteralPath $cfg).Hash.ToLowerInvariant()
