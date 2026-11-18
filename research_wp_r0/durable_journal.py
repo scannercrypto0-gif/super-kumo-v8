@@ -1,0 +1,376 @@
+"""WP-R7: single-writer local JSONL journal for trial-family and holdout events.
+
+Fail closed: verify the *entire* chain and replay the logical state machine on
+open. Never truncate/repair a torn tail automatically. A local SHA-256 chain is
+TAMPER-EVIDENT only relative to an externally retained trustworthy anchor:
+an attacker able to rewrite the full journal can recompute every hash.
+
+Synthetic/offline only. No database, cloud provider, operator permission or
+live-trader access. stdlib Python 3.10+.
+"""
+from __future__ import annotations
+
+from copy import deepcopy
+from datetime import datetime
+import json
+import os
+import stat
+from pathlib import Path
+from typing import Any
+
+from research_wp_r0.trial_holdout import (
+    Attempt, AttemptState, FrozenSearchFamily, HoldoutEvent,
+    TrialFamilyLedger, fingerprint, utc_stamp,
+)
+
+
+class JournalIntegrityError(ValueError):
+    """Journal verification, schema or state-machine replay has failed."""
+
+
+def _canonical(record: dict) -> bytes:
+    return json.dumps(record, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=True, allow_nan=False).encode("utf-8")
+
+
+def _family_data(family: FrozenSearchFamily) -> dict[str, Any]:
+    return {
+        "family_id": family.family_id,
+        "protocol_digest": family.protocol_digest,
+        "temporal_manifest_digest": family.temporal_manifest_digest,
+        "dataset_version": family.dataset_version,
+        "metric_name": family.metric_name,
+        "metric_direction": family.metric_direction,
+        "candidate_ids": list(family.candidate_ids),
+        "alpha": family.alpha,
+        "declared_at": utc_stamp(family.declared_at),
+    }
+
+
+def _replay_event(ledger: TrialFamilyLedger, kind: str, data: dict) -> None:
+    try:
+        if kind == "ATTEMPT":
+            if set(data) != {"candidate_id", "state", "result_digest", "recorded_at", "marginal_p_value"}:
+                raise ValueError("Bad attempt schema")
+            ledger.record_attempt(Attempt(
+                candidate_id=data["candidate_id"],
+                state=AttemptState(data["state"]),
+                result_digest=data["result_digest"],
+                recorded_at=datetime.fromisoformat(data["recorded_at"]),
+                marginal_p_value=data["marginal_p_value"],
+            ))
+        elif kind == "SELECT":
+            if set(data) != {"candidate_id", "at"}:
+                raise ValueError("Bad selection schema")
+            ledger.select(data["candidate_id"], at=datetime.fromisoformat(data["at"]))
+        elif kind == "HOLDOUT":
+            if set(data) != {"event_type", "at", "evidence_digest"}:
+                raise ValueError("Bad holdout schema")
+            ledger.holdout_event(HoldoutEvent(
+                event_type=data["event_type"],
+                at=datetime.fromisoformat(data["at"]),
+                evidence_digest=data["evidence_digest"],
+            ))
+        else:
+            raise ValueError("Unknown journal event")
+    except (ValueError, TypeError, KeyError, AttributeError) as exc:
+        raise JournalIntegrityError("Invalid replayed research event") from exc
+
+
+class DurableTrialJournal:
+    """Exclusive local writer, whose evidence must be externally anchored.
+
+    close() is needed to release the exclusive writer lock. Do not forcibly
+    remove an orphaned .lock until independently confirming no writer exists.
+    """
+
+    GENESIS = "0" * 64
+    MAX_LINE = 1_000_000
+
+    def __init__(self, path: str | Path, family: FrozenSearchFamily, *,
+                 expected_head: str | None = None,
+                 expected_sequence: int | None = None) -> None:
+        if (expected_head is None) != (expected_sequence is None):
+            raise ValueError("External anchors require both head and sequence")
+        if expected_sequence is not None and (type(expected_sequence) is not int or expected_sequence < 1):
+            raise ValueError("External anchor sequence must be a positive integer")
+        if expected_head is not None and (len(expected_head) != 64 or any(c not in "0123456789abcdef" for c in expected_head)):
+            raise ValueError("External anchor must be a canonical SHA-256 hex digest")
+        self._trusted_head = expected_head
+        self._trusted_sequence = expected_sequence
+        self.path = Path(path)
+        self.family = family
+        self._lock_path = self.path.with_name(self.path.name + ".lock")
+        self._lock_fd: int | None = None
+        self._closed = False
+        self._poisoned = False
+        self._events: dict[str, bytes] = {}
+        self._sequence = 0
+        self._head = self.GENESIS
+        self._journal_identity: tuple[int, int] | None = None
+        self._ledger = TrialFamilyLedger(family)
+
+        if not self.path.parent.is_dir():
+            raise FileNotFoundError("Journal parent directory must exist")
+        # Lock prevents cooperating processes using this implementation from
+        # racing. It is NOT an OS-enforced universal lock against other tools.
+        self._lock_fd = os.open(self._lock_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o600)
+        try:
+            if self.path.exists():
+                self._restore()
+            elif expected_head is not None or expected_sequence is not None:
+                raise JournalIntegrityError("Missing journal cannot satisfy an external anchor")
+            else:
+                self._append("FAMILY", _family_data(family), "family:" + family.digest)
+            # _restore verifies the externally anchored prefix, including
+            # when later journal records have legitimately been appended.
+        except BaseException:
+            self.close()
+            raise
+
+    def __enter__(self) -> "DurableTrialJournal":
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self.close()
+
+    @property
+    def head(self) -> str:
+        return self._head
+
+    @property
+    def sequence(self) -> int:
+        return self._sequence
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        if self._lock_fd is not None:
+            os.close(self._lock_fd)
+            self._lock_fd = None
+            # Only the lock owned by this instance may be removed.
+            self._lock_path.unlink()
+
+    def report(self):
+        """Verify current disk evidence before exposing a research report.
+
+        A cached ledger is not evidence that the file still exists, has its
+        original identity, or satisfies its pinned checkpoint. Read failures
+        poison this instance just like failed append/anchor verification.
+        This still cannot authenticate a fully rewritten unanchored journal.
+        """
+        self._require_healthy()
+        try:
+            self._restore()
+        except BaseException:
+            self._poisoned = True
+            raise
+        return self._ledger.report()
+
+    def verify_anchor(self, *, expected_head: str | None,
+                      expected_sequence: int | None = None) -> None:
+        """Pin and verify a trusted, independently held checkpoint prefix.
+
+        Re-read and replay disk: a cached in-memory head is not evidence.
+        Subsequent appends are allowed; historical prefix rewrites are not.
+        This must not be mistaken for independently authenticating the anchor.
+        """
+        self._require_healthy()
+        if (not isinstance(expected_head, str) or len(expected_head) != 64 or
+                any(c not in "0123456789abcdef" for c in expected_head) or
+                type(expected_sequence) is not int or expected_sequence < 1):
+            raise ValueError("Trusted anchor requires canonical head and positive sequence")
+        if self._trusted_head is not None and (
+            self._trusted_head != expected_head or self._trusted_sequence != expected_sequence
+        ):
+            raise JournalIntegrityError("Cannot replace an already pinned trusted anchor")
+        self._trusted_head = expected_head
+        self._trusted_sequence = expected_sequence
+        try:
+            self._restore()
+        except BaseException:
+            # A failed verification must never let this writer continue.
+            self._poisoned = True
+            raise
+        # The accepted pin remains active for all future full replays.
+
+
+    def _require_healthy(self) -> None:
+        if self._closed or self._poisoned:
+            raise JournalIntegrityError("Journal closed or write state uncertain")
+
+    def _append(self, kind: str, data: dict, event_id: str) -> bool:
+        self._require_healthy()
+        if not event_id or not isinstance(event_id, str):
+            raise ValueError("Stable event id required")
+        payload = {"kind": kind, "data": data, "event_id": event_id}
+        canonical_payload = _canonical(payload)
+        prior = self._events.get(event_id)
+        if prior is not None:
+            if prior == canonical_payload:
+                return False  # idempotent exactly-the-same committed event
+            raise JournalIntegrityError("Conflicting duplicate event id")
+        number = self._sequence + 1
+        record = {"sequence": number, "prev_hash": self._head, **payload}
+        record["hash"] = fingerprint(record)
+        encoded = _canonical(record) + b"\n"
+        if len(encoded) > self.MAX_LINE:
+            raise ValueError("Oversized journal entry")
+        # Exclusive lock acquired before inspection, no concurrent writers
+        # under this contract. O_APPEND, fsync and write-all minimize torn
+        # records but do not guarantee atomic multi-process appends.
+        # Windows CRT text mode silently turns LF into CRLF for os.write.
+        # Journal hashes and canonical bytes require binary mode end-to-end.
+        flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_BINARY", 0)
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        try:
+            fd = os.open(self.path, flags, 0o600)
+            try:
+                metadata = os.fstat(fd)
+                size = metadata.st_size
+                identity = (metadata.st_dev, metadata.st_ino)
+                if not stat.S_ISREG(metadata.st_mode):
+                    raise JournalIntegrityError("Journal must be a regular file")
+                if self._journal_identity is not None and identity != self._journal_identity:
+                    raise JournalIntegrityError("Journal file replaced during writer lifetime")
+                if self._sequence and size != self._persisted_size:
+                    raise JournalIntegrityError("Journal changed outside active writer")
+                if not self._sequence and size != 0:
+                    raise JournalIntegrityError("New journal unexpectedly nonempty")
+                written = 0
+                while written < len(encoded):
+                    amount = os.write(fd, encoded[written:])
+                    if amount <= 0:
+                        raise OSError("Non-progressing append")
+                    written += amount
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+        except BaseException:
+            self._poisoned = True
+            raise
+        self._journal_identity = identity
+        self._persisted_size = (getattr(self, "_persisted_size", 0) + len(encoded))
+        self._sequence = number
+        self._head = record["hash"]
+        self._events[event_id] = canonical_payload
+        return True
+
+    def _restore(self) -> None:
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        fd = os.open(self.path, flags)
+        try:
+            metadata = os.fstat(fd)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise JournalIntegrityError("Journal must be a regular file")
+            identity = (metadata.st_dev, metadata.st_ino)
+            if self._journal_identity is not None and identity != self._journal_identity:
+                raise JournalIntegrityError("Journal file replaced during writer lifetime")
+            with os.fdopen(fd, "rb") as source:
+                fd = -1
+                raw = source.read()
+        finally:
+            if fd >= 0:
+                os.close(fd)
+        if not raw or not raw.endswith(b"\n"):
+            raise JournalIntegrityError("Empty or truncated journal (no automatic repair)")
+        parts = raw.splitlines(keepends=True)
+        if any(len(line) > self.MAX_LINE for line in parts):
+            raise JournalIntegrityError("Oversized journal record")
+        expected = self.GENESIS
+        seen = {}
+        reconstructed = TrialFamilyLedger(self.family)
+        for idx, line in enumerate(parts, start=1):
+            try:
+                record = json.loads(line.decode("utf-8"))
+                if not isinstance(record, dict) or _canonical(record) + b"\n" != line:
+                    raise ValueError("Noncanonical JSON record")
+                if set(record) != {"sequence", "prev_hash", "kind", "data", "event_id", "hash"}:
+                    raise ValueError("Unexpected journal schema")
+                if type(record["sequence"]) is not int or record["sequence"] != idx:
+                    raise ValueError("Noncontiguous sequence")
+                if record["prev_hash"] != expected:
+                    raise ValueError("Broken predecessor hash")
+                claim = record["hash"]
+                without_hash = {k: v for k, v in record.items() if k != "hash"}
+                if claim != fingerprint(without_hash):
+                    raise ValueError("Tampered record hash")
+                payload = {k: record[k] for k in ("kind", "data", "event_id")}
+                if not isinstance(record["event_id"], str) or not record["event_id"]:
+                    raise ValueError("Missing event identity")
+                if record["event_id"] in seen:
+                    raise ValueError("Duplicate event recorded on disk")
+                if idx == 1:
+                    if record["kind"] != "FAMILY" or record["data"] != _family_data(self.family):
+                        raise ValueError("Frozen family mismatch")
+                    if record["event_id"] != "family:" + self.family.digest:
+                        raise ValueError("Frozen family identifier mismatch")
+                else:
+                    if record["kind"] == "FAMILY":
+                        raise ValueError("Redefined trial family")
+                    _replay_event(reconstructed, record["kind"], record["data"])
+                if self._trusted_sequence == idx and self._trusted_head != claim:
+                    raise ValueError("Externally anchored prefix hash mismatch")
+                seen[record["event_id"]] = _canonical(payload)
+                expected = claim
+            except (ValueError, TypeError, KeyError, UnicodeError, AttributeError) as exc:
+                raise JournalIntegrityError(f"Invalid journal at record {idx}") from exc
+        if self._trusted_sequence is not None and len(parts) < self._trusted_sequence:
+            raise JournalIntegrityError("Journal rollback before externally trusted checkpoint")
+        self._sequence = len(parts)
+        self._head = expected
+        self._events = seen
+        self._ledger = reconstructed
+        self._journal_identity = identity
+        self._persisted_size = len(raw)
+
+    def record_attempt(self, attempt: Attempt, *, event_id: str) -> None:
+        self._require_healthy()
+        data = {
+            "candidate_id": attempt.candidate_id,
+            "state": attempt.state.value,
+            "result_digest": attempt.result_digest,
+            "recorded_at": utc_stamp(attempt.recorded_at),
+            "marginal_p_value": attempt.marginal_p_value,
+        }
+        self._validated_append("ATTEMPT", data, event_id)
+
+    def select(self, candidate_id: str, *, at: datetime, event_id: str) -> None:
+        self._validated_append("SELECT", {"candidate_id": candidate_id, "at": utc_stamp(at)}, event_id)
+
+    def holdout_event(self, event: HoldoutEvent, *, event_id: str) -> None:
+        self._validated_append("HOLDOUT", {
+            "event_type": event.event_type, "at": utc_stamp(event.at),
+            "evidence_digest": event.evidence_digest,
+        }, event_id)
+
+    def _validated_append(self, kind: str, data: dict, event_id: str) -> None:
+        self._require_healthy()
+        # Before EVERY mutation, detect tampering, truncation or noncanonical
+        # events even when an attacker preserves the file's byte length.
+        try:
+            self._restore()
+        except BaseException:
+            self._poisoned = True
+            raise
+        payload = _canonical({"kind": kind, "data": data, "event_id": event_id})
+        if event_id in self._events:
+            if self._events[event_id] == payload:
+                return
+            raise JournalIntegrityError("Conflicting duplicate event id")
+        # Validate on a fresh state-machine reconstruction before writing. A
+        # durable append is the commit point; never update in-memory state first.
+        # _restore above already verified the complete on-disk hash chain,
+        # external anchor prefix and every state transition. Replay a copy
+        # of that validated state rather than parsing/replaying disk twice.
+        # Never mutate the committed in-memory ledger before fsync succeeds.
+        shadow = deepcopy(self._ledger)
+        _replay_event(shadow, kind, data)
+        changed = self._append(kind, data, event_id)
+        if changed:
+            self._ledger = shadow
+
