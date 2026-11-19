@@ -31,6 +31,23 @@ class OneShotTest(unittest.TestCase):
             self.assertEqual(first["operational_core_scanner_factory_secretary"], "NOT_ATTESTED")
             self.assertEqual(run_one_shot(**kwargs), first)
 
+    def test_vision_source_to_durable_5m(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "vision.csv"
+            rows = []
+            for i in range(5):
+                opened = i * 60000
+                rows.append(",".join([str(opened), "10", "12", "9", "11", "2",
+                                      str(opened + 59999), "22", "1", "1", "11", "0"]))
+            source.write_text("\\n".join(rows) + "\\n", encoding="utf-8")
+            result = run_one_shot(store_path=Path(tmp) / "vision.sqlite",
+                                  source_path=source,
+                                  sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
+                                  source_kind="vision_csv", source_clock_ms=300001)
+            self.assertEqual(result["status"], "OFFLINE_PINNED_SOURCE_DURABILITY_PASS")
+            self.assertEqual(result["durability"]["source_class"], "RETROSPECTIVE_NON_PIT")
+            self.assertEqual(result["scientific_promotion"], "BLOCKED")
+
     def test_incomplete_source_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "source.jsonl"
