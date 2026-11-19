@@ -14,14 +14,18 @@ from aql.research_offline_one_shot import run_one_shot
 
 
 def run_live_research_one_shot(*, spool_dir, store_path, authorization,
-                               frame_limit=5, wall_seconds=420,
+                               frame_limit=5, wall_seconds=900,
                                interval="5m", capture=capture_live):
     if authorization != AUTHORIZATION:
         raise ValueError("ORIGINAL_CAPTURE_AUTHORIZATION_REQUIRED")
-    if interval not in ("5m", "15m", "30m", "1h"):
+    if interval not in ("5m", "15m", "30m"):
         raise ValueError("LIVE_RESEARCH_INTERVAL_UNSUPPORTED")
+    width = {"5m": 5, "15m": 15, "30m": 30}[interval]
+    if frame_limit < width:
+        raise ValueError("CAPTURE_TOO_SHORT_FOR_INTERVAL")
     sealed = capture(spool_dir=spool_dir, authorization=authorization,
-                     frame_limit=frame_limit, wall_seconds=wall_seconds)
+                     frame_limit=frame_limit, wall_seconds=wall_seconds,
+                     alignment_minutes=width)
     if (sealed.get("status") != "OFFLINE_CAPTURE_SEALED"
             or sealed.get("source_authenticity") != "NOT_INDEPENDENTLY_ATTESTED"
             or sealed.get("frames") != frame_limit):
@@ -43,7 +47,7 @@ def main(argv=None):
     parser.add_argument("--spool-dir", type=Path, required=True)
     parser.add_argument("--store", type=Path, required=True)
     parser.add_argument("--frame-limit", type=int, default=5)
-    parser.add_argument("--wall-seconds", type=int, default=420)
+    parser.add_argument("--wall-seconds", type=int, default=900)
     parser.add_argument("--interval", choices=("5m", "15m", "30m", "1h"), default="5m")
     parser.add_argument("--authorize-original-1m-research-capture",
                         action="store_true", required=True)
