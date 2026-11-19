@@ -5,7 +5,7 @@ The caller must separately authorize original source acquisition and custody.
 """
 from __future__ import annotations
 
-import time
+import json
 
 from aql.research_capture_spool import seal_capture
 from aql.research_ws_1m_ingest import project_closed_1m_frame
@@ -38,7 +38,20 @@ def collect_authorized_1m(*, reader, clock_ms, spool_dir, authorization,
             row = project_closed_1m_frame(raw, received_at_ms=received)
         except ValueError as exc:
             if str(exc) == "PROVISIONAL_KLINE":
-                continue
+                # Ignore only expected 1m provisional frames, never foreign data.
+                try:
+                    obj = json.loads(raw)
+                    candle = obj["k"]
+                    if (obj["e"] == "kline" and obj["s"] == "BTCUSDT"
+                            and candle["s"] == "BTCUSDT"
+                            and candle["i"] == "1m" and candle["x"] is False
+                            and type(candle["t"]) is int
+                            and candle["t"] >= 0 and candle["t"] % 60000 == 0
+                            and type(candle["T"]) is int
+                            and candle["T"] == candle["t"] + 59999):
+                        continue
+                except (ValueError, KeyError, TypeError):
+                    pass
             raise
         opened = row["open_ms"]
         if first is None:
