@@ -91,3 +91,27 @@ def test_immutable_conflict_denied(source, tmp_path):
     path.write_text("not the report")
     with pytest.raises(ValueError, match="IMMUTABLE_CONFLICT"):
         write_immutable_report(report, path, expected_manifest_sha256=pin)
+
+
+def test_owner_local_cli_bounded_readback(source, tmp_path, capsys):
+    from research_wp_r0.aql_stage7_source_research_v1 import main
+    root, pin = source
+    output = tmp_path / "stage7-owner-readback.json"
+    main(["--source", str(root), "--manifest-sha256", pin,
+          "--output", str(output)])
+    receipt = json.loads(capsys.readouterr().out)
+    assert receipt["status"] == "STAGE7_OWNER_LOCAL_WAIT_READBACK_PASS"
+    assert receipt["source_count"] == 2 and receipt["orders"] == 0
+    assert receipt["report_sha256"] == read_immutable_report(
+        output, expected_manifest_sha256=pin)["sha256"]
+    main(["--source", str(root), "--manifest-sha256", pin,
+          "--output", str(output)])
+    assert json.loads(capsys.readouterr().out) == receipt
+
+
+def test_cli_refuses_output_inside_source(source):
+    from research_wp_r0.aql_stage7_source_research_v1 import main
+    root, pin = source
+    with pytest.raises(ValueError, match="OUTPUT_MUST_BE_OUTSIDE_SOURCE"):
+        main(["--source", str(root), "--manifest-sha256", pin,
+              "--output", str(root / "forbidden.json")])
