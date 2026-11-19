@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from aql.research_offline_one_shot import run_one_shot
+from aql.research_bar_store import ResearchBarStore
 
 
 def ws_frame(open_ms):
@@ -52,11 +53,14 @@ class OneShotTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "source.jsonl"
             source.write_bytes(ws_frame(0) + b"\n")
+            target = Path(tmp) / "research.sqlite"
             with self.assertRaisesRegex(ValueError, "SOURCE_WINDOW_INCOMPLETE"):
-                run_one_shot(store_path=Path(tmp) / "research.sqlite",
+                run_one_shot(store_path=target,
                              source_path=source,
                              sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
                              source_kind="ws_jsonl", source_clock_ms=60001)
+            with ResearchBarStore(target) as store:
+                self.assertIsNone(store.read("BTCUSDT", "1m", 0))
 
 
 if __name__ == "__main__":
