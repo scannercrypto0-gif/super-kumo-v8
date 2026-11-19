@@ -15,10 +15,12 @@ ENDPOINT = "wss://data-stream.binance.vision/ws/btcusdt@kline_1m"
 AUTHORIZATION = "OWNER_AUTHORIZED_ORIGINAL_1M_RESEARCH_CAPTURE"
 
 
-def capture_live(*, spool_dir, authorization, frame_limit=5, wall_seconds=420,
+def capture_live(*, spool_dir, authorization, frame_limit=5, wall_seconds=900, alignment_minutes=5,
                  connection_factory=None, monotonic=None, clock_ms=None):
     if authorization != AUTHORIZATION:
         raise ValueError("ORIGINAL_CAPTURE_AUTHORIZATION_REQUIRED")
+    if (type(alignment_minutes) is not int or alignment_minutes not in (1, 5, 15, 30)):
+        raise ValueError("LIVE_CAPTURE_ALIGNMENT_INVALID")
     if (type(frame_limit) is not int or not 1 <= frame_limit <= 30
             or type(wall_seconds) is not int or not 60 <= wall_seconds <= 1800):
         raise ValueError("LIVE_CAPTURE_BUDGET_INVALID")
@@ -52,7 +54,7 @@ def capture_live(*, spool_dir, authorization, frame_limit=5, wall_seconds=420,
         return collect_authorized_1m(
             reader=reader, clock_ms=clock_ms, spool_dir=spool_dir,
             authorization=authorization, frame_limit=frame_limit,
-            event_limit=frame_limit * 300)
+            event_limit=frame_limit * 300, alignment_minutes=alignment_minutes)
     finally:
         connection.close()
 
@@ -61,14 +63,14 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--spool-dir", required=True, type=Path)
     parser.add_argument("--frame-limit", type=int, default=5)
-    parser.add_argument("--wall-seconds", type=int, default=420)
+    parser.add_argument("--wall-seconds", type=int, default=900)
     parser.add_argument("--authorize-original-1m-research-capture",
                         action="store_true", required=True)
     args = parser.parse_args(argv)
     receipt = capture_live(
         spool_dir=args.spool_dir,
         authorization=AUTHORIZATION if args.authorize_original_1m_research_capture else "",
-        frame_limit=args.frame_limit, wall_seconds=args.wall_seconds)
+        frame_limit=args.frame_limit, wall_seconds=args.wall_seconds, alignment_minutes=5)
     print(json.dumps(receipt, sort_keys=True))
     return 0
 
