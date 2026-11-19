@@ -59,6 +59,22 @@ class LiveOneShotTest(unittest.TestCase):
             self.assertEqual(result["durability"]["status"], "OFFLINE_PINNED_SOURCE_DURABILITY_PASS")
             self.assertEqual(result["core_scanner_factory_e2e"], "NOT_ATTESTED")
 
+    def test_complete_native_15m_capture_to_readback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            def capture(**kwargs):
+                self.assertEqual(kwargs["alignment_minutes"], 15)
+                self.assertEqual(kwargs["frame_limit"], 15)
+                return seal_capture(kwargs["spool_dir"], [frame(i) for i in range(15)], 900001)
+            result = run_live_research_one_shot(
+                spool_dir=root / "spool", store_path=root / "store.sqlite",
+                authorization=AUTHORIZATION, interval="15m", frame_limit=15,
+                wall_seconds=1800, capture=capture)
+            self.assertEqual(result["status"], "CAPTURE_TO_DURABLE_RESEARCH_PASS")
+            self.assertEqual(result["durability"]["durability"]["interval"], "15m")
+            self.assertEqual(result["durability"]["durability"]["constituent_count"], 15)
+            self.assertEqual(result["core_scanner_factory_e2e"], "NOT_ATTESTED")
+
     def test_refuse_unapproved_capture(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(ValueError, "ORIGINAL_CAPTURE_AUTHORIZATION_REQUIRED"):
@@ -67,7 +83,7 @@ class LiveOneShotTest(unittest.TestCase):
 
     def test_refuse_incomplete_timeframe_before_network(self):
         with tempfile.TemporaryDirectory() as tmp:
-            with self.assertRaisesRegex(ValueError, "LIVE_RESEARCH_INTERVAL_UNSUPPORTED"):
+            with self.assertRaisesRegex(ValueError, "CAPTURE_TOO_SHORT_FOR_INTERVAL"):
                 run_live_research_one_shot(spool_dir=tmp, store_path=Path(tmp) / "db",
                     authorization=AUTHORIZATION, interval="15m", frame_limit=5,
                     capture=lambda **kw: self.fail("must not capture"))
