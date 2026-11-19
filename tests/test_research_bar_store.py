@@ -49,6 +49,15 @@ class StoreTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "MIXED_SOURCE_CLASS"):
                     store.project("BTCUSDT", "5m", 0)
 
+    def test_digest_column_tamper_detection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with ResearchBarStore(Path(tmp) / "bars.sqlite") as store:
+                store.insert_1m(bar(0))
+                with store.db:
+                    store.db.execute("UPDATE finalized_bars SET sha256=?", ("0" * 64,))
+                with self.assertRaisesRegex(ValueError, "STORE_INTEGRITY_FAILED"):
+                    store.read("BTCUSDT", "1m", 0)
+
     def test_tamper_detection(self):
         with tempfile.TemporaryDirectory() as tmp:
             with ResearchBarStore(Path(tmp) / "bars.sqlite") as store:
