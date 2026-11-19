@@ -89,10 +89,12 @@ class ResearchBarStore:
             raise ValueError("INTERVAL_UNSUPPORTED")
         count = WIDTHS[interval]
         rows = []
+        source_classes = set()
         for i in range(count):
             row = self.read(symbol, "1m", open_ms + i * MINUTE)
             if row is None:
                 raise ValueError("SOURCE_GAP")
+            source_classes.add(row["source_class"])
             rows.append({
                 "symbol": row["symbol"], "interval": "1m",
                 "open_ms": row["open_ms"], "final": True,
@@ -101,8 +103,6 @@ class ResearchBarStore:
                 "source_sha256": row["constituent_sha256"][0],
                 "available_at_ms": row["available_at_ms"],
             })
-        source_classes = {self.read(symbol, "1m", open_ms + i * MINUTE)["source_class"]
-                          for i in range(count)}
         if len(source_classes) != 1:
             raise ValueError("MIXED_SOURCE_CLASS")
         result = project_finalized_1m(rows, interval, source_class=source_classes.pop())
