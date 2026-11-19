@@ -11,6 +11,7 @@ on:
       - "src/aql/research_offline_one_shot.py"
       - "src/aql/research_service_bridge_gate.py"
       - "src/aql/research_capture_spool.py"
+      - "src/aql/research_1m_collector.py"
       - "tests/test_research_timeframes.py"
       - "tests/test_research_bar_store.py"
       - "tests/test_research_vision_import.py"
@@ -20,6 +21,7 @@ on:
       - "tests/test_research_offline_one_shot.py"
       - "tests/test_research_service_bridge_gate.py"
       - "tests/test_research_capture_spool.py"
+      - "tests/test_research_1m_collector.py"
       - "tools/ATLAS-RESEARCH-WINDOWS-PREFLIGHT.ps1"
       - ".github/workflows/research-finalized-timeframes.yml"
   workflow_dispatch:
@@ -41,7 +43,7 @@ jobs:
       - name: Install package and test runner
         run: python -m pip install -e ".[dev]"
       - name: Focused research timeframe tests
-        run: python -m pytest -q tests/test_research_timeframes.py tests/test_research_bar_store.py tests/test_research_vision_import.py tests/test_research_ws_1m_ingest.py tests/test_research_ws_capture_import.py tests/test_research_durability_readback.py tests/test_research_offline_one_shot.py tests/test_research_service_bridge_gate.py tests/test_research_capture_spool.py
+        run: python -m pytest -q tests/test_research_timeframes.py tests/test_research_bar_store.py tests/test_research_vision_import.py tests/test_research_ws_1m_ingest.py tests/test_research_ws_capture_import.py tests/test_research_durability_readback.py tests/test_research_offline_one_shot.py tests/test_research_service_bridge_gate.py tests/test_research_capture_spool.py tests/test_research_1m_collector.py
       - name: Windows owner-local preflight dry run (no host changes)
         if: runner.os == 'Windows'
         shell: pwsh
