@@ -40,7 +40,8 @@ $testPaths = @(
     "tests/test_research_offline_one_shot.py",
     "tests/test_research_service_bridge_gate.py",
     "tests/test_research_capture_spool.py",
-    "tests/test_research_1m_collector.py"
+    "tests/test_research_1m_collector.py",
+    "tests/test_research_live_1m_capture.py"
 )
 $missing = @($testPaths | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) })
 if ($missing.Count -gt 0) {
