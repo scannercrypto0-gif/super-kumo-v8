@@ -39,7 +39,7 @@ class OneShotTest(unittest.TestCase):
                 opened = i * 60000
                 rows.append(",".join([str(opened), "10", "12", "9", "11", "2",
                                       str(opened + 59999), "22", "1", "1", "11", "0"]))
-            source.write_text("\\n".join(rows) + "\\n", encoding="utf-8")
+            source.write_text(chr(10).join(rows) + chr(10), encoding="utf-8")
             result = run_one_shot(store_path=Path(tmp) / "vision.sqlite",
                                   source_path=source,
                                   sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
