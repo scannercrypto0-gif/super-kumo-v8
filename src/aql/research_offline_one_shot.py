@@ -34,7 +34,18 @@ def run_one_shot(*, store_path, source_path, sha256, source_kind,
         from aql.research_timeframes import WIDTHS, MINUTE
         width = WIDTHS[interval] * MINUTE
         # The proof window must be fully covered by this exact pinned source.
-        start = ((first + width - 1) // width) * width
+        if interval == "1w":
+            # UTC weeks start Monday, not Unix epoch Thursday.
+            from datetime import datetime, timezone
+            dt = datetime.fromtimestamp(first / 1000, tz=timezone.utc)
+            weekday_offset = (dt.weekday() * 86400000
+                              + dt.hour * 3600000 + dt.minute * 60000
+                              + dt.second * 1000 + dt.microsecond // 1000)
+            start = first - weekday_offset
+            if start < first:
+                start += width
+        else:
+            start = ((first + width - 1) // width) * width
         if start + width - MINUTE > imported["last_open_ms"]:
             raise ValueError("SOURCE_WINDOW_INCOMPLETE")
         durable = verify_research_window(store, symbol=symbol,
