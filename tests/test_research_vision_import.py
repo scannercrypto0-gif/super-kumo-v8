@@ -15,6 +15,22 @@ def line(i):
 
 
 class VisionImportTest(unittest.TestCase):
+    def test_atomic_rollback_when_late_source_conflicts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "native.csv"
+            path.write_text(line(0) + "\\n" + line(1) + "\\n", encoding="utf-8")
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            with ResearchBarStore(Path(tmp) / "bars.sqlite") as store:
+                conflicting = dict(symbol="BTCUSDT", interval="1m", open_ms=60000,
+                                   final=True, o="20", h="22", l="19", c="21", v="2",
+                                   source_sha256="a"*64, available_at_ms=180000)
+                store.insert_1m(conflicting, source_class="RETROSPECTIVE_NON_PIT")
+                with self.assertRaisesRegex(ValueError, "SOURCE_REWRITE_DENIED"):
+                    import_pinned_vision_csv(store, path, symbol="BTCUSDT",
+                                             expected_sha256=digest, available_at_ms=180000)
+                self.assertIsNone(store.read("BTCUSDT", "1m", 0))
+                self.assertEqual(store.read("BTCUSDT", "1m", 60000)["o"], "20")
+
     def test_pinned_import_replay_and_negative(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "native.csv"
