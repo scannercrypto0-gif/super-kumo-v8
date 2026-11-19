@@ -18,9 +18,9 @@ def run_live_research_one_shot(*, spool_dir, store_path, authorization,
                                interval="5m", capture=capture_live):
     if authorization != AUTHORIZATION:
         raise ValueError("ORIGINAL_CAPTURE_AUTHORIZATION_REQUIRED")
-    if interval not in ("5m", "15m", "30m"):
+    if interval != "5m":
         raise ValueError("LIVE_RESEARCH_INTERVAL_UNSUPPORTED")
-    width = {"5m": 5, "15m": 15, "30m": 30}[interval]
+    width = 5
     if frame_limit < width:
         raise ValueError("CAPTURE_TOO_SHORT_FOR_INTERVAL")
     sealed = capture(spool_dir=spool_dir, authorization=authorization,
@@ -48,7 +48,7 @@ def main(argv=None):
     parser.add_argument("--store", type=Path, required=True)
     parser.add_argument("--frame-limit", type=int, default=5)
     parser.add_argument("--wall-seconds", type=int, default=900)
-    parser.add_argument("--interval", choices=("5m", "15m", "30m", "1h"), default="5m")
+    parser.add_argument("--interval", choices=("5m",), default="5m")
     parser.add_argument("--authorize-original-1m-research-capture",
                         action="store_true", required=True)
     args = parser.parse_args(argv)
