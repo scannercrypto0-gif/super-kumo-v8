@@ -38,7 +38,7 @@ class LiveOneShotTest(unittest.TestCase):
 
     def test_refuse_incomplete_timeframe_before_network(self):
         with tempfile.TemporaryDirectory() as tmp:
-            with self.assertRaisesRegex(ValueError, "CAPTURE_TOO_SHORT_FOR_INTERVAL"):
+            with self.assertRaisesRegex(ValueError, "LIVE_RESEARCH_INTERVAL_UNSUPPORTED"):
                 run_live_research_one_shot(spool_dir=tmp, store_path=Path(tmp) / "db",
                     authorization=AUTHORIZATION, interval="15m", frame_limit=5,
                     capture=lambda **kw: self.fail("must not capture"))
