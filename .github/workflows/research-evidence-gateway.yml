@@ -1,0 +1,45 @@
+name: Research evidence gateway
+on:
+  pull_request:
+    paths: ['tools/research_evidence_gateway/**', '.github/workflows/research-evidence-gateway.yml']
+  push:
+    branches: ['codex/pkg04-read-only-evidence-gateway']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install pytest websocket-client
+      - name: Exact affected native producer to consumer acceptance, no G4 rerun
+        run: python -B -m tools.research_evidence_gateway.acceptance --fetch --output gateway-acceptance-evidence
+      - run: python -B -m pytest tools/research_evidence_gateway -q --basetemp=.gateway-tests --junitxml=gateway-tests.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gateway-${{ matrix.os }}-${{ matrix.python }}
+          path: |
+            gateway-tests.xml
+            gateway-acceptance-evidence/acceptance-receipt.json
+            gateway-acceptance-evidence/negative-receipts.json
+            gateway-acceptance-evidence/fixture-provenance-parity.json
+            gateway-acceptance-evidence/read-model-*.json
+            gateway-acceptance-evidence/manifest.sha256
+            gateway-acceptance-evidence/inputs/**/*.json
+            gateway-acceptance-evidence/native/delivery.json
+            gateway-acceptance-evidence/native/overlay/source-overlay.json
+            gateway-acceptance-evidence/*.log

@@ -1,0 +1,341 @@
+{
+  "baseline_id": "independent-null-01",
+  "candidate_package": {
+    "attempt_ledger_head": "6bc439c0343c133b15408f674576f91f5fd3fbac75fe3f2cb1d35af398f04052",
+    "candidate_id": "1c93b953-7b78-4725-b1e1-7e935ce508d5",
+    "counterhypothesis_id": "null-001",
+    "delivery_authorized": false,
+    "evaluation_status": "NOT_EVALUATED",
+    "execution_status": "NOT_AUTHORIZED",
+    "factory_routing": "NOT_CONNECTED",
+    "family_id": "F001",
+    "family_version": "1.0",
+    "holdout_status": "SEALED_UNOPENED",
+    "nomination_evidence_digest": "9395141994be38e3333fbd2023eb09ebd4fb1ebee4657b9da03a7cee6ee6034b",
+    "package_digest": "c4f6bf9857e5355cb80f63c080aa4b8292e061510b70906fc937256fb3b7363a",
+    "publishable": false,
+    "rule_grammar_version": "aql.strategy-definition.grammar.v1",
+    "schema_version": "aql.discoverer.candidate.v1",
+    "scientific_acceptance": "NOT_OBTAINED",
+    "search_plan_digest": "044dd385d6d03943767ad5b865a747ed12d6b265032f0a9a31c6d509d0e1bc77",
+    "source_manifest_sha256": "b53ed8972c464304091aa3e68c2aeb931e3071012e7edfec19287b52b65f91ca",
+    "status": "PROPOSED_RESEARCH_ONLY",
+    "strategy_definition_digest": "20800c5c1c60d03618d51717914e2400e3743e9496572b23a178e59366df166d",
+    "strategy_spec": {
+      "definition": {
+        "entry": {
+          "left": {
+            "field": "value",
+            "lag": 0,
+            "name": "trend",
+            "op": "indicator"
+          },
+          "op": "gt",
+          "right": {
+            "op": "constant",
+            "value": 100
+          }
+        },
+        "exit": {
+          "left": {
+            "field": "value",
+            "lag": 1,
+            "name": "trend",
+            "op": "indicator"
+          },
+          "op": "lt",
+          "right": {
+            "op": "constant",
+            "value": 99
+          }
+        },
+        "indicators": [
+          {
+            "constraints": {
+              "period": {
+                "max": 20,
+                "min": 2,
+                "type": "int"
+              }
+            },
+            "indicator_id": "SMA_v1",
+            "name": "trend",
+            "parameters": {
+              "period": 3
+            },
+            "version": "1"
+          }
+        ],
+        "risk": {
+          "entry_ttl_bars": 2,
+          "holding_bars": 10,
+          "max_exposure": 1,
+          "max_leverage": 1,
+          "stop_fraction": 0.02,
+          "target_fraction": 0.04,
+          "unit": "ENTRY_NOTIONAL"
+        },
+        "schema_version": "1",
+        "scope": "RESEARCH_ONLY",
+        "strategy_id": "d_scan_1_synthetic_test",
+        "strategy_version": "v1",
+        "timing": {
+          "ambiguity": "REJECT",
+          "decision": "CONFIRMED_CLOSE",
+          "entry_execution": "NEXT_ELIGIBLE_OPEN"
+        }
+      },
+      "digest": "20800c5c1c60d03618d51717914e2400e3743e9496572b23a178e59366df166d"
+    }
+  },
+  "frozen_trial_budget": 10,
+  "hypothesis": {
+    "assumptions": [
+      "synthetic only"
+    ],
+    "counterhypothesis_id": "null-001",
+    "entry_direction": "LONG",
+    "family_digest": "e2efdde1df20748e48c43847f26de76dea53e239291f7c21c9288474225fd662",
+    "family_id": "F001",
+    "family_version": "1.0",
+    "hypothesis_digest": "0ccffe04a92f0c71949e20eed94828919d1ce0b0581a8a5724b010cdd64db5a2",
+    "hypothesis_id": "g4-synthetic-hypothesis",
+    "hypothesis_statement": "Frozen synthetic signal differs from null baseline",
+    "minimum_effect_size": "0",
+    "null_hypothesis": "No effect versus matched null",
+    "parameter_config": {},
+    "scientific_status": "PROPOSED_RESEARCH_ONLY"
+  },
+  "ledger_attempt_id": "selected-01",
+  "ledger_reference": "synthetic-ledger-01",
+  "scanner_binding": {
+    "binding_sha256": "c445a658656c627ac8a3a0f865d0761a03b8afcca4f04a43bfb4d59f56fab92d",
+    "candidate_id": "1c93b953-7b78-4725-b1e1-7e935ce508d5",
+    "candidate_package_sha256": "c4f6bf9857e5355cb80f63c080aa4b8292e061510b70906fc937256fb3b7363a",
+    "f4_historical_connected": false,
+    "factory_consumer_ack_sha256": null,
+    "historical_pit": "NOT_ATTESTED",
+    "holdout_status": "SEALED_UNOPENED",
+    "nomination_evidence_sha256": "9395141994be38e3333fbd2023eb09ebd4fb1ebee4657b9da03a7cee6ee6034b",
+    "research_scope": "SYNTHETIC_RESEARCH_ONLY",
+    "scanner_plugin_schema": "aql.scanner.h.strategy-plugin.v1",
+    "scanner_plugin_sha256": "50a42850544d6c6ea9ef8cae9423997eb71b4ab3aa5bebada1e342a7d84581f4",
+    "schema_version": "aql.discoverer.h.synthetic-scanner-candidate-binding.v1",
+    "selected": false,
+    "source_ack_sha256": null,
+    "source_class": "TEST_ONLY",
+    "status": "RESEARCH_ONLY_NO_INDEPENDENT_APPROVAL",
+    "strategy_approval_sha256": null,
+    "strategy_definition_sha256": "20800c5c1c60d03618d51717914e2400e3743e9496572b23a178e59366df166d",
+    "trading_authority": "NONE"
+  },
+  "scanner_plugin": {
+    "payload": {
+      "candidate_sha256": "c4f6bf9857e5355cb80f63c080aa4b8292e061510b70906fc937256fb3b7363a",
+      "config_digest": "ee9afacdd33a1c22054c04bc255a78965112cfa0e50434f6f0c7bb6b4be397e3",
+      "config_identity_class": "MANUAL_AST_PARAMETERS",
+      "definition": {
+        "definition": {
+          "entry": {
+            "left": {
+              "field": "value",
+              "lag": 0,
+              "name": "trend",
+              "op": "indicator"
+            },
+            "op": "gt",
+            "right": {
+              "op": "constant",
+              "value": 100
+            }
+          },
+          "exit": {
+            "left": {
+              "field": "value",
+              "lag": 1,
+              "name": "trend",
+              "op": "indicator"
+            },
+            "op": "lt",
+            "right": {
+              "op": "constant",
+              "value": 99
+            }
+          },
+          "indicators": [
+            {
+              "constraints": {
+                "period": {
+                  "max": 20,
+                  "min": 2,
+                  "type": "int"
+                }
+              },
+              "indicator_id": "SMA_v1",
+              "name": "trend",
+              "parameters": {
+                "period": 3
+              },
+              "version": "1"
+            }
+          ],
+          "risk": {
+            "entry_ttl_bars": 2,
+            "holding_bars": 10,
+            "max_exposure": 1,
+            "max_leverage": 1,
+            "stop_fraction": 0.02,
+            "target_fraction": 0.04,
+            "unit": "ENTRY_NOTIONAL"
+          },
+          "schema_version": "1",
+          "scope": "RESEARCH_ONLY",
+          "strategy_id": "d_scan_1_synthetic_test",
+          "strategy_version": "v1",
+          "timing": {
+            "ambiguity": "REJECT",
+            "decision": "CONFIRMED_CLOSE",
+            "entry_execution": "NEXT_ELIGIBLE_OPEN"
+          }
+        },
+        "digest": "20800c5c1c60d03618d51717914e2400e3743e9496572b23a178e59366df166d"
+      },
+      "definition_digest": "20800c5c1c60d03618d51717914e2400e3743e9496572b23a178e59366df166d",
+      "evaluator_code_sha256": "18d3b6a6785cb4890c75a6d30265f546eafa941b936b2ba0900aa2c2da4bf298",
+      "factory_consumer_ack_sha256": null,
+      "historical_pit": "NOT_ATTESTED",
+      "input_origin": "DISCOVERER_CANDIDATE",
+      "parameters": [
+        {
+          "indicator_id": "SMA_v1",
+          "name": "trend",
+          "parameters": {
+            "period": 3
+          },
+          "version": "1"
+        }
+      ],
+      "policy_status": "RESEARCH_ONLY_NO_INDEPENDENT_APPROVAL",
+      "schema": "aql.scanner.h.strategy-plugin.v1",
+      "source_ack_sha256": null,
+      "source_spec_sha256": null,
+      "strategy_approval_sha256": null,
+      "strategy_id": "d_scan_1_synthetic_test",
+      "strategy_version": "v1",
+      "timing": {
+        "ambiguity": "REJECT",
+        "decision": "CONFIRMED_CLOSE",
+        "entry_execution": "NEXT_ELIGIBLE_OPEN"
+      },
+      "trading_authority": "NONE"
+    },
+    "sha256": "50a42850544d6c6ea9ef8cae9423997eb71b4ab3aa5bebada1e342a7d84581f4"
+  },
+  "search_plan": {
+    "family_registry_digest": "e918abbf0ecb1572cd29174a021c2989b13c5ec940c960ffeaae6921bb120065",
+    "hypothesis_ids": [
+      "g4-synthetic-hypothesis"
+    ],
+    "plan_digest": "044dd385d6d03943767ad5b865a747ed12d6b265032f0a9a31c6d509d0e1bc77",
+    "search_plan_id": "g4-synthetic-plan",
+    "total_candidate_budget": 4
+  },
+  "synthetic_nomination": {
+    "cutoff_ms": 1735747201000,
+    "eligible_selected": 80,
+    "evidence_class": "TEST_ONLY_SYNTHETIC",
+    "failed_attempts": 0,
+    "full_universe_denominator": 100,
+    "independent_verifier_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "ineligible": 10,
+    "market": "BINANCE_SPOT",
+    "nominated": 60,
+    "nomination_digest": "9395141994be38e3333fbd2023eb09ebd4fb1ebee4657b9da03a7cee6ee6034b",
+    "omission_reason_codes": [],
+    "profile": "default",
+    "quarantine_status": "TEST_ONLY_SYNTHETIC",
+    "scan_run_id": "run-001",
+    "scanner_contract_version": "0.1.0",
+    "scanner_envelope_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "scanner_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "scanner_source_commit": "0000000000000000000000000000000000000000000000000000000000000000",
+    "schema_version": "aql.discoverer.nomination-evidence.v1",
+    "screened_rejected": 3,
+    "source_availability": "CONFIRMED_FINAL",
+    "source_dataset_id": "TEST-ONLY-G4-CURRENT-HEAD",
+    "source_dataset_version": 1,
+    "source_manifest_sha256": "b53ed8972c464304091aa3e68c2aeb931e3071012e7edfec19287b52b65f91ca",
+    "source_raw_sha256": "bbd6b9dc6f74e0fa4614a7f5d39da393969764137454cec2bf6191cb9ea8669b",
+    "symbol": "BTCUSDT",
+    "timeframe": "15m",
+    "universe_snapshot_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "unknown": 2,
+    "unscanned": 5
+  },
+  "trial_family_id": "g4-paired-family-01",
+  "validation_protocol": {
+    "comparator_slate": [
+      "{\"description\": \"Random entry/exit conditioned on same eligible universe and time; same k candidates as the strategy family.\", \"id\": \"RANDOM_BASELINE\"}",
+      "{\"description\": \"Random signal matching the empirical nomination rate of each strategy, applied at same frequency.\", \"id\": \"PREVALENCE_MATCHED_RANDOM\"}",
+      "{\"description\": \"Entry based solely on 24h quote-volume rank; no technical signal.\", \"id\": \"VOLUME_ONLY\"}",
+      "{\"description\": \"1-bar lookback return sign; no indicator or filter.\", \"id\": \"SIMPLE_MOMENTUM\"}",
+      "{\"description\": \"Relative volume (RVOL) threshold only; no price signal.\", \"id\": \"RVOL_ONLY\"}",
+      "{\"description\": \"Select lowest bid-ask spread and highest volume; no direction signal.\", \"id\": \"MIN_SPREAD_LIQUIDITY\"}",
+      "{\"description\": \"Simple momentum combined with volume; no other filters.\", \"id\": \"MOMENTUM_PLUS_LIQUIDITY\"}"
+    ],
+    "evaluation_gates": [
+      "GATE_A: P0 identity/PIT fail-closed, complete run census, receipt integrity, 3.11-3.13 CI green",
+      "GATE_B: Authorized real custody read-only replay with immutable receipts, full missingness/accounting coverage, separate source verification",
+      "GATE_C: Locked comparator evaluation with uncertainty report, no holdout",
+      "GATE_D: Untouched OOS claim only after separate explicit owner permission and prereg \u2014 not through this review"
+    ],
+    "family_registry_digest": "e918abbf0ecb1572cd29174a021c2989b13c5ec940c960ffeaae6921bb120065",
+    "holdout_sealed": true,
+    "multiplicity_plan": {
+      "approach": "block_bootstrap_by_time_and_symbol_cluster",
+      "methods": [
+        "Holm_stepdown",
+        "White_Reality_Check",
+        "bootstrap_confidence_intervals"
+      ],
+      "minimum_effective_independent_events": "to be determined from actual partition size",
+      "references": [
+        "White (2000) doi:10.1111/1468-0262.00152",
+        "Sullivan, Timmermann, White (1999) doi:10.1111/0022-1082.00163",
+        "Bailey et al. (2014) https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2308659"
+      ],
+      "search_multiplicity_scope": "All candidates across all families, all profiles, all threshold variants, all parameter grid points. Search duplication, ablations, profile tuning, repeated peeks, and negative controls all counted."
+    },
+    "partition_rules": {
+      "description": "Strictly non-overlapping chronological partitions. Development/validation period precedes prospective untouched test tranche. No random row split.",
+      "embargo_policy": "Purge overlapping label/feature windows with embargo sized at least maximum_lookback + outcome_exposure as applicable.",
+      "group_policy": "Source/delist-aware groups. Cluster/block uncertainty accounted for in bootstrap.",
+      "holdout_policy": "Hidden holdout sealed until new authorization. No peeking, no adaptive decisions based on holdout performance.",
+      "normalization_policy": "Fit normalizations and thresholds strictly within training partition. No information leakage from validation or test periods.",
+      "type": "chronological_walkforward"
+    },
+    "predeclared_metrics": [
+      "precision_at_k",
+      "recall_at_k",
+      "opportunity_coverage_rate",
+      "censor_rate",
+      "lift_vs_unconditional",
+      "lift_vs_same_eligibility_prevalence",
+      "pr_auc",
+      "calibration_brier_score",
+      "turnover_rate",
+      "symbol_concentration",
+      "false_positive_rate",
+      "regime_strata_breakdown",
+      "volatility_strata_breakdown",
+      "liquidity_strata_breakdown",
+      "cost_latency_breakeven_spread",
+      "missingness_failure_rate"
+    ],
+    "protocol_digest": "259f73404a64c833c34f7ff1bc3daabd0c56e7e8abe3ea94c28d82842b5ff4ab",
+    "protocol_id": "g4-synthetic-protocol",
+    "protocol_status": "EVALUATION_NOT_AUTHORIZED",
+    "schema_version": "aql.discoverer.validation-protocol.v1",
+    "search_plan_digest": "044dd385d6d03943767ad5b865a747ed12d6b265032f0a9a31c6d509d0e1bc77"
+  }
+}
