@@ -1,0 +1,78 @@
+{
+  "method": "Document-only schema validation and disposition assertions; no deployed check",
+  "records": [
+    {
+      "main_sha": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+      "owner_handoff": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/271#issuecomment-6823601215 (owner archive/checksum handoff; later Windows Check is operational evidence)",
+      "later_decisions": [
+        "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/205#issuecomment-6824875424"
+      ],
+      "new_tests": [],
+      "authority": "Dry run only; no code or data access",
+      "rollback": "Withdraw task proposal; preserve cited evidence",
+      "task": "Hypothetical second durable SQLite attempt writer",
+      "capability_ids": [
+        "FACTORY.ATTEMPT",
+        "FACTORY.LEGACY_BATCH"
+      ],
+      "head_pins": {
+        "FACTORY.ATTEMPT": "4104221085746455547257cc1876705d427cf641",
+        "FACTORY.LEGACY_BATCH": "a4c106a02c55ee012eedf4c55c1488d71d850203"
+      },
+      "lookups": [
+        "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/78",
+        "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/46"
+      ],
+      "crosswalk": "Merged AttemptLedger already implements commit-before-ACK, exact replay and conflicting-state rejection; Batch01 synthetic evaluator is complementary.",
+      "owner": "Factory #77 / PM",
+      "changed_seam": "No changed seam; proposal duplicates merged receipt semantics.",
+      "proof": "DUPLICATE_OVERLAP",
+      "tests_reused": [
+        "CI-40101207446"
+      ],
+      "overlap_review": "Exact PR #78 ledger and #46 evaluator blobs inspected; no new assertion.",
+      "disposition": "BLOCKED_DUPLICATE_RISK"
+    },
+    {
+      "main_sha": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+      "owner_handoff": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/271#issuecomment-6823601215 (owner archive/checksum handoff; later Windows Check is operational evidence)",
+      "later_decisions": [
+        "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/205#issuecomment-6824875424"
+      ],
+      "new_tests": [
+        {
+          "assertion": "Authenticate the recovered original attestation and source/decision binding",
+          "rationale": "Original attestation was outside detached packet coverage",
+          "invalidation": "Original artifact or trusted signature-chain change"
+        }
+      ],
+      "authority": "Dry run only; no code or data access",
+      "rollback": "Withdraw task proposal; preserve cited evidence",
+      "task": "Request bounded recovery of original February custody attestation",
+      "capability_ids": [
+        "DATA.SOURCE_ATTESTATION"
+      ],
+      "head_pins": {
+        "DATA.SOURCE_ATTESTATION": "84649a323613bf4415c7abc41e774381aa379428"
+      },
+      "lookups": [
+        "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6822693017",
+        "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/308"
+      ],
+      "crosswalk": "As-of consumer validates supplied rights/known_at; independent Audit accepted detached artifact integrity and left original execution attestation partial.",
+      "owner": "Core / Audit #134 / PM",
+      "changed_seam": "Original Core event-to-known_at attestation bound to the February source and decision cutoff.",
+      "proof": "REAL_GAP",
+      "tests_reused": [
+        "AUDIT-FEB-CLOSURE02"
+      ],
+      "overlap_review": "Evidence-only review; no duplicate collector, rerun, or inferred known_at.",
+      "disposition": "PROCEED_TO_APPROVAL"
+    }
+  ],
+  "additional_negative_controls": [
+    "Stale main SHA → INVENTORY_REQUIRED",
+    "Missing capability IDs → BLOCKED_DUPLICATE_RISK"
+  ],
+  "branch_control": "REUSE_WITH_ADAPTER → CONNECT_EXISTING"
+}

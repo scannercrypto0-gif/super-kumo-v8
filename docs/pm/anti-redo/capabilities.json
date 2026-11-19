@@ -1,0 +1,529 @@
+{
+  "schema": "atlas.pm.capabilities.v1",
+  "main_sha": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+  "entries": [
+    {
+      "id": "PM.HANDOFF",
+      "component": "PM",
+      "accountable_role": "PM",
+      "pr": 12,
+      "head": "1948132315ee6a5b3174c56f767c84d1063251cd",
+      "pr_state": "closed-unmerged",
+      "paths": [
+        {
+          "path": "09_DATA_SCHEMAS.md",
+          "main_blob": "c56eb21098b829c072ace568ed46c71e1d981a28"
+        }
+      ],
+      "caller": "PM #205 / G0-GOV-01",
+      "contract": "Conceptual secretarial lifecycle and isolated authority",
+      "evidence_grade": "CODE_INSPECTED",
+      "status": "LEGACY_REUSE_CANDIDATE",
+      "risk": "Consult the accepted operating record and #307 before selectively carrying forward historical policy language. Closed-unmerged prose gives no runtime authority.",
+      "phase": "Governance review",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/12"
+    },
+    {
+      "id": "DATA.ARCHIVE",
+      "component": "DATA",
+      "accountable_role": "Core",
+      "pr": 73,
+      "head": "cb7829e3e3c13c6b6433b6625f2df35d1991a65d",
+      "pr_state": "merged",
+      "paths": [
+        {
+          "path": "src/aql/archive/local.py",
+          "main_blob": "3f5d6eeecc029829fda32ba160d1e16233bf741d"
+        }
+      ],
+      "caller": "ArchiveService / ingestion journal sidecar",
+      "contract": "Bounded segments, expected hashes and optional archive; preserve independent operational ACKs",
+      "evidence_grade": "EXACT_CI",
+      "status": "ACTIVE_CANONICAL",
+      "risk": "Prefer merged storage primitives. Verify exact new source adapter and retention policy separately.",
+      "phase": "Reuse now",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/73"
+    },
+    {
+      "id": "DATA.BACKUP",
+      "component": "DATA",
+      "accountable_role": "Core",
+      "pr": 73,
+      "head": "cb7829e3e3c13c6b6433b6625f2df35d1991a65d",
+      "pr_state": "merged",
+      "paths": [
+        {
+          "path": "src/aql/archive/backup.py",
+          "main_blob": "c3440932651d2403ca61932411c549116d1e1d5a"
+        }
+      ],
+      "caller": "Owner backup/restore operator",
+      "contract": "Verified backup, optional hot SQLite integrity, path and byte limits",
+      "evidence_grade": "EXACT_CI",
+      "status": "ACTIVE_CANONICAL",
+      "risk": "Treat restore and network/source reconciliation as separate functions.",
+      "phase": "Reuse now",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/73"
+    },
+    {
+      "id": "DATA.HISTORICAL_QA",
+      "component": "DATA",
+      "accountable_role": "Core",
+      "pr": 304,
+      "head": "e0e08a8381a8cceaaa44d6ae2721e9cb0d004648",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "tools/historical_source_qa/qa.py",
+          "main_blob": null
+        }
+      ],
+      "caller": "Offline historical intake",
+      "contract": "Native checksum and exact UTC derivation",
+      "evidence_grade": "EXACT_CI",
+      "status": "ALREADY_IMPLEMENTED_NOT_CONNECTED",
+      "risk": "Checksum and bar event time do not establish known_at, usage rights or OOS custody.",
+      "phase": "Source-bound integration",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/304"
+    },
+    {
+      "id": "DATA.AS_OF_VIEW",
+      "component": "DATA",
+      "accountable_role": "Core",
+      "pr": 308,
+      "head": "84649a323613bf4415c7abc41e774381aa379428",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "src/aql/archive/source_view.py",
+          "main_blob": null
+        }
+      ],
+      "caller": "Scanner / Discoverer source views",
+      "contract": "Pins, source eligibility, rights, cutoff and explicit missing coverage",
+      "evidence_grade": "CODE_INSPECTED",
+      "status": "ALREADY_IMPLEMENTED_NOT_CONNECTED",
+      "risk": "Keep source rights and known_at fail-closed. Test only new consumers against this contract.",
+      "phase": "Authorized integration",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/308"
+    },
+    {
+      "id": "DATA.PUBLIC_CAPTURE",
+      "component": "DATA",
+      "accountable_role": "Integration",
+      "pr": 305,
+      "head": "607f258ce9aa754dca8e1ca8c77a69cf4f498398",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "tools/binance_live_feed/run_pilot.py",
+          "main_blob": null
+        }
+      ],
+      "caller": "Owner Windows pilot",
+      "contract": "Shared quota, bounded transport and one-shot capture",
+      "evidence_grade": "ISOLATED_SYNTHETIC",
+      "status": "ALREADY_IMPLEMENTED_NOT_CONNECTED",
+      "risk": "Preserve P0; check source rights, egress, custody and host attestations before Live. No second collector.",
+      "phase": "Owner-local P0",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/305"
+    },
+    {
+      "id": "DATA.PUBLIC_EPHEMERAL",
+      "component": "DATA",
+      "accountable_role": "Integration",
+      "pr": 305,
+      "head": "607f258ce9aa754dca8e1ca8c77a69cf4f498398",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "tools/binance_live_feed/ephemeral.py",
+          "main_blob": null
+        }
+      ],
+      "caller": "Pilot report / bounded measurements",
+      "contract": "Memory-only frame treatment and aggregate export",
+      "evidence_grade": "ISOLATED_SYNTHETIC",
+      "status": "ALREADY_IMPLEMENTED_NOT_CONNECTED",
+      "risk": "No raw evidence for downstream custody. Separate OS memory review and independent Audit status.",
+      "phase": "Owner-local P0",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/305"
+    },
+    {
+      "id": "DATA.G2_OBSERVE",
+      "component": "DATA",
+      "accountable_role": "Core",
+      "pr": 286,
+      "head": "d072544427d6b08473c88b2e36d5857cfd8581dc",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "src/aql/observation/durable_bridge_v1.py",
+          "main_blob": "4aead3b2a4b3a9a1f0475e85dc4192dfd4354c8b"
+        }
+      ],
+      "caller": "Existing owner-host G2 observer",
+      "contract": "Durable forward observation journal and readback",
+      "evidence_grade": "CODE_INDEXED",
+      "status": "DEFER_UNSAFE",
+      "risk": "Existing runtime has isolation boundary. No restart, edit, new observation or maturity claim.",
+      "phase": "Existing G2 governance",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/286"
+    },
+    {
+      "id": "SIGNAL.BULK",
+      "component": "SIGNAL",
+      "accountable_role": "Scanner",
+      "pr": 277,
+      "head": "e09778b90194e33369fd4e7613f8d570fb2a5958",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "tools/scanner_strategy_f/bulk_census.py",
+          "main_blob": null
+        }
+      ],
+      "caller": "Integration / Discoverer",
+      "contract": "Explicit census and source-bound decisions",
+      "evidence_grade": "CODE_INDEXED",
+      "status": "ALREADY_IMPLEMENTED_NOT_CONNECTED",
+      "risk": "Avoid source/policy inference and keep UNKNOWN.",
+      "phase": "Authorized connection",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/277"
+    },
+    {
+      "id": "SIGNAL.MEMBERSHIP",
+      "component": "SIGNAL",
+      "accountable_role": "Scanner",
+      "pr": 309,
+      "head": "35972ffe115cbc1fcde5655d56f1484b19452ca0",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "tools/first_research_cycle/verify_run.py",
+          "main_blob": null
+        }
+      ],
+      "caller": "Readback / historical bridge",
+      "contract": "Verify ordered decision evidence",
+      "evidence_grade": "CODE_INDEXED",
+      "status": "ALREADY_IMPLEMENTED_NOT_CONNECTED",
+      "risk": "Native saved evidence is required for each actual historical row. Synthetic membership does not attest February originals.",
+      "phase": "Custody proof",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/309"
+    },
+    {
+      "id": "RESEARCH.DISCOVER",
+      "component": "RESEARCH",
+      "accountable_role": "Discoverer",
+      "pr": 276,
+      "head": "f3cda931f6f7adb2616f6f20d8e139fef5328450",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "tools/strategy_discoverer_offline/historical_f4_intake.py",
+          "main_blob": null
+        }
+      ],
+      "caller": "Factory and candidate review",
+      "contract": "Canonical intake and original-cohort boundary",
+      "evidence_grade": "CODE_INDEXED",
+      "status": "ALREADY_IMPLEMENTED_NOT_CONNECTED",
+      "risk": "Reject untrusted provenance and missing membership.",
+      "phase": "Authorized connection",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/276"
+    },
+    {
+      "id": "RESEARCH.REVIEW",
+      "component": "RESEARCH",
+      "accountable_role": "Discoverer",
+      "pr": 276,
+      "head": "f3cda931f6f7adb2616f6f20d8e139fef5328450",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "tools/strategy_discoverer_offline/review_vertical.py",
+          "main_blob": null
+        }
+      ],
+      "caller": "Python review consumer",
+      "contract": "Bounded search/readback/export review model",
+      "evidence_grade": "JOINED_TEST_ONLY",
+      "status": "ALREADY_IMPLEMENTED_NOT_CONNECTED",
+      "risk": "Pin accepted test version; confirm current diff before reuse. Browser UI coverage is separate.",
+      "phase": "Authorized connection",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/276"
+    },
+    {
+      "id": "FACTORY.LEGACY_BATCH",
+      "component": "FACTORY",
+      "accountable_role": "Factory",
+      "pr": 46,
+      "head": "a4c106a02c55ee012eedf4c55c1488d71d850203",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "research_wp_r0/strategy_factory.py",
+          "main_blob": null
+        }
+      ],
+      "caller": "Batch01 offline synthetic operator",
+      "contract": "Frozen synthetic families, costs, replay and ranking",
+      "evidence_grade": "CODE_INSPECTED",
+      "status": "LEGACY_REUSE_CANDIDATE",
+      "risk": "Review formulas as candidate references only. No historical/OOS claim or promotion; keep reserve sealed.",
+      "phase": "Differential review only if authorized",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/46"
+    },
+    {
+      "id": "FACTORY.ATTEMPT",
+      "component": "FACTORY",
+      "accountable_role": "Factory",
+      "pr": 78,
+      "head": "4104221085746455547257cc1876705d427cf641",
+      "pr_state": "merged",
+      "paths": [
+        {
+          "path": "research_wp_r0/attempt_ledger.py",
+          "main_blob": "8288ca7f7fd3396d1a19552ee4b74f40016bf242"
+        }
+      ],
+      "caller": "prepare_durable_candidate / Factory",
+      "contract": "Immutable attempt receipts, ACK after commit, conflict detection",
+      "evidence_grade": "EXACT_CI",
+      "status": "ACTIVE_CANONICAL",
+      "risk": "Input receipt is not an evaluated result. For current results use the existing downstream contract.",
+      "phase": "Reuse now",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/78"
+    },
+    {
+      "id": "FACTORY.RESULTS",
+      "component": "FACTORY",
+      "accountable_role": "Factory",
+      "pr": 267,
+      "head": "67c591a8111b8d8d1c3395e602ebcb243d970ac7",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "research_wp_r0/aql_factory_e_research_results_store_v1.py",
+          "main_blob": "56f5b5c720955a2aa8595fdc6006dc28dceef8e9"
+        }
+      ],
+      "caller": "Factory consumers and Lab",
+      "contract": "Immutable stored research results",
+      "evidence_grade": "CODE_INDEXED",
+      "status": "ALREADY_IMPLEMENTED_NOT_CONNECTED",
+      "risk": "Maintain source gates; absent evaluation stays pending. Compare role and source binding before integration.",
+      "phase": "Authorized connection",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/267"
+    },
+    {
+      "id": "LAB.RESEARCH",
+      "component": "LAB",
+      "accountable_role": "Factory/Lab",
+      "pr": 267,
+      "head": "67c591a8111b8d8d1c3395e602ebcb243d970ac7",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "research_wp_r0/aql_factory_h_scientific_lab_v1.py",
+          "main_blob": "cd12e27415c19559f80b8ffbe26101f2e8560622"
+        }
+      ],
+      "caller": "Lab research consumer",
+      "contract": "Scientific Lab contract and research evidence",
+      "evidence_grade": "CODE_INDEXED",
+      "status": "ALREADY_IMPLEMENTED_NOT_CONNECTED",
+      "risk": "No inference of live execution or scientific acceptance.",
+      "phase": "Authorized connection",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/267"
+    },
+    {
+      "id": "RESEARCH.CYCLE",
+      "component": "RESEARCH",
+      "accountable_role": "Integration",
+      "pr": 296,
+      "head": "eb49308d61ffdfc24ed5032df2cb541f37c48bfe",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "tools/first_research_cycle/market_cycle.py",
+          "main_blob": null
+        }
+      ],
+      "caller": "Saved-run operator / reader",
+      "contract": "Pinned retrospective research cycle",
+      "evidence_grade": "CODE_INDEXED",
+      "status": "ALREADY_IMPLEMENTED_NOT_CONNECTED",
+      "risk": "Use original saved receipts for historical readback. Do not rerun as a substitute.",
+      "phase": "Authorized connection",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/296"
+    },
+    {
+      "id": "SECRETARY.DELIVERY",
+      "component": "SECRETARY",
+      "accountable_role": "Core/Integration",
+      "pr": 261,
+      "head": "40ad0b4cf3b4b75b8ba55f524e79af3928b0673f",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "research_wp_r0/aql_core_c_scanner_reconciliation_v1.py",
+          "main_blob": null
+        },
+        {
+          "path": "research_wp_r0/aql_core_c_strategy_secretary_route_v1.py",
+          "main_blob": null
+        }
+      ],
+      "caller": "Scanner to Factory/Lab",
+      "contract": "Strategy-level dispatch and approval separation",
+      "evidence_grade": "JOINED_TEST_ONLY",
+      "status": "ALREADY_IMPLEMENTED_NOT_CONNECTED",
+      "risk": "Reuse durable identity/ACK surfaces. Verify actual caller and authority on changed seams only.",
+      "phase": "Authorized connection",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/261"
+    },
+    {
+      "id": "PAPER.OFFLINE",
+      "component": "PAPER",
+      "accountable_role": "Paper",
+      "pr": 288,
+      "head": "3e7afd10497365dbbfb2a0760bf5f6d0a4591fd1",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "src/aql/paper_sim/adapter.py",
+          "main_blob": null
+        },
+        {
+          "path": "src/aql/paper_sim/contracts.py",
+          "main_blob": null
+        },
+        {
+          "path": "src/aql/paper_sim/engine.py",
+          "main_blob": null
+        },
+        {
+          "path": "src/aql/paper_sim/measure.py",
+          "main_blob": null
+        },
+        {
+          "path": "src/aql/promotion.py",
+          "main_blob": null
+        }
+      ],
+      "caller": "Paper test-only consumer",
+      "contract": "Isolated durable offline simulator",
+      "evidence_grade": "JOINED_TEST_ONLY",
+      "status": "DEFER_UNSAFE",
+      "risk": "Keep operational Paper/LIVE and G0 authority outside scope.",
+      "phase": "Separate owner authorization",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/288"
+    },
+    {
+      "id": "VIEW.BROWSER",
+      "component": "VIEW",
+      "accountable_role": "Integration",
+      "pr": 276,
+      "head": "f3cda931f6f7adb2616f6f20d8e139fef5328450",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "tools/strategy_discoverer_offline/review_vertical.py",
+          "main_blob": null
+        }
+      ],
+      "caller": "Browser UI",
+      "contract": "Python model evidence only; browser consumer still unverified",
+      "evidence_grade": "JOINED_TEST_ONLY",
+      "status": "UNVERIFIED",
+      "risk": "Demand exact UI caller/path and actual browser evidence before an assignment.",
+      "phase": "Targeted inventory",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/276"
+    },
+    {
+      "id": "DATA.SOURCE_ATTESTATION",
+      "component": "DATA",
+      "accountable_role": "Core/Audit",
+      "pr": 308,
+      "head": "84649a323613bf4415c7abc41e774381aa379428",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "src/aql/archive/source_view.py",
+          "main_blob": null
+        }
+      ],
+      "caller": "Original February Core custody",
+      "contract": "Independent native Core known_at/source attestation for accepted retained packet",
+      "evidence_grade": "HISTORICAL_PARTIAL",
+      "status": "REAL_GAP",
+      "risk": "Recover original signed/provenanced evidence. Neither a new collector nor derived candle time closes this gap.",
+      "phase": "Custody handoff only",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/308"
+    },
+    {
+      "id": "PROMOTION.POLICY",
+      "component": "PROMOTION",
+      "accountable_role": "Promotion/Integration",
+      "pr": 271,
+      "head": "182331b90efdcc31cf04476200fe09b45e16997c",
+      "pr_state": "open",
+      "paths": [
+        {
+          "path": "tools/atlas_e_combined_gate_manifest.py",
+          "main_blob": null
+        },
+        {
+          "path": "tools/atlas_f2_owner_execute.py",
+          "main_blob": null
+        },
+        {
+          "path": "tools/atlas_f2_owner_factory_packet_v1.py",
+          "main_blob": null
+        },
+        {
+          "path": "tools/atlas_f2_owner_provenance_v1.py",
+          "main_blob": null
+        },
+        {
+          "path": "tools/atlas_f2_recovery_evidence_v1.py",
+          "main_blob": null
+        },
+        {
+          "path": "tools/atlas_f2_recovery_research_operator.py",
+          "main_blob": null
+        }
+      ],
+      "caller": "Joined Factory to Paper test-only",
+      "contract": "Joined promotion gate evidence",
+      "evidence_grade": "JOINED_TEST_ONLY",
+      "status": "UNVERIFIED",
+      "risk": "Pin exact Promotion supplier path before any assignment; authority remains limited to test-only.",
+      "phase": "Targeted inventory",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/271"
+    },
+    {
+      "id": "INDICATORS.BASE",
+      "component": "INDICATORS",
+      "accountable_role": "Core/Research",
+      "pr": 63,
+      "head": "95c2498dd47a444ff1c88fcc14401399b4d91e62",
+      "pr_state": "merged",
+      "paths": [
+        {
+          "path": "research_wp_r0/_dep_guard.py",
+          "main_blob": "09df4b6040e2fd85b54829069f178ed639fb83fa"
+        }
+      ],
+      "caller": "Strategy Factory and replay",
+      "contract": "Merged base indicators from #63",
+      "evidence_grade": "CODE_INDEXED",
+      "status": "ACTIVE_CANONICAL",
+      "risk": "Use the main-tree symbol index for individual indicator callers.",
+      "phase": "Reuse now",
+      "source": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/63"
+    }
+  ]
+}

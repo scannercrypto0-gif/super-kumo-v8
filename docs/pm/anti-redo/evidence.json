@@ -1,0 +1,396 @@
+{
+  "schema": "atlas.pm.evidence.v1",
+  "entries": [
+    {
+      "evidence_id": "CI-43221921066",
+      "capabilities": [
+        "DATA.PUBLIC_EPHEMERAL"
+      ],
+      "source_sha": "607f258ce9aa754dca8e1ca8c77a69cf4f498398",
+      "test_repository_sha": "607f258ce9aa754dca8e1ca8c77a69cf4f498398",
+      "test_blob_sha": null,
+      "test_workflow": ".github/workflows/binance-live-feed-303.yml",
+      "checkout_sha_provenance": "Run head or explicitly cited PR evidence; validate checkout steps for any artifact-level or merge-tree claim",
+      "scope": "Ephemeral offline delta; no live traffic",
+      "fixture": "Local synthetic transport and bounded ephemeral/quota fixtures",
+      "grade": "ISOLATED_OFFLINE",
+      "ci_url": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/43221921066",
+      "jobs": [
+        {
+          "id": 131195294600,
+          "name": "offline-acceptance (ubuntu-latest)",
+          "conclusion": "success"
+        },
+        {
+          "id": 131195295234,
+          "name": "offline-acceptance (windows-latest)",
+          "conclusion": "success"
+        }
+      ],
+      "artifact_sha256": "da6ed82fd529fe7a6e168b9f6798379a5fd41484a7073a86b915db0bd2e67fa9",
+      "artifact_scope": "Work local evidence ZIP hash reported by Audit request; not CI artifact",
+      "audit_url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6824185646",
+      "audit_verdict": "review request; independent disposition not confirmed",
+      "validity": "Exact head/workflow/fixture scope; compare current content pins before carrying evidence forward",
+      "invalidation": "Ephemeral retention, quota or timing-contract change",
+      "workflow_blob_sha": "1328bb2d343a99cad06a33b9c2b6f8bb90e43976",
+      "workflow_settings_and_test_commands": [
+        "- uses: actions/checkout@v4",
+        "ref: ${{ github.event.pull_request.head.sha || github.sha }}",
+        "python-version: '3.13'",
+        "- run: python -m pip install pytest==9.0.2 websocket-client==1.9.2",
+        "run: python -B -m pytest tools/binance_live_feed/test_feed.py tools/binance_live_feed/test_run_pilot.py -q --junitxml=feed-tests.xml",
+        "- run: python -B -m pytest tools/binance_live_feed/test_ephemeral.py -q --junitxml=ephemeral-tests.xml",
+        "- uses: actions/upload-artifact@v4"
+      ]
+    },
+    {
+      "evidence_id": "CI-43177927719",
+      "capabilities": [
+        "SECRETARY.DELIVERY"
+      ],
+      "source_sha": "74a8dc7c502791d237b025db9448c2f02596684a",
+      "test_repository_sha": "74a8dc7c502791d237b025db9448c2f02596684a",
+      "test_blob_sha": null,
+      "test_workflow": ".github/workflows/atlas-i0-i6-joined.yml",
+      "checkout_sha_provenance": "Run head or explicitly cited PR evidence; validate checkout steps for any artifact-level or merge-tree claim",
+      "scope": "I0–I6 joined test-only route",
+      "fixture": "Isolated synthetic integration fixture",
+      "grade": "JOINED_TEST_ONLY",
+      "ci_url": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/43177927719",
+      "jobs": [
+        {
+          "id": 131053140727,
+          "name": "joined (windows-latest)",
+          "conclusion": "success"
+        },
+        {
+          "id": 131053142583,
+          "name": "joined (ubuntu-latest)",
+          "conclusion": "success"
+        }
+      ],
+      "artifact_sha256": null,
+      "artifact_scope": null,
+      "audit_url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6818717509",
+      "audit_verdict": "PASS_BOUNDED_JOINED_TEST_ONLY_CROSS_PLATFORM",
+      "validity": "Exact head/workflow/fixture scope; compare current content pins before carrying evidence forward",
+      "invalidation": "Any pinned seam, fixture, runner or permission contract change",
+      "workflow_blob_sha": "3016e399c58f1c7c4c8c06309992bf8ec3323941",
+      "workflow_settings_and_test_commands": [
+        "- uses: actions/checkout@v4",
+        "python-version: '3.12'",
+        "- run: python -m pip install pytest==9.0.2",
+        "- uses: actions/upload-artifact@v4"
+      ]
+    },
+    {
+      "evidence_id": "CI-43186443684",
+      "capabilities": [
+        "RESEARCH.REVIEW"
+      ],
+      "source_sha": "e34a57920a5330b26bf2acdab86529ed9d8d5e5e",
+      "test_repository_sha": "e34a57920a5330b26bf2acdab86529ed9d8d5e5e",
+      "test_blob_sha": null,
+      "test_workflow": ".github/workflows/discoverer-review-vertical.yml",
+      "checkout_sha_provenance": "Run head or explicitly cited PR evidence; validate checkout steps for any artifact-level or merge-tree claim",
+      "scope": "Bounded Discoverer review vertical",
+      "fixture": "Review vertical fixtures; no browser proof",
+      "grade": "JOINED_TEST_ONLY",
+      "ci_url": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/43186443684",
+      "jobs": [
+        {
+          "id": 131084579420,
+          "name": "bounded (windows-latest)",
+          "conclusion": "success"
+        },
+        {
+          "id": 131084581543,
+          "name": "bounded (ubuntu-latest)",
+          "conclusion": "success"
+        }
+      ],
+      "artifact_sha256": null,
+      "artifact_scope": null,
+      "audit_url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6819896247",
+      "audit_verdict": "independent bounded Discoverer review; consult exact limits",
+      "validity": "Exact head/workflow/fixture scope; compare current content pins before carrying evidence forward",
+      "invalidation": "Core/Discoverer review or export contract change",
+      "workflow_blob_sha": "15480eeefff237122747f0ed7598e7b60267cca7",
+      "workflow_settings_and_test_commands": [
+        "- uses: actions/checkout@v4",
+        "ref: ${{ github.event.pull_request.head.sha }}",
+        "- uses: actions/checkout@v4",
+        "ref: 84649a323613bf4415c7abc41e774381aa379428",
+        "- uses: actions/checkout@v4",
+        "ref: 203289f7cac191dca92df2f4d8fa84ec9cf369cc",
+        "- uses: actions/checkout@v4",
+        "ref: 3e7afd10497365dbbfb2a0760bf5f6d0a4591fd1",
+        "python-version: '3.12'",
+        "python -m pip install pytest==8.4.2",
+        "case=tools/strategy_discoverer_offline/tests/test_review_vertical.py",
+        "python -B -m pytest \"$case\" -q -p no:cacheprovider --basetemp \"$RUNNER_TEMP/review-tests\" 2>&1 | tee review-tests.txt",
+        "- uses: actions/upload-artifact@v4"
+      ]
+    },
+    {
+      "evidence_id": "CI-42975587622",
+      "capabilities": [
+        "DATA.HISTORICAL_QA"
+      ],
+      "source_sha": "e0e08a8381a8cceaaa44d6ae2721e9cb0d004648",
+      "test_repository_sha": "e0e08a8381a8cceaaa44d6ae2721e9cb0d004648",
+      "test_blob_sha": null,
+      "test_workflow": ".github/workflows/historical-source-qa.yml",
+      "checkout_sha_provenance": "Run head or explicitly cited PR evidence; validate checkout steps for any artifact-level or merge-tree claim",
+      "scope": "Offline archive QA",
+      "fixture": "Offline source validation fixtures",
+      "grade": "ISOLATED_OFFLINE",
+      "ci_url": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/42975587622",
+      "jobs": [
+        {
+          "id": 130373802634,
+          "name": "qa (ubuntu-latest)",
+          "conclusion": "success"
+        },
+        {
+          "id": 130373802972,
+          "name": "qa (windows-latest)",
+          "conclusion": "success"
+        }
+      ],
+      "artifact_sha256": null,
+      "artifact_scope": null,
+      "audit_url": null,
+      "audit_verdict": "Independent verdict not independently linked in this record",
+      "validity": "Exact head/workflow/fixture scope; compare current content pins before carrying evidence forward",
+      "invalidation": "Checksum, UTC or parser changes",
+      "workflow_blob_sha": "ab9593e7f74c1a6dd6e92365a3ce8fab586613e3",
+      "workflow_settings_and_test_commands": [
+        "- uses: actions/checkout@v4",
+        "with: {python-version: '3.11'}",
+        "- run: python -B -m unittest -v tools.historical_source_qa.test_qa"
+      ]
+    },
+    {
+      "evidence_id": "CI-42985701745",
+      "capabilities": [
+        "DATA.PUBLIC_CAPTURE"
+      ],
+      "source_sha": "e2b78703dccaefc5acc91be705025d1571f2cf4f",
+      "test_repository_sha": "e2b78703dccaefc5acc91be705025d1571f2cf4f",
+      "test_blob_sha": null,
+      "test_workflow": ".github/workflows/binance-live-feed-303.yml",
+      "checkout_sha_provenance": "Run head or explicitly cited PR evidence; validate checkout steps for any artifact-level or merge-tree claim",
+      "scope": "Historical offline pilot rehearsal",
+      "fixture": "Synthetic feed and quota fixtures",
+      "grade": "ISOLATED_OFFLINE",
+      "ci_url": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/42985701745",
+      "jobs": [
+        {
+          "id": 130406220152,
+          "name": "offline-acceptance (windows-latest)",
+          "conclusion": "success"
+        },
+        {
+          "id": 130406220700,
+          "name": "offline-acceptance (ubuntu-latest)",
+          "conclusion": "success"
+        }
+      ],
+      "artifact_sha256": null,
+      "artifact_scope": null,
+      "audit_url": null,
+      "audit_verdict": "Independent verdict not independently linked in this record",
+      "validity": "Exact head/workflow/fixture scope; compare current content pins before carrying evidence forward",
+      "invalidation": "Transport/reconnect/quota change; superseded for ephemeral delta by 43221921066",
+      "workflow_blob_sha": "4a2e558700d26e0289a5e4e09ed017b2fb2e3972",
+      "workflow_settings_and_test_commands": [
+        "- uses: actions/checkout@v4",
+        "ref: ${{ github.event.pull_request.head.sha || github.sha }}",
+        "python-version: '3.13'",
+        "- run: python -m pip install pytest==9.0.2 websocket-client==1.9.2",
+        "- run: python -B -m pytest tools/binance_live_feed/test_feed.py tools/binance_live_feed/test_run_pilot.py -q --junitxml=feed-tests.xml",
+        "- uses: actions/upload-artifact@v4"
+      ]
+    },
+    {
+      "evidence_id": "CI-40089205693",
+      "capabilities": [
+        "DATA.ARCHIVE",
+        "DATA.BACKUP"
+      ],
+      "source_sha": "cb7829e3e3c13c6b6433b6625f2df35d1991a65d",
+      "test_repository_sha": "cb7829e3e3c13c6b6433b6625f2df35d1991a65d",
+      "test_blob_sha": null,
+      "test_workflow": ".github/workflows/g1-storage-02.yml",
+      "checkout_sha_provenance": "Run head or explicitly cited PR evidence; validate checkout steps for any artifact-level or merge-tree claim",
+      "scope": "Archive and backup six-job matrix",
+      "fixture": "Temporary fixture archive and SQLite snapshots",
+      "grade": "ISOLATED_OFFLINE",
+      "ci_url": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40089205693",
+      "jobs": [
+        {
+          "id": 120858230009,
+          "name": "Archive (ubuntu-latest, Python 3.12)",
+          "conclusion": "success"
+        },
+        {
+          "id": 120858230137,
+          "name": "Archive (windows-latest, Python 3.14)",
+          "conclusion": "success"
+        },
+        {
+          "id": 120858230183,
+          "name": "Archive (windows-latest, Python 3.11)",
+          "conclusion": "success"
+        },
+        {
+          "id": 120858230221,
+          "name": "Archive (ubuntu-latest, Python 3.11)",
+          "conclusion": "success"
+        },
+        {
+          "id": 120858230230,
+          "name": "Archive (ubuntu-latest, Python 3.14)",
+          "conclusion": "success"
+        },
+        {
+          "id": 120858230338,
+          "name": "Archive (windows-latest, Python 3.12)",
+          "conclusion": "success"
+        }
+      ],
+      "artifact_sha256": null,
+      "artifact_scope": null,
+      "audit_url": null,
+      "audit_verdict": "Independent verdict not independently linked in this record",
+      "validity": "Exact head/workflow/fixture scope; compare current content pins before carrying evidence forward",
+      "invalidation": "Archive bytes, path handling, backup format, or platform contract change",
+      "workflow_blob_sha": "df837dc1c19596a1448bcb086ec234e5b82a67b6",
+      "workflow_settings_and_test_commands": [
+        "- uses: actions/checkout@v4",
+        "ref: ${{ github.event.pull_request.head.sha || github.sha }}",
+        "python-version: ${{ matrix.python }}",
+        "- name: Exact imported archive checkout",
+        "run: python -B -m pytest tests/test_g1_storage_02.py -v --tb=short --junitxml=storage02.xml",
+        "- uses: actions/upload-artifact@v4"
+      ]
+    },
+    {
+      "evidence_id": "CI-40101207446",
+      "capabilities": [
+        "FACTORY.ATTEMPT"
+      ],
+      "source_sha": "4104221085746455547257cc1876705d427cf641",
+      "test_repository_sha": "4104221085746455547257cc1876705d427cf641",
+      "test_blob_sha": null,
+      "test_workflow": ".github/workflows/sf-research-int-01.yml",
+      "checkout_sha_provenance": "Run head or explicitly cited PR evidence; validate checkout steps for any artifact-level or merge-tree claim",
+      "scope": "Factory six-job matrix",
+      "fixture": "Offline synthetic inputs, temporary SQLite and process-exit recovery",
+      "grade": "ISOLATED_OFFLINE",
+      "ci_url": "https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/40101207446",
+      "jobs": [
+        {
+          "id": 120893551742,
+          "name": "contracts (ubuntu-latest, 3.10)",
+          "conclusion": "success"
+        },
+        {
+          "id": 120893551891,
+          "name": "contracts (windows-latest, 3.11)",
+          "conclusion": "success"
+        },
+        {
+          "id": 120893551935,
+          "name": "contracts (windows-latest, 3.10)",
+          "conclusion": "success"
+        },
+        {
+          "id": 120893551938,
+          "name": "contracts (windows-latest, 3.12)",
+          "conclusion": "success"
+        },
+        {
+          "id": 120893551974,
+          "name": "contracts (ubuntu-latest, 3.12)",
+          "conclusion": "success"
+        },
+        {
+          "id": 120893552022,
+          "name": "contracts (ubuntu-latest, 3.11)",
+          "conclusion": "success"
+        }
+      ],
+      "artifact_sha256": null,
+      "artifact_scope": null,
+      "audit_url": null,
+      "audit_verdict": "Independent verdict not independently linked in this record",
+      "validity": "Exact head/workflow/fixture scope; compare current content pins before carrying evidence forward",
+      "invalidation": "ACK, state mapping, persistence or identity contract change",
+      "workflow_blob_sha": "1408e9eb3ec0379b0fede223139eddbe0bd7fe28",
+      "workflow_settings_and_test_commands": [
+        "- uses: actions/checkout@v4",
+        "ref: ${{ github.event.pull_request.head.sha || github.sha }}",
+        "python-version: ${{ matrix.python }}",
+        "- run: python -m pip install pytest pytest-timeout",
+        "run: python -B -m pytest -p no:cacheprovider tests/test_sf_data_01.py tests/test_sf_ind_01.py tests/test_sf_dep_guard.py tests/test_sf_ind_02.py tests/test_sf_strat_01.py integration_tests/test_sf_strat_ind02.py tests/test_sf_research_int_01.py tests/test_sf_content_identity.py tests/test_sf_attempt_ledger.py -v --tb=short --junitxml=sf-research-int-01.xml",
+        "- uses: actions/upload-artifact@v4"
+      ]
+    },
+    {
+      "evidence_id": "AUDIT-FEB-CLOSURE02",
+      "capabilities": [
+        "DATA.SOURCE_ATTESTATION",
+        "SIGNAL.MEMBERSHIP"
+      ],
+      "grade": "HISTORICAL_PARTIAL",
+      "fixture": "Owner February 2024 closure-02 private ZIP",
+      "artifact_sha256": "feb071e8a6c21b866d7bf289d963ecf840d06c731c0af0d44124fa1991b5778a",
+      "source_sha": null,
+      "test_repository_sha": null,
+      "ci_url": null,
+      "audit_url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6822693017",
+      "audit_verdict": "PASS_BOUNDED_DETACHED_ARTIFACT_INTEGRITY / PARTIAL_ORIGINAL_EXECUTION_ATTESTATION",
+      "validity": "Exact detached packet only",
+      "invalidation": "Any bytes, custody assertions or original decision membership change"
+    },
+    {
+      "evidence_id": "AUDIT-MCRS-01",
+      "capabilities": [
+        "SIGNAL.BULK",
+        "RESEARCH.DISCOVER",
+        "FACTORY.RESULTS"
+      ],
+      "grade": "CODE_DELTA_PARTIAL",
+      "fixture": "Original approved engineering seam and reused joined evidence",
+      "source_sha": null,
+      "test_repository_sha": null,
+      "ci_url": null,
+      "audit_url": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-6823104779",
+      "audit_verdict": "PASS_CODE_DELTA_INSPECTION / PARTIAL_BLOCKED_PRIVATE_PACKET_ACCESS",
+      "validity": "Code inspection only at pins in Audit comment",
+      "invalidation": "Any seam pin, contract, or private packet availability change"
+    },
+    {
+      "evidence_id": "NOV10-REPLAY",
+      "capabilities": [
+        "DATA.HISTORICAL_QA",
+        "SIGNAL.BULK"
+      ],
+      "grade": "HISTORICAL_REPLAY_REPORTED",
+      "fixture": "Owner November 10 2026 Vision ZIP and CHECKSUM",
+      "source_sha": null,
+      "test_repository_sha": null,
+      "ci_url": null,
+      "artifact_sha256": null,
+      "audit_url": null,
+      "work_url": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/271#issuecomment-6823601215",
+      "audit_verdict": "No independent live or original native custody claim",
+      "validity": "Retrospective archive and Scanner replay only",
+      "invalidation": "Change to archive bytes, QA or replay contract"
+    }
+  ],
+  "null_semantics": "Unverified or unavailable at this layer. Cannot satisfy a stronger evidence claim."
+}
