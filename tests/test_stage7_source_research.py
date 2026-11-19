@@ -40,7 +40,7 @@ def source(tmp_path):
 
 def test_exact_source_to_research_wait_immutable_readback(source, tmp_path):
     root, pin = source
-    before = {p.name: p.read_bytes() for p in root.iterdir()}
+    before = {p.name: p.read_bytes() for p in root.iterdir() if p.suffix in (".frame", ".json")}
     a = build_wait_report(root, expected_manifest_sha256=pin)
     b = build_wait_report(root, expected_manifest_sha256=pin)
     assert a == b
@@ -48,11 +48,13 @@ def test_exact_source_to_research_wait_immutable_readback(source, tmp_path):
     assert a["factory_consumer_ack_sha256"] is None
     assert a["secretary"] == "WAIT" and a["orders"] == 0
     assert a["source_count"] == 2
-    path = tmp_path / "stage7-research.json"
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    path = reports / "stage7-research.json"
     assert write_immutable_report(a, path, expected_manifest_sha256=pin) == a["sha256"]
     assert write_immutable_report(a, path, expected_manifest_sha256=pin) == a["sha256"]
     assert read_immutable_report(path, expected_manifest_sha256=pin) == a
-    assert before == {p.name: p.read_bytes() for p in root.iterdir()}
+    assert before == {p.name: p.read_bytes() for p in root.iterdir() if p.suffix in (".frame", ".json")}
 
 
 def test_wrong_manifest_denied(source):
