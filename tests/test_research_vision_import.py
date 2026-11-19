@@ -18,7 +18,7 @@ class VisionImportTest(unittest.TestCase):
     def test_atomic_rollback_when_late_source_conflicts(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "native.csv"
-            path.write_text(line(0) + "\\n" + line(1) + "\\n", encoding="utf-8")
+            path.write_text(line(0) + "\n" + line(1) + "\n", encoding="utf-8")
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
             with ResearchBarStore(Path(tmp) / "bars.sqlite") as store:
                 conflicting = dict(symbol="BTCUSDT", interval="1m", open_ms=60000,
