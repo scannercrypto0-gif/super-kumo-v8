@@ -12,6 +12,7 @@ on:
       - "tests/test_research_vision_import.py"
       - "tests/test_research_ws_1m_ingest.py"
       - "tests/test_research_ws_capture_import.py"
+      - "tools/ATLAS-RESEARCH-WINDOWS-PREFLIGHT.ps1"
       - ".github/workflows/research-finalized-timeframes.yml"
   workflow_dispatch:
 
@@ -33,3 +34,7 @@ jobs:
         run: python -m pip install -e ".[dev]"
       - name: Focused research timeframe tests
         run: python -m pytest -q tests/test_research_timeframes.py tests/test_research_bar_store.py tests/test_research_vision_import.py tests/test_research_ws_1m_ingest.py tests/test_research_ws_capture_import.py
+      - name: Windows owner-local preflight dry run (no host changes)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tools/ATLAS-RESEARCH-WINDOWS-PREFLIGHT.ps1 -StateRoot "${{ runner.temp }}/nonexistent-atlas-state" -OutputDirectory "${{ runner.temp }}/atlas-preflight"
