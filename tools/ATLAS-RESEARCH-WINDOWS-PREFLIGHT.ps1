@@ -6,6 +6,9 @@ param(
     [string]$OutputDirectory = "$env:TEMP\\atlas-research-preflight"
 )
 $ErrorActionPreference = "Stop"
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+Push-Location -LiteralPath $repoRoot
+try {
 $tasks = @("ATLAS-Research-Sustained-Spot-WS", "ATLAS-Research-Sustained-BTCUSDT-Daily")
 $report = [ordered]@{
     schema = "aql.windows.research-preflight.v1"
@@ -57,4 +60,7 @@ $output = Join-Path $OutputDirectory "research-preflight.json"
 $report | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $output -Encoding UTF8
 Write-Output ($report | ConvertTo-Json -Depth 6)
 Write-Output "RECEIPT_PATH=$output"
+} finally {
+    Pop-Location
+}
 if ($report.offline_tests -ne "PASS") { exit 1 }
