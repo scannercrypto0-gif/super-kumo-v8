@@ -63,8 +63,9 @@ def import_pinned_vision_csv(store: ResearchBarStore, path, *, symbol, expected_
     from aql.research_timeframes import project_finalized_1m
     for row in rows:
         project_finalized_1m([row], "1m", source_class="RETROSPECTIVE_NON_PIT")
-    for row in rows:
-        store.insert_1m(row, source_class="RETROSPECTIVE_NON_PIT")
+    projected = [project_finalized_1m([row], "1m", source_class="RETROSPECTIVE_NON_PIT")
+                 for row in rows]
+    store.insert_batch(projected)
     return {"status": "RETROSPECTIVE_NON_PIT_IMPORTED",
             "rows": len(rows), "source_sha256": expected_sha256,
             "first_open_ms": rows[0]["open_ms"], "last_open_ms": rows[-1]["open_ms"],
