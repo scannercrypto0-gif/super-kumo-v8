@@ -26,6 +26,8 @@ def import_pinned_vision_csv(store: ResearchBarStore, path, *, symbol, expected_
     if type(max_rows) is not int or not 1 <= max_rows <= 10080:
         raise ValueError("BOUND_REQUIRED")
     # Read and verify complete source before any repository mutation.
+    if source.stat().st_size > max_rows * 512:
+        raise ValueError("SOURCE_TOO_LARGE")
     raw = source.read_bytes()
     if len(raw) > max_rows * 512:
         raise ValueError("SOURCE_TOO_LARGE")
@@ -61,8 +63,6 @@ def import_pinned_vision_csv(store: ResearchBarStore, path, *, symbol, expected_
                          available_at_ms=available_at_ms))
     # Validate entire batch before any write, then preserve immutable rows.
     from aql.research_timeframes import project_finalized_1m
-    for row in rows:
-        project_finalized_1m([row], "1m", source_class="RETROSPECTIVE_NON_PIT")
     projected = [project_finalized_1m([row], "1m", source_class="RETROSPECTIVE_NON_PIT")
                  for row in rows]
     store.insert_batch(projected)
