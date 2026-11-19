@@ -1,0 +1,18 @@
+{
+  "a/tools/first_research_cycle/__init__.py": "5ea840e39930207232d5d9f366814938f836bbdb4fc15b3973191127fe5cc2b5",
+  "a/tools/first_research_cycle/cycle.py": "337d55447b35fe27607ef0d28e7eebb0156d70ea24b5d77a92005bcfb7184cb3",
+  "a/tools/first_research_cycle/market_cycle.py": "8b4e6029e996aee3bff9ab9b2f508cb5330e7559c1e2652b4391148626899646",
+  "a/tools/first_research_cycle/stage_dependencies.py": "b9b08f2ae26726f16c90a5d95e59f340271e484c14480f4b21d273837e5e5ec6",
+  "a/tools/first_research_cycle/test_cycle.py": "3b6dd8d9e925fa766e3559f6c836ef42e5a64ba2e9909d3c78b77949383ab679",
+  "a/tools/first_research_cycle/test_market.py": "0011bad6d17469035e703d45d24334914ffabbf58750436928868fc7b721f888",
+  "a/tools/first_research_cycle/verify_run.py": "3bf9690728fafaf0c441ad79659bd8a970d29575ba30bb8595448c54c3530ffe",
+  "b/tools/research_capacity_scale/__init__.py": "37b940447d5512b87aea3d425d4124ca660cbae04e87244ec6c7b0d2fa21385e",
+  "b/tools/research_capacity_scale/__main__.py": "07cad651c2bf74b01566d443d72469fbd57ddeef29bc5884a366d17a5bf794b3",
+  "b/tools/research_capacity_scale/benchmark.py": "2a13dd0ceb43d8b4e9b586def26a863c4d60dbd41f2f6a253385d012989eafac",
+  "b/tools/research_capacity_scale/contracts.py": "09cc2efb8ce5665cf1ca15e73dfa340bd87e00366a8e7824bd9e23be1c756851",
+  "b/tools/research_capacity_scale/dependencies.py": "d3982b815c758c6c418a75f1881b1605004fc3262cc6f4118dbe3bb62ba79f22",
+  "b/tools/research_capacity_scale/resources.py": "29626144a954e61cf22b629a0779e9365d2aca065ec26938d2ba2b500f463a0b",
+  "b/tools/research_capacity_scale/runtime.py": "6c62a209d4039fcd1e88516351da2f463bcfcfb66712f14a0494079c60bfe703",
+  "b/tools/research_capacity_scale/tests/test_capacity.py": "f917460b35dae0ce875a44093eb95054352e2298955383e2e216d09e86ef07f5",
+  "b/tools/research_capacity_scale/worker.py": "b2d6acd548e22497329becca65a85a495b12ab41b3d6924127426fde0a379db9"
+}
