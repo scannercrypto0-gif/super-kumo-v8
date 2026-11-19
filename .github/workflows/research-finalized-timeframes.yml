@@ -56,4 +56,7 @@ jobs:
       - name: Windows owner one-shot authorization gate dry run
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./tools/ATLAS-RESEARCH-1M-OWNER-ONE-SHOT.ps1 -StateRoot "${{ runner.temp }}/nonexistent-atlas-state" -OutputDirectory "${{ runner.temp }}/atlas-owner-one-shot"
+        run: |
+          $script = (Resolve-Path ./tools/ATLAS-RESEARCH-1M-OWNER-ONE-SHOT.ps1).Path
+          Push-Location "${{ runner.temp }}"
+          try { & $script -StateRoot "${{ runner.temp }}/nonexistent-atlas-state" -OutputDirectory "${{ runner.temp }}/atlas-owner-one-shot" } finally { Pop-Location }
