@@ -8,12 +8,12 @@ from __future__ import annotations
 import hashlib
 import json
 
-from aql.research_timeframes import MINUTE
+from aql.research_timeframes import MINUTE, project_finalized_1m
 from aql.research_bar_store import ResearchBarStore
 
 
-def ingest_closed_1m_frame(store: ResearchBarStore, raw: bytes, *,
-                           received_at_ms: int, expected_symbol="BTCUSDT"):
+def project_closed_1m_frame(raw: bytes, *, received_at_ms: int,
+                            expected_symbol="BTCUSDT"):
     if type(raw) is not bytes or not 0 < len(raw) <= 65536:
         raise ValueError("FRAME_BOUND")
     if type(received_at_ms) is not int or received_at_ms < 0:
@@ -55,9 +55,16 @@ def ingest_closed_1m_frame(store: ResearchBarStore, raw: bytes, *,
         "source_sha256": hashlib.sha256(raw).hexdigest(),
         "available_at_ms": received_at_ms,
     }
-    result = store.insert_1m(bar, source_class="FORWARD_UNQUALIFIED")
+    return project_finalized_1m([bar], "1m", source_class="FORWARD_UNQUALIFIED")
+
+
+def ingest_closed_1m_frame(store: ResearchBarStore, raw: bytes, *,
+                           received_at_ms: int, expected_symbol="BTCUSDT"):
+    result = project_closed_1m_frame(raw, received_at_ms=received_at_ms,
+                                     expected_symbol=expected_symbol)
+    store.insert_batch([result])
     return {"status": "FORWARD_UNQUALIFIED_PERSISTED",
             "symbol": expected_symbol, "open_ms": opened,
-            "bar_sha256": result["sha256"], "source_sha256": bar["source_sha256"],
+            "bar_sha256": result["sha256"], "source_sha256": result["constituent_sha256"][0],
             "source_authenticity": "NOT_INDEPENDENTLY_ATTESTED",
             "trading_authority": "NONE"}
