@@ -27,6 +27,7 @@ on:
       - "tests/test_research_live_1m_capture.py"
       - "tests/test_research_live_one_shot.py"
       - "tools/ATLAS-RESEARCH-WINDOWS-PREFLIGHT.ps1"
+      - "tools/ATLAS-RESEARCH-1M-OWNER-ONE-SHOT.ps1"
       - ".github/workflows/research-finalized-timeframes.yml"
   workflow_dispatch:
 
@@ -52,3 +53,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./tools/ATLAS-RESEARCH-WINDOWS-PREFLIGHT.ps1 -StateRoot "${{ runner.temp }}/nonexistent-atlas-state" -OutputDirectory "${{ runner.temp }}/atlas-preflight"
+      - name: Windows owner one-shot authorization gate dry run
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tools/ATLAS-RESEARCH-1M-OWNER-ONE-SHOT.ps1 -StateRoot "${{ runner.temp }}/nonexistent-atlas-state" -OutputDirectory "${{ runner.temp }}/atlas-owner-one-shot"
