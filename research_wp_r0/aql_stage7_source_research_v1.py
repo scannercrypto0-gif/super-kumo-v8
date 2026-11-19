@@ -116,3 +116,42 @@ def read_immutable_report(destination, *, expected_manifest_sha256):
           and path.stat().st_size < 65536, "REPORT_PATH_OR_BOUND")
     return verify_wait_report(json.loads(path.read_bytes()),
                               expected_manifest_sha256=expected_manifest_sha256)
+
+
+def main(argv=None):
+    """Operator-local, read-only original-source verification with separate report."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", required=True, type=Path)
+    parser.add_argument("--manifest-sha256", required=True)
+    parser.add_argument("--output", required=True, type=Path)
+    args = parser.parse_args(argv)
+    source = args.source.resolve(strict=True)
+    output = args.output.resolve(strict=False)
+    _need(source.is_dir() and output != source
+          and source not in output.parents, "OUTPUT_MUST_BE_OUTSIDE_SOURCE")
+    _need(output.parent.is_dir(), "OUTPUT_PARENT_REQUIRED")
+    report = build_wait_report(source, expected_manifest_sha256=args.manifest_sha256)
+    write_immutable_report(report, output, expected_manifest_sha256=args.manifest_sha256)
+    reread = read_immutable_report(output, expected_manifest_sha256=args.manifest_sha256)
+    _need(report == reread, "IMMUTABLE_READBACK_DRIFT")
+    print(json.dumps({
+        "status": "STAGE7_OWNER_LOCAL_WAIT_READBACK_PASS",
+        "report_sha256": report["sha256"],
+        "manifest_sha256": report["source_manifest_sha256"],
+        "source_count": report["source_count"],
+        "source_digests": report["source_digests"],
+        "g1_core_source_checksums": report["g1_core_source_checksums"],
+        "scanner_route": report["scanner_route"],
+        "secretary": report["secretary"],
+        "factory_research_status": report["factory_research_status"],
+        "orders": report["orders"],
+        "clock": report["clock"],
+        "historical_pit": report["historical_pit"],
+        "output": str(output),
+    }, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()
