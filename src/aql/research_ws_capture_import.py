@@ -25,6 +25,8 @@ def import_pinned_ws_jsonl(store, path, *, expected_sha256, received_at_ms, max_
         raise ValueError("RECEIPT_CLOCK_REQUIRED")
     if type(max_frames) is not int or not 1 <= max_frames <= 10080:
         raise ValueError("FRAME_BOUND")
+    if source.stat().st_size > max_frames * 65537:
+        raise ValueError("SOURCE_TOO_LARGE")
     raw = source.read_bytes()
     if len(raw) > max_frames * 65537:
         raise ValueError("SOURCE_TOO_LARGE")
