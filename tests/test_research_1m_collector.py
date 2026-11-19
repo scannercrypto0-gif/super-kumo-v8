@@ -43,7 +43,7 @@ class CollectorTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             raw = json.loads(frame(0, False))
             raw["s"] = "ETHUSDT"
-            with self.assertRaisesRegex(ValueError, "PROVISIONAL_KLINE"):
+            with self.assertRaisesRegex(ValueError, "FOREIGN_KLINE"):
                 collect_authorized_1m(
                     reader=lambda: ("text", json.dumps(raw).encode()),
                     clock_ms=lambda: 60001, spool_dir=Path(tmp) / "spool",
