@@ -44,16 +44,27 @@ class ResearchBarStore:
         return projected
 
     def _insert(self, projected):
+        with self.db:
+            self.insert_batch([projected])
+
+    def insert_batch(self, projected_rows):
+        """Atomically append a validated batch; reject any conflicting key."""
+        if not isinstance(projected_rows, list) or not projected_rows:
+            raise ValueError("BATCH_REQUIRED")
+        with self.db:
+            for projected in projected_rows:
+                self._insert_in_transaction(projected)
+
+    def _insert_in_transaction(self, projected):
         key = (projected["symbol"], projected["interval"], projected["open_ms"])
         payload = json.dumps(projected, sort_keys=True, separators=(",", ":"))
-        with self.db:
-            self.db.execute("INSERT OR IGNORE INTO finalized_bars VALUES (?,?,?,?,?)",
-                            (*key, projected["sha256"], payload))
-            row = self.db.execute(
-                "SELECT sha256,payload FROM finalized_bars WHERE symbol=? AND interval=? AND open_ms=?",
-                key).fetchone()
-            if row != (projected["sha256"], payload):
-                raise ValueError("SOURCE_REWRITE_DENIED")
+        self.db.execute("INSERT OR IGNORE INTO finalized_bars VALUES (?,?,?,?,?)",
+                        (*key, projected["sha256"], payload))
+        row = self.db.execute(
+            "SELECT sha256,payload FROM finalized_bars WHERE symbol=? AND interval=? AND open_ms=?",
+            key).fetchone()
+        if row != (projected["sha256"], payload):
+            raise ValueError("SOURCE_REWRITE_DENIED")
 
     def read(self, symbol, interval, open_ms):
         row = self.db.execute(
