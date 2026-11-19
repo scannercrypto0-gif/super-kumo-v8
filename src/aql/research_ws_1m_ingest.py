@@ -64,7 +64,7 @@ def ingest_closed_1m_frame(store: ResearchBarStore, raw: bytes, *,
                                      expected_symbol=expected_symbol)
     store.insert_batch([result])
     return {"status": "FORWARD_UNQUALIFIED_PERSISTED",
-            "symbol": expected_symbol, "open_ms": opened,
+            "symbol": expected_symbol, "open_ms": result["open_ms"],
             "bar_sha256": result["sha256"], "source_sha256": result["constituent_sha256"][0],
             "source_authenticity": "NOT_INDEPENDENTLY_ATTESTED",
             "trading_authority": "NONE"}
