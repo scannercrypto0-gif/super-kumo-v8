@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from tempfile import TemporaryDirectory
 from pathlib import Path
 
 from aql.research_bar_store import ResearchBarStore
@@ -17,7 +18,9 @@ from aql.research_ws_capture_import import import_pinned_ws_jsonl
 
 def run_one_shot(*, store_path, source_path, sha256, source_kind,
                  source_clock_ms, interval="5m", symbol="BTCUSDT"):
-    with ResearchBarStore(store_path) as store:
+    with TemporaryDirectory(prefix="atlas-research-stage-") as staging:
+      with ResearchBarStore(Path(staging) / "staged.sqlite") as stage:
+        store = stage
         if source_kind == "vision_csv":
             imported = import_pinned_vision_csv(
                 store, source_path, symbol=symbol, expected_sha256=sha256,
@@ -48,8 +51,14 @@ def run_one_shot(*, store_path, source_path, sha256, source_kind,
             start = ((first + width - 1) // width) * width
         if start + width - MINUTE > imported["last_open_ms"]:
             raise ValueError("SOURCE_WINDOW_INCOMPLETE")
-        durable = verify_research_window(store, symbol=symbol,
-                                         interval=interval, open_ms=start)
+        # Verify complete source window before touching the target database.
+        verify_research_window(stage, symbol=symbol, interval=interval, open_ms=start)
+        projected_rows = [json.loads(row[0]) for row in stage.db.execute(
+            "SELECT payload FROM finalized_bars WHERE interval='1m' ORDER BY open_ms")]
+        with ResearchBarStore(store_path) as target:
+            target.insert_batch(projected_rows)
+            durable = verify_research_window(target, symbol=symbol,
+                                             interval=interval, open_ms=start)
         return {
             "status": "OFFLINE_PINNED_SOURCE_DURABILITY_PASS",
             "source": imported, "durability": durable,
