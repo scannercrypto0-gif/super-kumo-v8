@@ -16,7 +16,7 @@ import stat
 import time
 
 from research_wp_r0.aql_archive_custody_bridge_v1 import (
-    OfflineBridgeStager, digest, raw_sha,
+    OfflineBridgeStager, PACKET_SCHEMA, RECEIPT_SCHEMA, decode, digest, raw_sha,
 )
 from research_wp_r0.aql_authenticated_historical_admission_v1 import (
     admit_original_bytes,
@@ -200,7 +200,7 @@ def _vault_admit(vault, raw, pin, spec):
 
 def admit_local_original(
     root, raw_zip, checksum_bytes, external_pin, spec, *,
-    decision_cutoff_ms, vault=None,
+    decision_cutoff_ms, vault=None, check_progress=None,
 ):
     """ONE source object (<=4096 bars) committed to immutable Core and SQLite index.
 
@@ -220,7 +220,7 @@ def admit_local_original(
     a=admit_original_bytes(
         raw_zip,external_pin,spec,stager=stage,library=lib,
         decision_cutoff_ms=decision_cutoff_ms,
-        checksum_file_bytes=checksum_bytes,
+        checksum_file_bytes=checksum_bytes, check_progress=check_progress,
     )
     require(a["coverage"] in ("COMPLETE","PARTIAL","UNKNOWN"),
             "CUSTODY_COVERAGE")
@@ -265,7 +265,9 @@ def admit_local_original(
              a["coverage"],a["underlying_availability_class"],
              json.dumps(a,sort_keys=True,separators=(",",":"))),
         )
-        for bar in prices["bars"]:
+        for index, bar in enumerate(prices["bars"]):
+            if check_progress is not None and index % 64 == 0:
+                check_progress()
             values=(spec["dataset_id"],spec["version"],
                     bar["bar_open_ms"],bar["bar_close_ms"],
                     bar["open"],bar["high"],bar["low"],bar["close"],
@@ -314,10 +316,32 @@ def admit_local_original(
     return {**body,"receipt_sha256":digest(body)}
 
 
+def _saved_packet(stage, original, source_sha, manifest_sha, dataset_id, version):
+    folder = stage._folder(original["packet_sha256"])
+    documents = []
+    for name, bound in (("packet.json", 8_000_000), ("receipt.json", 16_384)):
+        path = _safe_root(folder / name)
+        require(path.is_file() and path.stat().st_size <= bound, "SAVED_BRIDGE_DOCUMENT")
+        documents.append(decode(path.read_bytes()))
+    packet, receipt = documents
+    _sealed(packet, "packet_sha256")
+    _sealed(receipt, "receipt_sha256")
+    spec = packet["spec"]
+    require(packet["schema"] == PACKET_SCHEMA and receipt["schema"] == RECEIPT_SCHEMA
+            and packet["packet_sha256"] == receipt["packet_sha256"] == original["packet_sha256"]
+            and packet["source_bytes_sha256"] == receipt["source_bytes_sha256"] == source_sha
+            and receipt["manifest_integrity_sha256"] == manifest_sha
+            and receipt["receipt_sha256"] == original["custody_receipt_sha256"]
+            and receipt["dataset_id"] == spec["dataset_id"] == dataset_id
+            and receipt["version"] == spec["version"] == version
+            and receipt["bar_count"] == len(packet["bars"]), "SAVED_BRIDGE_PARENT_DRIFT")
+    return packet
+
+
 def query_local(root, dataset_id, version, start_ms, end_exclusive_ms,
                 cutoff_ms, *, required_source_sha256, require_complete=True,
-                sqlite_immutable=False):
-    """Read only indexed derived price partition; no future-row repair."""
+                sqlite_immutable=False, expected_saved_query_sha256=None):
+    """Read indexed prices. A pinned saved query verifies committed metadata without opening source bytes."""
     require(type(dataset_id) is str and IDENTITY.fullmatch(dataset_id)
             and type(version) is int and version>0
             and all(type(v) is int and v>=0 for v in
@@ -325,11 +349,19 @@ def query_local(root, dataset_id, version, start_ms, end_exclusive_ms,
             and start_ms<end_exclusive_ms
             and type(required_source_sha256) is str and HEX.fullmatch(required_source_sha256)
             and type(require_complete) is bool
-            and type(sqlite_immutable) is bool,
+            and type(sqlite_immutable) is bool
+            and (expected_saved_query_sha256 is None or
+                 (sqlite_immutable and type(expected_saved_query_sha256) is str
+                  and HEX.fullmatch(expected_saved_query_sha256))),
             "INVALID_HISTORICAL_QUERY")
     root=_safe_root(root)
-    require((root/"warehouse.sqlite").is_file(),"WAREHOUSE_NOT_AVAILABLE")
-    con=sqlite3.connect((root/"warehouse.sqlite").as_uri()+
+    database = _safe_root(root / "warehouse.sqlite")
+    require(database.is_file(),"WAREHOUSE_NOT_AVAILABLE")
+    if expected_saved_query_sha256 is not None:
+        require(all(not sidecar.exists() or sidecar.stat().st_size == 0
+                    for sidecar in (Path(str(database) + suffix) for suffix in ("-wal", "-journal"))),
+                "SAVED_WAREHOUSE_NOT_CHECKPOINTED")
+    con=sqlite3.connect(database.as_uri()+
                         ("?mode=ro&immutable=1" if sqlite_immutable else "?mode=ro"),
                         uri=True)
     try:
@@ -352,12 +384,15 @@ def query_local(root, dataset_id, version, start_ms, end_exclusive_ms,
             require(stage.root.is_dir(),"WAREHOUSE_STAGE_NOT_AVAILABLE")
         else:
             stage=OfflineBridgeStager(root/"stage")
-        packet,raw=stage._load(original["packet_sha256"])
-        require(packet["source_bytes_sha256"]==g[0]
-                and raw_sha(raw)==g[0]
-                and packet["spec"]["version"]==version
-                and packet["spec"]["dataset_id"]==dataset_id,
-                "WAREHOUSE_SOURCE_READBACK_DRIFT")
+        if expected_saved_query_sha256 is None:
+            packet,raw=stage._load(original["packet_sha256"])
+            require(packet["source_bytes_sha256"]==g[0]
+                    and raw_sha(raw)==g[0]
+                    and packet["spec"]["version"]==version
+                    and packet["spec"]["dataset_id"]==dataset_id,
+                    "WAREHOUSE_SOURCE_READBACK_DRIFT")
+        else:
+            packet = _saved_packet(stage, original, g[0], g[1], dataset_id, version)
         from research_wp_r0.historical_library import _interval_to_ms
         step=_interval_to_ms(packet["spec"]["interval"])
         require(start_ms%step==0 and end_exclusive_ms%step==0
@@ -407,6 +442,9 @@ def query_local(root, dataset_id, version, start_ms, end_exclusive_ms,
             "historical_pit":"NOT_ATTESTED",
             "universe":"NOT_ATTESTED",
         }
-        return {**body,"query_sha256":digest(body)}
+        pin = digest(body)
+        require(expected_saved_query_sha256 is None or pin == expected_saved_query_sha256,
+                "SAVED_QUERY_PIN_MISMATCH")
+        return {**body,"query_sha256":pin}
     finally:
         con.close()
