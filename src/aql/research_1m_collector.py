@@ -12,7 +12,7 @@ from aql.research_ws_1m_ingest import project_closed_1m_frame
 
 
 def collect_authorized_1m(*, reader, clock_ms, spool_dir, authorization,
-                          frame_limit=5, event_limit=200):
+                          frame_limit=5, event_limit=200, alignment_minutes=1):
     if authorization != "OWNER_AUTHORIZED_ORIGINAL_1M_RESEARCH_CAPTURE":
         raise ValueError("ORIGINAL_CAPTURE_AUTHORIZATION_REQUIRED")
     if not callable(reader) or not callable(clock_ms):
@@ -20,6 +20,8 @@ def collect_authorized_1m(*, reader, clock_ms, spool_dir, authorization,
     if (type(frame_limit) is not int or not 1 <= frame_limit <= 1440
             or type(event_limit) is not int or not frame_limit <= event_limit <= 10000):
         raise ValueError("CAPTURE_BUDGET_INVALID")
+    if (type(alignment_minutes) is not int or alignment_minutes not in (1, 5, 15, 30)):
+        raise ValueError("CAPTURE_ALIGNMENT_INVALID")
     frames = []
     first = None
     last_received = None
@@ -55,6 +57,8 @@ def collect_authorized_1m(*, reader, clock_ms, spool_dir, authorization,
             raise
         opened = row["open_ms"]
         if first is None:
+            if opened % (alignment_minutes * 60000):
+                continue
             first = opened
         elif opened != first + len(frames) * 60000:
             raise ValueError("CAPTURE_GAP_DUPLICATE")
