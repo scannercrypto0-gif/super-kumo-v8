@@ -96,7 +96,9 @@ def test_immutable_conflict_denied(source, tmp_path):
 def test_owner_local_cli_bounded_readback(source, tmp_path, capsys):
     from research_wp_r0.aql_stage7_source_research_v1 import main
     root, pin = source
-    output = tmp_path / "stage7-owner-readback.json"
+    report_dir = tmp_path.parent / (tmp_path.name + "-stage7-report")
+    report_dir.mkdir()
+    output = report_dir / "stage7-owner-readback.json"
     main(["--source", str(root), "--manifest-sha256", pin,
           "--output", str(output)])
     receipt = json.loads(capsys.readouterr().out)
