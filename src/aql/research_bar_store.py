@@ -68,18 +68,18 @@ class ResearchBarStore:
 
     def read(self, symbol, interval, open_ms):
         row = self.db.execute(
-            "SELECT payload FROM finalized_bars WHERE symbol=? AND interval=? AND open_ms=?",
+            "SELECT sha256,payload FROM finalized_bars WHERE symbol=? AND interval=? AND open_ms=?",
             (symbol, interval, open_ms)).fetchone()
         if row is None:
             return None
         try:
-            result = json.loads(row[0])
+            result = json.loads(row[1])
             if type(result) is not dict:
                 raise ValueError("STORE_INTEGRITY_FAILED")
             digest = result.pop("sha256")
         except (ValueError, TypeError, KeyError) as exc:
             raise ValueError("STORE_INTEGRITY_FAILED") from exc
-        if digest != _seal(result):
+        if digest != row[0] or digest != _seal(result) or (result.get("symbol"), result.get("interval"), result.get("open_ms")) != (symbol, interval, open_ms):
             raise ValueError("STORE_INTEGRITY_FAILED")
         result["sha256"] = digest
         return result
