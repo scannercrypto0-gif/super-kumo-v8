@@ -39,6 +39,17 @@ class CollectorTest(unittest.TestCase):
                     frame_limit=1)
             self.assertEqual(list(Path(tmp).iterdir()), [])
 
+    def test_foreign_provisional_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            raw = json.loads(frame(0, False))
+            raw["s"] = "ETHUSDT"
+            with self.assertRaisesRegex(ValueError, "PROVISIONAL_KLINE"):
+                collect_authorized_1m(
+                    reader=lambda: ("text", json.dumps(raw).encode()),
+                    clock_ms=lambda: 60001, spool_dir=Path(tmp) / "spool",
+                    authorization=AUTH, frame_limit=1, event_limit=1)
+            self.assertFalse((Path(tmp) / "spool").exists())
+
     def test_gap_refuses_output(self):
         with tempfile.TemporaryDirectory() as tmp:
             events = iter([("text", frame(0)), ("text", frame(2))])
