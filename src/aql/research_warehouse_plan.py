@@ -17,8 +17,6 @@ def plan_warehouse(root=DEFAULT_ROOT, *, cap_bytes=CAP_BYTES, reserve_bytes=RESE
     root = Path(root).absolute()
     if type(cap_bytes) is not int or type(reserve_bytes) is not int or cap_bytes <= 0 or reserve_bytes < 0:
         raise ValueError("WAREHOUSE_CAP_INVALID")
-    if os.name == "nt" and (root.drive.upper() != "E:" or not root.is_absolute()):
-        raise ValueError("WAREHOUSE_ROOT_MUST_BE_E")
     # Never traverse an existing symlink/reparse point in the selected root ancestry.
     for parent in (root, *root.parents):
         if parent.is_symlink():
@@ -51,6 +49,8 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--root", type=Path, default=DEFAULT_ROOT)
     args = p.parse_args()
+    if os.name == "nt" and args.root.drive.upper() != "E:":
+        p.error("WAREHOUSE_ROOT_MUST_BE_E")
     print(json.dumps(plan_warehouse(args.root), sort_keys=True))
 
 
