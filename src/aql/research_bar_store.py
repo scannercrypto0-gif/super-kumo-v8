@@ -61,8 +61,13 @@ class ResearchBarStore:
             (symbol, interval, open_ms)).fetchone()
         if row is None:
             return None
-        result = json.loads(row[0])
-        digest = result.pop("sha256")
+        try:
+            result = json.loads(row[0])
+            if type(result) is not dict:
+                raise ValueError("STORE_INTEGRITY_FAILED")
+            digest = result.pop("sha256")
+        except (ValueError, TypeError, KeyError) as exc:
+            raise ValueError("STORE_INTEGRITY_FAILED") from exc
         if digest != _seal(result):
             raise ValueError("STORE_INTEGRITY_FAILED")
         result["sha256"] = digest
