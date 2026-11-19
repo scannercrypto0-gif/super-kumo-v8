@@ -50,5 +50,6 @@ def seal_capture(root, frames, received_at_ms, *, max_frames=1440):
             "path": str(target), "sha256": pin, "frames": len(rows),
             "first_open_ms": rows[0]["open_ms"],
             "last_open_ms": rows[-1]["open_ms"],
+            "received_at_ms": received_at_ms,
             "source_authenticity": "NOT_INDEPENDENTLY_ATTESTED",
             "trading_authority": "NONE"}
