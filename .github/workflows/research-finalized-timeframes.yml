@@ -4,8 +4,10 @@ on:
     paths:
       - "src/aql/research_timeframes.py"
       - "src/aql/research_bar_store.py"
+      - "src/aql/research_vision_import.py"
       - "tests/test_research_timeframes.py"
       - "tests/test_research_bar_store.py"
+      - "tests/test_research_vision_import.py"
       - ".github/workflows/research-finalized-timeframes.yml"
   workflow_dispatch:
 
@@ -26,4 +28,4 @@ jobs:
       - name: Install package and test runner
         run: python -m pip install -e ".[dev]"
       - name: Focused research timeframe tests
-        run: python -m pytest -q tests/test_research_timeframes.py tests/test_research_bar_store.py
+        run: python -m pytest -q tests/test_research_timeframes.py tests/test_research_bar_store.py tests/test_research_vision_import.py
