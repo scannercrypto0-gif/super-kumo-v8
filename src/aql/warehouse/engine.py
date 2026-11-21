@@ -113,7 +113,7 @@ class HistoricalWarehouse(Warehouse):
         grouped = {}
         for row in rows:
             grouped.setdefault(row['open_ms'] // DAY * DAY, []).append(row)
-        plans, duplicate_count = [], 0
+        plans, duplicate_count, repaired_internal = [], 0, 0
         for day, batch in grouped.items():
             existing = {x['open_ms']: x for x in self._existing(day)}
             additions = []
@@ -125,6 +125,8 @@ class HistoricalWarehouse(Warehouse):
                          'SOURCE_BAR_CONFLICT')
                     duplicate_count += 1
                 else:
+                    if existing and min(existing) < row['open_ms'] < max(existing):
+                        repaired_internal += 1
                     additions.append(row)
             plans.append((day, additions))
         # Validate all source conflicts BEFORE committing any shards.
@@ -171,7 +173,7 @@ class HistoricalWarehouse(Warehouse):
             need(seal(self.path(f'raw/{pin}.zip').read_bytes()) == pin, 'RETAINED_RAW_CORRUPT')
         result = dict(status='ARCHIVE_IMPORTED', key=key, source_sha256=pin,
                       source_rows=len(rows), inserted_rows=sum(len(x[1]) for x in plans),
-                      duplicate_rows=duplicate_count, conflicts=0, source_class='RETROSPECTIVE_NON_PIT',
+                      duplicate_rows=duplicate_count, repaired_internal_minutes=repaired_internal, conflicts=0, source_class='RETROSPECTIVE_NON_PIT',
                       trading_authority='NONE')
         self.document('receipts', result)
         return result
@@ -243,6 +245,11 @@ class HistoricalWarehouse(Warehouse):
                     catalog.append(record)
                     source_bytes += record['source_zip_bytes']
                     csv_bytes += record['member_bytes']
+        conflicting = []
+        for item in self.path('quarantine').glob('*.json'):
+            candidate = json.loads(item.read_bytes())
+            if candidate.get('reason') == 'SOURCE_BAR_CONFLICT':
+                conflicting.append(candidate.get('key'))
         boundary_missing = []
         for record in catalog:
             if record['first_open_ms'] > record['period_start_ms']:
@@ -253,6 +260,10 @@ class HistoricalWarehouse(Warehouse):
                     stored_first_open_ms=first, stored_last_open_ms=last, one_minute_rows=count,
                     available_complete_projections=coverage, internal_gaps=gaps,
                     archive_count=len(catalog), archive_boundary_missing_ranges=boundary_missing,
+                    overlapping_accepted_source_rows=max(0, sum(r['rows'] for r in catalog)-count),
+                    conflicting_candidates=conflicting,
+                    quarantined_checksum_candidates=len(list(self.path('quarantine').glob('*.zip'))),
+                    resumable_partial_downloads=[p.name for p in self.path('raw').glob('*.part')],
                     source_zip_bytes=source_bytes,
                     source_csv_bytes=csv_bytes, stored_bytes=self.used(),
                     cap_bytes=self.cap, reserve_bytes=self.reserve,

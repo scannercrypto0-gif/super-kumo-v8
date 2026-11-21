@@ -49,7 +49,8 @@ def test_replay_restart_native_read_and_gap_repair(tmp_path):
         repeat = w.import_archive(raw, check, KEY, observed_ms=START+2*DAY)
         assert repeat['inserted_rows'] == 0
         repaired, check2 = fixture()
-        assert w.import_archive(repaired, check2, KEY, observed_ms=START+2*DAY)['inserted_rows'] == 1
+        repair = w.import_archive(repaired, check2, KEY, observed_ms=START+2*DAY)
+        assert repair['inserted_rows'] == repair['repaired_internal_minutes'] == 1
     report = w.report()
     assert report['one_minute_rows'] == 1440 and not report['internal_gaps']
     assert report['available_complete_projections']['15m'] == 96
@@ -329,3 +330,23 @@ def test_monthly_then_daily_does_not_download_duplicate_history(tmp_path):
     report = run(warehouse(tmp_path), Source(), now_ms=START+31*DAY)
     assert calls == [monthly_key] and report['one_minute_rows'] == 1440
     assert report['full_history_verified'] is False
+
+
+def test_lost_daily_shard_recovers_from_retained_partial_month_without_network(tmp_path):
+    from aql.warehouse.runner import run
+    monthly_key = KEY.replace('/daily/', '/monthly/').replace('2024-01-01.zip','2024-01.zip')
+    raw, check = fixture(key=monthly_key)
+    calls = []
+    class Source:
+        authority = AUTH
+        def discover(self, now_ms):
+            return [dict(key=monthly_key,size=len(raw),start_ms=START,end_ms=START+31*DAY)]
+        def acquire(self, w, key, expected_size):
+            calls.append(key)
+            return w.write_once(f'raw/{seal(raw)}.zip',raw),check
+    w = warehouse(tmp_path)
+    run(w,Source(),now_ms=START+31*DAY)
+    (tmp_path/'bars/2024-01-01.sqlite').unlink()
+    report = run(warehouse(tmp_path),Source(),now_ms=START+31*DAY)
+    assert len(calls) == 1 and report['one_minute_rows'] == 1440
+    assert report['this_run'][0]['inserted_rows'] == 1440

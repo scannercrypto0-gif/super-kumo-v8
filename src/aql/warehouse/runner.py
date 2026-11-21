@@ -53,10 +53,14 @@ def run(warehouse, source, *, now_ms, archive_limit=12, daily_only=False, rechec
                 if all(len(warehouse._existing(t)) == 1440 for t in
                        range(item['start_ms'], item['end_ms'], DAY)):
                     continue
-                # Listing month (exchange listing date) can be partial. It is
-                # already imported; daily source candidates handle its gaps.
-                if '/monthly/' in item['key']:
-                    continue
+                # Recover an absent/partial shard from the retained verified
+                # original before trying another network source. Partial listing
+                # months replay idempotently; no pre-listing bars are fabricated.
+                retained = warehouse.path(f"raw/{c['source_zip_sha256']}.zip")
+                checksum = warehouse.path(f"raw/{c['checksum_sha256']}.CHECKSUM")
+                results.append(warehouse.import_archive(retained.read_bytes(), checksum.read_bytes(),
+                                                        item['key'], observed_ms=c['observed_ms']))
+                continue
             examined += 1
             try:
                 path, checksum = source.acquire(warehouse, item['key'], expected_size=item['size'])
