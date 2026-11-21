@@ -1,3 +1,5 @@
+> Updated runtime: [continuous source recovery](resilient-history-continuation.md) supersedes the source-stop behavior below for FullHistory. The latest actual owner-host count is 151980 through November 2017; original December is quarantined. Default backfill/daily retains its original stop behavior.
+
 # Continue all available BTCUSDT Spot 1m history
 
 Owner continuation: #330/7059048243, following the actual owner-local 64140-bar August+September acceptance #7058983090. This extends the existing authorized E: historical acquisition to one frozen listing of all publisher archives through its latest complete period. It does not authorize new corrections, scheduler/WS changes, merge, PIT/OOS, native Scanner E receipts or trading. PM charter #205/6721828613 and the latest handoff/decisions were reconciled before implementation.

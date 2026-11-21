@@ -71,7 +71,12 @@ def period_covered(warehouse, start, end, *, inception=None, permitted_gaps=()):
     return True
 
 
-def run(warehouse, source, *, now_ms, archive_limit=12, daily_only=False, recheck_publisher=False, progress=None, clock_ms=None):
+def run(warehouse, source, *, now_ms, archive_limit=12, daily_only=False, recheck_publisher=False, progress=None, clock_ms=None, continue_on_source_error=False):
+    if continue_on_source_error:
+        from .resilient import run as resilient_run
+        return resilient_run(warehouse, source, now_ms=now_ms, archive_limit=archive_limit,
+            daily_only=daily_only, recheck_publisher=recheck_publisher,
+            progress=progress, clock_ms=clock_ms)
     need(type(archive_limit) is int and 1 <= archive_limit <= 10000, 'ARCHIVE_RUN_BOUND')
     with warehouse.writer():
         listing = source.discover(now_ms=now_ms)

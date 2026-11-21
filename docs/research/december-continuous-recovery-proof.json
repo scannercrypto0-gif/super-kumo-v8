@@ -1,0 +1,249 @@
+{
+  "status": "SOURCE_SCAN_FINISHED_WITH_OBSTACLES",
+  "one_minute_rows": 1440,
+  "stored_first_open_ms": 1512432000000,
+  "stored_last_open_ms": 1512518340000,
+  "source_scan_exhausted": true,
+  "acquisition_plan_exhausted": false,
+  "pending_source_partitions": [
+    "data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2017-12-04.zip",
+    "data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2017-12-18.zip",
+    "data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2017-12.zip"
+  ],
+  "failures": [],
+  "source_obstacles": [
+    {
+      "schema": "aql.warehouse.source-obstacle.v1",
+      "key": "data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2017-12.zip",
+      "period_start_ms": 1512086400000,
+      "period_end_ms": 1514764800000,
+      "stage": "VALIDATE",
+      "error_type": "ValueError",
+      "reason": "NATIVE_TIME_OR_MARKET_FIELDS",
+      "disposition": "DEFERRED_SOURCE",
+      "retryable": false,
+      "final_retry": false,
+      "source_class": "RETROSPECTIVE_NON_PIT",
+      "trading_authority": "NONE",
+      "source_zip_sha256": "3d41da2da488a69a21e9223221863c3a8ed6ccb9263d30cf1d3a012a48cfffc1",
+      "checksum_sha256": "afdf9662c3f2e718367ee743ac7970352c7f11d717b7cfc9cf03c4ae41c96dbe",
+      "diagnostic_file": "e82b6f78e97010d0f632a78c91793317b4016553c5634da3493c923ffd628d73.json",
+      "failed_rows": 20403,
+      "first_failure": {
+        "native_csv_line": 4681,
+        "open_time": "1512367200000",
+        "predicates": [
+          {
+            "field": 6,
+            "value": "1512367220798",
+            "expected": "1512367259999",
+            "delta_native_units": -39201,
+            "predicate": "close_time_equals_open_plus_minute_minus_one"
+          }
+        ]
+      },
+      "obstacle_file": "f30147f6fc9619ab471ce9cb36255e78153cf7f42516e57e65f99f111c2c1336.json"
+    },
+    {
+      "schema": "aql.warehouse.source-obstacle.v1",
+      "key": "data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2017-12-04.zip",
+      "period_start_ms": 1512345600000,
+      "period_end_ms": 1512432000000,
+      "stage": "VALIDATE",
+      "error_type": "ValueError",
+      "reason": "NATIVE_TIME_OR_MARKET_FIELDS",
+      "disposition": "DEFERRED_SOURCE",
+      "retryable": false,
+      "final_retry": false,
+      "source_class": "RETROSPECTIVE_NON_PIT",
+      "trading_authority": "NONE",
+      "source_zip_sha256": "3360ff9885fdedb652ace617b0142a11441aabf2503536855d69b733023acd53",
+      "checksum_sha256": "6f1a684f5f2b3fcdd0526558614a4ca330c196f0d6eef00f5dce451f71db5c67",
+      "diagnostic_file": "5c860019f23ae90a9025cc2b0c63f8bab68d5782b8baa0d35685851c5eebdb12.json",
+      "failed_rows": 1,
+      "first_failure": {
+        "native_csv_line": 361,
+        "open_time": "1512367200000",
+        "predicates": [
+          {
+            "field": 6,
+            "value": "1512367220798",
+            "expected": "1512367259999",
+            "delta_native_units": -39201,
+            "predicate": "close_time_equals_open_plus_minute_minus_one"
+          }
+        ]
+      },
+      "obstacle_file": "ea986ae0c7cac5fe8e7feae0a8afd6a57222626bf0e36177b84dd32bc63937d5.json"
+    },
+    {
+      "schema": "aql.warehouse.source-obstacle.v1",
+      "key": "data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2017-12-18.zip",
+      "period_start_ms": 1513555200000,
+      "period_end_ms": 1513641600000,
+      "stage": "VALIDATE",
+      "error_type": "ValueError",
+      "reason": "NATIVE_TIME_OR_MARKET_FIELDS",
+      "disposition": "DEFERRED_SOURCE",
+      "retryable": false,
+      "final_retry": false,
+      "source_class": "RETROSPECTIVE_NON_PIT",
+      "trading_authority": "NONE",
+      "source_zip_sha256": "ed924f105302c9819824a3341b920470d333c1768d078c1ec3a2bf811b1c949d",
+      "checksum_sha256": "340e558a3f663624e9a36020be3eb46c1484585619d34705be4812b10ac1d2ac",
+      "diagnostic_file": "6061ecb317b231da8b4e00ce0f6c06b4934766b05bd0c586f2333f9ab14d400a.json",
+      "failed_rows": 2,
+      "first_failure": {
+        "native_csv_line": 601,
+        "open_time": "1513591200000",
+        "predicates": [
+          {
+            "field": 6,
+            "value": "1513591242445",
+            "expected": "1513591259999",
+            "delta_native_units": -17554,
+            "predicate": "close_time_equals_open_plus_minute_minus_one"
+          }
+        ]
+      },
+      "obstacle_file": "700402bcbde81499005a9c61677604af600547d74ec002374b0ecdf1df477c3f.json"
+    }
+  ],
+  "unresolved_source_obstacles": [
+    {
+      "schema": "aql.warehouse.source-obstacle.v1",
+      "key": "data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2017-12.zip",
+      "period_start_ms": 1512086400000,
+      "period_end_ms": 1514764800000,
+      "stage": "VALIDATE",
+      "error_type": "ValueError",
+      "reason": "NATIVE_TIME_OR_MARKET_FIELDS",
+      "disposition": "DEFERRED_SOURCE",
+      "retryable": false,
+      "final_retry": false,
+      "source_class": "RETROSPECTIVE_NON_PIT",
+      "trading_authority": "NONE",
+      "source_zip_sha256": "3d41da2da488a69a21e9223221863c3a8ed6ccb9263d30cf1d3a012a48cfffc1",
+      "checksum_sha256": "afdf9662c3f2e718367ee743ac7970352c7f11d717b7cfc9cf03c4ae41c96dbe",
+      "diagnostic_file": "e82b6f78e97010d0f632a78c91793317b4016553c5634da3493c923ffd628d73.json",
+      "failed_rows": 20403,
+      "first_failure": {
+        "native_csv_line": 4681,
+        "open_time": "1512367200000",
+        "predicates": [
+          {
+            "field": 6,
+            "value": "1512367220798",
+            "expected": "1512367259999",
+            "delta_native_units": -39201,
+            "predicate": "close_time_equals_open_plus_minute_minus_one"
+          }
+        ]
+      },
+      "obstacle_file": "f30147f6fc9619ab471ce9cb36255e78153cf7f42516e57e65f99f111c2c1336.json",
+      "coverage_restored": false,
+      "resolution": "UNRESOLVED"
+    },
+    {
+      "schema": "aql.warehouse.source-obstacle.v1",
+      "key": "data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2017-12-04.zip",
+      "period_start_ms": 1512345600000,
+      "period_end_ms": 1512432000000,
+      "stage": "VALIDATE",
+      "error_type": "ValueError",
+      "reason": "NATIVE_TIME_OR_MARKET_FIELDS",
+      "disposition": "DEFERRED_SOURCE",
+      "retryable": false,
+      "final_retry": false,
+      "source_class": "RETROSPECTIVE_NON_PIT",
+      "trading_authority": "NONE",
+      "source_zip_sha256": "3360ff9885fdedb652ace617b0142a11441aabf2503536855d69b733023acd53",
+      "checksum_sha256": "6f1a684f5f2b3fcdd0526558614a4ca330c196f0d6eef00f5dce451f71db5c67",
+      "diagnostic_file": "5c860019f23ae90a9025cc2b0c63f8bab68d5782b8baa0d35685851c5eebdb12.json",
+      "failed_rows": 1,
+      "first_failure": {
+        "native_csv_line": 361,
+        "open_time": "1512367200000",
+        "predicates": [
+          {
+            "field": 6,
+            "value": "1512367220798",
+            "expected": "1512367259999",
+            "delta_native_units": -39201,
+            "predicate": "close_time_equals_open_plus_minute_minus_one"
+          }
+        ]
+      },
+      "obstacle_file": "ea986ae0c7cac5fe8e7feae0a8afd6a57222626bf0e36177b84dd32bc63937d5.json",
+      "coverage_restored": false,
+      "resolution": "UNRESOLVED"
+    },
+    {
+      "schema": "aql.warehouse.source-obstacle.v1",
+      "key": "data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2017-12-18.zip",
+      "period_start_ms": 1513555200000,
+      "period_end_ms": 1513641600000,
+      "stage": "VALIDATE",
+      "error_type": "ValueError",
+      "reason": "NATIVE_TIME_OR_MARKET_FIELDS",
+      "disposition": "DEFERRED_SOURCE",
+      "retryable": false,
+      "final_retry": false,
+      "source_class": "RETROSPECTIVE_NON_PIT",
+      "trading_authority": "NONE",
+      "source_zip_sha256": "ed924f105302c9819824a3341b920470d333c1768d078c1ec3a2bf811b1c949d",
+      "checksum_sha256": "340e558a3f663624e9a36020be3eb46c1484585619d34705be4812b10ac1d2ac",
+      "diagnostic_file": "6061ecb317b231da8b4e00ce0f6c06b4934766b05bd0c586f2333f9ab14d400a.json",
+      "failed_rows": 2,
+      "first_failure": {
+        "native_csv_line": 601,
+        "open_time": "1513591200000",
+        "predicates": [
+          {
+            "field": 6,
+            "value": "1513591242445",
+            "expected": "1513591259999",
+            "delta_native_units": -17554,
+            "predicate": "close_time_equals_open_plus_minute_minus_one"
+          }
+        ]
+      },
+      "obstacle_file": "700402bcbde81499005a9c61677604af600547d74ec002374b0ecdf1df477c3f.json",
+      "coverage_restored": false,
+      "resolution": "UNRESOLVED"
+    }
+  ],
+  "schema": "aql.warehouse.original-source-recovery-proof.v1",
+  "evidence_grade": "ORIGINAL_BOUNDED_LINUX_RUN_NOT_OWNER_E",
+  "keys_acquired": [
+    "data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2017-12.zip",
+    "data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2017-12-04.zip",
+    "data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2017-12-05.zip",
+    "data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2017-12-18.zip"
+  ],
+  "full_history_verified": false,
+  "trading_authority": "NONE",
+  "scheduler_changes": 0,
+  "verified_objects": [
+    {
+      "key": "data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2017-12.zip",
+      "source_zip_sha256": "3d41da2da488a69a21e9223221863c3a8ed6ccb9263d30cf1d3a012a48cfffc1",
+      "checksum_sha256": "afdf9662c3f2e718367ee743ac7970352c7f11d717b7cfc9cf03c4ae41c96dbe"
+    },
+    {
+      "key": "data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2017-12-04.zip",
+      "source_zip_sha256": "3360ff9885fdedb652ace617b0142a11441aabf2503536855d69b733023acd53",
+      "checksum_sha256": "6f1a684f5f2b3fcdd0526558614a4ca330c196f0d6eef00f5dce451f71db5c67"
+    },
+    {
+      "key": "data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2017-12-05.zip",
+      "source_zip_sha256": "9247290e2d392b5c9dcd770b5544aee7549d8a76355a2066aec501d2ac358579",
+      "checksum_sha256": "87178b9365353e5ad73d2da5a9b7bfe37837f7da47839746cd41df5384762876"
+    },
+    {
+      "key": "data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2017-12-18.zip",
+      "source_zip_sha256": "ed924f105302c9819824a3341b920470d333c1768d078c1ec3a2bf811b1c949d",
+      "checksum_sha256": "340e558a3f663624e9a36020be3eb46c1484585619d34705be4812b10ac1d2ac"
+    }
+  ]
+}

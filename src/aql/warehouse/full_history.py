@@ -92,7 +92,7 @@ def continue_history(warehouse, source, *, clock_ms, progress=None, archive_limi
         if progress: progress(event)
     started=clock_ms()
     report=run(warehouse,source,now_ms=started,archive_limit=archive_limit,
-               progress=emit,clock_ms=clock_ms)
+               progress=emit,clock_ms=clock_ms,continue_on_source_error=True)
     after=protected_snapshot(warehouse)
     need(after == before,'ACCEPTED_PREFIX_CHANGED')
     gaps=report['internal_gaps']
@@ -101,6 +101,8 @@ def continue_history(warehouse, source, *, clock_ms, progress=None, archive_limi
     all_partitions=report['acquisition_plan_exhausted'] and report['latest_published_close_reached']
     if report['failures']:
         state='FULL_HISTORY_BLOCKED_EXACT_SOURCE'
+    elif report.get('source_scan_exhausted') and report.get('unresolved_source_obstacles'):
+        state='PUBLISHED_SOURCE_SCAN_FINISHED_WITH_QUARANTINED_PARTITIONS'
     elif not all_partitions:
         state='BOUNDED_PROGRESS_MORE_PARTITIONS_PENDING'
     elif unknown:
@@ -143,7 +145,8 @@ def main():
             scheduler_changes=0,trading_authority='NONE')),flush=True)
         raise SystemExit(2)
     print(json.dumps(report,sort_keys=True,indent=2),flush=True)
-    if report['failures'] or report['unresolved_gap_ranges']:
+    if (report['failures'] or report['unresolved_gap_ranges']
+            or not report['all_published_partitions_ingested']):
         raise SystemExit(2)
 
 

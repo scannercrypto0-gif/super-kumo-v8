@@ -65,5 +65,5 @@ try {
     $env:ATLAS_WAREHOUSE_RECOVERY_TASK_INSPECTION = $oldInspection
     Pop-Location
 }
-# Code 2 is an explicit preserved-source block, never a successful September import.
+# Code 2 reports a fatal stop, pending work or quarantined coverage; inspect the receipt.
 exit $code
