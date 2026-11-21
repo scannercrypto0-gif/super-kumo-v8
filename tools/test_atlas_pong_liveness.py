@@ -10,9 +10,9 @@ from pathlib import Path
 cycle_path, quota_path = map(Path, sys.argv[1:3])
 sys.argv = sys.argv[:1]
 tree = ast.parse(cycle_path.read_text(encoding="utf-8"))
-helper = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "send_research_pong")
+helpers = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in {"send_research_pong", "read_research_frame"}]
 scope = {}
-exec(compile(ast.Module(body=[helper], type_ignores=[]), str(cycle_path), "exec"), scope)
+exec(compile(ast.Module(body=helpers, type_ignores=[]), str(cycle_path), "exec"), scope)
 send = scope["send_research_pong"]
 spec = importlib.util.spec_from_file_location("pinned_quota", quota_path)
 module = importlib.util.module_from_spec(spec)
@@ -77,6 +77,45 @@ class PongAdmission(unittest.TestCase):
             self.assertEqual(self.quota.get(db, "research_connection_attempts"), 1)
         send(self.quota, "research-15m", later + 20000, self.connection, b"ping")
         self.assertEqual(self.sent, [b"ping"])
+
+
+class ClosedSocketAdmission(unittest.TestCase):
+    def test_library_close_is_retryable_and_preserves_cause(self):
+        from websocket import WebSocketConnectionClosedException
+        original = WebSocketConnectionClosedException("provider text must not be logged")
+        transport = types.SimpleNamespace(frame=lambda *args: (_ for _ in ()).throw(original))
+        with self.assertRaises(ConnectionResetError) as captured:
+            scope["read_research_frame"](transport, object(), 30)
+        self.assertEqual(str(captured.exception), "WS_CONNECTION_CLOSED")
+        self.assertIs(captured.exception.__cause__, original)
+
+    def test_next_attempt_can_receive_after_close(self):
+        from websocket import WebSocketConnectionClosedException
+        calls = []
+        def frame(connection, timeout):
+            calls.append(connection)
+            if len(calls) == 1:
+                raise WebSocketConnectionClosedException("closed")
+            return "ping", b"token"
+        transport = types.SimpleNamespace(frame=frame)
+        with self.assertRaises(ConnectionResetError):
+            scope["read_research_frame"](transport, "first", 30)
+        self.assertEqual(scope["read_research_frame"](transport, "second", 30), ("ping", b"token"))
+        self.assertEqual(calls, ["first", "second"])
+
+    def test_integrity_error_stays_terminal(self):
+        original = ValueError("WS_UNEXPECTED_FRAMING")
+        transport = types.SimpleNamespace(frame=lambda *args: (_ for _ in ()).throw(original))
+        with self.assertRaises(ValueError) as captured:
+            scope["read_research_frame"](transport, object(), 30)
+        self.assertIs(captured.exception, original)
+
+    def test_timeout_keeps_existing_classification(self):
+        original = TimeoutError("WS_READ_TIMEOUT")
+        transport = types.SimpleNamespace(frame=lambda *args: (_ for _ in ()).throw(original))
+        with self.assertRaises(TimeoutError) as captured:
+            scope["read_research_frame"](transport, object(), 30)
+        self.assertIs(captured.exception, original)
 
 
 if __name__ == "__main__":
