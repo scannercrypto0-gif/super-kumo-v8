@@ -14,8 +14,9 @@ def register_window(warehouse, library, *, dataset_id, interval, start_ms, end_m
     from research_wp_r0.historical_library import (
         HistoricalBar, BarQuality, SourceType, DataAvailabilityKind, validate_bars,
     )
-    projected = warehouse.query(interval, start_ms, end_ms, cutoff_ms=cutoff_ms,
-                                max_bars=4096)
+    read = warehouse.query(interval, start_ms, end_ms, cutoff_ms=cutoff_ms,
+                           max_bars=4096, include_registry=True)
+    projected = read['bars']
     bars = [HistoricalBar(
         symbol='BTCUSDT', interval=interval, bar_open=row['open_ms'],
         bar_close=row['close_exclusive_ms'] - 1,
@@ -28,7 +29,10 @@ def register_window(warehouse, library, *, dataset_id, interval, start_ms, end_m
     ) for row in projected]
     validated, manifest = validate_bars(bars, 'BTCUSDT', interval)
     manifest = dataclasses.replace(manifest, dataset_id=dataset_id,
-                                   source_hash=sha256(canonical(projected)).hexdigest())
+                                   source_hash=sha256(canonical(dict(
+                                       bars=projected,
+                                       registry_sha256=read['registry']['snapshot_sha256'],
+                                       event_watermark=read['registry']['event_watermark']))).hexdigest())
     return library.register(dataset_id, validated, manifest)
 
 

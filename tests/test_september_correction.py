@@ -131,6 +131,13 @@ def test_apply_replay_restart_and_retained_runner_preserve_august_and_gap(policy
     assert result['september_rows'] == 42780 and result['missing_minutes'] == 420
     assert result['august_unchanged'] and result['original_bytes_unchanged']
     assert result['warehouse']['one_minute_rows'] == 64140
+    registry = result['warehouse']['registry']
+    assert registry['physical_rows'] == 64140 and registry['internal_gaps'] == [sc.GAP]
+    correction = [s for s in registry['sources'] if s['derivation'] is not None]
+    assert len(correction) == 1 and correction[0]['derivation'] == result['lineage']
+    from aql.warehouse.registry import history
+    corrected_events = [e for e in history(w) if e['event_type'] == 'APPROVED_DERIVED_CORRECTION']
+    assert len(corrected_events) == 1 and corrected_events[0]['policy_ref'] == sc.POLICY
     assert result['september_gaps'] == result['warehouse']['internal_gaps'] == [sc.GAP]
     assert result['full_history_verified'] is False
     for name,raw in before.items():assert (tmp_path/'bars'/name).read_bytes() == raw

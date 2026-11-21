@@ -204,3 +204,17 @@ No orders, production DB, credentials, research changes or merges.
 See docs/operations/G1_COMPLETION_20261024.md and evidence/g1_completion_public_smoke.json.
 Final-head local/CI evidence belongs to the resulting consolidated Draft PR.
 R09 unresolved; PR16 left open with a scoped supersession recommendation.
+
+## 2026-11-21 — Warehouse Registry Option C delta (existing Draft #330)
+
+Implemented hash-linked immutable events/checkpoints, sealed-source/physical-row
+verification, deterministic snapshots, explicit writer recovery and fail-closed
+research reads with provenance/watermark. Bound HistoricalLibrary manifest source
+hash to the registry identity; reused exact September transform and added lineage
+assertions to its existing admission test. Added focused offline corruption,
+restart, replay, quarantine and deterministic cross-platform fixtures. Operator
+scripts unchanged; local parser and diff checks passed. Baseline regression 59/59
+passed locally; final incremental/cross-platform results are recorded at the exact
+candidate SHA on #330, not inferred from this log. See warehouse-registry.md for
+reuse inventory, evidence grades, blocker solutions and rollback. No new data
+acquisition, E: execution, scheduler/WS operation, merge or gate promotion.

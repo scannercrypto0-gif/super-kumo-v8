@@ -99,6 +99,27 @@ class HistoricalWarehouse(Warehouse):
             store.close()
 
     def import_archive(self, raw, checksum, key, *, observed_ms, derivation=None):
+        from .registry import history
+        need(self.locked, 'WRITER_LOCK_REQUIRED')
+        history(self, recover=True)
+        try:
+            return self._import_archive(raw, checksum, key, observed_ms=observed_ms,
+                                        derivation=derivation)
+        except (ValueError, OSError) as exc:
+            failure = dict(schema='aql.warehouse.rejection.v1', key=key,
+                           source_sha256=seal(raw), checksum_sha256=seal(checksum),
+                           observed_ms=observed_ms, reason=str(exc),
+                           policy_ref='STRICT_NATIVE_VALIDATION', trading_authority='NONE')
+            # Preserve the original failure when a full disk or incomplete commit
+            # prevents registry reconciliation. The read gate remains closed.
+            try:
+                self.document('quarantine', failure)
+                self.rebuild_registry()
+            except (ValueError, OSError):
+                pass
+            raise
+
+    def _import_archive(self, raw, checksum, key, *, observed_ms, derivation=None):
         need(self.locked, 'WRITER_LOCK_REQUIRED')
         rows, meta = parse_archive(raw, checksum, key, observed_ms)
         if derivation is not None:
@@ -107,6 +128,7 @@ class HistoricalWarehouse(Warehouse):
         pin = seal(raw)
         receipt_rel = f'catalog/{pin}.json'
         old_receipt = self.path(receipt_rel)
+        previously_committed = old_receipt.exists()
         if old_receipt.exists():
             old = json.loads(old_receipt.read_bytes())
             need(old['source_zip_sha256'] == pin and old['key'] == key
@@ -186,10 +208,21 @@ class HistoricalWarehouse(Warehouse):
         if derivation is not None:
             result.update(source_kind='OWNER_AUTHORIZED_DERIVATIVE',
                           derivation_manifest_sha256=seal(canonical(derivation)))
+        if (previously_committed and result['inserted_rows']) or repaired_internal:
+            result.update(registry_action='REPAIR_RECOVERY', observed_ms=observed_ms,
+                          before=dict(missing_rows=result['inserted_rows']),
+                          policy_ref='SEALED_SOURCE_REPLAY')
         self.document('receipts', result)
+        self.rebuild_registry()
         return result
 
-    def query(self, interval, start_ms, end_ms, *, cutoff_ms, max_bars=10080):
+    def rebuild_registry(self):
+        """Explicit writer-only recovery from sealed committed evidence."""
+        from .registry import snapshot
+        return snapshot(self, synchronize=True)
+
+    def query(self, interval, start_ms, end_ms, *, cutoff_ms, max_bars=10080,
+              include_registry=False):
         need(interval in WIDTHS and all(type(x) is int and x >= 0
              for x in (start_ms, end_ms, cutoff_ms)) and start_ms < end_ms,
              'QUERY_INVALID')
@@ -198,6 +231,8 @@ class HistoricalWarehouse(Warehouse):
         need((start_ms - origin) % width == 0 and (end_ms - start_ms) % width == 0
              and 0 < (end_ms - start_ms) // width <= max_bars <= 10080
              and end_ms <= cutoff_ms, 'QUERY_BOUND_OR_FUTURE')
+        from .registry import snapshot
+        registry = snapshot(self)
         cache = {}
         result = []
         for opened in range(start_ms, end_ms, width):
@@ -217,9 +252,21 @@ class HistoricalWarehouse(Warehouse):
             # Queries spanning years keep <=8 daily shards in memory.
             if len(cache) > 8:
                 cache = {k: v for k, v in cache.items() if k >= opened // DAY}
+        need(snapshot(self)['snapshot_sha256'] == registry['snapshot_sha256'],
+             'REGISTRY_CHANGED_DURING_READ')
+        if include_registry:
+            return dict(bars=result, registry=registry,
+                        requested_window=[start_ms, end_ms], cutoff_ms=cutoff_ms)
         return result
 
     def report(self):
+        from .registry import snapshot
+        physical = self._physical_report()
+        registry = snapshot(self, synchronize=self.locked, physical_report=physical)
+        physical['stored_bytes'] = self.used()
+        return dict(physical, registry=registry)
+
+    def _physical_report(self):
         segments, count, previous, gaps = [], 0, None, []
         first = last = None
         source_bytes = csv_bytes = 0
