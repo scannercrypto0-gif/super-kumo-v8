@@ -5,6 +5,7 @@ conflicts and registry failures stop the writer. Whole rejected archives are
 preserved; no timestamp rounding, row dropping or additional derivatives.
 """
 import csv
+from collections import OrderedDict
 from decimal import InvalidOperation
 import json
 from http.client import IncompleteRead
@@ -79,19 +80,67 @@ def run(warehouse, source, *, now_ms, archive_limit, daily_only=False,
         examined = 0
         scanned = True
 
+        cache = OrderedDict()
+
+        def source_minutes(c):
+            pin = c['source_zip_sha256']
+            if pin not in cache:
+                raw = warehouse.path(f"raw/{pin}.zip").read_bytes()
+                checksum = warehouse.path(f"raw/{c['checksum_sha256']}.CHECKSUM").read_bytes()
+                need(seal(raw) == pin and seal(checksum) == c['checksum_sha256'],
+                     'RETAINED_RAW_CORRUPT')
+                rows, meta = parse_archive(raw, checksum, c['key'], c['observed_ms'])
+                need(c['rows'] == len(rows) and all(c.get(k) == v for k,v in meta.items()),
+                     'SOURCE_CATALOG_FACTS')
+                cache[pin] = frozenset(row['open_ms'] for row in rows)
+                if len(cache) > 2:
+                    cache.popitem(last=False)
+            cache.move_to_end(pin)
+            return cache[pin]
+
+        def committed_coverage(item):
+            # Physical membership alone cannot establish a committed import:
+            # interruption may publish the last shard before its source receipt.
+            if not covered(item):
+                return False
+            first = max(item['start_ms'], inception) if inception is not None else item['start_ms']
+            expected = {t for t in range(first,item['end_ms'],60000)
+                        if not any(a <= t < b for a,b in allowed)}
+            for records in index.values():
+                for c in records:
+                    if c['last_open_ms'] < first or c['first_open_ms'] >= item['end_ms']:
+                        continue
+                    expected.difference_update(source_minutes(c))
+                    if not expected:
+                        return True
+            return not expected
+
+        def retained_complete(c):
+            # Missing source rows require replay; original source gaps belong to
+            # the daily fallback queue, not a repeated monthly replay.
+            ranges = []
+            for t in sorted(source_minutes(c)):
+                if ranges and ranges[-1][1] == t:
+                    ranges[-1][1] = t+60000
+                else:
+                    ranges.append([t,t+60000])
+            return all(period_covered(warehouse,a,b) for a,b in ranges)
+
         def covered(item):
             return period_covered(warehouse, item['start_ms'], item['end_ms'],
                                   inception=inception, permitted_gaps=allowed)
 
         def attempt(item, *, revisit=False):
             nonlocal examined, inception
-            if not recheck_publisher and covered(item):
+            if not recheck_publisher and committed_coverage(item):
                 return
             receipts = index.get(item['key'], [])
             if receipts and not recheck_publisher:
                 # Recovery from committed evidence is a custody operation:
                 # errors here are never downgraded to a remote-source obstacle.
                 c = receipts[0]
+                if retained_complete(c):
+                    return
                 raw = warehouse.path(f"raw/{c['source_zip_sha256']}.zip").read_bytes()
                 need(seal(raw) == c['source_zip_sha256'], 'RETAINED_RAW_CORRUPT')
                 checksum = warehouse.path(f"raw/{c['checksum_sha256']}.CHECKSUM").read_bytes()
@@ -169,7 +218,7 @@ def run(warehouse, source, *, now_ms, archive_limit, daily_only=False,
         unresolved, resolved = [], []
         for obstacle in obstacles:
             item = dict(start_ms=obstacle['period_start_ms'], end_ms=obstacle['period_end_ms'])
-            complete = covered(item)
+            complete = committed_coverage(item)
             record = {**obstacle, 'coverage_restored':complete,
                       'resolution':'VERIFIED_ALTERNATIVE_COVERAGE' if complete else 'UNRESOLVED'}
             (resolved if complete else unresolved).append(record)
@@ -177,7 +226,7 @@ def run(warehouse, source, *, now_ms, archive_limit, daily_only=False,
         for item in candidates:
             # An invalid month can be fully satisfied by original daily data;
             # it need not acquire a false admission receipt to count as covered.
-            if item['key'] not in index and not covered(item):
+            if item['key'] not in index and not committed_coverage(item):
                 pending.append(item['key'])
         source_end = max(r['end_ms'] for r in listing)
         tail = bool(report['stored_last_open_ms'] is not None and report['stored_last_open_ms']+60000 == source_end)

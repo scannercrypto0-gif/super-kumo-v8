@@ -172,3 +172,27 @@ def test_permanent_network_outage_is_bounded_and_does_not_claim_success(tmp_path
     assert r['source_scan_exhausted'] and not r['failures']
     assert not r['acquisition_plan_exhausted'] and r['one_minute_rows']==0
     assert set(r['pending_source_partitions'])=={KEY,k2}
+
+
+@pytest.mark.parametrize('repair',[False,True])
+def test_interruption_after_final_shard_before_source_receipt_replays(tmp_path,monkeypatch,repair):
+    w=warehouse(tmp_path)
+    if repair:
+        partial,pc=fixture(START,MONTH,missing=(7,))
+        with w.writer():w.import_archive(partial,pc,MONTH,observed_ms=START+31*DAY)
+    raw,c=fixture();original=w.write_once
+    def interrupted(rel,data):
+        if rel==f'catalog/{seal(raw)}.json':raise OSError('simulated power loss before receipt')
+        return original(rel,data)
+    monkeypatch.setattr(w,'write_once',interrupted)
+    with w.writer():
+        with pytest.raises(OSError,match='simulated power loss'):
+            w.import_archive(raw,c,KEY,observed_ms=START+31*DAY)
+    assert not w.path(f'catalog/{seal(raw)}.json').exists()
+    monkeypatch.setattr(w,'write_once',original)
+    listing=[source_object(raw=raw)];objects={KEY:(raw,c)}
+    if repair:listing.insert(0,source_object(MONTH,START,START+31*DAY,partial))
+    s=Source(listing,objects);r=invoke(w,s)
+    assert s.calls==[KEY] and not r['failures'] and r['one_minute_rows']==1440
+    assert w.path(f'catalog/{seal(raw)}.json').is_file()
+    assert r['this_run'][0]['inserted_rows']==0

@@ -49,6 +49,10 @@ recovery proof, not execution against the owner warehouse.
 - Pure source failures in acquisition or unchanged parser preflight are written
   to immutable quarantine records. Native diagnostics have separate hashed
   evidence objects; console progress emits compact reason/first-failure/pins.
+- Coverage skipping requires both physical minute membership and exact parsed
+  committed-source coverage. An interruption after the final shard but before
+  its receipt is replayed; physical rows alone cannot mark it completed. A
+  bounded two-source minute cache avoids unbounded history memory.
 - Import, conflicts, local retained-byte corruption, clock, registry, unknown
   errors, path/link protection and storage cap/reserve violations are fatal.
   Never continue past an uncertain local commit. Reuse sealed-source recovery
