@@ -1,0 +1,68 @@
+name: Research finalized timeframe offline checks
+on:
+  pull_request:
+    paths:
+      - "src/aql/research_timeframes.py"
+      - "src/aql/research_bar_store.py"
+      - "src/aql/research_vision_import.py"
+      - "src/aql/research_ws_1m_ingest.py"
+      - "src/aql/research_ws_capture_import.py"
+      - "src/aql/research_durability_readback.py"
+      - "src/aql/research_offline_one_shot.py"
+      - "src/aql/research_service_bridge_gate.py"
+      - "src/aql/research_capture_spool.py"
+      - "src/aql/research_1m_collector.py"
+      - "src/aql/research_live_1m_capture.py"
+      - "src/aql/research_live_one_shot.py"
+      - "src/aql/research_forward_scanner_boundary.py"
+      - "src/aql/research_forward_core_read.py"
+      - "src/aql/research_warehouse_plan.py"
+      - "tests/test_research_timeframes.py"
+      - "tests/test_research_bar_store.py"
+      - "tests/test_research_vision_import.py"
+      - "tests/test_research_ws_1m_ingest.py"
+      - "tests/test_research_ws_capture_import.py"
+      - "tests/test_research_durability_readback.py"
+      - "tests/test_research_offline_one_shot.py"
+      - "tests/test_research_service_bridge_gate.py"
+      - "tests/test_research_capture_spool.py"
+      - "tests/test_research_1m_collector.py"
+      - "tests/test_research_live_1m_capture.py"
+      - "tests/test_research_live_one_shot.py"
+      - "tests/test_research_forward_scanner_boundary.py"
+      - "tests/test_research_forward_core_read.py"
+      - "tests/test_research_warehouse_plan.py"
+      - "tools/ATLAS-RESEARCH-WINDOWS-PREFLIGHT.ps1"
+      - "tools/ATLAS-RESEARCH-1M-OWNER-ONE-SHOT.ps1"
+      - ".github/workflows/research-finalized-timeframes.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  finalized-timeframes:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install package and test runner
+        run: python -m pip install -e ".[dev]"
+      - name: Focused research timeframe tests
+        run: python -m pytest -q tests/test_research_timeframes.py tests/test_research_bar_store.py tests/test_research_vision_import.py tests/test_research_ws_1m_ingest.py tests/test_research_ws_capture_import.py tests/test_research_durability_readback.py tests/test_research_offline_one_shot.py tests/test_research_service_bridge_gate.py tests/test_research_capture_spool.py tests/test_research_1m_collector.py tests/test_research_live_1m_capture.py tests/test_research_live_one_shot.py tests/test_research_forward_scanner_boundary.py tests/test_research_forward_core_read.py tests/test_research_warehouse_plan.py
+      - name: Windows owner-local preflight dry run (no host changes)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tools/ATLAS-RESEARCH-WINDOWS-PREFLIGHT.ps1 -StateRoot "${{ runner.temp }}/nonexistent-atlas-state" -OutputDirectory "${{ runner.temp }}/atlas-preflight"
+      - name: Windows owner one-shot authorization gate dry run
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $script = (Resolve-Path ./tools/ATLAS-RESEARCH-1M-OWNER-ONE-SHOT.ps1).Path
+          Push-Location "${{ runner.temp }}"
+          try { & $script -StateRoot "${{ runner.temp }}/nonexistent-atlas-state" -OutputDirectory "${{ runner.temp }}/atlas-owner-one-shot" } finally { Pop-Location }
