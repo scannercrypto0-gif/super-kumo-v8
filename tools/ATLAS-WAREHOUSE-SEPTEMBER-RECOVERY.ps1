@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$ExpectedCommit,
-    [ValidateSet('Diagnose','ApplyApprovedCorrection','RebuildRegistry')][string]$Mode = 'Diagnose',
+    [ValidateSet('Diagnose','ApplyApprovedCorrection','RebuildRegistry','FullHistory')][string]$Mode = 'Diagnose',
     [string]$AuthorizationFile,
     [string]$Python = 'python',
     [string]$DailyArchiveRoot,
@@ -17,7 +17,7 @@ if ($LASTEXITCODE -ne 0) { throw 'REVIEWED_CODE_MODIFIED' }
 $taskName = 'ATLAS-Research-Sustained-BTCUSDT-Daily'
 $inspection = [ordered]@{task=$taskName;scheduler_changes=0;finite_action='NOT_PROVEN';
     original_1m_output='NOT_INSPECTED_NO_DIRECTORY';task_status='NOT_INSPECTED'}
-if ($Mode -ne 'RebuildRegistry') {
+if ($Mode -notin @('RebuildRegistry','FullHistory')) {
 try {
     $task = Get-ScheduledTask -TaskName $taskName -ErrorAction Stop
     $inspection.task_status = 'READ_ONLY_INSPECTED'
@@ -51,6 +51,9 @@ try {
         $argsList = @('-B','-m','aql.warehouse.registry','--root',$Root)
     } elseif ($Mode -eq 'ApplyApprovedCorrection') {
         $argsList = @('-B','-m','aql.warehouse.september_correction','--root',$Root)
+    } elseif ($Mode -eq 'FullHistory') {
+        $argsList = @('-B','-m','aql.warehouse.full_history','--root',$Root)
+        if ($AuthorizationFile) { $argsList += @('--authorization',$AuthorizationFile) }
     } else {
         $argsList = @('-B','-m','aql.warehouse.diagnose','--root',$Root,'--archive-limit','3')
         if ($AuthorizationFile) { $argsList += @('--authorization',$AuthorizationFile) }
