@@ -8,6 +8,7 @@ on:
       - 'tools/test_atlas_pong_liveness.py'
       - 'tools/atlas_pong_repair_windows.ps1'
       - 'tools/atlas_mixed_recovery_windows.ps1'
+      - 'tools/atlas_closed_socket_repair_windows.ps1'
 permissions:
   contents: read
 jobs:
@@ -97,6 +98,8 @@ jobs:
           $content = git show 0a45cb6de6027b6fba54320e07b0faf3317a5382:tools/binance_live_feed/quota.py
           if ($LASTEXITCODE) {throw 'PINNED_QUOTA_MISSING'}
           $content | Set-Content -LiteralPath $quota -Encoding utf8
+          python -m pip install websocket-client==1.9.2
+          if ($LASTEXITCODE) {throw 'DEPENDENCY_INSTALL_FAILED'}
           python -B tools/test_atlas_pong_liveness.py tools/atlas_live_research_cycle.py $quota
           if ($LASTEXITCODE) {throw 'PONG_REGRESSION_FAILED'}
       - name: Validate deployment script syntax
@@ -113,3 +116,23 @@ jobs:
           $errors=$null
           $null=[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'tools/atlas_mixed_recovery_windows.ps1'),[ref]$tokens,[ref]$errors)
           if($errors.Count){throw ($errors | Out-String)}
+      - name: Validate closed socket installer
+        shell: pwsh
+        run: |
+          $tokens=$null
+          $errors=$null
+          $null=[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'tools/atlas_closed_socket_repair_windows.ps1'),[ref]$tokens,[ref]$errors)
+          if($errors.Count){throw ($errors | Out-String)}
+  closed-socket-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline closed socket and PONG regressions
+        run: |
+          git fetch --no-tags origin refs/pull/305/head
+          git show 0a45cb6de6027b6fba54320e07b0faf3317a5382:tools/binance_live_feed/quota.py > "$RUNNER_TEMP/quota.py"
+          python -m pip install websocket-client==1.9.2
+          python -B tools/test_atlas_pong_liveness.py tools/atlas_live_research_cycle.py "$RUNNER_TEMP/quota.py"
