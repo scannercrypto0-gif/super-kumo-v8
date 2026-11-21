@@ -1,0 +1,138 @@
+name: Sustained WS reset recovery
+on:
+  pull_request:
+    paths:
+      - 'tools/atlas_live_research_service_windows.ps1'
+      - '.github/workflows/sustained-ws-reset-recovery.yml'
+      - 'tools/atlas_live_research_cycle.py'
+      - 'tools/test_atlas_pong_liveness.py'
+      - 'tools/atlas_pong_repair_windows.ps1'
+      - 'tools/atlas_mixed_recovery_windows.ps1'
+      - 'tools/atlas_closed_socket_repair_windows.ps1'
+permissions:
+  contents: read
+jobs:
+  recovery:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check reset evidence and persisted fail-closed transitions without market access
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $script = (Resolve-Path 'tools/atlas_live_research_service_windows.ps1').Path
+          $tokens = $null
+          $errors = $null
+          $ast = [System.Management.Automation.Language.Parser]::ParseFile($script, [ref]$tokens, [ref]$errors)
+          if ($errors.Count) { throw ($errors | Out-String) }
+          $helper = $ast.Find({param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Test-ResetRecovery'}, $true)
+          . ([scriptblock]::Create($helper.Extent.Text))
+          $root = Join-Path $env:RUNNER_TEMP ([guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $root | Out-Null
+          $log = Join-Path $root 'health.jsonl'
+          $reset = @{status='TRANSPORT_INTERRUPTED';error='ConnectionResetError';deadline_origin='CONNECTION_RESET';receive_phase='FRAME_BOUNDARY'}
+          $terminal = @{status='STOPPED_ERROR';error='ConnectionResetError'}
+          $events = @(@{status='CONNECTING';attempt=1},$reset,@{status='CONNECTING';attempt=2},$reset.Clone(),$terminal)
+          function Save-Events { $events | ForEach-Object {ConvertTo-Json -InputObject $_ -Compress} | Set-Content -LiteralPath $log }
+          Save-Events
+          if (-not (Test-ResetRecovery $log 'PILOT_STOP_ConnectionResetError')) {throw 'DOUBLE_RESET_NOT_RECOGNIZED'}
+          if (Test-ResetRecovery $log 'LIVE_SERVICE_CLOCK_UNCERTAINTY') {throw 'CLOCK_ERROR_RETRY_ALLOWED'}
+          $events[3].receive_phase = 'FRAME_PAYLOAD'
+          Save-Events
+          if (Test-ResetRecovery $log 'PILOT_STOP_ConnectionResetError') {throw 'PARTIAL_FRAME_RETRY_ALLOWED'}
+          $events[3].receive_phase = 'FRAME_BOUNDARY'
+          $events[2].attempt = 1
+          Save-Events
+          if (Test-ResetRecovery $log 'PILOT_STOP_ConnectionResetError') {throw 'INVALID_ATTEMPT_SEQUENCE_ALLOWED'}
+          $events[2].attempt = 2
+          $socketTimeout = @{status='TRANSPORT_INTERRUPTED';error='TimeoutError';deadline_origin='UNDERLYING_RECEIVE_TIMEOUT';receive_phase='FRAME_BOUNDARY'}
+          $events[1] = $socketTimeout
+          $events[3] = $socketTimeout.Clone()
+          $events[4].error = 'TimeoutError'
+          Save-Events
+          if (-not (Test-ResetRecovery $log 'PILOT_STOP_TimeoutError')) {throw 'DOUBLE_SOCKET_TIMEOUT_NOT_RECOGNIZED'}
+          $events[3].deadline_origin = 'OUTER_FRAME_DEADLINE'
+          Save-Events
+          if (Test-ResetRecovery $log 'PILOT_STOP_TimeoutError') {throw 'OUTER_DEADLINE_RETRY_ALLOWED'}
+          $events[3].deadline_origin = 'UNDERLYING_RECEIVE_TIMEOUT'
+          $events[3].receive_phase = 'PARTIAL_HEADER'
+          Save-Events
+          if (Test-ResetRecovery $log 'PILOT_STOP_TimeoutError') {throw 'PARTIAL_HEADER_RETRY_ALLOWED'}
+          $events[3] = $reset
+          Save-Events
+          $events[4].error = 'ConnectionResetError'
+          Save-Events
+          if (-not (Test-ResetRecovery $log 'PILOT_STOP_ConnectionResetError')) {throw 'MIXED_FAILURE_RECOVERY_REJECTED'}
+          $events[1].receive_phase = 'FRAME_PAYLOAD'
+          Save-Events
+          if (Test-ResetRecovery $log 'PILOT_STOP_ConnectionResetError') {throw 'MIXED_PARTIAL_FRAME_RETRY_ALLOWED'}
+          $events[1].receive_phase = 'FRAME_BOUNDARY'
+          $events[1].deadline_origin = 'PONG_LIVENESS_EXPIRED'
+          Save-Events
+          if (-not (Test-ResetRecovery $log 'PILOT_STOP_ConnectionResetError')) {throw 'STALE_PONG_RESET_RECOVERY_REJECTED'}
+          $cfg = Join-Path $root 'config.json'
+          '{}' | Set-Content -LiteralPath $cfg
+          $pin = (Get-FileHash -LiteralPath $cfg).Hash.ToLowerInvariant()
+          $pending = Join-Path $root 'reset-recovery.pending'
+          $claimed = Join-Path $root 'reset-recovery.claimed'
+          $hold = Join-Path $root 'hold.json'
+          $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+          $slot = $now - ($now % 900000L)
+          @{failed_ms=($slot-3600000L);slot_ms=($slot-3600000L);config_sha256=$pin} | ConvertTo-Json | Set-Content -LiteralPath $pending
+          & pwsh -NoProfile -File $script -Config $cfg -ConfigSha256 $pin
+          if ($LASTEXITCODE -ne 1 -or (Get-Content $hold -Raw | ConvertFrom-Json).reason -cne 'LIVE_SERVICE_RESET_RECOVERY_INVALID_OR_EXPIRED' -or !(Test-Path $pending)) {throw 'EXPIRED_RECOVERY_DID_NOT_HOLD'}
+          Remove-Item -LiteralPath $hold
+          Rename-Item -LiteralPath $pending -NewName (Split-Path -Leaf $claimed)
+          & pwsh -NoProfile -File $script -Config $cfg -ConfigSha256 $pin
+          if ($LASTEXITCODE -ne 1 -or (Get-Content $hold -Raw | ConvertFrom-Json).reason -cne 'LIVE_SERVICE_RESET_RECOVERY_ALREADY_CLAIMED') {throw 'CRASHED_CLAIM_DID_NOT_HOLD'}
+          exit 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test stale PONG recovery with the original quota implementation
+        shell: pwsh
+        run: |
+          git fetch --no-tags origin refs/pull/305/head
+          if ($LASTEXITCODE) {throw 'PIN_FETCH_FAILED'}
+          $quota = Join-Path $env:RUNNER_TEMP 'pinned-pong-quota.py'
+          $content = git show 0a45cb6de6027b6fba54320e07b0faf3317a5382:tools/binance_live_feed/quota.py
+          if ($LASTEXITCODE) {throw 'PINNED_QUOTA_MISSING'}
+          $content | Set-Content -LiteralPath $quota -Encoding utf8
+          python -m pip install websocket-client==1.9.2
+          if ($LASTEXITCODE) {throw 'DEPENDENCY_INSTALL_FAILED'}
+          python -B tools/test_atlas_pong_liveness.py tools/atlas_live_research_cycle.py $quota
+          if ($LASTEXITCODE) {throw 'PONG_REGRESSION_FAILED'}
+      - name: Validate deployment script syntax
+        shell: pwsh
+        run: |
+          $tokens=$null
+          $errors=$null
+          $null=[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'tools/atlas_pong_repair_windows.ps1'),[ref]$tokens,[ref]$errors)
+          if($errors.Count){throw ($errors | Out-String)}
+      - name: Validate mixed recovery installer
+        shell: pwsh
+        run: |
+          $tokens=$null
+          $errors=$null
+          $null=[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'tools/atlas_mixed_recovery_windows.ps1'),[ref]$tokens,[ref]$errors)
+          if($errors.Count){throw ($errors | Out-String)}
+      - name: Validate closed socket installer
+        shell: pwsh
+        run: |
+          $tokens=$null
+          $errors=$null
+          $null=[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'tools/atlas_closed_socket_repair_windows.ps1'),[ref]$tokens,[ref]$errors)
+          if($errors.Count){throw ($errors | Out-String)}
+  closed-socket-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline closed socket and PONG regressions
+        run: |
+          git fetch --no-tags origin refs/pull/305/head
+          git show 0a45cb6de6027b6fba54320e07b0faf3317a5382:tools/binance_live_feed/quota.py > "$RUNNER_TEMP/quota.py"
+          python -m pip install websocket-client==1.9.2
+          python -B tools/test_atlas_pong_liveness.py tools/atlas_live_research_cycle.py "$RUNNER_TEMP/quota.py"

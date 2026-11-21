@@ -289,6 +289,33 @@ class MemoryObserver(MemoryDatabase, ProspectiveObserver):
     isolation_level = ""
 
 
+def read_research_frame(transport, connection, timeout):
+    """Normalize the library's closed-socket exception for bounded retries."""
+    from websocket import WebSocketConnectionClosedException
+
+    try:
+        return transport.frame(connection, timeout)
+    except WebSocketConnectionClosedException as exc:
+        raise ConnectionResetError("WS_CONNECTION_CLOSED") from exc
+
+
+def send_research_pong(quota, socket_id, received, connection, payload):
+    """Reconnect a stale socket without treating its age as message exhaustion."""
+    if not quota.ws(socket_id, received, "PONG"):
+        with quota.tx() as db:
+            row = db.execute("SELECT opened,last_ping FROM sockets WHERE id=?",
+                             (socket_id,)).fetchone()
+            stale = (row is not None and not quota.get(db, "ban")
+                     and 0 <= received - row[0] < 86_390_000
+                     and received - row[1] >= 60_000
+                     and quota.used(db, "ws:" + socket_id, received, 1000)
+                     < quota.limits.ws_messages // 2)
+        if stale:
+            raise TimeoutError("PONG_LIVENESS_EXPIRED")
+        raise ValueError("PONG_QUOTA_STOP")
+    connection.pong(payload)
+
+
 def observe(root, plan, pin, fixture, clock, transport, wait, uncertainty, synthetic,
             stop_after_first, lease):
     if plan.get("egress_budget") == "LOCAL_PILOT_ONLY":
@@ -371,15 +398,21 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
                              last_close_age_ms=now - rows[-1]["slot"] - STEP + 1 if rows else None)
                         heartbeat = now
                     try:
-                        kind, raw = transport.frame(connection, min(left, 30))
+                        kind, raw = read_research_frame(transport, connection, min(left, 30))
                     except (TimeoutError, ConnectionResetError) as exc:
                         if plan.get("sustained_research") and type(transport) is BinanceReceiptTransport:
                             failure_context = receive_fault_context(connection, exc)
+                            if isinstance(exc, ConnectionResetError) and str(exc) == 'WS_CONNECTION_CLOSED':
+                                failure_context['transport_exception'] = 'WebSocketConnectionClosedException'
                         raise
                     received, _ = time_left()
                     if kind == "ping":
-                        need(quota.ws(socket_id, received, "PONG"), "PONG_QUOTA_STOP")
-                        connection.pong(raw)
+                        try:
+                            send_research_pong(quota, socket_id, received, connection, raw)
+                        except TimeoutError:
+                            failure_context = dict(receive_phase="FRAME_BOUNDARY",
+                                                   deadline_origin="PONG_LIVENESS_EXPIRED")
+                            raise
                         continue
                     need(kind == "text", "UNEXPECTED_FRAME")
                     row = ingest(root, raw, rows, first, received, uncertainty, clock.monotonic_ns(),
