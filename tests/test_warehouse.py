@@ -310,3 +310,22 @@ with HistoricalWarehouse(sys.argv[1],reserve=0,test_root=True).writer():
         for node in ast.walk(ast.parse(path.read_text())):
             if isinstance(node, ast.ImportFrom):
                 assert not any(x in (node.module or '') for x in ('collector', 'research_ws', 'scheduler'))
+
+
+def test_monthly_then_daily_does_not_download_duplicate_history(tmp_path):
+    from aql.warehouse.runner import run
+    monthly_key = KEY.replace('/daily/', '/monthly/').replace('2024-01-01.zip', '2024-01.zip')
+    raw, check = fixture(key=monthly_key)
+    calls = []
+    class Source:
+        authority = AUTH
+        def discover(self, now_ms):
+            return [dict(key=monthly_key, size=len(raw), start_ms=START, end_ms=START+31*DAY),
+                    dict(key=KEY, size=100, start_ms=START, end_ms=START+DAY)]
+        def acquire(self, w, key, expected_size):
+            calls.append(key)
+            assert key == monthly_key
+            return w.write_once(f'raw/{seal(raw)}.zip', raw), check
+    report = run(warehouse(tmp_path), Source(), now_ms=START+31*DAY)
+    assert calls == [monthly_key] and report['one_minute_rows'] == 1440
+    assert report['full_history_verified'] is False

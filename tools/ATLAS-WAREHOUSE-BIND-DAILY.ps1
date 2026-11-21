@@ -6,7 +6,8 @@ param(
     [string]$DailyArchiveRoot,
     [string]$Python = 'python',
     [string]$ExpectedTaskXmlSha256,
-    [string]$HostTaskChangeRef
+    [string]$HostTaskChangeRef,
+    [switch]$OriginalFiniteActionVerified
 )
 $ErrorActionPreference = 'Stop'
 $taskName = 'ATLAS-Research-Sustained-BTCUSDT-Daily'
@@ -21,9 +22,11 @@ if ($Mode -eq 'Prepare') {
     [ordered]@{task=$taskName;xml_sha256=$hash;actions=1;state=[string]$task.State;
         original_executable=[string]$action.Execute;source_interval_required='1m';
         daily_archive_root=$DailyArchiveRoot;changes=0;
-        activation='Run this same script with -Mode Activate -ExpectedTaskXmlSha256 <this hash> -HostTaskChangeRef <scoped owner permission> -DailyArchiveRoot <existing retained 1m ZIP directory> -Python <installed environment python.exe>'} | ConvertTo-Json
+        activation='Run this same script with -Mode Activate -ExpectedTaskXmlSha256 <this hash> -HostTaskChangeRef <scoped owner permission> -DailyArchiveRoot <existing retained 1m ZIP directory> -Python <installed environment python.exe> -OriginalFiniteActionVerified'} | ConvertTo-Json
     return
 }
+if (-not $OriginalFiniteActionVerified) { throw 'FINITE_DAILY_ACTION_VERIFICATION_REQUIRED' }
+if ($action.Arguments -match '-BindingFile') { throw 'EXISTING_WAREHOUSE_HOOK_ALREADY_BOUND' }
 if (-not $HostTaskChangeRef -or $hash -cne $ExpectedTaskXmlSha256) { throw 'HOST_AUTHORITY_OR_TASK_XML_PIN_REQUIRED' }
 if (-not $DailyArchiveRoot -or -not (Test-Path -LiteralPath $DailyArchiveRoot -PathType Container)) { throw 'EXISTING_1M_ARCHIVE_DIRECTORY_REQUIRED' }
 if ([IO.Path]::GetFullPath($DailyArchiveRoot).StartsWith($root,[StringComparison]::OrdinalIgnoreCase)) { throw 'DAILY_INPUT_MUST_BE_SEPARATE' }

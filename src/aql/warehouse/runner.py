@@ -29,6 +29,11 @@ def run(warehouse, source, *, now_ms, archive_limit=12, daily_only=False, rechec
         results, failures = [], []
         examined = 0
         for item in candidates:
+            # Monthly ingestion earlier in this run may already cover a daily
+            # candidate. Recheck now to avoid downloading duplicate originals.
+            if ('/daily/' in item['key'] and not recheck_publisher
+                    and len(warehouse._existing(item['start_ms'])) == 1440):
+                continue
             if examined >= archive_limit:
                 break
             # Completed keys are verified against retained bytes. Revisions

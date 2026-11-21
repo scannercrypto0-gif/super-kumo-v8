@@ -88,9 +88,10 @@ class HistoricalWarehouse(Warehouse):
         store.path = path
         store.db = sqlite3.connect(path.as_uri() + '?mode=ro&immutable=1', uri=True)
         try:
-            keys = store.db.execute('SELECT open_ms FROM finalized_bars ORDER BY open_ms').fetchall()
-            need(len(keys) <= 1440, 'SHARD_ROW_BOUND')
-            rows = [store.read('BTCUSDT', '1m', x[0]) for x in keys]
+            keys = store.db.execute('SELECT symbol,interval,open_ms FROM finalized_bars ORDER BY open_ms').fetchall()
+            need(len(keys) <= 1440 and all(x[:2] == ('BTCUSDT','1m') for x in keys)
+                 and len({x[2] for x in keys}) == len(keys), 'SHARD_ROW_BOUND_OR_IDENTITY')
+            rows = [store.read('BTCUSDT', '1m', x[2]) for x in keys]
             need(all(x is not None and self._shard_name(x['open_ms']) == self._shard_name(opened)
                      and x['source_class'] == 'RETROSPECTIVE_NON_PIT' for x in rows), 'SHARD_IDENTITY')
             return rows
@@ -152,7 +153,7 @@ class HistoricalWarehouse(Warehouse):
                 need(store.db.execute('PRAGMA integrity_check').fetchone()[0] == 'ok', 'SHARD_INTEGRITY')
             finally:
                 store.close()
-            with staging.open('rb') as stream:
+            with staging.open('r+b') as stream:
                 os.fsync(stream.fileno())
             os.replace(staging, target)
         body = dict(schema='aql.research.warehouse-source.v1', key=key,

@@ -66,7 +66,7 @@ The importer consumes the existing task's retained **original 1m ZIP + CHECKSUM*
 
 A 15m-only archive directory returns `WAIT_NO_1M_DAILY_ARCHIVES`. It cannot provide original 1m candles. Existing output directory and finite-action behavior must be established by the host readback. If the existing task is a continuous poller, do not bind an after-exit hook: the importer must be attached to its successful archive-commit callback instead. That host-specific seam cannot be asserted from GitHub metadata.
 
-`ATLAS-WAREHOUSE-BIND-DAILY.ps1 -Mode Prepare -DailyArchiveRoot <existing directory>` reads the existing task XML and emits its SHA256 and exact activation arguments. It makes zero changes. After separately authorized host action changes, the same script's `Activate` mode requires the current XML pin and `-HostTaskChangeRef`. It retains original XML/action/binding/hook privately inside the warehouse, verifies the installed package, changes only the **existing task's action**, then verifies readback. No trigger, principal, settings, enabled state, immediate start or duplicate task is requested. The original action runs first and must exit successfully before offline import. If Windows requires credentials or denies updating the action, leave it unchanged and use the saved preparation output for the authorized host operator. Restore, when separately authorized, uses the retained exact task XML; no automatic rollback changes host state.
+`ATLAS-WAREHOUSE-BIND-DAILY.ps1 -Mode Prepare -DailyArchiveRoot <existing directory>` reads the existing task XML and emits its SHA256 and exact activation arguments. It makes zero changes. After separately authorized host action changes, the same script's `Activate` mode requires the current XML pin, `-HostTaskChangeRef` and `-OriginalFiniteActionVerified`. It retains original XML/action/binding/hook privately inside the warehouse, verifies the installed package, changes only the **existing task's action**, then verifies readback. No trigger, principal, settings, enabled state, immediate start or duplicate task is requested. The original action runs first and must exit successfully before offline import. If Windows requires credentials or denies updating the action, leave it unchanged and use the saved preparation output for the authorized host operator. Restore, when separately authorized, uses the retained exact task XML; no automatic rollback changes host state.
 
 ## Research consumer interfaces
 
@@ -90,3 +90,10 @@ Focused generated-source tests cover interruption/Range resume, replay, checksum
 | Windows/Ubuntu tests | See candidate-head CI; do not infer original Windows deployment |
 | Blockers/solutions | No Windows executor; no scoped bulk permission file; task-output contract unknown; prepared unified local runner and pinned-action activation procedure |
 | Completion grade | Engineering implementation with scoped synthetic evidence; full owner-host/source/native E2E success not claimed |
+
+
+## Observed implementation failure and correction
+
+First candidate `e07f231b1952873f6921196a0017f4696a27b92e`: Ubuntu 18/18 passed. Windows 12/18 passed, six cases failed from one root cause: Python Windows `os.fsync` rejects a read-only file descriptor (`Errno 9`) when flushing the closed SQLite staging file. Changed the flush handle to `r+b`, retaining SQLite FULL synchronous commits and the pre-publication fsync; no exception suppression. Existing cross-platform crash/replay/import cases exercise the correction. Run: https://github.com/scannercrypto0-gif/super-kumo-v8/actions/runs/44873170795 .
+
+A source-selection regression also verifies that a monthly archive imported earlier in the same run suppresses now-covered daily candidates, avoiding a second download of the same minute history. The daily hook rejects an already-bound action, requires an explicit finite-action verification at activation, and verifies the retained binding/hook content hashes before use.
