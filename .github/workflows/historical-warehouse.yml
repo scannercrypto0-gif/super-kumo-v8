@@ -5,6 +5,7 @@ on:
       - 'src/aql/warehouse/**'
       - 'tests/test_warehouse.py'
       - 'tests/test_warehouse_september.py'
+      - 'tests/test_september_correction.py'
       - 'tools/ATLAS-WAREHOUSE-*.ps1'
       - '.github/workflows/historical-warehouse.yml'
   workflow_dispatch:
@@ -22,7 +23,7 @@ jobs:
         with:
           python-version: '3.11'
       - run: python -m pip install -e ".[dev]"
-      - run: python -m pytest -q tests/test_warehouse.py tests/test_warehouse_september.py
+      - run: python -m pytest -q tests/test_warehouse.py tests/test_warehouse_september.py tests/test_september_correction.py
       - name: Parse unified Windows entry point
         if: runner.os == 'Windows'
         shell: pwsh

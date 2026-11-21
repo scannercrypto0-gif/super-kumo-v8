@@ -98,9 +98,12 @@ class HistoricalWarehouse(Warehouse):
         finally:
             store.close()
 
-    def import_archive(self, raw, checksum, key, *, observed_ms):
+    def import_archive(self, raw, checksum, key, *, observed_ms, derivation=None):
         need(self.locked, 'WRITER_LOCK_REQUIRED')
         rows, meta = parse_archive(raw, checksum, key, observed_ms)
+        if derivation is not None:
+            from .september_correction import verify_derivative
+            derivation = verify_derivative(self,raw,checksum,key,derivation)
         pin = seal(raw)
         receipt_rel = f'catalog/{pin}.json'
         old_receipt = self.path(receipt_rel)
@@ -109,6 +112,7 @@ class HistoricalWarehouse(Warehouse):
             need(old['source_zip_sha256'] == pin and old['key'] == key
                  and old.get('receipt_sha256') == seal(canonical({k:v for k,v in old.items()
                      if k != 'receipt_sha256'})), 'SOURCE_CATALOG_CONFLICT')
+            need(old.get('derivation') == derivation, 'SOURCE_DERIVATION_CONFLICT')
             # Replay verifies retained original and every requested row.
         grouped = {}
         for row in rows:
@@ -165,6 +169,10 @@ class HistoricalWarehouse(Warehouse):
                     observed_ms=observed_ms, source_class='RETROSPECTIVE_NON_PIT',
                     historical_known_at_ms=None, publisher_integrity='ZIP_CHECKSUM_MATCH',
                     independent_origin_attestation='NOT_ATTESTED', trading_authority='NONE', **meta)
+        if derivation is not None:
+            body.update(source_kind='OWNER_AUTHORIZED_DERIVATIVE', derivation=derivation,
+                        publisher_integrity='ORIGINAL_PINNED_DERIVATIVE_LOCAL_CHECKSUM',
+                        original_source_zip_sha256=derivation['original_zip_sha256'])
         body['receipt_sha256'] = seal(canonical(body))
         # Replays retain original observation time and receipt bytes.
         if not old_receipt.exists():
@@ -175,6 +183,9 @@ class HistoricalWarehouse(Warehouse):
                       source_rows=len(rows), inserted_rows=sum(len(x[1]) for x in plans),
                       duplicate_rows=duplicate_count, repaired_internal_minutes=repaired_internal, conflicts=0, source_class='RETROSPECTIVE_NON_PIT',
                       trading_authority='NONE')
+        if derivation is not None:
+            result.update(source_kind='OWNER_AUTHORIZED_DERIVATIVE',
+                          derivation_manifest_sha256=seal(canonical(derivation)))
         self.document('receipts', result)
         return result
 

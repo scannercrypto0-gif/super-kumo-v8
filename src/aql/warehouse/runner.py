@@ -59,7 +59,8 @@ def run(warehouse, source, *, now_ms, archive_limit=12, daily_only=False, rechec
                 retained = warehouse.path(f"raw/{c['source_zip_sha256']}.zip")
                 checksum = warehouse.path(f"raw/{c['checksum_sha256']}.CHECKSUM")
                 results.append(warehouse.import_archive(retained.read_bytes(), checksum.read_bytes(),
-                                                        item['key'], observed_ms=c['observed_ms']))
+                                                        item['key'], observed_ms=c['observed_ms'],
+                                                        derivation=c.get('derivation')))
                 continue
             examined += 1
             try:

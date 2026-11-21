@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$ExpectedCommit,
+    [ValidateSet('Diagnose','ApplyApprovedCorrection')][string]$Mode = 'Diagnose',
     [string]$AuthorizationFile,
     [string]$Python = 'python',
     [string]$DailyArchiveRoot,
@@ -44,8 +45,12 @@ Push-Location $repo
 try {
     $env:PYTHONPATH = "$repo\src;$repo"
     $env:ATLAS_WAREHOUSE_RECOVERY_TASK_INSPECTION = $inspection | ConvertTo-Json -Depth 5 -Compress
-    $argsList = @('-B','-m','aql.warehouse.diagnose','--root',$Root,'--archive-limit','3')
-    if ($AuthorizationFile) { $argsList += @('--authorization',$AuthorizationFile) }
+    if ($Mode -eq 'ApplyApprovedCorrection') {
+        $argsList = @('-B','-m','aql.warehouse.september_correction','--root',$Root)
+    } else {
+        $argsList = @('-B','-m','aql.warehouse.diagnose','--root',$Root,'--archive-limit','3')
+        if ($AuthorizationFile) { $argsList += @('--authorization',$AuthorizationFile) }
+    }
     & $Python @argsList
     $code = $LASTEXITCODE
 } finally {
