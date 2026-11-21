@@ -289,6 +289,16 @@ class MemoryObserver(MemoryDatabase, ProspectiveObserver):
     isolation_level = ""
 
 
+def read_research_frame(transport, connection, timeout):
+    """Normalize the library's closed-socket exception for bounded retries."""
+    from websocket import WebSocketConnectionClosedException
+
+    try:
+        return transport.frame(connection, timeout)
+    except WebSocketConnectionClosedException as exc:
+        raise ConnectionResetError("WS_CONNECTION_CLOSED") from exc
+
+
 def send_research_pong(quota, socket_id, received, connection, payload):
     """Reconnect a stale socket without treating its age as message exhaustion."""
     if not quota.ws(socket_id, received, "PONG"):
@@ -388,10 +398,12 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
                              last_close_age_ms=now - rows[-1]["slot"] - STEP + 1 if rows else None)
                         heartbeat = now
                     try:
-                        kind, raw = transport.frame(connection, min(left, 30))
+                        kind, raw = read_research_frame(transport, connection, min(left, 30))
                     except (TimeoutError, ConnectionResetError) as exc:
                         if plan.get("sustained_research") and type(transport) is BinanceReceiptTransport:
                             failure_context = receive_fault_context(connection, exc)
+                            if isinstance(exc, ConnectionResetError) and str(exc) == 'WS_CONNECTION_CLOSED':
+                                failure_context['transport_exception'] = 'WebSocketConnectionClosedException'
                         raise
                     received, _ = time_left()
                     if kind == "ping":
