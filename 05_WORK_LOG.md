@@ -218,3 +218,11 @@ passed locally; final incremental/cross-platform results are recorded at the exa
 candidate SHA on #330, not inferred from this log. See warehouse-registry.md for
 reuse inventory, evidence grades, blocker solutions and rollback. No new data
 acquisition, E: execution, scheduler/WS operation, merge or gate promotion.
+
+### Continuity update / host handoff correction
+
+Fresh latest-comment read found owner success #330/7058983090 (64140 total,
+September 42780, August unchanged) and continuation authority #330/7059048243.
+Superseded the stale September-pending assessment. Added guarded registry-only
+adoption to avoid repeating completed correction or daily task inspection.
+No new host execution or full-history completion is claimed.

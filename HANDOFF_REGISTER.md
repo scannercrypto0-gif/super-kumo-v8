@@ -138,3 +138,11 @@ Deferred: native Scanner-E custody, daily activation, PIT/trading/G0 and merge.
 Private E: and unavailable cross-chat evidence NOT_ACCESSED. Resulting changes,
 exact successor SHA, CI and scoped Audit request belong to existing PR #330;
 no owner closure or merge is implied. Details: docs/research/warehouse-registry.md.
+
+### ATLAS-WH-REGISTRY-RECOVERY-001 latest-host addendum
+
+Reconciled #330/7058983090 actual September success and #330/7059048243 full-history
+continuation authority; September recovery is ALREADY_DOCUMENTED / reused.
+Host next action is registry-only adoption, no repeated correction/task probe.
+Full-history runtime remains unverified and separate. Original private receipt
+bytes NOT_ACCESSED. Previous September-pending wording is superseded.

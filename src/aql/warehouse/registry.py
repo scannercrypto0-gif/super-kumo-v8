@@ -240,3 +240,45 @@ def snapshot(warehouse, *, synchronize=False, physical_report=None):
         need(warehouse.path(relative).exists() and warehouse.path(relative).read_bytes() == canonical(result),
              'REGISTRY_SNAPSHOT_PENDING_OR_CORRUPT')
     return result
+
+
+def adopt_existing(warehouse):
+    """Registry-only host handoff after the already completed September admission."""
+    from .september_correction import AUGUST_SHARDS, START, END, GAP, _august_snapshot
+    need(warehouse.path('catalog/warehouse-policy.json').is_file(),
+         'EXISTING_WAREHOUSE_REQUIRED_NO_REBUILD')
+    with warehouse.writer():
+        before = _august_snapshot(warehouse)
+        need(before['rows'] == 21360 and before['shard_sha256'] == AUGUST_SHARDS,
+             'OWNER_AUGUST_BASELINE_MISMATCH')
+        opens = [r['open_ms'] for day in range(START, END, 86400000)
+                 for r in warehouse._existing(day)]
+        gaps = [[a+60000, b] for a, b in zip(opens, opens[1:]) if b != a+60000]
+        need(len(opens) == 42780 and opens[0] == START and opens[-1] == END-60000
+             and gaps == [GAP], 'OWNER_SEPTEMBER_ADMISSION_REQUIRED')
+        warehouse.rebuild_registry()
+        report = warehouse.report()
+        after = _august_snapshot(warehouse)
+        need(before == after, 'ACCEPTED_AUGUST_CHANGED')
+        result = dict(schema='aql.warehouse.registry-adoption.v1',
+                      status='REGISTRY_ADOPTED_EXISTING_COMMITTED_DATA',
+                      warehouse=report, august_before=before, august_after=after,
+                      september_rows=len(opens), september_gaps=gaps,
+                      source_network_calls=0, scheduler_changes=0, admission_operations=0,
+                      trading_authority='NONE', scientific_status='REAL_PIT_OOS_BLOCKED')
+        receipt = warehouse.document('receipts', result)
+        return dict(result, receipt_file=receipt.name)
+
+
+def main():
+    import argparse
+    from pathlib import Path
+    from .engine import HistoricalWarehouse
+    parser = argparse.ArgumentParser(description='Adopt committed warehouse evidence; no source import/network')
+    parser.add_argument('--root', type=Path, default=Path('E:/ATLAS/DataWarehouse'))
+    args = parser.parse_args()
+    print(json.dumps(adopt_existing(HistoricalWarehouse(args.root)), sort_keys=True, indent=2))
+
+
+if __name__ == '__main__':
+    main()

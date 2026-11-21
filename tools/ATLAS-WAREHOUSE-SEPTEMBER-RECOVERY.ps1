@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$ExpectedCommit,
-    [ValidateSet('Diagnose','ApplyApprovedCorrection')][string]$Mode = 'Diagnose',
+    [ValidateSet('Diagnose','ApplyApprovedCorrection','RebuildRegistry')][string]$Mode = 'Diagnose',
     [string]$AuthorizationFile,
     [string]$Python = 'python',
     [string]$DailyArchiveRoot,
@@ -17,6 +17,7 @@ if ($LASTEXITCODE -ne 0) { throw 'REVIEWED_CODE_MODIFIED' }
 $taskName = 'ATLAS-Research-Sustained-BTCUSDT-Daily'
 $inspection = [ordered]@{task=$taskName;scheduler_changes=0;finite_action='NOT_PROVEN';
     original_1m_output='NOT_INSPECTED_NO_DIRECTORY';task_status='NOT_INSPECTED'}
+if ($Mode -ne 'RebuildRegistry') {
 try {
     $task = Get-ScheduledTask -TaskName $taskName -ErrorAction Stop
     $inspection.task_status = 'READ_ONLY_INSPECTED'
@@ -39,13 +40,16 @@ if ($DailyArchiveRoot) {
     $inspection.original_1m_output = if ($pairs.Count) {'RETAINED_ZIP_CHECKSUM_PAIRS_SEEN_NOT_VALIDATED'} else {'NO_1M_ZIP_CHECKSUM_PAIRS_SEEN'}
     $inspection.pairs_seen_max_1000 = $pairs.Count
 }
+}
 $oldPath = $env:PYTHONPATH
 $oldInspection = $env:ATLAS_WAREHOUSE_RECOVERY_TASK_INSPECTION
 Push-Location $repo
 try {
     $env:PYTHONPATH = "$repo\src;$repo"
     $env:ATLAS_WAREHOUSE_RECOVERY_TASK_INSPECTION = $inspection | ConvertTo-Json -Depth 5 -Compress
-    if ($Mode -eq 'ApplyApprovedCorrection') {
+    if ($Mode -eq 'RebuildRegistry') {
+        $argsList = @('-B','-m','aql.warehouse.registry','--root',$Root)
+    } elseif ($Mode -eq 'ApplyApprovedCorrection') {
         $argsList = @('-B','-m','aql.warehouse.september_correction','--root',$Root)
     } else {
         $argsList = @('-B','-m','aql.warehouse.diagnose','--root',$Root,'--archive-limit','3')

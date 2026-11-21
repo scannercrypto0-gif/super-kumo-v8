@@ -254,3 +254,13 @@ remains BLOCKED on the actual owner-local September+registry receipt and scoped
 Audit acceptance; keep the 420-minute gap OPEN and all trading/PIT/G0 boundaries.
 Next: exact-head CI, one scoped #134 Audit request, then guarded existing Windows
 resume command on the authorized host. No merge/task/WS changes.
+
+### Fresh continuity correction — 2026-11-21
+
+Latest #330/7058983090 supersedes the old September-zero host state: actual
+OWNER_REPORTED_LOCAL acceptance is August 21360 + September 42780 =64140,
+originals/August pins unchanged, 420-minute gap OPEN. Do not repeat correction.
+#330/7059048243 separately authorizes full-history continuation without proving
+its execution. New guarded RebuildRegistry mode adopts already committed data
+only, with no imports/network/task probing. Remaining host blocker is the new
+registry receipt, not September correction. Independent delta Audit remains open.

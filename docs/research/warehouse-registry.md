@@ -72,7 +72,7 @@ physical higher-timeframe files. Every eligible read remains
 RETROSPECTIVE_NON_PIT; FORWARD_UNQUALIFIED, REAL_PIT_OOS_BLOCKED and trading NONE
 are explicit. Native Core245/253/Scanner-E receipts are still separate.
 
-## September and one guarded local handoff
+## September reuse and one guarded registry-only local handoff
 
 Reuse [the exact transform and pins](september-derived-admission.md). The only
 change is line 8160 / field 6: `1504713600000` → `1504713599999`, policy
@@ -82,20 +82,31 @@ September acceptance is 42,780 rows; with August alone the total is 64,140.
 August's 21,360 rows and fifteen owner-pinned shard hashes must match before
 and after. The registry verifies the original-to-derived lineage again.
 
+Fresh continuity reconciliation found the subsequent owner-local success
+[#330/7058983090](https://github.com/scannercrypto0-gif/super-kumo-v8/pull/330#issuecomment-7058983090):
+September 42,780 admitted, combined 64,140, August pins unchanged, original bytes
+unchanged and the 420-minute gap OPEN. Receipt
+`088a83c07c495d24ebc258f9029bebe67e081ffba2ba9801d12bbf475905eec8.json`.
+This supersedes the older September-zero report and is OWNER_REPORTED_LOCAL,
+not independently rehashed private E: evidence. Do not repeat that correction.
+
 After the final exact-SHA delivery and only on the authorized owner host, use
-the **existing** `ATLAS-WAREHOUSE-SEPTEMBER-RECOVERY.ps1` in
-`ApplyApprovedCorrection` mode with `-ExpectedCommit` equal to that full SHA.
-The delivery comment supplies the complete command. It reads already-retained
-source files, checks the warehouse policy and all August pins, admits the one
-approved derivative, rebuilds the registry and emits the actual receipt. It
-does not obtain new data or change the daily task/WS. Do not invoke Diagnose or
-full backfill again. Existing checks fail closed if required files, free space,
-permissions or pins are absent.
+the **existing** `ATLAS-WAREHOUSE-SEPTEMBER-RECOVERY.ps1` in the new
+`RebuildRegistry` mode with `-ExpectedCommit` equal to that full SHA. The delivery
+comment supplies the command. It checks the warehouse policy, all August pins
+and the existing September count/gap, then rebuilds the registry and emits a
+sealed receipt. It imports zero archives, makes zero source network calls and
+skips task inspection entirely, reusing the prior read-only task evidence.
+No daily/WS change, repeated correction or backfill occurs. Missing pins, data,
+free space or permissions fail closed.
 
 No new E: execution occurred in this implementation package. Host receipt
-#330/7058739302 remains **OWNER_REPORTED_LOCAL**: August 21,360; September 0 at
-the then-current failure; daily task Ready / result 0; finite action NOT_PROVEN;
-original daily-output directory not inspected. This is reused, not re-probed.
+#330/7058983090 remains **OWNER_REPORTED_LOCAL**: August 21,360 + September
+42,780; daily task Ready / result 0; finite action NOT_PROVEN; original daily
+output directory not inspected. This is reused, not re-probed. Subsequent
+#330/7059048243 records owner continuation authority for full history, but no
+full-history host result was available; this registry-only package neither
+executes nor claims that separate backfill.
 Unavailable private E: files and cross-chat conversations are **NOT_ACCESSED**.
 The isolated Linux September proof is **ORIGINAL_E2E_RUN** only for that earlier
 diagnostic store, never Windows registry operational acceptance.
@@ -111,7 +122,7 @@ correction lineage, policy, count and the OPEN gap while preserving August.
 Cross-platform exact-head CI and the scoped Audit request are in the delivery
 comment; only an actual independent Audit response can earn AUDIT_ACCEPTED.
 
-Remaining blockers: no newly evidenced owner E: September+registry receipt;
+Remaining blockers: no newly evidenced owner E: registry adoption receipt;
 no independent Audit acceptance of this delta. Deferred: native Scanner-E
 original custody, daily-task finite-action verification/activation, live/PIT,
 trading and G0 decisions. No claim closes the stage or advances these authorities.

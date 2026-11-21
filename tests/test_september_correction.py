@@ -138,6 +138,10 @@ def test_apply_replay_restart_and_retained_runner_preserve_august_and_gap(policy
     from aql.warehouse.registry import history
     corrected_events = [e for e in history(w) if e['event_type'] == 'APPROVED_DERIVED_CORRECTION']
     assert len(corrected_events) == 1 and corrected_events[0]['policy_ref'] == sc.POLICY
+    from aql.warehouse.registry import adopt_existing
+    adoption = adopt_existing(w)
+    assert adoption['admission_operations'] == adoption['source_network_calls'] == 0
+    assert adoption['warehouse']['registry'] == registry
     assert result['september_gaps'] == result['warehouse']['internal_gaps'] == [sc.GAP]
     assert result['full_history_verified'] is False
     for name,raw in before.items():assert (tmp_path/'bars'/name).read_bytes() == raw
