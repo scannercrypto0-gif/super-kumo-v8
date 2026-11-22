@@ -14,6 +14,10 @@ on:
       - 'tools/test_atlas_ws_*.py'
       - 'tools/test_atlas_ws_supervisor.ps1'
       - 'tools/test_atlas_ws_private_check.ps1'
+      - 'tools/test_atlas_ws_baseline.ps1'
+      - 'tools/test_atlas_ws_apply_lock.ps1'
+      - 'tools/test_atlas_ws_clock.ps1'
+      - 'tools/ATLAS-WS-CONTINUOUS-RECOVERY.ps1'
 permissions:
   contents: read
 jobs:
@@ -165,7 +169,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
-          foreach($path in @('tools/ATLAS-WS-NETWORK-COMPARE.ps1','tools/ATLAS-WS-CONTINUOUS-RECOVERY.ps1','tools/atlas_ws_resilience_windows.ps1','tools/atlas_live_research_service_windows.ps1','tools/test_atlas_ws_supervisor.ps1','tools/test_atlas_ws_private_check.ps1','tools/test_atlas_ws_baseline.ps1','tools/test_atlas_ws_apply_lock.ps1')) {
+          foreach($path in @('tools/ATLAS-WS-NETWORK-COMPARE.ps1','tools/ATLAS-WS-CONTINUOUS-RECOVERY.ps1','tools/atlas_ws_resilience_windows.ps1','tools/atlas_live_research_service_windows.ps1','tools/test_atlas_ws_supervisor.ps1','tools/test_atlas_ws_private_check.ps1','tools/test_atlas_ws_baseline.ps1','tools/test_atlas_ws_apply_lock.ps1','tools/test_atlas_ws_clock.ps1')) {
             $tokens=$null;$errors=$null
             $null=[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path),[ref]$tokens,[ref]$errors)
             if($errors.Count){throw ($errors | Out-String)}
@@ -174,6 +178,7 @@ jobs:
           & ./tools/test_atlas_ws_private_check.ps1
           & ./tools/test_atlas_ws_baseline.ps1
           & ./tools/test_atlas_ws_apply_lock.ps1
+          & ./tools/test_atlas_ws_clock.ps1
       - name: Windows PowerShell 5 UTF8 private diagnostic wire
         if: runner.os == 'Windows'
         shell: pwsh
@@ -184,3 +189,5 @@ jobs:
           if($LASTEXITCODE){throw 'WINDOWS_PS5_BASELINE_FAILED'}
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/test_atlas_ws_apply_lock.ps1
           if($LASTEXITCODE){throw 'WINDOWS_PS5_APPLY_LOCK_FAILED'}
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/test_atlas_ws_clock.ps1
+          if($LASTEXITCODE){throw 'WINDOWS_PS5_CLOCK_FAILED'}

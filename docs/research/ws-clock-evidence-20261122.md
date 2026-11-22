@@ -1,0 +1,11 @@
+# Owner clock evidence and bounded qualification recovery
+
+Owner f06a39ee Apply reached HOST_CLOCK_SAMPLE_INVALID after authorization, before deployment. Later original w32tm output (2026-11-22 14:51 Riyadh) returned exit0 and four complete samples. The exact offset, roundtrip, root-delay, root-dispersion and leap values are retained in the native regression fixture. Their existing conservative formula produces ceil(102.97355)=103ms, within the unchanged 250ms ceiling. This later output does not identify which field was missing in the earlier failing invocation; no permanent parser/localization defect or clock repair is claimed.
+
+Both operator and installed supervisor now use identical qualification functions, checked byte-for-byte in native tests. Values are parsed with invariant culture; four complete independent samples, four no-warning leap fields and the existing uncertainty formula are required. No partial results are pooled between invocations.
+
+The same time.cloudflare.com w32tm endpoint and four-sample probe are retained. A bounded probe timeout is 15 seconds with concurrent stdout/stderr draining. Only a missing/incomplete sample set, unsuccessful probe or probe timeout may receive two additional attempts, separated by 500ms. Maximum12 NTP samples per qualification and three15second process deadlines. Unknown errors and a measured uncertainty above250ms stop immediately. The service receives the same recovery, so deployment-only tolerance cannot conceal a supervisor failure.
+
+Final operator failure includes attempt numbers, safe reason codes and counts for offset/root-delay/root-dispersion/leap fields. Raw clock output, host paths, provider reference addresses and exception details are not published. Host clock/timezone/settings are never modified; no resync, endpoint change, market request, quota/circuit reset, task start or schedule/principal change is introduced.
+
+Native PowerShell regression executes the actual AST functions on owner numeric evidence under en-US, de-DE and ar-SA cultures; proves103ms; missing-first/good-second recovery; exactly three failed attempts; no retry of excessive uncertainty; no retry of unknown errors; and identical operator/supervisor functions. Synthetic retry results are engineering proof only, not original host continuous operation.

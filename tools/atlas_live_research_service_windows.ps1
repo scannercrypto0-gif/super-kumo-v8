@@ -174,6 +174,58 @@ function Claim-OperatorResume([string]$TicketPath, [string]$RootPath, [string]$C
 
 if ((Test-Path -LiteralPath $stop) -or
     ((Test-Path -LiteralPath $hold) -and !(Test-Path -LiteralPath $operatorTicket))) {return}
+function Measure-ClockSamples([string]$Text){
+    $lines=@($Text -split '[\r\n]+' | ForEach-Object Trim)
+    $culture=[Globalization.CultureInfo]::InvariantCulture
+    $offset=@($lines|ForEach-Object {if($_ -match 'd:([+-][0-9.]+)s\s+o:([+-][0-9.]+)s'){
+        [Math]::Abs([double]::Parse($Matches[2],$culture))+[Math]::Abs([double]::Parse($Matches[1],$culture))/2}})
+    $delay=@($lines|ForEach-Object {if($_ -match '^Root Delay:.*\(([+-]?[0-9.]+)s\)'){[Math]::Abs([double]::Parse($Matches[1],$culture))/2}})
+    $disp=@($lines|ForEach-Object {if($_ -match '^Root Dispersion:.*\(([+-]?[0-9.]+)s\)'){[Math]::Abs([double]::Parse($Matches[1],$culture))}})
+    $leap=@($lines|Where-Object {$_ -match '^Leap Indicator: 0(?:\D|$)'}).Count
+    $script:clockSampleCounts=@{offset=$offset.Count;root_delay=$delay.Count;root_dispersion=$disp.Count;leap_ok=$leap}
+    if($offset.Count -ne 4 -or $delay.Count -ne 4 -or $disp.Count -ne 4 -or $leap -ne 4){throw 'HOST_CLOCK_SAMPLE_INVALID'}
+    $uncertainty=[int][Math]::Ceiling(20+1000*(($offset|Measure-Object -Maximum).Maximum+
+        ($delay|Measure-Object -Maximum).Maximum+($disp|Measure-Object -Maximum).Maximum))
+    if($uncertainty -gt 250){throw 'HOST_CLOCK_UNCERTAINTY'}
+    return @{checked_ms=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();uncertainty_ms=$uncertainty}
+}
+function Read-ClockProbe {
+    $info=[Diagnostics.ProcessStartInfo]::new()
+    $info.FileName='w32tm.exe'
+    $info.Arguments='/stripchart /computer:time.cloudflare.com /samples:4 /period:1 /packetinfo'
+    $info.UseShellExecute=$false;$info.CreateNoWindow=$true
+    $info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true
+    $process=[Diagnostics.Process]::new();$process.StartInfo=$info
+    try{
+        if(!$process.Start()){throw 'HOST_CLOCK_PROBE_FAILED'}
+        $stdout=$process.StandardOutput.ReadToEndAsync();$stderr=$process.StandardError.ReadToEndAsync()
+        if(!$process.WaitForExit(15000)){$process.Kill();$process.WaitForExit();throw 'HOST_CLOCK_PROBE_TIMEOUT'}
+        $text=$stdout.GetAwaiter().GetResult();$errorText=$stderr.GetAwaiter().GetResult()
+        if($process.ExitCode -ne 0 -or $text.Length -gt 65536 -or $errorText.Length -gt 65536){throw 'HOST_CLOCK_PROBE_FAILED'}
+        return $text
+    }finally{$process.Dispose()}
+}
+function Qualified-Clock {
+    $script:clockFailure=$null
+    $attempts=@()
+    for($attempt=1;$attempt -le 3;$attempt++){
+        $script:clockSampleCounts=$null
+        try{
+            $measurement=Measure-ClockSamples (Read-ClockProbe)
+            $measurement['probe_attempts']=$attempt
+            $measurement['prior_failures']=@($attempts)
+            return $measurement
+        }catch{
+            $reason=$_.Exception.Message
+            $attempts+=@{attempt=$attempt;reason=if($reason -cmatch '^HOST_CLOCK_[A-Z_]+$'){$reason}else{'HOST_CLOCK_PRIVATE_FAILURE'};counts=$script:clockSampleCounts}
+            $script:clockFailure=@{attempts=@($attempts);max_attempts=3;uncertainty_limit_ms=250}
+            # Never pool partial samples, accept an uncertain result or retry an
+            # unknown error. A new bounded probe must independently pass all four.
+            if($reason -cnotin @('HOST_CLOCK_SAMPLE_INVALID','HOST_CLOCK_PROBE_FAILED','HOST_CLOCK_PROBE_TIMEOUT') -or $attempt -eq 3){throw}
+            Start-Sleep -Milliseconds 500
+        }
+    }
+}
 $lockPath=Join-Path $root 'supervisor.lock'
 try { $lock=[IO.File]::Open($lockPath,'OpenOrCreate','ReadWrite','None') }
 catch [IO.IOException] { return }
@@ -225,21 +277,15 @@ try {
         @(Get-ChildItem Env: | Where-Object Name -match '^(HTTPS?_PROXY|ALL_PROXY)$').Count -or
         !(netsh winhttp show proxy | Select-String 'Direct access')) {throw 'LIVE_SERVICE_PROXY_ROUTE_CHANGED'}
 
-    $ntp=@((w32tm.exe /stripchart /computer:time.cloudflare.com /samples:4 /period:1 /packetinfo) -join "`n")
-    if ($LASTEXITCODE) {throw 'LIVE_SERVICE_CLOCK_PROBE'}
-    $lines=@($ntp -split '[\r\n]+' | ForEach-Object Trim)
-    $offset=@($lines | ForEach-Object {if ($_ -match 'd:([+-][0-9.]+)s o:([+-][0-9.]+)s') {
-        [Math]::Abs([double]$Matches[2])+[Math]::Abs([double]$Matches[1])/2 }})
-    $delay=@($lines | ForEach-Object {if ($_ -match '^Root Delay:.*\(([+-]?[0-9.]+)s\)') {
-        [Math]::Abs([double]$Matches[1])/2 }})
-    $disp=@($lines | ForEach-Object {if ($_ -match '^Root Dispersion:.*\(([+-]?[0-9.]+)s\)') {
-        [Math]::Abs([double]$Matches[1]) }})
-    if ($offset.Count -ne 4 -or $delay.Count -ne 4 -or $disp.Count -ne 4 -or
-        @($lines | Where-Object {$_ -match '^Leap Indicator: 0'}).Count -ne 4) {throw 'LIVE_SERVICE_CLOCK_SAMPLE'}
-    $uncertainty=[int][Math]::Ceiling(20+1000*(($offset|Measure-Object -Maximum).Maximum+
-        ($delay|Measure-Object -Maximum).Maximum+($disp|Measure-Object -Maximum).Maximum))
-    if($uncertainty -gt 250) {throw 'LIVE_SERVICE_CLOCK_UNCERTAINTY'}
-    $checked=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    try{$clock=Qualified-Clock}catch{
+        switch -CaseSensitive ($_.Exception.Message){
+            'HOST_CLOCK_UNCERTAINTY' {throw 'LIVE_SERVICE_CLOCK_UNCERTAINTY'}
+            'HOST_CLOCK_SAMPLE_INVALID' {throw 'LIVE_SERVICE_CLOCK_SAMPLE'}
+            default {throw 'LIVE_SERVICE_CLOCK_PROBE'}
+        }
+    }
+    $uncertainty=$clock.uncertainty_ms
+    $checked=$clock.checked_ms
     $slot=$checked-($checked%900000L)
     $state=Join-Path $segments ([string]$slot)
     if ($checked-$slot -gt 885000L -or (Test-Path -LiteralPath "$state/plan.json") -or

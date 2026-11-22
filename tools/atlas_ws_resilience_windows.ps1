@@ -171,35 +171,59 @@ function Get-AuthorizedApplySnapshot([string]$Root,[int]$WaitSeconds=180){
         }
     }while($true)
 }
-function Qualified-Clock {
-    # Existing supervisor's bounded clock qualification, only after separate consent.
-    $clockInfo=[Diagnostics.ProcessStartInfo]::new()
-    $clockInfo.FileName='w32tm.exe'
-    $clockInfo.Arguments='/stripchart /computer:time.cloudflare.com /samples:4 /period:1 /packetinfo'
-    $clockInfo.UseShellExecute=$false;$clockInfo.CreateNoWindow=$true
-    $clockInfo.RedirectStandardOutput=$true;$clockInfo.RedirectStandardError=$true
-    $clockProcess=[Diagnostics.Process]::new();$clockProcess.StartInfo=$clockInfo
-    try {
-        if(-not $clockProcess.Start()){throw 'HOST_CLOCK_PROBE_FAILED'}
-        if(-not $clockProcess.WaitForExit(15000)){
-            $clockProcess.Kill();$null=$clockProcess.WaitForExit(5000)
-            throw 'HOST_CLOCK_PROBE_TIMEOUT'
-        }
-        $text=$clockProcess.StandardOutput.ReadToEnd()
-        if($clockProcess.ExitCode -ne 0 -or $text.Length -gt 65536){throw 'HOST_CLOCK_PROBE_FAILED'}
-    } finally {$clockProcess.Dispose()}
-    $lines=@($text -split '[\r\n]+' | ForEach-Object Trim)
-    $offset=@($lines|ForEach-Object {if($_ -match 'd:([+-][0-9.]+)s o:([+-][0-9.]+)s'){
-        [Math]::Abs([double]$Matches[2])+[Math]::Abs([double]$Matches[1])/2}})
-    $delay=@($lines|ForEach-Object {if($_ -match '^Root Delay:.*\(([+-]?[0-9.]+)s\)'){[Math]::Abs([double]$Matches[1])/2}})
-    $disp=@($lines|ForEach-Object {if($_ -match '^Root Dispersion:.*\(([+-]?[0-9.]+)s\)'){[Math]::Abs([double]$Matches[1])}})
-    if($offset.Count -ne 4 -or $delay.Count -ne 4 -or $disp.Count -ne 4 -or
-        @($lines|Where-Object {$_ -match '^Leap Indicator: 0'}).Count -ne 4){throw 'HOST_CLOCK_SAMPLE_INVALID'}
+function Measure-ClockSamples([string]$Text){
+    $lines=@($Text -split '[\r\n]+' | ForEach-Object Trim)
+    $culture=[Globalization.CultureInfo]::InvariantCulture
+    $offset=@($lines|ForEach-Object {if($_ -match 'd:([+-][0-9.]+)s\s+o:([+-][0-9.]+)s'){
+        [Math]::Abs([double]::Parse($Matches[2],$culture))+[Math]::Abs([double]::Parse($Matches[1],$culture))/2}})
+    $delay=@($lines|ForEach-Object {if($_ -match '^Root Delay:.*\(([+-]?[0-9.]+)s\)'){[Math]::Abs([double]::Parse($Matches[1],$culture))/2}})
+    $disp=@($lines|ForEach-Object {if($_ -match '^Root Dispersion:.*\(([+-]?[0-9.]+)s\)'){[Math]::Abs([double]::Parse($Matches[1],$culture))}})
+    $leap=@($lines|Where-Object {$_ -match '^Leap Indicator: 0(?:\D|$)'}).Count
+    $script:clockSampleCounts=@{offset=$offset.Count;root_delay=$delay.Count;root_dispersion=$disp.Count;leap_ok=$leap}
+    if($offset.Count -ne 4 -or $delay.Count -ne 4 -or $disp.Count -ne 4 -or $leap -ne 4){throw 'HOST_CLOCK_SAMPLE_INVALID'}
     $uncertainty=[int][Math]::Ceiling(20+1000*(($offset|Measure-Object -Maximum).Maximum+
         ($delay|Measure-Object -Maximum).Maximum+($disp|Measure-Object -Maximum).Maximum))
     if($uncertainty -gt 250){throw 'HOST_CLOCK_UNCERTAINTY'}
     return @{checked_ms=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();uncertainty_ms=$uncertainty}
 }
+function Read-ClockProbe {
+    $info=[Diagnostics.ProcessStartInfo]::new()
+    $info.FileName='w32tm.exe'
+    $info.Arguments='/stripchart /computer:time.cloudflare.com /samples:4 /period:1 /packetinfo'
+    $info.UseShellExecute=$false;$info.CreateNoWindow=$true
+    $info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true
+    $process=[Diagnostics.Process]::new();$process.StartInfo=$info
+    try{
+        if(!$process.Start()){throw 'HOST_CLOCK_PROBE_FAILED'}
+        $stdout=$process.StandardOutput.ReadToEndAsync();$stderr=$process.StandardError.ReadToEndAsync()
+        if(!$process.WaitForExit(15000)){$process.Kill();$process.WaitForExit();throw 'HOST_CLOCK_PROBE_TIMEOUT'}
+        $text=$stdout.GetAwaiter().GetResult();$errorText=$stderr.GetAwaiter().GetResult()
+        if($process.ExitCode -ne 0 -or $text.Length -gt 65536 -or $errorText.Length -gt 65536){throw 'HOST_CLOCK_PROBE_FAILED'}
+        return $text
+    }finally{$process.Dispose()}
+}
+function Qualified-Clock {
+    $script:clockFailure=$null
+    $attempts=@()
+    for($attempt=1;$attempt -le 3;$attempt++){
+        $script:clockSampleCounts=$null
+        try{
+            $measurement=Measure-ClockSamples (Read-ClockProbe)
+            $measurement['probe_attempts']=$attempt
+            $measurement['prior_failures']=@($attempts)
+            return $measurement
+        }catch{
+            $reason=$_.Exception.Message
+            $attempts+=@{attempt=$attempt;reason=if($reason -cmatch '^HOST_CLOCK_[A-Z_]+$'){$reason}else{'HOST_CLOCK_PRIVATE_FAILURE'};counts=$script:clockSampleCounts}
+            $script:clockFailure=@{attempts=@($attempts);max_attempts=3;uncertainty_limit_ms=250}
+            # Never pool partial samples, accept an uncertain result or retry an
+            # unknown error. A new bounded probe must independently pass all four.
+            if($reason -cnotin @('HOST_CLOCK_SAMPLE_INVALID','HOST_CLOCK_PROBE_FAILED','HOST_CLOCK_PROBE_TIMEOUT') -or $attempt -eq 3){throw}
+            Start-Sleep -Milliseconds 500
+        }
+    }
+}
+
 try {
     $actual=& git -C $repo rev-parse HEAD
     if($LASTEXITCODE -or $actual -cne $ExpectedCommit){throw 'EXACT_CANDIDATE_COMMIT_REQUIRED'}
@@ -273,7 +297,7 @@ try {
     $reason=$_.Exception.Message
     if($reason -cnotmatch '^[A-Z][A-Z0-9_]{1,119}$'){$reason='PRIVATE_IO_SCHEMA_OR_GATE_FAILURE'}
     [ordered]@{schema='atlas.ws.operator-result.v1';status='WS_OPERATOR_BLOCKED';reason=$reason;
-        hold_preserved=$true;task_started=$false;private_failure=$privateFailure;orders=0;trading_authority='NONE'} | ConvertTo-Json -Depth 10 -Compress
+        hold_preserved=$true;task_started=$false;private_failure=$privateFailure;clock_failure=$script:clockFailure;orders=0;trading_authority='NONE'} | ConvertTo-Json -Depth 10 -Compress
     exit 2
 } finally {
     if($gate){
