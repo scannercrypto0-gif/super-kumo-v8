@@ -91,6 +91,18 @@ def authority(root, config_pin=None):
          and type(a.get('orders')) is int and a.get('orders')==0 and a.get('trading_authority')=='NONE'
          and type(a.get('authorization_sha256')) is str and re.fullmatch('[0-9a-f]{64}',a['authorization_sha256']),
          'CONTINUITY_AUTHORITY_SCOPE')
+    claimed=read(Path(root)/'operator-authorizations'/(a['authorization_sha256']+'.claimed'))
+    need(hashlib.sha256(claimed).hexdigest()==a['authorization_sha256'],'CONTINUITY_OWNER_PERMIT_PIN')
+    permit=json.loads(claimed,object_pairs_hook=pairs)
+    need(permit.get('schema')=='atlas.ws.operator-authorization.v1' and permit.get('action')=='DEPLOY_ONE_RECOVERY'
+         and permit.get('continuous_research') is True and permit.get('continuity_policy_sha256')==PIN
+         and permit.get('allow_explicit_missing_intervals') is True and permit.get('max_connections')==2
+         and permit.get('max_segments')==1 and type(permit.get('orders')) is int and permit['orders']==0
+         and permit.get('trading_authority')=='NONE','CONTINUITY_OWNER_PERMIT_SCOPE')
+    need(type(a.get('activated_ms')) is int and type(permit.get('issued_ms')) is int
+         and type(permit.get('expires_ms')) is int and
+         permit['issued_ms']<=a['activated_ms']<permit['expires_ms']<=permit['issued_ms']+1800000,
+         'CONTINUITY_ACTIVATION_TIME')
     name=a.get('config_filename')
     need(type(name) is str and Path(name).name==name and name not in ('.','..'), 'CONTINUITY_CONFIG_PATH')
     actual=hashlib.sha256(read(Path(root)/name,8*1024*1024)).hexdigest()

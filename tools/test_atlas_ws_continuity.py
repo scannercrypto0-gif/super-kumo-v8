@@ -63,11 +63,17 @@ def test_policy_corruption_and_symlink_fail_closed(tmp_path):
     with pytest.raises(ValueError,match='STATE_LINK'):c.reserve(link,NOW,SLOT)
 
 
-def install(root):
+def install(root,activated=NOW):
     cfg=root/'config.json';cfg.write_bytes(b'owner pinned configuration')
     pin=hashlib.sha256(cfg.read_bytes()).hexdigest()
+    permit=dict(schema='atlas.ws.operator-authorization.v1',action='DEPLOY_ONE_RECOVERY',
+        continuous_research=True,continuity_policy_sha256=c.PIN,allow_explicit_missing_intervals=True,
+        max_connections=2,max_segments=1,orders=0,trading_authority='NONE',issued_ms=activated-1000,expires_ms=activated+600000)
+    raw=json.dumps(permit,sort_keys=True).encode();authpin=hashlib.sha256(raw).hexdigest()
+    claims=root/'operator-authorizations';claims.mkdir()
+    (claims/(authpin+'.claimed')).write_bytes(raw)
     body=dict(schema='atlas.ws.continuous-authority.v1',policy_sha256=c.PIN,
-        config_sha256=pin,config_filename=cfg.name,authorization_sha256='a'*64,orders=0,trading_authority='NONE')
+        config_sha256=pin,config_filename=cfg.name,authorization_sha256=authpin,activated_ms=activated,orders=0,trading_authority='NONE')
     (root/'continuous-research.authorized.json').write_text(json.dumps(body))
     return cfg,pin
 
@@ -96,3 +102,10 @@ def test_scheduler_backoff_and_hold_gate_are_durable(tmp_path):
     r=c.next_action(tmp_path,pin,NOW,slot=SLOT,failed=True)
     assert r['wait_until_ms']>NOW and r['gap_status']=='OUTAGE_REQUIRES_COVERAGE_RECONCILIATION'
     assert c.next_action(tmp_path,pin,NOW+1)['wait_until_ms']==r['wait_until_ms']
+
+
+def test_marker_cannot_enable_continuity_without_claimed_owner_permit(tmp_path):
+    install(tmp_path)
+    claim=next((tmp_path/'operator-authorizations').glob('*.claimed'))
+    claim.write_bytes(b'changed')
+    with pytest.raises(ValueError,match='OWNER_PERMIT_PIN'):c.authority(tmp_path)

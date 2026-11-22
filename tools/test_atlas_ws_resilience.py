@@ -157,12 +157,8 @@ class ResilienceTests(unittest.TestCase):
         from tools import atlas_ws_continuity as policy
         with tempfile.TemporaryDirectory() as tmp:
             owner=Path(tmp)/'owner';owner.mkdir()
-            config=owner/'config.json';config.write_bytes(b'pinned offline config')
-            config_pin=hashlib.sha256(config.read_bytes()).hexdigest()
-            (owner/'continuous-research.authorized.json').write_text(json.dumps(dict(
-                schema='atlas.ws.continuous-authority.v1',policy_sha256=policy.PIN,
-                config_sha256=config_pin,config_filename=config.name,activated_ms=SLOT+100,
-                authorization_sha256='a'*64,orders=0,trading_authority='NONE')))
+            from test_atlas_ws_continuity import install
+            config,config_pin=install(owner,activated=SLOT+100)
             origin=SLOT
             for i in range(3):
                 opened=origin+i*8*STEP
