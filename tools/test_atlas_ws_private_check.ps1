@@ -41,7 +41,7 @@ function Refused([string]$mode,[string]$reason,[int]$timeout=30000){
     try {$null=Invoke-PrivateCheck $mode $snapshot $timeout} catch {
         $caught=$true
         Assert ($_.Exception.Message -ceq $reason) 'WRONG_PRIVATE_FAILURE_REASON'
-        $public=ConvertTo-Json -InputObject $script:privateFailure -Compress
+        [string]$public=ConvertTo-Json -InputObject $script:privateFailure -Compress
         Assert (!$public.Contains('PRIVATE_SECRET') -and !$public.Contains('PRIVATE_HOST_PATH') -and !$public.Contains('PRIVATE_STDERR_SECRET')) 'PRIVATE_OUTPUT_LEAK'
     }
     Assert $caught 'EXPECTED_PRIVATE_FAILURE_NOT_RAISED'
