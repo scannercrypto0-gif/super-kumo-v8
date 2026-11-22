@@ -199,3 +199,25 @@ def test_unresolved_normal_segment_claim_is_not_archived_or_bypassed(host):
 def test_task_xml_snapshot_pin_mismatch_is_not_accepted(host):
     host['snapshot']['task_xml']='different task or schedule'
     with pytest.raises(ValueError,match='TASK_XML_SNAPSHOT_MISMATCH'):diagnostic(host)
+
+
+def test_diagnostic_main_preserves_utf8_bom_task_xml_identity(host,monkeypatch,capsys):
+    from io import BytesIO,TextIOWrapper
+    import sys
+    host['snapshot']['task_xml']='<Task>'+''.join(chr(x) for x in (0x0623,0x03a9,0x4e2d))+'</Task>'
+    host['snapshot']['task_xml_sha256']=op.digest(host['snapshot']['task_xml'].encode('utf-8'))
+    wire=b'\xef\xbb\xbf'+json.dumps(host['snapshot'],ensure_ascii=False).encode('utf-8')+b'\n'
+    monkeypatch.setattr(sys,'stdin',TextIOWrapper(BytesIO(wire),encoding='utf-8'))
+    monkeypatch.setattr(sys,'argv',['operator','diagnose','--repo',str(host['repo']),'--expected-commit',COMMIT])
+    before=bytes_inventory(host['root']);op.main()
+    result=json.loads(capsys.readouterr().out)
+    assert result['identity']['task_xml_sha256']==host['snapshot']['task_xml_sha256']
+    assert result['writes']==result['network_calls']==0 and bytes_inventory(host['root'])==before
+
+
+def test_stream_preamble_does_not_relax_duplicate_key_rejection(monkeypatch):
+    from io import BytesIO,TextIOWrapper
+    import sys
+    monkeypatch.setattr(sys,'stdin',TextIOWrapper(BytesIO(b'\xef\xbb\xbf{"task_name":"a","task_name":"b"}\n'),encoding='utf-8'))
+    monkeypatch.setattr(sys,'argv',['operator','diagnose','--repo','.','--expected-commit',COMMIT])
+    with pytest.raises(ValueError,match='DUPLICATE_JSON_KEY'):op.main()

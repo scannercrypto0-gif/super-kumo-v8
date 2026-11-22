@@ -155,6 +155,9 @@ until the corrected diagnostic is returned. No safety condition is relaxed.
 The corrected wrapper uses an explicit UTF-8 redirected subprocess pipe (also
 for the separately authorized gate), preserving task XML/config identity when
 Windows PowerShell5's normal native pipeline would otherwise use ASCII.
+The byte reader accepts a UTF-8 stream preamble without changing any JSON
+value or relaxing duplicate-key rejection; actual CLI tests preserve the task
+XML digest with non-ASCII values and a preamble.
 UTF-8 correctness is an independently reproduced wire problem, not a claim
 that it caused this particular owner refusal. Structured uppercase helper
 reason codes propagate exactly, with bounded exit/phase/hash metadata. Private
