@@ -12,7 +12,7 @@ import uuid
 
 _spec=importlib.util.spec_from_file_location('atlas_net_operator',Path(__file__).with_name('atlas_ws_resilience_operator.py'))
 op=importlib.util.module_from_spec(_spec);_spec.loader.exec_module(op)
-CONFIG='857bea957d1da3fa1ef1c01ace44a0bfda27f84c2750523184455936a48f2cf2'
+CONFIG='7c05de1aba8f11ced74373ac99819851297039cda6cd0e61dc1c4663c943c070'
 ENDPOINT='wss://data-stream.binance.vision/ws/btcusdt@kline_15m'
 
 
