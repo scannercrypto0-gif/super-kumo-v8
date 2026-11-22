@@ -17,7 +17,10 @@ $privateValue=([char]0x0623).ToString()+([char]0x03A9).ToString()+([char]0x4e2d)
 $snapshot=@{python=$python;xml=$privateValue;expected=(Hash-Text $privateValue)}
 $scriptCode=@'
 import hashlib,json,sys,time
-x=json.loads(sys.stdin.buffer.readline().decode('utf-8'))
+raw=sys.stdin.buffer.readline()
+try:x=json.loads(raw.decode('utf-8-sig'))
+except Exception as exc:
+ print(json.dumps(dict(status='WS_OPERATOR_BLOCKED',reason='SYNTHETIC_INPUT_'+type(exc).__name__.upper(),prefix=raw[:3].hex())));sys.exit(2)
 mode=sys.argv[1]
 if mode=='sleep':time.sleep(5)
 if mode=='malformed':
@@ -27,7 +30,7 @@ if mode=='invalid_reason':
 if mode=='diagnose':
  if hashlib.sha256(x['xml'].encode('utf-8')).hexdigest()!=x['expected']:
   print(json.dumps(dict(status='WS_OPERATOR_BLOCKED',reason='TASK_XML_CONTENT_PIN_MISMATCH')));sys.exit(2)
- print(json.dumps(dict(schema='atlas.ws.operator-diagnostic.v1',identity_sha256='a'*64,transport='UTF8_EXACT')));sys.exit(0)
+ print(json.dumps(dict(schema='atlas.ws.operator-diagnostic.v1',identity_sha256='a'*64,transport='UTF8_EXACT',input_prefix=raw[:3].hex())));sys.exit(0)
 print(json.dumps(dict(status='WS_OPERATOR_BLOCKED',reason='RUNTIME_PIN_MISMATCH',private='PRIVATE_SECRET')))
 sys.exit(2)
 '@
@@ -49,6 +52,7 @@ try {
         throw
     }
     Assert ($ok.transport -ceq 'UTF8_EXACT') 'UNICODE_PIPE_CHANGED_IDENTITY'
+    Write-Output ('SYNTHETIC_UTF8_INPUT_PREFIX '+$ok.input_prefix)
     Refused 'authorize' 'RUNTIME_PIN_MISMATCH'
     Assert ($script:privateFailure.child_exit_code -eq 2 -and $script:privateFailure.reason -ceq 'RUNTIME_PIN_MISMATCH') 'CHILD_FAILURE_CONTEXT_LOST'
     Refused 'malformed' 'PRIVATE_HELPER_UNSTRUCTURED_FAILURE'

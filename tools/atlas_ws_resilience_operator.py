@@ -361,8 +361,10 @@ def main():
     p.add_argument('--repo',type=Path,required=True);p.add_argument('--expected-commit',required=True)
     p.add_argument('--authorization',type=Path)
     a=p.parse_args()
-    raw=sys.stdin.readline();need(len(raw.encode())<=MAX_JSON,'SNAPSHOT_BOUND')
-    snapshot=json.loads(raw,object_pairs_hook=pairs);now=time.time_ns()//1000000
+    # .NET Framework may emit one UTF-8 stream preamble when its native
+    # StandardInput writer is first opened. Preserve JSON values exactly.
+    raw=sys.stdin.buffer.readline(MAX_JSON+1);need(len(raw)<=MAX_JSON,'SNAPSHOT_BOUND')
+    snapshot=json.loads(raw.decode('utf-8-sig'),object_pairs_hook=pairs);now=time.time_ns()//1000000
     if a.mode=='gate':
         need(a.authorization is not None,'SEPARATE_OWNER_AUTHORIZATION_REQUIRED')
         gate(snapshot,a.repo,a.expected_commit,a.authorization,now,sys.stdin,sys.stdout)
