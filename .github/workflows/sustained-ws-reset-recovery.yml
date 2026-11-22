@@ -9,6 +9,10 @@ on:
       - 'tools/atlas_pong_repair_windows.ps1'
       - 'tools/atlas_mixed_recovery_windows.ps1'
       - 'tools/atlas_closed_socket_repair_windows.ps1'
+      - 'tools/atlas_ws_*.py'
+      - 'tools/atlas_ws_resilience_windows.ps1'
+      - 'tools/test_atlas_ws_*.py'
+      - 'tools/test_atlas_ws_supervisor.ps1'
 permissions:
   contents: read
 jobs:
@@ -136,3 +140,33 @@ jobs:
           git show 0a45cb6de6027b6fba54320e07b0faf3317a5382:tools/binance_live_feed/quota.py > "$RUNNER_TEMP/quota.py"
           python -m pip install websocket-client==1.9.2
           python -B tools/test_atlas_pong_liveness.py tools/atlas_live_research_cycle.py "$RUNNER_TEMP/quota.py"
+
+  resilience-matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch exact reusable code dependencies (not market sources)
+        run: git fetch --no-tags origin refs/pull/286/head refs/pull/305/head refs/pull/330/head
+      - name: Install pinned offline dependencies
+        run: python -m pip install pytest pytest-timeout websocket-client==1.9.2
+      - name: Native parser, recovery, operator and gap acceptance without source acquisition
+        run: python -B tools/atlas_ws_offline_acceptance.py
+      - name: Parse new operator and test durable one-use supervisor transitions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          foreach($path in @('tools/atlas_ws_resilience_windows.ps1','tools/atlas_live_research_service_windows.ps1','tools/test_atlas_ws_supervisor.ps1')) {
+            $tokens=$null;$errors=$null
+            $null=[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path),[ref]$tokens,[ref]$errors)
+            if($errors.Count){throw ($errors | Out-String)}
+          }
+          & ./tools/test_atlas_ws_supervisor.ps1

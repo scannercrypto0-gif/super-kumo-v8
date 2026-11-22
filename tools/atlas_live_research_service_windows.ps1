@@ -15,10 +15,31 @@ $stop=Join-Path $root 'stop.request'
 $log=Join-Path $root 'supervisor.jsonl'
 $pending=Join-Path $root 'reset-recovery.pending'
 $claimed=Join-Path $root 'reset-recovery.claimed'
+$operatorTicket=Join-Path $root 'operator-resume.authorized.json'
+$operatorActive=Join-Path $root 'operator-recovery.active.json'
+$executionActive=Join-Path $root 'segment-execution.active.json'
 
 function Record([string]$status, [string]$reason, [long]$slot) {
-    [ordered]@{utc=[DateTimeOffset]::UtcNow.ToString('o');status=$status;reason=$reason;slot_ms=$slot} |
-        ConvertTo-Json -Compress | Add-Content -LiteralPath $log -Encoding utf8
+    $record=[ordered]@{utc=[DateTimeOffset]::UtcNow.ToString('o');status=$status;reason=$reason;slot_ms=$slot}
+    $bytes=[Text.Encoding]::UTF8.GetBytes(($record | ConvertTo-Json -Compress)+"`n")
+    $stream=[IO.File]::Open($log,[IO.FileMode]::Append,[IO.FileAccess]::Write,[IO.FileShare]::Read)
+    try {$stream.Write($bytes,0,$bytes.Length);$stream.Flush($true)} finally {$stream.Dispose()}
+}
+
+function Save-ServiceHold([string]$Reason, [long]$SlotMs) {
+    $destination=$hold
+    if (Test-Path -LiteralPath $destination) {
+        $destination=Join-Path $root ('hold-rejection-'+[guid]::NewGuid().ToString('N')+'.json')
+    }
+    $bytes=[Text.Encoding]::UTF8.GetBytes((@{reason=$Reason;utc=[DateTimeOffset]::UtcNow.ToString('o');slot_ms=$SlotMs} | ConvertTo-Json -Compress))
+    $stream=[IO.File]::Open($destination,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read)
+    try {$stream.Write($bytes,0,$bytes.Length);$stream.Flush($true)} finally {$stream.Dispose()}
+}
+
+function Archive-ExecutionClaim([string]$Outcome) {
+    if ($executionClaim -and (Test-Path -LiteralPath $executionActive)) {
+        [IO.File]::Move($executionActive,(Join-Path $root ('segment-execution.'+$Outcome+'-'+[guid]::NewGuid().ToString('N')+'.json')))
+    }
 }
 
 function Test-ResetRecovery([string]$HealthLog, [string]$Reason) {
@@ -46,20 +67,83 @@ function Test-ResetRecovery([string]$HealthLog, [string]$Reason) {
     } catch {return $false}
 }
 
-if ((Test-Path -LiteralPath $hold) -or (Test-Path -LiteralPath $stop)) {return}
+function Test-OperatorResume([string]$TicketPath, [string]$RootPath, [string]$ConfigPin, [long]$NowMs) {
+    if (!(Test-Path -LiteralPath $TicketPath -PathType Leaf) -or
+        (Get-Item -LiteralPath $TicketPath).Length -gt 65536) {throw 'LIVE_SERVICE_OPERATOR_TICKET_BOUND'}
+    $ticket=Get-Content -LiteralPath $TicketPath -Raw | ConvertFrom-Json
+    if ($ticket.schema -cne 'atlas.ws.operator-resume.v1' -or
+        $ticket.authorization_sha256 -cnotmatch '^[0-9a-f]{64}$' -or
+        $ticket.config_sha256 -cne $ConfigPin -or
+        $ticket.issued_ms -isnot [long] -or $ticket.expires_ms -isnot [long] -or
+        $NowMs -lt $ticket.issued_ms -or $NowMs -ge $ticket.expires_ms -or
+        $ticket.expires_ms-$ticket.issued_ms -gt 1800000L -or
+        ($ticket.max_segments -isnot [int] -and $ticket.max_segments -isnot [long]) -or
+        ($ticket.max_connections -isnot [int] -and $ticket.max_connections -isnot [long]) -or
+        ($ticket.orders -isnot [int] -and $ticket.orders -isnot [long]) -or
+        $ticket.max_segments -ne 1 -or $ticket.max_connections -ne 2 -or
+        $ticket.orders -ne 0 -or $ticket.trading_authority -cne 'NONE') {
+        throw 'LIVE_SERVICE_OPERATOR_TICKET_SCOPE'
+    }
+    foreach($entry in @(@('hold.json','hold_sha256'),@('reset-recovery.claimed','claimed_sha256'),
+                         @('reset-recovery.pending','pending_sha256'))) {
+        $path=Join-Path $RootPath $entry[0]
+        $expected=$ticket.($entry[1])
+        if (Test-Path -LiteralPath $path) {
+            if ($expected -cnotmatch '^[0-9a-f]{64}$' -or
+                (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected) {
+                throw 'LIVE_SERVICE_OPERATOR_EVIDENCE_CHANGED'
+            }
+        } elseif ($null -ne $expected) {throw 'LIVE_SERVICE_OPERATOR_EVIDENCE_MISSING'}
+    }
+    $held=Get-Content -LiteralPath (Join-Path $RootPath 'hold.json') -Raw | ConvertFrom-Json
+    if (@('PILOT_STOP_TimeoutError','PILOT_STOP_ConnectionResetError') -cnotcontains $held.reason) {
+        throw 'LIVE_SERVICE_OPERATOR_HOLD_NOT_ELIGIBLE'
+    }
+    return $ticket
+}
+
+function Claim-OperatorResume([string]$TicketPath, [string]$RootPath, [string]$ConfigPin, [long]$NowMs) {
+    $ticket=Test-OperatorResume $TicketPath $RootPath $ConfigPin $NowMs
+    $active=Join-Path $RootPath 'operator-recovery.active.json'
+    if (Test-Path -LiteralPath $active) {throw 'LIVE_SERVICE_OPERATOR_RECOVERY_ALREADY_CLAIMED'}
+    # Claim first: a crash at any later stage cannot authorize another collector.
+    [IO.File]::Move($TicketPath,$active)
+    $stream=[IO.File]::Open($active,[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::Read)
+    try {$stream.Flush($true)} finally {$stream.Dispose()}
+    $archive=Join-Path (Join-Path $RootPath 'recovery-evidence') $ticket.authorization_sha256
+    if (Test-Path -LiteralPath $archive) {throw 'LIVE_SERVICE_OPERATOR_ARCHIVE_EXISTS'}
+    New-Item -ItemType Directory -Path $archive | Out-Null
+    foreach($name in @('hold.json','reset-recovery.pending','reset-recovery.claimed')) {
+        $path=Join-Path $RootPath $name
+        if (Test-Path -LiteralPath $path) {[IO.File]::Move($path,(Join-Path $archive $name))}
+    }
+    return $ticket
+}
+
+if ((Test-Path -LiteralPath $stop) -or
+    ((Test-Path -LiteralPath $hold) -and !(Test-Path -LiteralPath $operatorTicket))) {return}
 $lockPath=Join-Path $root 'supervisor.lock'
 try { $lock=[IO.File]::Open($lockPath,'OpenOrCreate','ReadWrite','None') }
 catch [IO.IOException] { return }
 $slot=0
 $route='Ethernet'
 $recovery=$null
+$operatorRecovery=$null
 $segmentFailure=$false
+$executionClaim=$false
 try {
-    if ((Test-Path -LiteralPath $hold) -or (Test-Path -LiteralPath $stop)) {return}
-    if (Test-Path -LiteralPath $claimed) {throw 'LIVE_SERVICE_RESET_RECOVERY_ALREADY_CLAIMED'}
+    if ((Test-Path -LiteralPath $stop) -or
+        ((Test-Path -LiteralPath $hold) -and !(Test-Path -LiteralPath $operatorTicket))) {return}
+    if (Test-Path -LiteralPath $executionActive) {throw 'LIVE_SERVICE_INCOMPLETE_SEGMENT_REVIEW_REQUIRED'}
+    if (Test-Path -LiteralPath $operatorActive) {throw 'LIVE_SERVICE_OPERATOR_RECOVERY_ALREADY_CLAIMED'}
+    if (Test-Path -LiteralPath (Join-Path $root 'operator-deployment.in-progress')) {throw 'LIVE_SERVICE_DEPLOYMENT_IN_PROGRESS'}
+    if (Test-Path -LiteralPath $operatorTicket) {
+        $operatorRecovery=Test-OperatorResume $operatorTicket $root $ConfigSha256 ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
+    }
+    if ((Test-Path -LiteralPath $claimed) -and -not $operatorRecovery) {throw 'LIVE_SERVICE_RESET_RECOVERY_ALREADY_CLAIMED'}
     $now=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
     $slot=$now-($now%900000L)
-    if (Test-Path -LiteralPath $pending) {
+    if ((Test-Path -LiteralPath $pending) -and -not $operatorRecovery) {
         $recovery=Get-Content -LiteralPath $pending -Raw | ConvertFrom-Json
         if ($recovery.config_sha256 -cne $ConfigSha256 -or
             $recovery.failed_ms -isnot [long] -or $recovery.slot_ms -isnot [long] -or
@@ -116,11 +200,19 @@ try {
             ConvertTo-Json | Set-Content -LiteralPath $qualPath -Encoding utf8NoBOM
         $pin=& $cfg.python -B -c 'import json,sys; from pathlib import Path; from aql.observation.contracts import digest; print(digest(json.loads(Path(sys.argv[1]).read_bytes())))' $qualPath
         if($LASTEXITCODE){throw 'LIVE_SERVICE_QUALIFICATION_PIN'}
-        if ($recovery) {
+        if ($operatorRecovery) {
+            $operatorRecovery=Claim-OperatorResume $operatorTicket $root $ConfigSha256 ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
+            $recovery=$operatorRecovery
+            Record 'OPERATOR_RECOVERY_STARTED' '' $slot
+        } elseif ($recovery) {
             if ($checked-$recovery.failed_ms -ge 1800000L) {throw 'LIVE_SERVICE_RESET_RECOVERY_INVALID_OR_EXPIRED'}
             Rename-Item -LiteralPath $pending -NewName (Split-Path -Leaf $claimed)
             Record 'RESET_RECOVERY_STARTED' '' $slot
         }
+        $claimBytes=[Text.Encoding]::UTF8.GetBytes((@{slot_ms=$slot;config_sha256=$ConfigSha256;plan_sha256=$plan.sha256} | ConvertTo-Json -Compress))
+        $claimFile=[IO.File]::Open($executionActive,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read)
+        try {$claimFile.Write($claimBytes,0,$claimBytes.Length);$claimFile.Flush($true)} finally {$claimFile.Dispose()}
+        $executionClaim=$true
         Record 'STARTED' '' $slot
         $result=@(& $cfg.python -B -m tools.atlas_live_research_cycle live --slot $slot --bars 8 --sustained-research --state $state --pin $plan.sha256 --pilot-qualification $qualPath --pilot-qualification-sha256 $pin 2>&1)
         $code=$LASTEXITCODE
@@ -136,13 +228,19 @@ try {
         if ($last.status -eq 'STOPPED_BY_OPERATOR') {
             if (!(Test-Path -LiteralPath $stop)) {New-Item -ItemType File -Path $stop | Out-Null}
             Record 'STOPPED' 'OPERATOR_STOP_REQUESTED' $slot
+            Archive-ExecutionClaim 'operator-stopped'
             return
         }
         if ($last.bars.Count -ne 8 -or $last.orders -ne 0 -or $last.dispatch -ne $null) {
             throw 'LIVE_SERVICE_SEGMENT_SCOPE'
         }
         Record 'COMPLETE' '' $slot
-        if ($recovery) {Remove-Item -LiteralPath $claimed}
+        if ($operatorRecovery) {
+            # One explicitly authorized segment, not an ongoing service release.
+            Save-ServiceHold 'LIVE_SERVICE_OPERATOR_RECOVERY_COMPLETE_REVIEW_REQUIRED' $slot
+            Record 'OPERATOR_RECOVERY_COMPLETE_REVIEW_REQUIRED' '' $slot
+        } elseif ($recovery) {Remove-Item -LiteralPath $claimed}
+        Archive-ExecutionClaim 'complete'
     } finally {Pop-Location}
 } catch {
     $reason=$_.Exception.Message
@@ -157,10 +255,16 @@ try {
             $file=[IO.File]::Open($pending,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write)
             try {$file.Write($bytes,0,$bytes.Length);$file.Flush($true)} finally {$file.Dispose()}
             Record 'RESET_RECOVERY_PENDING' $reason $slot
+            Archive-ExecutionClaim 'failed-recovery-pending'
             exit 1
         } catch {$reason='LIVE_SERVICE_RESET_RECOVERY_PERSIST_FAILED'}
     }
-    @{reason=$reason;utc=[DateTimeOffset]::UtcNow.ToString('o');slot_ms=$slot} |
-        ConvertTo-Json | Set-Content -LiteralPath $hold -Encoding utf8NoBOM
+    if ((Test-Path -LiteralPath $operatorTicket) -and (Test-Path -LiteralPath $hold)) {
+        # Invalid/expired requests do not keep waking the held service, nor
+        # overwrite the original safety evidence. A new permit is required.
+        [IO.File]::Move($operatorTicket,(Join-Path $root ('operator-resume.rejected-'+[guid]::NewGuid().ToString('N')+'.json')))
+    }
+    Save-ServiceHold $reason $slot
+    Archive-ExecutionClaim 'failed-held'
     exit 1
 } finally {$lock.Dispose()}

@@ -22,7 +22,7 @@ from tools.atlas_single_receipt import load_frame, need, parse_final, persist_fr
 from tools.atlas_single_receipt_runner import ENDPOINT, BinanceReceiptTransport
 from tools.atlas_research_lease import Lease
 from tools.binance_live_feed.quota import Limits, Quota
-from tools.atlas_ws_receive_diagnostics import receive_fault_context
+from tools.atlas_ws_receive_diagnostics import receive_fault_context, classify_transport_fault
 
 MARKER = "atlas-live-research-v1"
 
@@ -48,7 +48,10 @@ def emit(root, status, **fields):
     print(line, flush=True)
 
 
-def operational_guard(root):
+def operational_guard(root, *, sustained=False):
+    if sustained:
+        need(not (root.parent.parent / "operator-deployment.in-progress").exists(),
+             "OPERATOR_DEPLOYMENT_IN_PROGRESS")
     need(not (root / "stop.request").exists(), "OPERATOR_STOP_REQUESTED")
     need(shutil.disk_usage(root).free >= 128 * 1024 * 1024, "DISK_RESERVE_LOW")
 
@@ -147,7 +150,7 @@ def run(root, plan, pin, fixture, *, verifier, clock, transport, wait=time.sleep
     with closing(sqlite3.connect(lock_path, timeout=0)) as lock:
         lock.execute("BEGIN EXCLUSIVE")
         try:
-            operational_guard(root)
+            operational_guard(root, sustained=sustained)
             with (nullcontext() if pilot else Lease(verifier, scope, now=clock.now)) as lease:
                 result = observe(root, plan, pin, fixture, clock, transport, wait, uncertainty,
                                  synthetic, stop_after_first, lease)
@@ -290,13 +293,39 @@ class MemoryObserver(MemoryDatabase, ProspectiveObserver):
 
 
 def read_research_frame(transport, connection, timeout):
-    """Normalize the library's closed-socket exception for bounded retries."""
-    from websocket import WebSocketConnectionClosedException
+    """Normalize only a library close or a verified clean CLOSE control frame.
 
+    The pinned transport intentionally groups CLOSE with unsupported opcodes.
+    Observe the original parser's return, without replacing parsing or retaining
+    its payload, so binary/malformed/policy-close frames remain terminal.
+    """
+    from websocket import ABNF, WebSocketConnectionClosedException
+
+    original = getattr(connection, "recv_frame", None)
+    seen = []
+    if callable(original):
+        def capture_frame():
+            frame = original()
+            seen[:] = [frame]
+            return frame
+        connection.recv_frame = capture_frame
     try:
         return transport.frame(connection, timeout)
     except WebSocketConnectionClosedException as exc:
         raise ConnectionResetError("WS_CONNECTION_CLOSED") from exc
+    except ValueError as exc:
+        frame = seen[0] if seen else None
+        if (str(exc) == "WS_CLOSED_OR_UNSUPPORTED_FRAME" and frame is not None
+                and frame.opcode == ABNF.OPCODE_CLOSE and frame.fin
+                and not frame.mask_value and not (frame.rsv1 or frame.rsv2 or frame.rsv3)
+                and type(frame.data) is bytes and len(frame.data) <= 125
+                and (not frame.data or (len(frame.data) >= 2
+                     and int.from_bytes(frame.data[:2], "big") in (1000, 1001)))):
+            raise ConnectionResetError("WS_GRACEFUL_CLOSE") from exc
+        raise
+    finally:
+        if callable(original):
+            connection.recv_frame = original
 
 
 def send_research_pong(quota, socket_id, received, connection, payload):
@@ -363,7 +392,7 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
     last_failure = None
 
     def time_left():
-        operational_guard(root)
+        operational_guard(root, sustained=bool(plan.get("sustained_research")))
         now = clock.now()
         elapsed = (clock.monotonic_ns() - monotonic_start) // 1_000_000
         need(0 <= elapsed and abs(now - started - elapsed) <= 250, "CLOCK_STEP")
@@ -383,30 +412,39 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
             quota.set(db, "research_connection_attempts", used + 1)
         need(quota.connect(socket_id, now, ["btcusdt@kline_15m"]), "LOCAL_WS_BUDGET_STOP")
         failure_context = {}
+        fault_stage = "CONNECT"
         try:
             emit(root, "CONNECTING", utc_ms=now, attempt=used + 1, plan_sha256=pin)
             with transport.stream(ENDPOINT, min(5, left)) as connection:
+                fault_stage = "HANDSHAKE"
                 need(connection.getstatus() == 101, "WS_UPGRADE")
                 heartbeat = now
                 while len(rows) < target:
+                    fault_stage = "CLOCK_GUARD"
                     now, left = time_left()
                     expected_close = first + (len(rows) + 1) * STEP - 1
                     need(now + uncertainty <= expected_close + 300_000, "FINALIZED_SOURCE_GAP")
                     if now - heartbeat >= 30_000:
+                        fault_stage = "HEARTBEAT"
                         emit(root, "OBSERVING", utc_ms=now, committed=len(rows),
                              last_slot=rows[-1]["slot"] if rows else None,
                              last_close_age_ms=now - rows[-1]["slot"] - STEP + 1 if rows else None)
                         heartbeat = now
+                    fault_stage = "FRAME_READ"
                     try:
                         kind, raw = read_research_frame(transport, connection, min(left, 30))
                     except (TimeoutError, ConnectionResetError) as exc:
-                        if plan.get("sustained_research") and type(transport) is BinanceReceiptTransport:
-                            failure_context = receive_fault_context(connection, exc)
-                            if isinstance(exc, ConnectionResetError) and str(exc) == 'WS_CONNECTION_CLOSED':
-                                failure_context['transport_exception'] = 'WebSocketConnectionClosedException'
+                        failure_context = receive_fault_context(connection, exc)
+                        if isinstance(exc, ConnectionResetError) and str(exc) == 'WS_CONNECTION_CLOSED':
+                            failure_context['transport_exception'] = 'WebSocketConnectionClosedException'
+                        elif isinstance(exc, ConnectionResetError) and str(exc) == 'WS_GRACEFUL_CLOSE':
+                            failure_context['transport_exception'] = 'VERIFIED_GRACEFUL_CLOSE'
                         raise
+                    fault_stage = "CLOCK_GUARD"
                     received, _ = time_left()
+                    fault_stage = "FRAME_ADMISSION"
                     if kind == "ping":
+                        fault_stage = "PONG"
                         try:
                             send_research_pong(quota, socket_id, received, connection, raw)
                         except TimeoutError:
@@ -415,6 +453,7 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
                             raise
                         continue
                     need(kind == "text", "UNEXPECTED_FRAME")
+                    fault_stage = "VALIDATE_AND_PERSIST"
                     row = ingest(root, raw, rows, first, received, uncertainty, clock.monotonic_ns(),
                                  pin, journal, store, observer, clock.now, wait, ephemeral=ephemeral)
                     if row is not None:
@@ -425,12 +464,17 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
                         emit(root, "EPHEMERAL_RESEARCH_BAR" if ephemeral else "DURABLE_RESEARCH_BAR", **row)
                         if plan.get("sustained_research"):
                             save_service_receipt(root, plan, pin, row, observer, clock.now(), used + 1, last_failure)
-        except (TimeoutError, ConnectionError) as exc:
+                fault_stage = "SEGMENT_CLOSE"
+        except Exception as exc:
+            classification = classify_transport_fault(exc, failure_context, fault_stage)
+            # Nontransport parsing/persistence failures propagate unchanged. An
+            # eligible receive fault requires real frame-boundary evidence.
             last_failure = dict(error=type(exc).__name__)
             if plan.get("bounded_operations") or plan.get("sustained_research"):
                 last_failure["utc_ms"] = clock.now()
-            emit(root, "TRANSPORT_INTERRUPTED", **last_failure, **failure_context)
-            if attempt or len(rows) == target:
+            emit(root, "TRANSPORT_INTERRUPTED" if classification["is_transport_fault"] else
+                 "FAULT_CLASSIFIED", **last_failure, **failure_context, **classification)
+            if not classification["retry_eligible"] or attempt or len(rows) == target:
                 raise
         finally:
             quota.disconnect(socket_id, clock.now(), failed=len(rows) < target)
