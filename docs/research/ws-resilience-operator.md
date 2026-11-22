@@ -205,3 +205,22 @@ rejection, exact/unknown working directory, unchanged diagnosis bytes, and
 post-stage hash verification for all bindings. These reproduce supported
 legacy layouts on generated files; actual host layout/readiness remains
 unattested until the new diagnostic is returned.
+
+### Owner metadata reconciliation, 22 November 2026
+
+Owner readback identified the two previously masked bindings as `pwsh.exe`
+and state-root `supervisor.ps1`. A task has two interpreters: its PowerShell
+`task_action.Execute`, and the collector `cfg.python`. Accept the former only
+at the exact absolute action path, with the unchanged manifest hash and all
+existing link/size guards; no PATH search or directory-wide exception.
+
+The retained state-root `supervisor.ps1` is accepted only with historical Git
+blob `6dfc236c3c43553cf80fe9818c3098308dc45629` SHA256
+`b2ddb3f7509227af6865f4fe7157d82c72b2407e0138d88a11eb34b73773dadf`.
+This is a read-only retained-code identity, not a new executable/task target.
+Staging still targets only reviewed runtime files and the actual task script;
+a dormant legacy copy does not gain deployment authority. Unknown siblings,
+relative shell executables and different legacy hashes remain blocked.
+
+These observations do not prove host bytes until the corrected diagnostic
+verifies them. HOLD and separate owner deployment authorization remain required.

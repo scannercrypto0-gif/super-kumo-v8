@@ -118,6 +118,9 @@ def verify_repo(repo, expected_commit):
     subprocess.run(['git', '-C', str(repo), 'diff', '--quiet', 'HEAD', '--', *protected], check=True)
 
 
+LEGACY_SUPERVISOR_SHA256 = 'b2ddb3f7509227af6865f4fe7157d82c72b2407e0138d88a11eb34b73773dadf'
+
+
 def inspect(snapshot, repo, expected_commit, now):
     need(type(snapshot) is dict and snapshot.get('task_name') == TASK, 'TASK_IDENTITY')
     need(re.fullmatch('[0-9a-f]{40}', expected_commit), 'EXACT_COMMIT_REQUIRED')
@@ -136,6 +139,11 @@ def inspect(snapshot, repo, expected_commit, now):
     need(service.is_relative_to(root) or service.is_relative_to(tree), 'SUPERVISOR_PATH_SCOPE')
     python_path = Path(cfg['python'])
     python_path = python_path.absolute() if python_path.is_absolute() else None
+    shell_path = Path(snapshot.get('task_action', {}).get('Execute', ''))
+    shell_path = shell_path.absolute() if shell_path.is_absolute() else None
+    # Historical installed bootstrap, independently identified in retained Git.
+    legacy_service = root/'supervisor.ps1'
+    legacy_service_pin = LEGACY_SUPERVISOR_SHA256
     working = snapshot.get('task_action', {}).get('WorkingDirectory')
     working = Path(working) if type(working) is str and working else None
     working = working.absolute() if working is not None and working.is_absolute() else None
@@ -164,6 +172,10 @@ def inspect(snapshot, repo, expected_commit, now):
             role, label = 'TASK_SUPERVISOR', '@TASK_SUPERVISOR'
         elif python_path is not None and p == python_path:
             role, label = 'TASK_INTERPRETER', '@TASK_INTERPRETER'
+        elif shell_path is not None and p == shell_path:
+            role, label = 'TASK_SHELL', '@TASK_SHELL'
+        elif p == legacy_service and item['sha256'] == legacy_service_pin:
+            role, label = 'RETAINED_LEGACY_SUPERVISOR', '@RETAINED_LEGACY_SUPERVISOR'
         else:
             # Do not read unrelated private files or turn their config entries
             # into authority. The authenticated manifest is retained unchanged.

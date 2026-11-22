@@ -317,3 +317,50 @@ def test_supervisor_named_anchor_still_requires_original_hash(host):
     service=Path(host['snapshot']['service_path'])
     pinned_manifest(host,[dict(path=str(service),sha256='0'*64)])
     with pytest.raises(ValueError,match='RUNTIME_PIN_MISMATCH'):diagnostic(host)
+
+
+def test_task_shell_exact_anchor_requires_its_pin(host):
+    shell=host['root'].parent/'pwsh.exe';shell.write_bytes(b'exact installed task shell')
+    sibling=shell.with_name('other.exe');sibling.write_bytes(b'not an anchor')
+    host['snapshot']['task_action']['Execute']=str(shell)
+    cfg=op.load(host['config']);cfg['files'].extend([
+        dict(path=str(shell),sha256=op.digest(shell.read_bytes())),
+        dict(path=str(sibling),sha256=op.digest(sibling.read_bytes()))])
+    host['config'].write_bytes(op.canonical(cfg))
+    host['snapshot']['task_config_sha256']=op.digest(host['config'].read_bytes())
+    result=diagnostic(host)
+    assert any(r['scope']=='TASK_SHELL' for r in result['identity']['runtime'])
+    assert len(result['manifest_scope']['unverified_bindings'])==1
+    shell.write_bytes(b'tampered')
+    with pytest.raises(ValueError,match='RUNTIME_PIN_MISMATCH'):diagnostic(host)
+
+
+def test_relative_task_shell_does_not_guess_search_path(host):
+    shell=host['root'].parent/'pwsh.exe';shell.write_bytes(b'shell')
+    host['snapshot']['task_action']['Execute']='pwsh.exe'
+    cfg=op.load(host['config']);cfg['files'].append(dict(path=str(shell),sha256=op.digest(shell.read_bytes())))
+    host['config'].write_bytes(op.canonical(cfg));host['snapshot']['task_config_sha256']=op.digest(host['config'].read_bytes())
+    assert diagnostic(host)['blockers']==['RUNTIME_PATH_OUTSIDE_VERIFIED_ANCHORS']
+
+
+def test_known_legacy_supervisor_is_verified_without_staging_authority(host,monkeypatch):
+    raw=b'known retained supervisor fixture'
+    monkeypatch.setattr(op,'LEGACY_SUPERVISOR_SHA256',op.digest(raw))
+    legacy=host['root']/'supervisor.ps1';legacy.write_bytes(raw)
+    # Actual task points at the runtime-tree supervisor; legacy stays retained.
+    host['snapshot']['service_path']=str(host['tree']/'tools/atlas_live_research_service_windows.ps1')
+    cfg=op.load(host['config']);cfg['files'].append(dict(path=str(legacy),sha256=op.digest(raw)))
+    host['config'].write_bytes(op.canonical(cfg));host['snapshot']['task_config_sha256']=op.digest(host['config'].read_bytes())
+    d=diagnostic(host)
+    assert not d['blockers']
+    assert any(r['scope']=='RETAINED_LEGACY_SUPERVISOR' for r in d['identity']['runtime'])
+    legacy.write_bytes(b'tampered')
+    with pytest.raises(ValueError,match='RUNTIME_PIN_MISMATCH'):diagnostic(host)
+
+
+def test_unknown_legacy_supervisor_pin_is_not_an_anchor(host):
+    legacy=host['root']/'supervisor.ps1'
+    host['snapshot']['service_path']=str(host['tree']/'tools/atlas_live_research_service_windows.ps1')
+    cfg=op.load(host['config']);cfg['files'].append(dict(path=str(legacy),sha256=op.digest(legacy.read_bytes())))
+    host['config'].write_bytes(op.canonical(cfg));host['snapshot']['task_config_sha256']=op.digest(host['config'].read_bytes())
+    assert diagnostic(host)['blockers']==['RUNTIME_PATH_OUTSIDE_VERIFIED_ANCHORS']
