@@ -132,23 +132,56 @@ def inspect(snapshot, repo, expected_commit, now):
     cfg = load(cfgpath)
     tree = Path(cfg['tree']).absolute()
     safe(tree, exists=False)
-    runtime = []
+    service = safe(snapshot['service_path'])
+    need(service.is_relative_to(root) or service.is_relative_to(tree), 'SUPERVISOR_PATH_SCOPE')
+    python_path = Path(cfg['python'])
+    python_path = python_path.absolute() if python_path.is_absolute() else None
+    working = snapshot.get('task_action', {}).get('WorkingDirectory')
+    working = Path(working) if type(working) is str and working else None
+    working = working.absolute() if working is not None and working.is_absolute() else None
+    runtime, rejected = [], []
     need(type(cfg.get('files')) is list and 1 <= len(cfg['files']) <= 4096, 'RUNTIME_MANIFEST_BOUND')
-    seen = set(); runtime_bytes = 0
+    seen = {}; runtime_bytes = 0; duplicate_bindings = 0
     for item in cfg['files']:
-        p = safe(item['path'])
-        need(p.is_relative_to(tree) and str(p).casefold() not in seen, 'RUNTIME_PATH_SCOPE')
-        seen.add(str(p).casefold())
+        need(type(item) is dict and type(item.get('path')) is str and
+             type(item.get('sha256')) is str and HEX.fullmatch(item['sha256']), 'RUNTIME_MANIFEST_BINDING')
+        raw_path = Path(item['path'])
+        need('..' not in raw_path.parts, 'PATH_TRAVERSAL_DENIED')
+        if not raw_path.is_absolute() and working is None:
+            rejected.append(dict(path_sha256=digest(item['path'].encode('utf-8')),
+                expected_sha256=item['sha256'], reason='RELATIVE_RUNTIME_PATH_UNRESOLVED'))
+            continue
+        p = raw_path.absolute() if raw_path.is_absolute() else (working/raw_path).absolute()
+        key = os.path.normcase(str(p))
+        if key in seen:
+            need(seen[key] == item['sha256'], 'RUNTIME_DUPLICATE_PIN_CONFLICT')
+            duplicate_bindings += 1
+            continue
+        seen[key] = item['sha256']
+        if p.is_relative_to(tree):
+            role, label = 'CODE_TREE', str(p.relative_to(tree)).replace('\\', '/')
+        elif p == service:
+            role, label = 'TASK_SUPERVISOR', '@TASK_SUPERVISOR'
+        elif python_path is not None and p == python_path:
+            role, label = 'TASK_INTERPRETER', '@TASK_INTERPRETER'
+        else:
+            # Do not read unrelated private files or turn their config entries
+            # into authority. The authenticated manifest is retained unchanged.
+            rejected.append(dict(path_sha256=digest(str(p).encode('utf-8')),
+                expected_sha256=item['sha256'], reason='RUNTIME_PATH_OUTSIDE_VERIFIED_ANCHORS'))
+            continue
+        p = safe(p)
         runtime_bytes += p.stat().st_size
         need(runtime_bytes <= 128*1024*1024, 'RUNTIME_TOTAL_BOUND')
         pin = digest(read(p))
         need(pin == item['sha256'], 'RUNTIME_PIN_MISMATCH')
-        runtime.append(dict(path=str(p.relative_to(tree)).replace('\\', '/'), sha256=pin))
+        runtime.append(dict(path=label, scope=role, sha256=pin))
+    manifest_scope = dict(bindings=len(cfg['files']), verified_unique_files=len(runtime),
+        identical_duplicate_bindings=duplicate_bindings, unverified_bindings=rejected,
+        verification_complete=not rejected)
     need(type(snapshot.get('task_xml_sha256')) is str and HEX.fullmatch(snapshot['task_xml_sha256']), 'TASK_XML_PIN')
     need(type(snapshot.get('task_xml')) is str and digest(snapshot['task_xml'].encode('utf-8')) == snapshot['task_xml_sha256'], 'TASK_XML_SNAPSHOT_MISMATCH')
     need(type(snapshot.get('task_policy_sha256')) is str and HEX.fullmatch(snapshot['task_policy_sha256']), 'TASK_POLICY_PIN')
-    service = safe(snapshot['service_path'])
-    need(service.is_relative_to(root) or service.is_relative_to(tree), 'SUPERVISOR_PATH_SCOPE')
     hold = load(root/'hold.json')
     need(hold.get('reason') in ('PILOT_STOP_TimeoutError', 'PILOT_STOP_ConnectionResetError'), 'HOLD_NOT_RESUMABLE')
     need(type(hold.get('slot_ms')) is int and hold['slot_ms'] % 900000 == 0, 'HOLD_SLOT_IDENTITY')
@@ -162,7 +195,7 @@ def inspect(snapshot, repo, expected_commit, now):
     cycle = tree/'tools/atlas_live_research_cycle.py'
     identity = dict(schema='atlas.ws.operator-identity.v1', task_name=TASK,
                     task_xml_sha256=snapshot['task_xml_sha256'], task_policy_sha256=snapshot['task_policy_sha256'], config_sha256=digest(config_raw),
-                    runtime=sorted(runtime, key=lambda r:r['path']),
+                    runtime=sorted(runtime, key=lambda r:r['path']), manifest_scope=manifest_scope,
                     cycle_sha256=digest(read(cycle)), supervisor_sha256=digest(read(service)),
                     hold_sha256=optional_pin(root/'hold.json'),
                     claimed_sha256=optional_pin(root/'reset-recovery.claimed'),
@@ -176,7 +209,7 @@ def inspect(snapshot, repo, expected_commit, now):
         code = str(exc) if isinstance(exc,ValueError) and re.fullmatch('[A-Z][A-Z0-9_]{1,119}',str(exc)) else 'QUOTA_EVIDENCE_INVALID'
         quota = dict(policy_verified=False, ready=False, reason=code, scoped_connections=2,
                      shared_ip_headroom='UNVERIFIED_EXISTING_PILOT_ONLY')
-    blockers = []
+    blockers = sorted({r['reason'] for r in rejected})
     if snapshot.get('task_state') != 'Ready' or snapshot.get('task_enabled') is not True:
         blockers.append('TASK_NOT_QUIESCENT_READY')
     if snapshot.get('collector_processes') != 0:
@@ -194,7 +227,7 @@ def inspect(snapshot, repo, expected_commit, now):
     return dict(schema='atlas.ws.operator-diagnostic.v1', status='HELD_REQUIRES_SEPARATE_OWNER_AUTHORIZATION',
                 identity=identity, identity_sha256=digest(canonical(identity)), quota=quota,
                 task_state=snapshot.get('task_state'), hold_reason=hold['reason'],
-                hold_slot_ms=hold['slot_ms'], blockers=blockers, clock_probe='NOT_PERFORMED',
+                hold_slot_ms=hold['slot_ms'], blockers=blockers, manifest_scope=manifest_scope, clock_probe='NOT_PERFORMED',
                 source_class='LIVE_CAPTURE', retention='SANITIZED_RECEIPTS_ONLY',
                 root_cause='ROOT_CAUSE_NOT_PROVEN', network_calls=0, writes=0,
                 orders=0, trading_authority='NONE', real_pit_oos='BLOCKED')
@@ -293,12 +326,20 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
             for item in files:
                 p=Path(item['path']);p.parent.mkdir(parents=True,exist_ok=True)
                 durable(p,read(item['source']))
-            by_path={str(Path(x['path']).absolute()).casefold():x for x in cfg['files']}
+            by_path = {}
+            working = snapshot.get('task_action', {}).get('WorkingDirectory')
+            for binding in cfg['files']:
+                target = Path(binding['path'])
+                if not target.is_absolute():
+                    need(type(working) is str and Path(working).is_absolute(), 'RELATIVE_RUNTIME_PATH_UNRESOLVED')
+                    target = Path(working)/target
+                by_path.setdefault(os.path.normcase(str(target.absolute())), []).append(binding)
             for item in files:
-                if not Path(item['path']).is_relative_to(tree):continue
-                key=item['path'].casefold()
-                if key in by_path:by_path[key]['sha256']=item['new_sha256']
-                else:cfg['files'].append(dict(path=item['path'],sha256=item['new_sha256']))
+                key = os.path.normcase(item['path'])
+                if key in by_path:
+                    for binding in by_path[key]:binding['sha256'] = item['new_sha256']
+                else:
+                    cfg['files'].append(dict(path=item['path'],sha256=item['new_sha256']))
             durable(cfgpath,canonical(cfg));newpin=digest(read(cfgpath))
             active=root/'activation.json'
             if active.exists():

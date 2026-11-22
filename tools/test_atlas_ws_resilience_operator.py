@@ -221,3 +221,99 @@ def test_stream_preamble_does_not_relax_duplicate_key_rejection(monkeypatch):
     monkeypatch.setattr(sys,'stdin',TextIOWrapper(BytesIO(b'\xef\xbb\xbf{"task_name":"a","task_name":"b"}\n'),encoding='utf-8'))
     monkeypatch.setattr(sys,'argv',['operator','diagnose','--repo','.','--expected-commit',COMMIT])
     with pytest.raises(ValueError,match='DUPLICATE_JSON_KEY'):op.main()
+
+
+def pinned_manifest(host, extra=(), *, relative_first=False, python=None):
+    cfg=op.load(host['config'])
+    cfg['files'].extend(dict(x) for x in extra)
+    if relative_first:cfg['files'][0]['path']=str(Path(cfg['files'][0]['path']).relative_to(host['tree']))
+    if python is not None:cfg['python']=str(python)
+    host['config'].write_bytes(op.canonical(cfg))
+    pin=op.digest(host['config'].read_bytes());host['snapshot']['task_config_sha256']=pin
+    (host['root']/'activation.json').write_bytes(op.canonical(dict(config_sha256=pin)))
+    return cfg
+
+
+def test_pinned_task_supervisor_outside_tree_is_a_named_anchor_read_only(host):
+    service=Path(host['snapshot']['service_path'])
+    pinned_manifest(host,[dict(path=str(service),sha256=op.digest(service.read_bytes()))])
+    before=bytes_inventory(host['root']);r=diagnostic(host)
+    assert r['blockers']==[] and r['manifest_scope']['verification_complete']
+    assert any(x['scope']=='TASK_SUPERVISOR' and x['path']=='@TASK_SUPERVISOR' for x in r['identity']['runtime'])
+    assert bytes_inventory(host['root'])==before
+
+
+def test_unknown_external_binding_is_not_read_or_granted_authority(host,monkeypatch):
+    external=host['root']/'unrelated-private-file.dat';external.write_bytes(b'PRIVATE_UNKNOWN_CONTENT')
+    pinned_manifest(host,[dict(path=str(external),sha256=op.digest(external.read_bytes()))])
+    original=op.read
+    def guarded(path,*a,**kw):
+        assert Path(path)!=external,'UNAPPROVED_EXTERNAL_FILE_READ'
+        return original(path,*a,**kw)
+    monkeypatch.setattr(op,'read',guarded);before=bytes_inventory(host['root']);r=diagnostic(host)
+    assert 'RUNTIME_PATH_OUTSIDE_VERIFIED_ANCHORS' in r['blockers']
+    assert not r['manifest_scope']['verification_complete']
+    assert str(external) not in json.dumps(r) and 'PRIVATE_UNKNOWN_CONTENT' not in json.dumps(r)
+    assert bytes_inventory(host['root'])==before
+    with pytest.raises(ValueError,match='OWNER_HOST_PREFLIGHT_BLOCKED'):
+        op.authorize(authorization(host),r,host['now'])
+
+
+def test_identical_manifest_duplicates_are_idempotent_not_rewritten(host):
+    first=op.load(host['config'])['files'][0]
+    pinned_manifest(host,[first]);before=bytes_inventory(host['root']);r=diagnostic(host)
+    assert r['manifest_scope']['identical_duplicate_bindings']==1 and not r['blockers']
+    assert r['manifest_scope']['verified_unique_files']==len(op.CANDIDATES)
+    assert bytes_inventory(host['root'])==before
+
+
+def test_conflicting_duplicate_manifest_pin_is_terminal(host):
+    first=op.load(host['config'])['files'][0]
+    pinned_manifest(host,[{**first,'sha256':'0'*64}])
+    with pytest.raises(ValueError,match='RUNTIME_DUPLICATE_PIN_CONFLICT'):diagnostic(host)
+
+
+def test_only_exact_declared_interpreter_is_an_external_anchor(host):
+    interpreter=host['root'].parent/'private-python.exe';interpreter.write_bytes(b'generated interpreter fixture')
+    pinned_manifest(host,[dict(path=str(interpreter),sha256=op.digest(interpreter.read_bytes()))],python=interpreter)
+    r=diagnostic(host)
+    assert not r['blockers'] and any(x['scope']=='TASK_INTERPRETER' for x in r['identity']['runtime'])
+    sibling=interpreter.with_name('other-executable.exe');sibling.write_bytes(b'unrelated')
+    pinned_manifest(host,[dict(path=str(sibling),sha256=op.digest(sibling.read_bytes()))])
+    assert 'RUNTIME_PATH_OUTSIDE_VERIFIED_ANCHORS' in diagnostic(host)['blockers']
+
+
+def test_apply_updates_supervisor_and_every_identical_binding_pin(host):
+    first=op.load(host['config'])['files'][0];service=Path(host['snapshot']['service_path'])
+    pinned_manifest(host,[first,dict(path=str(service),sha256=op.digest(service.read_bytes()))])
+    p=authorization(host);out=StringIO()
+    op.gate(host['snapshot'],host['repo'],COMMIT,p,host['now'],StringIO('COMMIT\n'),out)
+    cfg=op.load(host['config'])
+    # Existing supervisor preflight hashes every binding, including duplicates.
+    assert all(op.digest(Path(x['path']).read_bytes())==x['sha256'] for x in cfg['files'])
+    assert (host['root']/'hold.json').exists()
+    assert op.load(host['root']/'operator-resume.authorized.json')['max_segments']==1
+
+
+def test_relative_binding_uses_exact_task_working_directory(host):
+    host['snapshot']['task_action']['WorkingDirectory']=str(host['tree'])
+    pinned_manifest(host,relative_first=True)
+    assert not diagnostic(host)['blockers']
+    p=authorization(host);op.gate(host['snapshot'],host['repo'],COMMIT,p,host['now'],StringIO('COMMIT\n'),StringIO())
+    cfg=op.load(host['config'])
+    for x in cfg['files']:
+        path=Path(x['path']);path=path if path.is_absolute() else host['tree']/path
+        assert op.digest(path.read_bytes())==x['sha256']
+
+
+def test_relative_binding_without_declared_workdir_does_not_guess_cwd(host):
+    pinned_manifest(host,relative_first=True)
+    r=diagnostic(host)
+    assert r['manifest_scope']['unverified_bindings'][0]['reason']=='RELATIVE_RUNTIME_PATH_UNRESOLVED'
+    assert not r['manifest_scope']['verification_complete'] and r['blockers']
+
+
+def test_supervisor_named_anchor_still_requires_original_hash(host):
+    service=Path(host['snapshot']['service_path'])
+    pinned_manifest(host,[dict(path=str(service),sha256='0'*64)])
+    with pytest.raises(ValueError,match='RUNTIME_PIN_MISMATCH'):diagnostic(host)

@@ -168,3 +168,40 @@ and PowerShell7/Ubuntu, including Unicode hash roundtrip, a specific refusal,
 unstructured/secret-bearing errors and timeout. The revised one-line handoff
 fast-forwards only the isolated WS worktree; it never changes the active
 historical checkout or installed service, and remains Diagnose-only.
+
+## Runtime manifest scope correction
+
+The next owner Diagnose returned `RUNTIME_PATH_SCOPE`. The previous predicate
+combined two distinct cases: an entry outside `cfg.tree`, and a repeated path.
+The supplied status alone does not identify which private binding triggered it.
+Repository review reproduced a narrower contract defect: the task's pinned
+supervisor may reside under the service state root, outside the staged code
+folder, and the existing supervisor checks all configured file hashes without
+requiring every binding to live under that folder. The previous operator even
+accepted that exact `service_path` later, but rejected its manifest binding first.
+
+Inspection now verifies only three named anchors: the pinned code tree; the
+exact Task Scheduler supervisor path (still confined to code or service root);
+and the exact interpreter path declared by the hash-verified configuration.
+There is no directory-wide exemption for the service root or interpreter
+folder. Every accepted file still needs the configured digest and the original
+file/link/hard-link/size guards. Unknown external bindings are not read: the
+read-only result lists their hashed path identity, declared pin and precise
+blocker, marks manifest verification incomplete, and forbids Apply.
+
+Identical duplicate path+pin bindings are counted as redundant and inspected
+once; conflicting pins are terminal. The diagnostic never rewrites the private
+configuration. Relative paths resolve only against the actual task action's
+explicit absolute WorkingDirectory; missing context is an explicit blocker,
+never the diagnostic process's current directory. The separately authorized
+stager updates every identical binding and the exact supervisor binding, so
+the existing supervisor's full-manifest hash loop still passes after staging.
+No unknown file is admitted or overwritten, no host task/HOLD is changed by
+Diagnose, and the retrospective backfill remains separate.
+
+Regressions cover named supervisor/interpreter pins, directory-wide exemption
+refusal without reading unrelated files, same-pin idempotency, conflicting pin
+rejection, exact/unknown working directory, unchanged diagnosis bytes, and
+post-stage hash verification for all bindings. These reproduce supported
+legacy layouts on generated files; actual host layout/readiness remains
+unattested until the new diagnostic is returned.
