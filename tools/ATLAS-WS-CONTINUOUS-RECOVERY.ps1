@@ -79,7 +79,7 @@ try{
             Write-Output ('REPORT_FILE='+$output)
             return
         }
-        if($r.hold_reason){
+        if($r.hold_reason -and !$r.initial_resume_pending){
             Write-NewJson $output $r
             $r|ConvertTo-Json -Depth 15
             Write-Output ('REPORT_FILE='+$output)

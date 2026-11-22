@@ -180,6 +180,22 @@ class ResilienceTests(unittest.TestCase):
             body=json.loads(receipt.read_text());body['orders']=1;receipt.write_text(json.dumps(body))
             with self.assertRaisesRegex(ValueError,'SERVICE_RECEIPT_INTEGRITY'):policy.report(owner,config_pin,clock.now())
 
+    def test_continuous_report_waits_for_valid_initial_schedule_not_expired_ticket(self):
+        from test_atlas_ws_continuity import install
+        from tools import atlas_ws_continuity as policy
+        with tempfile.TemporaryDirectory() as tmp:
+            owner=Path(tmp);(owner/'segments').mkdir()
+            config,pin=install(owner,activated=SLOT+100)
+            a=json.loads((owner/'continuous-research.authorized.json').read_text())
+            (owner/'hold.json').write_text(json.dumps(dict(reason='PILOT_STOP_ConnectionResetError')))
+            (owner/'operator-resume.authorized.json').write_text(json.dumps(dict(schema='atlas.ws.operator-resume.v1',
+                authorization_sha256=a['authorization_sha256'],config_sha256=pin,issued_ms=SLOT+100,expires_ms=SLOT+600100)))
+            r=policy.report(owner,pin,SLOT+200)
+            self.assertEqual(r['status'],'AWAITING_EXISTING_SCHEDULE');self.assertTrue(r['initial_resume_pending'])
+            self.assertFalse(r['acceptance_ready'])
+            expired=policy.report(owner,pin,SLOT+600101)
+            self.assertEqual(expired['status'],'HELD');self.assertFalse(expired['initial_resume_pending'])
+
     def test_clean_and_duplicate_same_bytes_use_one_connection_and_two_logical_acks(self):
         clock=Clock(); wire=Wire(clock,[final(),final(),final(SLOT+STEP)])
         result=self.execute(wire,clock)

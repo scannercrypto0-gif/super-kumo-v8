@@ -191,11 +191,20 @@ def report(root,config_pin,now):
                     if e['status']=='CONNECTING' and e.get('attempt')==2:reconnections.append(e)
     recovered=any(r['observation']['committed_ms']>e.get('utc_ms',now) for e in faults for r in rows)
     hold=root/'hold.json';reason=json.loads(bounded(hold)).get('reason') if hold.exists() else None
+    awaiting=False
+    ticket=root/'operator-resume.authorized.json'
+    if reason in ('PILOT_STOP_TimeoutError','PILOT_STOP_ConnectionResetError') and not rows and ticket.exists():
+        t=json.loads(bounded(ticket))
+        awaiting=(t.get('schema')=='atlas.ws.operator-resume.v1' and t.get('config_sha256')==config_pin
+            and t.get('authorization_sha256')==a['authorization_sha256']
+            and type(t.get('issued_ms')) is int and type(t.get('expires_ms')) is int
+            and t['issued_ms']<=now<t['expires_ms']<=t['issued_ms']+1800000
+            and not (root/'operator-recovery.active.json').exists())
     fresh=bool(last and 0<=now-last['slot']-900000<=1200000)
     rollovers=sum(b==a+8*900000 for a,b in zip(complete,complete[1:]))
     ready=not reason and len(complete)>=3 and rollovers>=2 and len(rows)>=24 and fresh and recovered
     return dict(schema='atlas.ws.continuous-report.v1',status='CONTINUOUS_EVIDENCE_READY' if ready else
-                ('HELD' if reason else 'OBSERVING_CONTINUOUS_ACCEPTANCE'),acceptance_ready=ready,
+                ('AWAITING_EXISTING_SCHEDULE' if awaiting else ('HELD' if reason else 'OBSERVING_CONTINUOUS_ACCEPTANCE')),acceptance_ready=ready,initial_resume_pending=awaiting,
                 as_of_ms=now,activated_ms=start,policy_sha256=PIN,config_sha256=config_pin,
                 completed_segments=complete,confirmed_rollovers=rollovers,verified_receipts=len(rows),
                 last_committed_ms=last['committed_ms'] if last else None,last_receipt_fresh=fresh,
