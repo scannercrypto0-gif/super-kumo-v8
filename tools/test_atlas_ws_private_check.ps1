@@ -44,7 +44,10 @@ function Refused([string]$mode,[string]$reason,[int]$timeout=30000){
     Assert $caught 'EXPECTED_PRIVATE_FAILURE_NOT_RAISED'
 }
 try {
-    $ok=Invoke-PrivateCheck 'diagnose' $snapshot
+    try {$ok=Invoke-PrivateCheck 'diagnose' $snapshot} catch {
+        Write-Output ('SYNTHETIC_WIRE_FAILURE_METADATA '+(ConvertTo-Json -InputObject $script:privateFailure -Compress))
+        throw
+    }
     Assert ($ok.transport -ceq 'UTF8_EXACT') 'UNICODE_PIPE_CHANGED_IDENTITY'
     Refused 'authorize' 'RUNTIME_PIN_MISMATCH'
     Assert ($script:privateFailure.child_exit_code -eq 2 -and $script:privateFailure.reason -ceq 'RUNTIME_PIN_MISMATCH') 'CHILD_FAILURE_CONTEXT_LOST'

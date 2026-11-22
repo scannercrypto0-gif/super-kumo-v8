@@ -99,8 +99,8 @@ function Invoke-PrivateCheck([string]$mode,$snapshot,[ValidateRange(100,30000)][
         $process=[Diagnostics.Process]::new();$process.StartInfo=$info
         if(-not $process.Start()){throw 'PRIVATE_HELPER_START_FAILED'}
         # Read concurrently, with hard bounds; never forward private stderr.
-        $outputChars=New-Object char[] 2097153
-        $errorChars=New-Object char[] 65537
+        $outputChars=[char[]](New-Object char[] 2097153)
+        $errorChars=[char[]](New-Object char[] 65537)
         $stdout=$process.StandardOutput.ReadBlockAsync($outputChars,0,$outputChars.Length)
         $stderr=$process.StandardError.ReadBlockAsync($errorChars,0,$errorChars.Length)
         $write=$process.StandardInput.WriteLineAsync($payload)
