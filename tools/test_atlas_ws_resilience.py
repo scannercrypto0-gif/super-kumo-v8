@@ -196,6 +196,59 @@ class ResilienceTests(unittest.TestCase):
             expired=policy.report(owner,pin,SLOT+600101)
             self.assertEqual(expired['status'],'HELD');self.assertFalse(expired['initial_resume_pending'])
 
+    def test_actual_delayed_complete_ping_refreshes_liveness_and_completes_segment(self):
+        clock=Clock()
+        f=websocket.ABNF(fin=1,opcode=9,mask_value=0,data=b'1234567890123').format()
+        wire=Wire(clock,[('packet',f)]*4+[final(SLOT+i*STEP) for i in range(8)])
+        original=wire.frame;calls=[0]
+        def delayed(connection,timeout):
+            calls[0]+=1
+            if calls[0]<=3:clock.current=SLOT+calls[0]*20000
+            elif calls[0]==4:clock.current=SLOT+147200
+            return original(connection,timeout)
+        wire.frame=delayed
+        result=self.execute(wire,clock,sustained=True)
+        self.assertEqual((wire.attempts,len(result['bars']),len(wire.pongs)),(1,8,4))
+        self.assertTrue(all(p==b'1234567890123' for p in wire.pongs))
+
+    def test_verified_fresh_ping_preserves_all_real_quota_denials(self):
+        from tools.atlas_ws_receive_diagnostics import remember_complete_ping
+        for case in ('ban','missing','expired','exhausted'):
+            with self.subTest(case=case),tempfile.TemporaryDirectory() as tmp:
+                q=cycle.Quota(Path(tmp)/'quota.sqlite',cycle.Limits(rest_weight=2,connections=4))
+                now=SLOT+90000
+                self.assertTrue(q.connect('research-15m',SLOT,['btcusdt@kline_15m']))
+                c=websocket.WebSocket();sent=[];c.pong=sent.append
+                if case=='ban':
+                    with q.tx() as db:q.set(db,'ban',1)
+                elif case=='missing':q.disconnect('research-15m',now,failed=False)
+                elif case=='expired':now=SLOT+86390000
+                elif case=='exhausted':
+                    with q.tx() as db:
+                        q.charge(db,'ws:research-15m',now,1000,1,2)
+                        q.charge(db,'ws:research-15m',now,1000,1,2)
+                f=websocket.ABNF(fin=1,opcode=9,mask_value=0,data=b'ping')
+                self.assertTrue(remember_complete_ping(c,f))
+                with self.assertRaisesRegex(ValueError,'PONG_QUOTA_STOP'):cycle.send_research_pong(q,'research-15m',now,c,b'ping')
+                self.assertEqual(sent,[])
+
+    def test_fresh_ping_circuit_initial_ticket_is_waiting_only_with_special_scope(self):
+        from test_atlas_ws_continuity import install
+        from tools import atlas_ws_continuity as policy
+        with tempfile.TemporaryDirectory() as tmp:
+            owner=Path(tmp);(owner/'segments').mkdir()
+            config,pin=install(owner,activated=SLOT+100)
+            a=json.loads((owner/'continuous-research.authorized.json').read_text())
+            (owner/'hold.json').write_text(json.dumps(dict(reason='LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN')))
+            ticket=owner/'operator-resume.authorized.json'
+            t=dict(schema='atlas.ws.operator-resume.v1',authorization_sha256=a['authorization_sha256'],config_sha256=pin,
+                issued_ms=SLOT+100,expires_ms=SLOT+600100)
+            ticket.write_text(json.dumps(t))
+            self.assertEqual(policy.report(owner,pin,SLOT+200)['status'],'HELD')
+            t['fresh_ping_correction']=True;ticket.write_text(json.dumps(t))
+            self.assertEqual(policy.report(owner,pin,SLOT+200)['status'],'AWAITING_EXISTING_SCHEDULE')
+            self.assertEqual(policy.report(owner,pin,SLOT+600101)['status'],'HELD')
+
     def test_clean_and_duplicate_same_bytes_use_one_connection_and_two_logical_acks(self):
         clock=Clock(); wire=Wire(clock,[final(),final(),final(SLOT+STEP)])
         result=self.execute(wire,clock)

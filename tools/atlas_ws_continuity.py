@@ -193,10 +193,11 @@ def report(root,config_pin,now):
     hold=root/'hold.json';reason=json.loads(bounded(hold)).get('reason') if hold.exists() else None
     awaiting=False
     ticket=root/'operator-resume.authorized.json'
-    if reason in ('PILOT_STOP_TimeoutError','PILOT_STOP_ConnectionResetError') and not rows and ticket.exists():
+    if reason in ('PILOT_STOP_TimeoutError','PILOT_STOP_ConnectionResetError','LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN') and not rows and ticket.exists():
         t=json.loads(bounded(ticket))
         awaiting=(t.get('schema')=='atlas.ws.operator-resume.v1' and t.get('config_sha256')==config_pin
             and t.get('authorization_sha256')==a['authorization_sha256']
+            and (reason!='LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN' or t.get('fresh_ping_correction') is True)
             and type(t.get('issued_ms')) is int and type(t.get('expires_ms')) is int
             and t['issued_ms']<=now<t['expires_ms']<=t['issued_ms']+1800000
             and not (root/'operator-recovery.active.json').exists())

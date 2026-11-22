@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{40}$')][string]$ExpectedCommit,
-    [ValidateSet('ActivateAndObserve','Observe','RepairPermitAndObserve')][string]$Mode='ActivateAndObserve',
+    [ValidateSet('ActivateAndObserve','Observe','RepairPermitAndObserve','ApplyPingCorrectionAndObserve')][string]$Mode='ActivateAndObserve',
     [string]$OwnerDecisionRef,
     [ValidateRange(6,48)][int]$ObserveHours=24,
     [string]$ExpectedInstalledConfig='34bbaa0d7a419d4a45731b03d103753cff6428e22e11003fb3bc433a0d504dd9'
@@ -27,18 +27,22 @@ function Write-NewJson([string]$Path,$Value){
 $t=@(Get-ScheduledTask -TaskName $taskName)
 if($t.Count -ne 1 -or @($t[0].Actions).Count -ne 1){throw 'TASK_NOT_UNIQUE'}
 $config=Read-ConfigPath $t[0];$root=Split-Path -Parent $config
-if($Mode -ceq 'ActivateAndObserve'){
+if($Mode -ceq 'ActivateAndObserve' -or $Mode -ceq 'ApplyPingCorrectionAndObserve'){
     if(!$OwnerDecisionRef){throw 'EXPLICIT_CONTINUOUS_OWNER_DECISION_REQUIRED'}
-    if(Test-Path -LiteralPath (Join-Path $root 'continuous-research.authorized.json')){throw 'CONTINUOUS_ALREADY_ACTIVATED_USE_OBSERVE'}
+    if($Mode -ceq 'ActivateAndObserve' -and (Test-Path -LiteralPath (Join-Path $root 'continuous-research.authorized.json'))){throw 'CONTINUOUS_ALREADY_ACTIVATED_USE_OBSERVE'}
     $raw=@(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -ExpectedCommit $ExpectedCommit -Mode Diagnose)
     if($LASTEXITCODE){$raw|Write-Output;throw 'CONTINUOUS_PREFLIGHT_BLOCKED'}
     $d=($raw -join "`n")|ConvertFrom-Json
+    if($Mode -ceq 'ApplyPingCorrectionAndObserve'){
+        if($d.identity.config_sha256 -cne '857bea957d1da3fa1ef1c01ace44a0bfda27f84c2750523184455936a48f2cf2' -or $d.hold_reason -cne 'LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN' -or @($d.blockers).Count -ne 0 -or !$d.manifest_scope.verification_complete){throw 'FRESH_PING_BASELINE_DRIFT'}
+    }else{
     if($d.identity.config_sha256 -cne $ExpectedInstalledConfig -or $d.hold_slot_ms -ne 1795329900000L -or
         $d.hold_reason -cne 'PILOT_STOP_ConnectionResetError' -or @($d.blockers).Count -ne 0 -or
         !$d.manifest_scope.verification_complete){throw 'CONTINUOUS_BASELINE_DRIFT'}
     $claim=Get-Content -LiteralPath (Join-Path $root 'operator-recovery.active.json') -Raw|ConvertFrom-Json
     if($claim.authorization_sha256 -cne 'fe42645ec37f9b36f80a0863d24951b67fdd548b231c432e50735bb2e13e0817'){
         throw 'PRIOR_OPERATOR_AUTHORIZATION_DRIFT'
+    }
     }
     $now=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
     $permit=[ordered]@{schema='atlas.ws.operator-authorization.v1';action='DEPLOY_ONE_RECOVERY';
@@ -47,6 +51,7 @@ if($Mode -ceq 'ActivateAndObserve'){
         allow_task_action_pin_update=$true;allow_clock_probe=$true;existing_pilot_quota_only=$true;
         owner_decision_ref=$OwnerDecisionRef;continuous_research=$true;continuity_policy_sha256=$policy;
         allow_explicit_missing_intervals=$true}
+    if($Mode -ceq 'ApplyPingCorrectionAndObserve'){$permit['fresh_ping_correction']=$true;$permit['expected_previous_config_sha256']=$d.identity.config_sha256}
     $file=Join-Path ([IO.Path]::GetTempPath()) ('atlas-continuous-permit-'+[guid]::NewGuid().ToString('N')+'.json')
     Write-NewJson $file $permit
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -ExpectedCommit $ExpectedCommit -Mode Apply -AuthorizationFile $file

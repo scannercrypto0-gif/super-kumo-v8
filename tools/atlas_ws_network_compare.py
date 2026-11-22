@@ -46,7 +46,7 @@ def observe_reader(mode,transport,quota,clock,duration,guard=lambda:None):
     from types import SimpleNamespace
     import websocket
     from tools.atlas_live_research_cycle import read_research_frame,send_research_pong
-    from tools.atlas_ws_receive_diagnostics import receive_fault_context,classify_transport_fault
+    from tools.atlas_ws_receive_diagnostics import receive_fault_context,classify_transport_fault,remember_complete_ping
     op.need(mode in ('production','reference') and 0<duration<=900,'NETWORK_COMPARE_SCOPE')
     started=clock.now();end=clock.monotonic()+duration
     counters=Counter();events=deque(maxlen=256);pending=deque(maxlen=8)
@@ -68,6 +68,7 @@ def observe_reader(mode,transport,quota,clock,duration,guard=lambda:None):
                 counters['nonfinal_frames']+=int(not frame.fin)
                 counters[{1:'text_frames',9:'ping_frames',10:'pong_frames',8:'close_frames'}.get(frame.opcode,'other_frames')]+=1
                 if frame.opcode==9:
+                    if mode=='reference':remember_complete_ping(connection,frame)
                     pin=hashlib.sha256(bytes(frame.data)).hexdigest();pending.append(pin)
                     mark('PING_RECEIVED',payload_bytes=len(frame.data),payload_sha256=pin)
                 elif frame.opcode==8:
@@ -77,7 +78,9 @@ def observe_reader(mode,transport,quota,clock,duration,guard=lambda:None):
                 nonlocal stage
                 old=stage;stage='PONG'
                 if mode=='reference':
-                    send_research_pong(quota,'network-compare',clock.now(),SimpleNamespace(pong=original_pong),payload)
+                    connection.pong=original_pong
+                    try:send_research_pong(quota,'network-compare',clock.now(),connection,payload)
+                    finally:connection.pong=tracked_pong
                 else:original_pong(payload)
                 counters['local_pong_returns']+=1
                 pin=hashlib.sha256(bytes(payload)).hexdigest()
@@ -115,6 +118,8 @@ def observe_reader(mode,transport,quota,clock,duration,guard=lambda:None):
             finally:connection.recv_frame=original_frame;connection.pong=original_pong
     except Exception as exc:
         context=receive_fault_context(connection,exc) if connection is not None else {}
+        if stage=='PONG' and type(exc) is TimeoutError and str(exc)=='PONG_LIVENESS_EXPIRED':
+            context=dict(receive_phase='FRAME_BOUNDARY',deadline_origin='PONG_LIVENESS_EXPIRED')
         provider=getattr(exc,'status_code',None)
         result['provider_status']=provider if type(provider) is int and 100<=provider<=599 else None
         result.update(status='READER_INTERRUPTED',error=type(exc).__name__,

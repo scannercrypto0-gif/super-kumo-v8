@@ -115,3 +115,18 @@ def test_sequential_differences_never_claim_root_cause_or_service_health():
 def test_terminal_ban_protocol_and_clock_faults_do_not_open_second_connection(status,eligible,code,allowed):
     assert probe.compare_next(dict(status=status,retry_eligible=eligible,provider_status=code)) is allowed
     assert 'NO_SECOND_CONNECTION' in probe.verdict([dict(status=status)])
+
+
+@pytest.mark.parametrize('mode',['production','reference'])
+def test_owner_observed_delayed_fourth_ping_returns_four_matching_pongs(tmp_path,mode):
+    c=Clock();wire=b''.join(packet(str(i).zfill(13).encode(),websocket.ABNF.OPCODE_PING) for i in range(4))
+    s=Sock(c,wire,reset());t=Transport(s);q=Quota(tmp_path/'quota.sqlite',Limits(rest_weight=2,connections=4))
+    advanced=[0]
+    def gap():
+        if len(s.sent)>advanced[0]:
+            c.value+=87180 if len(s.sent)==57 else 20000
+            advanced[0]=len(s.sent)
+    r=probe.observe_reader(mode,t,q,c,900,gap)
+    assert r['counters']['ping_frames']==r['counters']['local_pong_returns']==r['counters']['pong_echo_matches']==4
+    assert r['fault_stage']=='FRAME_READ' and r['error']=='ConnectionResetError'
+    assert 'PONG_TERMINAL'!=r['fault_class']

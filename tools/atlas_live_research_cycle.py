@@ -300,6 +300,8 @@ def read_research_frame(transport, connection, timeout):
     its payload, so binary/malformed/policy-close frames remain terminal.
     """
     from websocket import ABNF, WebSocketConnectionClosedException
+    from tools.atlas_ws_receive_diagnostics import clear_ping_proof,remember_complete_ping
+    clear_ping_proof(connection)
 
     original = getattr(connection, "recv_frame", None)
     seen = []
@@ -310,7 +312,10 @@ def read_research_frame(transport, connection, timeout):
             return frame
         connection.recv_frame = capture_frame
     try:
-        return transport.frame(connection, timeout)
+        result=transport.frame(connection, timeout)
+        if result[0]=='ping' and seen and result[1]==seen[0].data:
+            remember_complete_ping(connection,seen[0])
+        return result
     except WebSocketConnectionClosedException as exc:
         raise ConnectionResetError("WS_CONNECTION_CLOSED") from exc
     except ValueError as exc:
@@ -329,7 +334,24 @@ def read_research_frame(transport, connection, timeout):
 
 
 def send_research_pong(quota, socket_id, received, connection, payload):
-    """Reconnect a stale socket without treating its age as message exhaustion."""
+    """A newly verified PING can refresh liveness without relaxing quota."""
+    from tools.atlas_ws_receive_diagnostics import consume_recent_ping
+    had_proof=getattr(connection,'_atlas_verified_ping',None) is not None
+    fresh=consume_recent_ping(connection,payload)
+    if had_proof and not fresh:raise ValueError('PONG_FRESH_PING_PROOF_REJECTED')
+    if fresh:
+        with quota.tx() as db:
+            quota.clock(db,received)
+            row=db.execute("SELECT opened,last_ping FROM sockets WHERE id=?",(socket_id,)).fetchone()
+            admitted=bool(row and not quota.get(db,"ban") and
+                0<=received-row[0]<86390000 and received>=row[1] and
+                quota.charge(db,"ws:"+socket_id,received,1000,1,quota.limits.ws_messages//2))
+            if admitted:
+                db.execute("UPDATE sockets SET last_ping=? WHERE id=?",(received,socket_id))
+                quota.set(db,"ws_failures",0)
+        if not admitted:raise ValueError("PONG_QUOTA_STOP")
+        connection.pong(payload)
+        return
     if not quota.ws(socket_id, received, "PONG"):
         with quota.tx() as db:
             row = db.execute("SELECT opened,last_ping FROM sockets WHERE id=?",

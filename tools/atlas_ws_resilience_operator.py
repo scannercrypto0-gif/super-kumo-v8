@@ -195,7 +195,7 @@ def inspect(snapshot, repo, expected_commit, now):
     need(type(snapshot.get('task_xml')) is str and digest(snapshot['task_xml'].encode('utf-8')) == snapshot['task_xml_sha256'], 'TASK_XML_SNAPSHOT_MISMATCH')
     need(type(snapshot.get('task_policy_sha256')) is str and HEX.fullmatch(snapshot['task_policy_sha256']), 'TASK_POLICY_PIN')
     hold = load(root/'hold.json')
-    need(hold.get('reason') in ('PILOT_STOP_TimeoutError', 'PILOT_STOP_ConnectionResetError'), 'HOLD_NOT_RESUMABLE')
+    need(hold.get('reason') in ('PILOT_STOP_TimeoutError', 'PILOT_STOP_ConnectionResetError','LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN'), 'HOLD_NOT_RESUMABLE')
     need(type(hold.get('slot_ms')) is int and hold['slot_ms'] % 900000 == 0, 'HOLD_SLOT_IDENTITY')
     rights = {k:cfg.get(k) for k in ('source_rights_ref','region_ref','authorization_ref')}
     need(all(type(v) is str and v.strip() for v in rights.values()), 'SOURCE_RIGHTS_REQUIRED')
@@ -247,12 +247,16 @@ def inspect(snapshot, repo, expected_commit, now):
                 orders=0, trading_authority='NONE', real_pit_oos='BLOCKED')
 
 
-def continuity_pin():
+def continuity_module():
     # This helper is also launched by filename from an unrelated owner CWD.
     import importlib.util
     spec=importlib.util.spec_from_file_location('atlas_reviewed_continuity',Path(__file__).with_name('atlas_ws_continuity.py'))
     module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-    return module.PIN
+    return module
+
+
+def continuity_pin():
+    return continuity_module().PIN
 
 
 def authorize(path, diagnostic, now, *, action='DEPLOY_ONE_RECOVERY'):
@@ -276,6 +280,11 @@ def authorize(path, diagnostic, now, *, action='DEPLOY_ONE_RECOVERY'):
              'CONTINUITY_POLICY_AUTHORIZATION')
     else:
         need(auth.get('continuous_research') in (None,False),'CONTINUITY_POLICY_AUTHORIZATION')
+    correction=auth.get('fresh_ping_correction') is True
+    if diagnostic['hold_reason']=='LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN' or correction:
+        need(correction and auth.get('continuous_research') is True and
+             auth.get('expected_previous_config_sha256')==diagnostic['identity']['config_sha256'],
+             'FRESH_PING_CORRECTION_AUTHORITY_REQUIRED')
     need(not diagnostic['blockers'], 'OWNER_HOST_PREFLIGHT_BLOCKED')
     return auth, digest(raw)
 
@@ -319,9 +328,17 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
          type(clock.get('uncertainty_ms')) is int and 0 <= clock['uncertainty_ms'] <= 250, 'HOST_CLOCK_QUALIFICATION')
     marker = root/'operator-deployment.in-progress'
     continuous = auth.get('continuous_research') is True
+    correction=auth.get('fresh_ping_correction') is True
+    if correction:
+        need(not (root/'operator-recovery.active.json').exists(),'FRESH_PING_ACTIVE_RECOVERY_REVIEW_REQUIRED')
+        module=continuity_module()
+        need(module.authority(root,diagnostic['identity']['config_sha256']) is not None,
+             'FRESH_PING_PRIOR_CONTINUITY_AUTHORITY_REQUIRED')
+        need(not module.next_action(root,diagnostic['identity']['config_sha256'],now)['circuit_open'],
+             'FRESH_PING_EXISTING_CIRCUIT_WINDOW_NOT_EXPIRED')
     need(not marker.exists() and not (root/'operator-resume.authorized.json').exists()
          and (continuous or not (root/'operator-recovery.active.json').exists())
-         and not (root/'continuous-research.authorized.json').exists(), 'OPERATOR_STAGE_ALREADY_PRESENT')
+         and (correction or not (root/'continuous-research.authorized.json').exists()), 'OPERATOR_STAGE_ALREADY_PRESENT')
     with collector_lease(root):
         safe(root/'operator-authorizations', exists=False).mkdir(exist_ok=True)
         durable(root/'operator-authorizations'/f'{authpin}.claimed', auth_raw, create=True)
@@ -347,7 +364,7 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
         durable(backup/'config.json', original_config, create=True)
         durable(backup/'task.xml', snapshot['task_xml'].encode('utf-8'), create=True)
         durable(backup/'task-action.json', canonical(snapshot['task_action']), create=True)
-        for name in ('hold.json','reset-recovery.claimed','reset-recovery.pending','activation.json','operator-recovery.active.json'):
+        for name in ('hold.json','reset-recovery.claimed','reset-recovery.pending','activation.json','operator-recovery.active.json','continuous-research.authorized.json'):
             p=root/name
             if p.exists():durable(backup/name,read(p),create=True)
         manifest = dict(schema='atlas.ws.operator-backup.v1', files=files,
@@ -391,7 +408,7 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
                 config_sha256=newpin,hold_sha256=diagnostic['identity']['hold_sha256'],
                 claimed_sha256=diagnostic['identity']['claimed_sha256'],pending_sha256=diagnostic['identity']['pending_sha256'],
                 issued_ms=now2,expires_ms=min(auth['expires_ms'],now2+1800000),max_segments=1,
-                max_connections=2,orders=0,trading_authority='NONE')
+                max_connections=2,orders=0,trading_authority='NONE',fresh_ping_correction=correction)
             if continuous:
                 PIN=continuity_pin()
                 prior=root/'operator-recovery.active.json'
@@ -399,6 +416,9 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
                 continuous_permit=dict(schema='atlas.ws.continuous-authority.v1',policy_sha256=PIN,
                     config_sha256=newpin,config_filename=cfgpath.name,authorization_sha256=authpin,activated_ms=now2,
                     orders=0,trading_authority='NONE')
+                if correction:
+                    old_authority=root/'continuous-research.authorized.json'
+                    if old_authority.exists():old_authority.rename(backup/'continuous-authority.prior.json')
                 durable(root/'continuous-research.authorized.json',canonical(continuous_permit),create=True)
             durable(root/'operator-resume.authorized.json',canonical(ticket),create=True)
             marker.rename(backup/'deployment-marker.completed.json')
@@ -411,7 +431,7 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
                 task_action_pin_readback=True,clock_checked_ms=clock['checked_ms'],
                 clock_uncertainty_ms=clock['uncertainty_ms'],
                 max_segments=1,max_connections=2,orders=0,trading_authority='NONE',
-                host_reconnection='NOT_ATTESTED',continuous_research=continuous,root_cause='ROOT_CAUSE_NOT_PROVEN')
+                host_reconnection='NOT_ATTESTED',continuous_research=continuous,fresh_ping_correction=correction,root_cause='ROOT_CAUSE_NOT_PROVEN')
             durable(backup/'deployment-receipt.json',canonical(receipt),create=True)
             print(json.dumps(receipt),file=out,flush=True)
         except BaseException:

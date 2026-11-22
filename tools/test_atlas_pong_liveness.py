@@ -9,6 +9,7 @@ from pathlib import Path
 
 cycle_path, quota_path = map(Path, sys.argv[1:3])
 sys.argv = sys.argv[:1]
+sys.path.insert(0,str(cycle_path.resolve().parents[1]))
 tree = ast.parse(cycle_path.read_text(encoding="utf-8"))
 helpers = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in {"send_research_pong", "read_research_frame"}]
 scope = {}

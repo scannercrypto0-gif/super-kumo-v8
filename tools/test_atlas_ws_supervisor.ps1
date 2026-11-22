@@ -107,6 +107,23 @@ try {
     Archive-OperatorClaim
     Assert (!(Test-Path $operatorActive)) 'CONTINUOUS_CLAIM_NOT_ARCHIVED'
     Assert (@(Get-ChildItem $root -Filter 'operator-recovery.completed-*.json').Count -eq 1) 'CONTINUOUS_CLAIM_LOST'
+    New-Case 'fresh-ping-circuit-scope'
+    @{reason='LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN';slot_ms=1795259700000L}|ConvertTo-Json|Set-Content $hold
+    $permit.hold_sha256=Pin $hold
+    Save-Ticket
+    Refused {Test-OperatorResume $ticket $root $cfgPin $now} 'HOLD_NOT_ELIGIBLE'
+    $permit.fresh_ping_correction=$true;Save-Ticket
+    Assert ((Test-OperatorResume $ticket $root $cfgPin $now).fresh_ping_correction -eq $true) 'FRESH_PING_SCOPED_CIRCUIT_DENIED'
+    $bootstrap=Join-Path $PSScriptRoot 'ATLAS-WS-CONTINUOUS-RECOVERY.ps1'
+    $bootstrapAst=[System.Management.Automation.Language.Parser]::ParseFile($bootstrap,[ref]$null,[ref]$null)
+    $repairCondition=$bootstrapAst.Find({param($n) $n -is [System.Management.Automation.Language.IfStatementAst] -and
+        $n.Clauses[0].Item1.Extent.Text -cmatch "RepairPermitAndObserve"},$true).Clauses[0].Item1.Extent.Text
+    $stageCondition=$bootstrapAst.Find({param($n) $n -is [System.Management.Automation.Language.IfStatementAst] -and
+        $n.Clauses[0].Item1.Extent.Text -cmatch "ActivateAndObserve"},$true).Clauses[0].Item1.Extent.Text
+    foreach($Mode in @('Observe','RepairPermitAndObserve','ActivateAndObserve','ApplyPingCorrectionAndObserve')){
+        Assert ((& ([scriptblock]::Create($repairCondition))) -eq ($Mode -ceq 'RepairPermitAndObserve')) 'WRONG_REPAIR_MODE_BRANCH'
+        Assert ((& ([scriptblock]::Create($stageCondition))) -eq ($Mode -in @('ActivateAndObserve','ApplyPingCorrectionAndObserve'))) 'WRONG_STAGE_MODE_BRANCH'
+    }
     Write-Output 'WS_SUPERVISOR_OFFLINE_PASS'
 } finally {Remove-Item -LiteralPath $base -Recurse -Force}
 

@@ -413,3 +413,40 @@ def test_claim_preserves_exact_noncanonical_powershell_authorization_bytes(host)
     assert op.digest(claimed.read_bytes())==result['authorization_sha256']
     from tools.atlas_ws_continuity import authority
     assert authority(host['root'],result['config_sha256'])
+
+
+def test_circuit_hold_requires_explicit_fresh_ping_correction_scope(host):
+    (host['root']/'hold.json').write_bytes(op.canonical(dict(reason='LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN',slot_ms=SLOT)))
+    p=authorization(host,continuous_research=True,continuity_policy_sha256=op.continuity_pin(),allow_explicit_missing_intervals=True)
+    with pytest.raises(ValueError,match='FRESH_PING_CORRECTION_AUTHORITY_REQUIRED'):op.authorize(p,diagnostic(host),host['now'])
+
+
+def test_fresh_ping_rollout_preserves_prior_grant_and_existing_policy(host,monkeypatch):
+    old=authorization(host,continuous_research=True,continuity_policy_sha256=op.continuity_pin(),allow_explicit_missing_intervals=True)
+    op.gate(host['snapshot'],host['repo'],COMMIT,old,host['now'],StringIO('COMMIT\n'),StringIO())
+    grant=host['root']/'continuous-research.authorized.json';prior=grant.read_bytes()
+    (host['root']/'operator-resume.authorized.json').unlink()
+    (host['root']/'hold.json').write_bytes(op.canonical(dict(reason='LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN',slot_ms=SLOT)))
+    oldpin=op.digest(host['config'].read_bytes());host['snapshot']['task_config_sha256']=oldpin
+    fresh=authorization(host,continuous_research=True,continuity_policy_sha256=op.continuity_pin(),allow_explicit_missing_intervals=True,
+        fresh_ping_correction=True,expected_previous_config_sha256=oldpin)
+    module=op.continuity_module();ledger=host['root']/'continuous-admission.sqlite'
+    for i in range(4):module.outcome(ledger,host['now']-100+i,SLOT+i*900000,failed=True)
+    with pytest.raises(ValueError,match='EXISTING_CIRCUIT_WINDOW_NOT_EXPIRED'):
+        op.gate(host['snapshot'],host['repo'],COMMIT,fresh,host['now'],StringIO('COMMIT\n'),StringIO())
+    assert grant.read_bytes()==prior and not (host['root']/'operator-resume.authorized.json').exists()
+    host['now']+=3601000;host['snapshot']['clock']['checked_ms']=host['now']
+    monkeypatch.setattr(op.time,'time_ns',lambda:host['now']*1000000)
+    fresh=authorization(host,continuous_research=True,continuity_policy_sha256=op.continuity_pin(),allow_explicit_missing_intervals=True,
+        fresh_ping_correction=True,expected_previous_config_sha256=oldpin)
+    assert module.reserve(ledger,host['now']-1,SLOT)==0 and module.reserve(ledger,host['now'],SLOT)==0
+    out=StringIO();op.gate(host['snapshot'],host['repo'],COMMIT,fresh,host['now'],StringIO('COMMIT\n'),out)
+    result=json.loads(out.getvalue().splitlines()[-1]);ticket=op.load(host['root']/'operator-resume.authorized.json')
+    assert result['fresh_ping_correction'] and ticket['fresh_ping_correction']
+    assert (host['root']/result['backup']/'continuous-authority.prior.json').read_bytes()==prior
+    marker=op.continuity_module().authority(host['root'],result['config_sha256'])
+    assert 'circuit_epoch_ms' not in marker
+    assert (host['root']/'hold.json').exists()
+
+    assert module.reserve(ledger,host['now']+1,SLOT)>0
+    with closing(sqlite3.connect(ledger)) as db:assert db.execute("SELECT count(*) FROM events WHERE kind='OUTCOME'").fetchone()[0]==4
