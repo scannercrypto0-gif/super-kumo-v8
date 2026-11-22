@@ -261,6 +261,23 @@ def continuity_pin():
     return continuity_module().PIN
 
 
+class HostPreflightBlocked(ValueError):
+    def __init__(self, diagnostic):
+        super().__init__('OWNER_HOST_PREFLIGHT_BLOCKED')
+        blockers = diagnostic['blockers']
+        # Explicit allow-list: no task XML, command lines, file paths or raw bytes.
+        self.preflight = dict(
+            blockers=list(blockers), task_state=diagnostic.get('task_state'),
+            task_enabled=diagnostic.get('task_enabled'),
+            collector_processes=diagnostic.get('collector_processes'),
+            supervisor_lock_available=diagnostic.get('supervisor_lock_available'),
+            retryable_scheduler_only=(bool(blockers) and
+                set(blockers) <= {'TASK_NOT_QUIESCENT_READY'} and
+                diagnostic.get('task_enabled') is True and
+                diagnostic.get('collector_processes') == 0 and
+                diagnostic.get('supervisor_lock_available') is True))
+
+
 def authorize(path, diagnostic, now, *, action='DEPLOY_ONE_RECOVERY'):
     raw = read(path, 65536); auth = json.loads(raw.decode('utf-8-sig'), object_pairs_hook=pairs)
     need(auth.get('schema') == SCHEMA and auth.get('action') == action, 'OWNER_AUTHORIZATION_SCOPE')
@@ -287,7 +304,8 @@ def authorize(path, diagnostic, now, *, action='DEPLOY_ONE_RECOVERY'):
         need(correction and auth.get('continuous_research') is True and
              auth.get('expected_previous_config_sha256')==diagnostic['identity']['config_sha256'],
              'FRESH_PING_CORRECTION_AUTHORITY_REQUIRED')
-    need(not diagnostic['blockers'], 'OWNER_HOST_PREFLIGHT_BLOCKED')
+    if diagnostic['blockers']:
+        raise HostPreflightBlocked(diagnostic)
     return auth, digest(raw)
 
 
@@ -485,5 +503,6 @@ if __name__=='__main__':
     except (ValueError,OSError,sqlite3.Error,subprocess.SubprocessError,KeyError,TypeError,json.JSONDecodeError) as exc:
         # Never publish host paths, task args, raw market bytes or exception text.
         print(json.dumps(dict(status='WS_OPERATOR_BLOCKED',reason=str(exc) if isinstance(exc,ValueError) and re.fullmatch('[A-Z][A-Z0-9_]{1,119}',str(exc)) else 'PRIVATE_IO_SCHEMA_OR_LEASE_FAILURE',
-                              hold_preserved=True,orders=0,trading_authority='NONE')),flush=True)
+                              hold_preserved=True,orders=0,trading_authority='NONE',
+                              **({'preflight':exc.preflight} if isinstance(exc,HostPreflightBlocked) else {}))),flush=True)
         raise SystemExit(2)

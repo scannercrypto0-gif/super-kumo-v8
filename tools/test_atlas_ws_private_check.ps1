@@ -27,6 +27,8 @@ if mode=='malformed':
  print('PRIVATE_HOST_PATH_OR_SECRET');print('PRIVATE_STDERR_SECRET',file=sys.stderr);sys.exit(7)
 if mode=='invalid_reason':
  print(json.dumps(dict(status='WS_OPERATOR_BLOCKED',reason='PRIVATE_SECRET: C:/host')));sys.exit(2)
+if mode=='preflight':
+ print(json.dumps(dict(status='WS_OPERATOR_BLOCKED',reason='OWNER_HOST_PREFLIGHT_BLOCKED',preflight=dict(blockers=['TASK_NOT_QUIESCENT_READY'],retryable_scheduler_only=True))));sys.exit(2)
 if mode=='diagnose':
  if hashlib.sha256(x['xml'].encode('utf-8')).hexdigest()!=x['expected']:
   print(json.dumps(dict(status='WS_OPERATOR_BLOCKED',reason='TASK_XML_CONTENT_PIN_MISMATCH')));sys.exit(2)
@@ -55,6 +57,8 @@ try {
     Write-Output ('SYNTHETIC_UTF8_INPUT_PREFIX '+$ok.input_prefix)
     Refused 'authorize' 'RUNTIME_PIN_MISMATCH'
     Assert ($script:privateFailure.child_exit_code -eq 2 -and $script:privateFailure.reason -ceq 'RUNTIME_PIN_MISMATCH') 'CHILD_FAILURE_CONTEXT_LOST'
+    Refused 'preflight' 'OWNER_HOST_PREFLIGHT_BLOCKED'
+    Assert ($script:privateFailure.preflight.blockers[0] -ceq 'TASK_NOT_QUIESCENT_READY') 'PREFLIGHT_DETAILS_LOST'
     Refused 'malformed' 'PRIVATE_HELPER_UNSTRUCTURED_FAILURE'
     Refused 'invalid_reason' 'PRIVATE_HELPER_UNSTRUCTURED_FAILURE'
     Refused 'sleep' 'PRIVATE_HELPER_TIMEOUT' 1000

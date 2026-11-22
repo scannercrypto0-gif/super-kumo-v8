@@ -450,3 +450,20 @@ def test_fresh_ping_rollout_preserves_prior_grant_and_existing_policy(host,monke
 
     assert module.reserve(ledger,host['now']+1,SLOT)>0
     with closing(sqlite3.connect(ledger)) as db:assert db.execute("SELECT count(*) FROM events WHERE kind='OUTCOME'").fetchone()[0]==4
+
+@pytest.mark.parametrize('blockers,enabled,collectors,locked,retryable',[
+    (['TASK_NOT_QUIESCENT_READY'],True,0,True,True),
+    (['TASK_NOT_QUIESCENT_READY'],False,0,True,False),
+    (['TASK_NOT_QUIESCENT_READY','QUOTA_NOT_READY'],True,0,True,False),
+    (['TASK_NOT_QUIESCENT_READY'],True,1,True,False),
+    (['UNKNOWN_BLOCKER'],True,0,True,False),
+])
+def test_preflight_failure_is_exact_sanitized_and_narrow(blockers,enabled,collectors,locked,retryable):
+    d=dict(blockers=blockers,task_state='Running',task_enabled=enabled,
+           collector_processes=collectors,supervisor_lock_available=locked,
+           task_xml='PRIVATE_SECRET',root='PRIVATE_HOST_PATH')
+    error=op.HostPreflightBlocked(d)
+    assert str(error)=='OWNER_HOST_PREFLIGHT_BLOCKED'
+    assert error.preflight['blockers']==blockers
+    assert error.preflight['retryable_scheduler_only'] is retryable
+    assert 'PRIVATE' not in json.dumps(error.preflight)

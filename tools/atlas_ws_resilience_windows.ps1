@@ -118,13 +118,16 @@ function Invoke-PrivateCheck([string]$mode,$snapshot,[ValidateRange(100,30000)][
         if($count -ge $outputChars.Length -or $errorCount -ge $errorChars.Length){throw 'PRIVATE_HELPER_RESPONSE_BOUND'}
         $output=[string]::new($outputChars,0,$count)
         $privateError=[string]::new($errorChars,0,$errorCount)
-        $script:privateFailure=[ordered]@{phase='PRIVATE_HELPER';child_exit_code=$process.ExitCode;
+        $script:privateFailure=[ordered]@{phase=('PRIVATE_HELPER_'+$mode.ToUpperInvariant());child_exit_code=$process.ExitCode;
             stdout_sha256=(Hash-Text $output);stderr_sha256=(Hash-Text $privateError)}
         try {$response=$output|ConvertFrom-Json -ErrorAction Stop} catch {throw 'PRIVATE_HELPER_UNSTRUCTURED_FAILURE'}
         if($process.ExitCode -ne 0){
             if($response.status -ceq 'WS_OPERATOR_BLOCKED' -and
                 $response.reason -cmatch '^[A-Z][A-Z0-9_]{1,119}$'){
                 $script:privateFailure.reason=$response.reason
+                if($response.reason -ceq 'OWNER_HOST_PREFLIGHT_BLOCKED' -and $response.preflight){
+                    $script:privateFailure['preflight']=$response.preflight
+                }
                 throw [string]$response.reason
             }
             throw 'PRIVATE_HELPER_UNSTRUCTURED_FAILURE'
@@ -141,6 +144,32 @@ function Invoke-PrivateCheck([string]$mode,$snapshot,[ValidateRange(100,30000)][
             $process.Dispose()
         }
     }
+}
+function Get-AuthorizedApplySnapshot([string]$Root,[int]$WaitSeconds=180){
+    $deadline=[DateTimeOffset]::UtcNow.AddSeconds($WaitSeconds)
+    do{
+        $script:lock=$null
+        try{$script:lock=[IO.File]::Open((Join-Path $Root 'supervisor.lock'),'Open','ReadWrite','None')}
+        catch [IO.IOException]{
+            if(!(Test-Path -LiteralPath (Join-Path $Root 'supervisor.lock')) -or [DateTimeOffset]::UtcNow -ge $deadline){throw 'SUPERVISOR_LOCK_UNAVAILABLE'}
+            Start-Sleep -Milliseconds 500
+            continue
+        }
+        try{
+            $current=Get-UniqueTask
+            $currentSnapshot=Snapshot $current $true
+            # Authorization and every preflight predicate are checked while the
+            # same exclusive supervisor lock remains held through COMMIT.
+            $null=Invoke-PrivateCheck 'authorize' $currentSnapshot
+            return $currentSnapshot
+        }catch{
+            $retry=($_.Exception.Message -ceq 'OWNER_HOST_PREFLIGHT_BLOCKED' -and
+                $script:privateFailure.preflight.retryable_scheduler_only -eq $true)
+            $script:lock.Dispose();$script:lock=$null
+            if(!$retry -or [DateTimeOffset]::UtcNow -ge $deadline){throw}
+            Start-Sleep -Milliseconds 500
+        }
+    }while($true)
 }
 function Qualified-Clock {
     # Existing supervisor's bounded clock qualification, only after separate consent.
@@ -181,13 +210,11 @@ try {
         return
     }
     if(-not $AuthorizationFile){throw 'SEPARATE_OWNER_AUTHORIZATION_REQUIRED'}
-    # Confirm scope/identity/expiry BEFORE any clock/network probe or write.
-    $null=Invoke-PrivateCheck 'authorize' $snapshot
+    # Acquire once, then authorize the exact locked snapshot. Do not authorize
+    # a transient unlocked scheduler state and only acquire the lock afterward.
     $root=$snapshot.root
-    $lock=[IO.File]::Open((Join-Path $root 'supervisor.lock'),'Open','ReadWrite','None')
+    $snapshot=Get-AuthorizedApplySnapshot $root
     $task=Get-UniqueTask
-    $snapshot=Snapshot $task $true
-    $null=Invoke-PrivateCheck 'authorize' $snapshot
     $snapshot.clock=Qualified-Clock
     $oldAction=$task.Actions[0]
     $psi=[Diagnostics.ProcessStartInfo]::new()
@@ -205,6 +232,10 @@ try {
     $gateInput.WriteLine(($snapshot|ConvertTo-Json -Depth 30 -Compress))
     $gateInput.Flush()
     $ready=(Read-GateLine)|ConvertFrom-Json
+    if($ready.status -ceq 'WS_OPERATOR_BLOCKED' -and $ready.reason -cmatch '^[A-Z][A-Z0-9_]{1,119}$'){
+        $script:privateFailure=@{phase='PRIVATE_GATE_PREFLIGHT';reason=$ready.reason;preflight=$ready.preflight}
+        throw [string]$ready.reason
+    }
     if($ready.status -cne 'STAGED_AWAITING_TASK_PIN' -or $ready.config_sha256 -cnotmatch '^[a-f0-9]{64}$'){throw 'PRIVATE_GATE_PREFLIGHT_FAILED'}
     $gateReady=$true
     $current=Get-UniqueTask
@@ -242,7 +273,7 @@ try {
     $reason=$_.Exception.Message
     if($reason -cnotmatch '^[A-Z][A-Z0-9_]{1,119}$'){$reason='PRIVATE_IO_SCHEMA_OR_GATE_FAILURE'}
     [ordered]@{schema='atlas.ws.operator-result.v1';status='WS_OPERATOR_BLOCKED';reason=$reason;
-        hold_preserved=$true;task_started=$false;private_failure=$privateFailure;orders=0;trading_authority='NONE'} | ConvertTo-Json -Depth 5 -Compress
+        hold_preserved=$true;task_started=$false;private_failure=$privateFailure;orders=0;trading_authority='NONE'} | ConvertTo-Json -Depth 10 -Compress
     exit 2
 } finally {
     if($gate){

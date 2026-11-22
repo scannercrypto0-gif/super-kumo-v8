@@ -89,8 +89,18 @@ if($Mode -ceq 'ActivateAndObserve' -or $Mode -ceq 'ApplyPingCorrectionAndObserve
     if($Mode -ceq 'ApplyPingCorrectionAndObserve'){$permit['fresh_ping_correction']=$true;$permit['expected_previous_config_sha256']=$d.identity.config_sha256}
     $file=Join-Path ([IO.Path]::GetTempPath()) ('atlas-continuous-permit-'+[guid]::NewGuid().ToString('N')+'.json')
     Write-NewJson $file $permit
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -ExpectedCommit $ExpectedCommit -Mode Apply -AuthorizationFile $file
-    if($LASTEXITCODE){throw 'CONTINUOUS_DEPLOYMENT_BLOCKED'}
+    $applyRaw=@(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -ExpectedCommit $ExpectedCommit -Mode Apply -AuthorizationFile $file)
+    $applyExit=$LASTEXITCODE
+    $applyRaw|Write-Output
+    if($applyExit){
+        $outputDir=Join-Path $repo 'owner-results'
+        New-Item -ItemType Directory -Force -Path $outputDir|Out-Null
+        $blockedFile=Join-Path $outputDir ('ws-apply-blocked-'+[guid]::NewGuid().ToString('N')+'.json')
+        $failure=($applyRaw -join "`n")|ConvertFrom-Json
+        Write-NewJson $blockedFile $failure
+        Write-Output ('REPORT_FILE='+$blockedFile)
+        throw 'CONTINUOUS_DEPLOYMENT_BLOCKED_SEE_SAVED_RECEIPT'
+    }
 }
 if($Mode -ceq 'RepairPermitAndObserve'){
     if(!$OwnerDecisionRef){throw 'EXPLICIT_REPAIR_OWNER_DECISION_REQUIRED'}
