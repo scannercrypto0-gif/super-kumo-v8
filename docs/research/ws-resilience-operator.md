@@ -16,10 +16,12 @@ read or modify the separate active E: warehouse backfill, its locks or task.
 After the engineering candidate has passed CI, substitute its exact 40-hex SHA:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\dell\Desktop\ATLAS-Quant-Lab\tools\atlas_ws_resilience_windows.ps1" -ExpectedCommit "<EXACT_REVIEWED_COMMIT>" -Mode Diagnose
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\dell\Desktop\ATLAS-WS-Resilience-20261122\tools\atlas_ws_resilience_windows.ps1" -ExpectedCommit "<EXACT_REVIEWED_COMMIT>" -Mode Diagnose
 ```
 
-The working checkout must already be that SHA with tracked, unmodified package
+Use an isolated detached Git worktree at `C:\Users\dell\Desktop\ATLAS-WS-Resilience-20261122`; prepare it with `git worktree add --detach` from the existing repository after fetching the candidate. Never switch or modify the active historical backfill checkout.
+
+The isolated working checkout must already be that SHA with tracked, unmodified package
 and candidate runtime files. `Diagnose` is read-only: no market calls, clock
 probe, state creation, task edits, HOLD archival or collector process. It reads
 the existing uniquely identified task, current task action/config pin, all
@@ -68,7 +70,7 @@ create-once by the SHA256 of the actual private file bytes.
 The **single deployment invocation**, only after that separate decision, is:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\dell\Desktop\ATLAS-Quant-Lab\tools\atlas_ws_resilience_windows.ps1" -ExpectedCommit "<EXACT_REVIEWED_COMMIT>" -Mode Apply -AuthorizationFile "<owner-private-permit.json>"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\dell\Desktop\ATLAS-WS-Resilience-20261122\tools\atlas_ws_resilience_windows.ps1" -ExpectedCommit "<EXACT_REVIEWED_COMMIT>" -Mode Apply -AuthorizationFile "<owner-private-permit.json>"
 ```
 
 The wrapper verifies authorization before the bounded 4-sample clock probe.

@@ -1,4 +1,5 @@
 """No host, scheduler, subprocess collector or network execution in these tests."""
+from contextlib import closing
 from io import StringIO
 import json
 from pathlib import Path
@@ -30,7 +31,7 @@ def host(tmp_path,monkeypatch):
     (root/'reset-recovery.claimed').write_bytes(b'{"claim":"prior automatic successor"}')
     (root/'activation.json').write_bytes(op.canonical(dict(config_sha256=op.digest(config.read_bytes()))))
     q=root/'segments'/str(SLOT)/'quota.sqlite';q.parent.mkdir(parents=True)
-    with sqlite3.connect(q) as db:
+    with closing(sqlite3.connect(q)) as db, db:
         db.execute('CREATE TABLE quota_config(id INTEGER PRIMARY KEY,limits TEXT)')
         db.execute('INSERT INTO quota_config VALUES(1,?)',(op.LIMITS,))
         db.execute('CREATE TABLE state(key TEXT PRIMARY KEY,value INTEGER)')
@@ -110,9 +111,9 @@ def test_runtime_or_hold_tamper_is_rejected(host):
 
 def test_quota_ban_and_policy_drift_block(host):
     q=host['root']/'segments'/str(SLOT)/'quota.sqlite'
-    with sqlite3.connect(q) as db:db.execute("INSERT INTO state VALUES('ban',1)")
+    with closing(sqlite3.connect(q)) as db, db:db.execute("INSERT INTO state VALUES('ban',1)")
     assert diagnostic(host)['quota']['ban'] and 'QUOTA_NOT_READY' in diagnostic(host)['blockers']
-    with sqlite3.connect(q) as db:db.execute("UPDATE quota_config SET limits='relaxed'")
+    with closing(sqlite3.connect(q)) as db, db:db.execute("UPDATE quota_config SET limits='relaxed'")
     assert diagnostic(host)['quota']['reason']=='QUOTA_POLICY_DRIFT'
     assert 'QUOTA_NOT_READY' in diagnostic(host)['blockers']
 

@@ -87,3 +87,6 @@ try {
     Assert ((Pin $hold) -ceq $before) 'HOLD_EVIDENCE_OVERWRITTEN'
     Write-Output 'WS_SUPERVISOR_OFFLINE_PASS'
 } finally {Remove-Item -LiteralPath $base -Recurse -Force}
+
+# Expected failing child-process checks leave LASTEXITCODE=1; this suite passed.
+exit 0
