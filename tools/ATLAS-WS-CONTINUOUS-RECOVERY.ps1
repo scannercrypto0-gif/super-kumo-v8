@@ -24,17 +24,52 @@ function Write-NewJson([string]$Path,$Value){
     $stream=[IO.File]::Open($Path,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
     try{$stream.Write($bytes,0,$bytes.Length);$stream.Flush($true)}finally{$stream.Dispose()}
 }
+function Test-FreshPingBaseline($Diagnostic){
+    $failures=@()
+    if($Diagnostic.identity.config_sha256 -cne '857bea957d1da3fa1ef1c01ace44a0bfda27f84c2750523184455936a48f2cf2'){$failures+='INSTALLED_CONFIG_PIN_MISMATCH'}
+    if($Diagnostic.hold_reason -cne 'LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN'){$failures+='HOLD_REASON_MISMATCH'}
+    if($Diagnostic.manifest_scope.verification_complete -ne $true){$failures+='RUNTIME_MANIFEST_NOT_VERIFIED'}
+    $blockers=@($Diagnostic.blockers | Where-Object {$null -ne $_ -and [string]$_ -ne ''})
+    $failures+=@($blockers)
+    # Only a scheduled supervisor briefly holding its lock is safe to wait out.
+    # Quota, collector, integrity, disabled task and unknown conditions stay terminal.
+    $transient=($failures.Count -gt 0 -and $Diagnostic.task_enabled -eq $true -and
+        $Diagnostic.collector_processes -eq 0 -and
+        @($failures | Where-Object {$_ -notin @('TASK_NOT_QUIESCENT_READY','SUPERVISOR_LOCK_UNPROVEN')}).Count -eq 0)
+    [pscustomobject]@{schema='atlas.ws.fresh-ping-baseline.v1';ready=($failures.Count -eq 0);
+        retryable=$transient;failures=@($failures);installed_config_sha256=$Diagnostic.identity.config_sha256;
+        hold_reason=$Diagnostic.hold_reason;manifest_verified=$Diagnostic.manifest_scope.verification_complete;
+        task_state=$Diagnostic.task_state;task_enabled=$Diagnostic.task_enabled;
+        collector_processes=$Diagnostic.collector_processes;supervisor_lock_available=$Diagnostic.supervisor_lock_available;
+        quota=$Diagnostic.quota;orders=0;trading_authority='NONE'}
+}
 $t=@(Get-ScheduledTask -TaskName $taskName)
 if($t.Count -ne 1 -or @($t[0].Actions).Count -ne 1){throw 'TASK_NOT_UNIQUE'}
 $config=Read-ConfigPath $t[0];$root=Split-Path -Parent $config
 if($Mode -ceq 'ActivateAndObserve' -or $Mode -ceq 'ApplyPingCorrectionAndObserve'){
     if(!$OwnerDecisionRef){throw 'EXPLICIT_CONTINUOUS_OWNER_DECISION_REQUIRED'}
     if($Mode -ceq 'ActivateAndObserve' -and (Test-Path -LiteralPath (Join-Path $root 'continuous-research.authorized.json'))){throw 'CONTINUOUS_ALREADY_ACTIVATED_USE_OBSERVE'}
-    $raw=@(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -ExpectedCommit $ExpectedCommit -Mode Diagnose)
-    if($LASTEXITCODE){$raw|Write-Output;throw 'CONTINUOUS_PREFLIGHT_BLOCKED'}
-    $d=($raw -join "`n")|ConvertFrom-Json
+    $baselineDeadline=[DateTimeOffset]::UtcNow.AddMinutes(3)
+    do{
+        $raw=@(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -ExpectedCommit $ExpectedCommit -Mode Diagnose)
+        if($LASTEXITCODE){$raw|Write-Output;throw 'CONTINUOUS_PREFLIGHT_BLOCKED'}
+        $d=($raw -join "`n")|ConvertFrom-Json
+        if($Mode -cne 'ApplyPingCorrectionAndObserve'){break}
+        $assessment=Test-FreshPingBaseline $d
+        if($assessment.ready){break}
+        $assessment|ConvertTo-Json -Depth 15 -Compress|Write-Output
+        if(!$assessment.retryable -or [DateTimeOffset]::UtcNow -ge $baselineDeadline){
+            $outputDir=Join-Path $repo 'owner-results'
+            New-Item -ItemType Directory -Force -Path $outputDir|Out-Null
+            $blockedFile=Join-Path $outputDir ('ws-baseline-blocked-'+[guid]::NewGuid().ToString('N')+'.json')
+            Write-NewJson $blockedFile $assessment
+            Write-Output ('REPORT_FILE='+$blockedFile)
+            throw ('FRESH_PING_BASELINE_BLOCKED:'+($assessment.failures -join ','))
+        }
+        Start-Sleep -Seconds 5
+    }while($true)
     if($Mode -ceq 'ApplyPingCorrectionAndObserve'){
-        if($d.identity.config_sha256 -cne '857bea957d1da3fa1ef1c01ace44a0bfda27f84c2750523184455936a48f2cf2' -or $d.hold_reason -cne 'LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN' -or @($d.blockers).Count -ne 0 -or !$d.manifest_scope.verification_complete){throw 'FRESH_PING_BASELINE_DRIFT'}
+        # Exact baseline was verified above; no host state was changed while waiting.
     }else{
     if($d.identity.config_sha256 -cne $ExpectedInstalledConfig -or $d.hold_slot_ms -ne 1795329900000L -or
         $d.hold_reason -cne 'PILOT_STOP_ConnectionResetError' -or @($d.blockers).Count -ne 0 -or

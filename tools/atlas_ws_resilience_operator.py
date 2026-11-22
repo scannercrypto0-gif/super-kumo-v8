@@ -240,7 +240,9 @@ def inspect(snapshot, repo, expected_commit, now):
         blockers.append('DISK_RESERVE_LOW')
     return dict(schema='atlas.ws.operator-diagnostic.v1', status='HELD_REQUIRES_SEPARATE_OWNER_AUTHORIZATION',
                 identity=identity, identity_sha256=digest(canonical(identity)), quota=quota,
-                task_state=snapshot.get('task_state'), hold_reason=hold['reason'],
+                task_state=snapshot.get('task_state'), task_enabled=snapshot.get('task_enabled'),
+                collector_processes=snapshot.get('collector_processes'),
+                supervisor_lock_available=snapshot.get('supervisor_lock_available'), hold_reason=hold['reason'],
                 hold_slot_ms=hold['slot_ms'], blockers=blockers, manifest_scope=manifest_scope, clock_probe='NOT_PERFORMED',
                 source_class='LIVE_CAPTURE', retention='SANITIZED_RECEIPTS_ONLY',
                 root_cause='ROOT_CAUSE_NOT_PROVEN', network_calls=0, writes=0,
