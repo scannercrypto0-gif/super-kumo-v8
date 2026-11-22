@@ -10,7 +10,7 @@ param(
 $ErrorActionPreference='Stop'
 $repo=Split-Path -Parent $PSScriptRoot
 $helper=Join-Path $PSScriptRoot 'atlas_ws_resilience_operator.py'
-$lock=$null; $gate=$null; $oldAction=$null; $taskChanged=$false; $commitSent=$false; $gateReady=$false
+$lock=$null; $gate=$null; $oldAction=$null; $taskChanged=$false; $commitSent=$false; $gateReady=$false; $privateFailure=$null
 function Hash-Text([string]$value) {
     $h=[Security.Cryptography.SHA256]::Create()
     try { return ([BitConverter]::ToString($h.ComputeHash([Text.Encoding]::UTF8.GetBytes($value)))).Replace('-','').ToLowerInvariant() }
@@ -72,15 +72,69 @@ function Snapshot($task,[bool]$locked) {
         collector_processes=$collectors.Count;supervisor_lock_available=$locked;
         operator_stop=(Test-Path -LiteralPath (Join-Path $root 'stop.request'))}
 }
-function Invoke-PrivateCheck([string]$mode,$snapshot) {
-    $argsList=@('-B',$helper,$mode,'--repo',$repo,'--expected-commit',$ExpectedCommit)
-    if($AuthorizationFile){$argsList+=@('--authorization',$AuthorizationFile)}
-    $result=@(($snapshot|ConvertTo-Json -Depth 30 -Compress) | & $snapshot.python @argsList)
-    if($LASTEXITCODE -ne 0){
-        if($result.Count){Write-Output $result[-1]}
-        throw 'PRIVATE_PREFLIGHT_FAILED'
+function Set-PrivateUtf8($info) {
+    # Windows PowerShell 5 pipelines default to ASCII. Use an explicit UTF-8
+    # pipe on both CLR generations, preserving task XML/config hash identity.
+    $utf8=[Text.UTF8Encoding]::new($false)
+    $info.StandardOutputEncoding=$utf8
+    $info.StandardErrorEncoding=$utf8
+    if($info.GetType().GetProperty('StandardInputEncoding')){$info.StandardInputEncoding=$utf8}
+    $info.EnvironmentVariables['PYTHONIOENCODING']='utf-8'
+    $info.EnvironmentVariables['PYTHONUTF8']='1'
+}
+function Invoke-PrivateCheck([string]$mode,$snapshot,[ValidateRange(100,30000)][int]$TimeoutMs=30000) {
+    $script:privateFailure=$null
+    $process=$null
+    $payload=$snapshot|ConvertTo-Json -Depth 30 -Compress
+    if([Text.Encoding]::UTF8.GetByteCount($payload) -gt 8388608){throw 'PRIVATE_SNAPSHOT_BOUND'}
+    if($helper.Contains('"') -or $repo.Contains('"') -or ($AuthorizationFile -and $AuthorizationFile.Contains('"'))){throw 'ARGUMENT_PATH_INVALID'}
+    $info=[Diagnostics.ProcessStartInfo]::new()
+    $info.FileName=$snapshot.python
+    $info.Arguments='-B "'+$helper+'" '+$mode+' --repo "'+$repo+'" --expected-commit '+$ExpectedCommit
+    if($AuthorizationFile){$info.Arguments+=' --authorization "'+$AuthorizationFile+'"'}
+    $info.UseShellExecute=$false;$info.CreateNoWindow=$true
+    $info.RedirectStandardInput=$true;$info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true
+    Set-PrivateUtf8 $info
+    try {
+        $process=[Diagnostics.Process]::new();$process.StartInfo=$info
+        if(-not $process.Start()){throw 'PRIVATE_HELPER_START_FAILED'}
+        # Read concurrently, with hard bounds; never forward private stderr.
+        $outputChars=New-Object char[] 2097153
+        $errorChars=New-Object char[] 65537
+        $stdout=$process.StandardOutput.ReadBlockAsync($outputChars,0,$outputChars.Length)
+        $stderr=$process.StandardError.ReadBlockAsync($errorChars,0,$errorChars.Length)
+        $write=$process.StandardInput.WriteLineAsync($payload)
+        if(-not $write.Wait($TimeoutMs)){throw 'PRIVATE_HELPER_INPUT_TIMEOUT'}
+        $process.StandardInput.Close()
+        if(-not $process.WaitForExit($TimeoutMs)){throw 'PRIVATE_HELPER_TIMEOUT'}
+        if(-not $stdout.Wait(5000) -or -not $stderr.Wait(5000)){throw 'PRIVATE_HELPER_DRAIN_TIMEOUT'}
+        $count=$stdout.Result;$errorCount=$stderr.Result
+        if($count -ge $outputChars.Length -or $errorCount -ge $errorChars.Length){throw 'PRIVATE_HELPER_RESPONSE_BOUND'}
+        $output=[string]::new($outputChars,0,$count)
+        $privateError=[string]::new($errorChars,0,$errorCount)
+        $script:privateFailure=[ordered]@{phase='PRIVATE_HELPER';child_exit_code=$process.ExitCode;
+            stdout_sha256=(Hash-Text $output);stderr_sha256=(Hash-Text $privateError)}
+        try {$response=$output|ConvertFrom-Json -ErrorAction Stop} catch {throw 'PRIVATE_HELPER_UNSTRUCTURED_FAILURE'}
+        if($process.ExitCode -ne 0){
+            if($response.status -ceq 'WS_OPERATOR_BLOCKED' -and
+                $response.reason -cmatch '^[A-Z][A-Z0-9_]{1,119}$'){
+                $script:privateFailure.reason=$response.reason
+                throw [string]$response.reason
+            }
+            throw 'PRIVATE_HELPER_UNSTRUCTURED_FAILURE'
+        }
+        if(($mode -ceq 'diagnose' -and ($response.schema -cne 'atlas.ws.operator-diagnostic.v1' -or
+            $response.identity_sha256 -cnotmatch '^[a-f0-9]{64}$')) -or
+           ($mode -ceq 'authorize' -and ($response.status -cne 'EXPLICIT_OWNER_AUTHORIZATION_VERIFIED' -or
+            $response.authorization_sha256 -cnotmatch '^[a-f0-9]{64}$'))){throw 'PRIVATE_HELPER_RESPONSE_SCHEMA'}
+        $script:privateFailure=$null
+        return $response
+    } finally {
+        if($process){
+            if(-not $process.HasExited){try {$process.Kill();$null=$process.WaitForExit(5000)}catch{}}
+            $process.Dispose()
+        }
     }
-    return ($result[-1]|ConvertFrom-Json)
 }
 function Qualified-Clock {
     # Existing supervisor's bounded clock qualification, only after separate consent.
@@ -137,6 +191,7 @@ try {
     $psi.Arguments='-B "'+$helper+'" gate --repo "'+$repo+'" --expected-commit '+$ExpectedCommit+' --authorization "'+$AuthorizationFile+'"'
     $psi.UseShellExecute=$false; $psi.CreateNoWindow=$true
     $psi.RedirectStandardInput=$true; $psi.RedirectStandardOutput=$true; $psi.RedirectStandardError=$true
+    Set-PrivateUtf8 $psi
     $gate=[Diagnostics.Process]::new();$gate.StartInfo=$psi
     if(-not $gate.Start()){throw 'PRIVATE_GATE_START_FAILED'}
     $gate.StandardInput.WriteLine(($snapshot|ConvertTo-Json -Depth 30 -Compress))
@@ -179,7 +234,7 @@ try {
     $reason=$_.Exception.Message
     if($reason -cnotmatch '^[A-Z][A-Z0-9_]{1,119}$'){$reason='PRIVATE_IO_SCHEMA_OR_GATE_FAILURE'}
     [ordered]@{schema='atlas.ws.operator-result.v1';status='WS_OPERATOR_BLOCKED';reason=$reason;
-        hold_preserved=$true;task_started=$false;orders=0;trading_authority='NONE'} | ConvertTo-Json -Compress
+        hold_preserved=$true;task_started=$false;private_failure=$privateFailure;orders=0;trading_authority='NONE'} | ConvertTo-Json -Depth 5 -Compress
     exit 2
 } finally {
     if($gate){

@@ -141,3 +141,27 @@ scope, banned/unknown quotas, zero-write diagnostics, byte-preserving rollback,
 crash-before-ACK, one-use operator claims and competing collector lease. Windows
 CI parses the entire PowerShell wrapper. No original owner-host deployment,
 source collection, real reconnection, sustained capture or trading is asserted.
+
+
+## Diagnostic wire correction after the first owner invocation
+
+The owner's first Diagnose at58aef4e created the isolated code worktree, then
+returned WS_OPERATOR_BLOCKED / PRIVATE_PREFLIGHT_FAILED, HOLD preserved and no
+task started. The wrapper discarded the structured helper's actual refusal
+while its output was inside a PowerShell pipeline. That masking defect is
+reproduced and fixed; the underlying private-host prerequisite remains UNKNOWN
+until the corrected diagnostic is returned. No safety condition is relaxed.
+
+The corrected wrapper uses an explicit UTF-8 redirected subprocess pipe (also
+for the separately authorized gate), preserving task XML/config identity when
+Windows PowerShell5's normal native pipeline would otherwise use ASCII.
+UTF-8 correctness is an independently reproduced wire problem, not a claim
+that it caused this particular owner refusal. Structured uppercase helper
+reason codes propagate exactly, with bounded exit/phase/hash metadata. Private
+stdout extras and stderr are never forwarded; malformed output remains a
+sanitized block. Concurrent bounded readers and input/exit deadlines prevent
+pipe deadlocks. Regression executes actual subprocesses on Windows PowerShell5
+and PowerShell7/Ubuntu, including Unicode hash roundtrip, a specific refusal,
+unstructured/secret-bearing errors and timeout. The revised one-line handoff
+fast-forwards only the isolated WS worktree; it never changes the active
+historical checkout or installed service, and remains Diagnose-only.
