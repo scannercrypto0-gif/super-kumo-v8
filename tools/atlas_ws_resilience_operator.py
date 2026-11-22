@@ -111,7 +111,7 @@ def quota_view(path, now):
 def verify_repo(repo, expected_commit):
     head = subprocess.check_output(['git', '-C', str(repo), 'rev-parse', 'HEAD'], text=True).strip()
     need(head == expected_commit, 'CANDIDATE_COMMIT_MISMATCH')
-    protected = (*CANDIDATES, 'tools/atlas_ws_resilience_operator.py', 'tools/atlas_ws_resilience_windows.ps1', 'tools/ATLAS-WS-CONTINUOUS-RECOVERY.ps1')
+    protected = (*CANDIDATES, 'tools/atlas_ws_resilience_operator.py', 'tools/atlas_ws_resilience_windows.ps1', 'tools/ATLAS-WS-CONTINUOUS-RECOVERY.ps1','tools/atlas_ws_permit_repair.py')
     for rel in protected:
         subprocess.run(['git', '-C', str(repo), 'ls-files', '--error-unmatch', rel],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
@@ -256,7 +256,7 @@ def continuity_pin():
 
 
 def authorize(path, diagnostic, now, *, action='DEPLOY_ONE_RECOVERY'):
-    raw = read(path, 65536); auth = load(path)
+    raw = read(path, 65536); auth = json.loads(raw.decode('utf-8-sig'), object_pairs_hook=pairs)
     need(auth.get('schema') == SCHEMA and auth.get('action') == action, 'OWNER_AUTHORIZATION_SCOPE')
     need(auth.get('identity_sha256') == diagnostic['identity_sha256'] and
          auth.get('candidate_commit') == diagnostic['identity']['candidate_commit'] and
@@ -310,6 +310,8 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
     """PS holds supervisor.lock. A dead gate leaves marker/HOLD and backup intact."""
     diagnostic = inspect(snapshot, repo, commit, now)
     auth, authpin = authorize(authorization_path, diagnostic, now)
+    auth_raw=read(authorization_path,65536)
+    need(digest(auth_raw)==authpin,'OWNER_AUTHORIZATION_BYTES_CHANGED')
     root = Path(snapshot['root']).absolute(); cfgpath = Path(snapshot['config_path']).absolute()
     cfg = load(cfgpath); tree = Path(cfg['tree']).absolute()
     clock = snapshot.get('clock', {})
@@ -322,7 +324,7 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
          and not (root/'continuous-research.authorized.json').exists(), 'OPERATOR_STAGE_ALREADY_PRESENT')
     with collector_lease(root):
         safe(root/'operator-authorizations', exists=False).mkdir(exist_ok=True)
-        durable(root/'operator-authorizations'/f'{authpin}.claimed', canonical(auth), create=True)
+        durable(root/'operator-authorizations'/f'{authpin}.claimed', auth_raw, create=True)
         backup = root/('ws-recovery-backup-'+uuid.uuid4().hex)
         backup.mkdir()
         durable(marker, canonical(dict(authorization_sha256=authpin, backup=str(backup))), create=True)

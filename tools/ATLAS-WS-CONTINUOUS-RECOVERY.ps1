@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{40}$')][string]$ExpectedCommit,
-    [ValidateSet('ActivateAndObserve','Observe')][string]$Mode='ActivateAndObserve',
+    [ValidateSet('ActivateAndObserve','Observe','RepairPermitAndObserve')][string]$Mode='ActivateAndObserve',
     [string]$OwnerDecisionRef,
     [ValidateRange(6,48)][int]$ObserveHours=24,
     [string]$ExpectedInstalledConfig='34bbaa0d7a419d4a45731b03d103753cff6428e22e11003fb3bc433a0d504dd9'
@@ -51,6 +51,19 @@ if($Mode -ceq 'ActivateAndObserve'){
     Write-NewJson $file $permit
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -ExpectedCommit $ExpectedCommit -Mode Apply -AuthorizationFile $file
     if($LASTEXITCODE){throw 'CONTINUOUS_DEPLOYMENT_BLOCKED'}
+}
+if($Mode -ceq 'RepairPermitAndObserve'){
+    if(!$OwnerDecisionRef){throw 'EXPLICIT_REPAIR_OWNER_DECISION_REQUIRED'}
+    $repair=Join-Path $PSScriptRoot 'atlas_ws_permit_repair.py'
+    & git -C $repo diff --quiet HEAD -- $repair
+    if($LASTEXITCODE){throw 'REPAIR_CODE_DRIFT'}
+    $cfg=Get-Content -LiteralPath $config -Raw|ConvertFrom-Json
+    $lock=$null
+    try{
+        $lock=[IO.File]::Open((Join-Path $root 'supervisor.lock'),'Open','ReadWrite','None')
+        & $cfg.python -B $repair --config $config --expected-commit $ExpectedCommit --permit-dir ([IO.Path]::GetTempPath()) --owner-ref $OwnerDecisionRef
+        if($LASTEXITCODE){throw 'ORIGINAL_PERMIT_REPAIR_BLOCKED'}
+    }finally{if($lock){$lock.Dispose()}}
 }
 $cfg=Get-Content -LiteralPath $config -Raw|ConvertFrom-Json
 $configPin=(Get-FileHash -LiteralPath $config -Algorithm SHA256).Hash.ToLowerInvariant()

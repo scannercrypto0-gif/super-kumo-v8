@@ -397,3 +397,19 @@ def test_continuous_rejected_precommit_rolls_back_without_new_authority(host):
     op.gate(host['snapshot'],host['repo'],COMMIT,permit,host['now'],StringIO('ROLLBACK\n'),StringIO())
     assert bytes_inventory(host['tree'])==old and claim.read_bytes()==b'original claim'
     assert not (host['root']/'continuous-research.authorized.json').exists()
+
+
+def test_claim_preserves_exact_noncanonical_powershell_authorization_bytes(host):
+    permit=authorization(host,continuous_research=True,continuity_policy_sha256=op.continuity_pin(),allow_explicit_missing_intervals=True)
+    a=op.load(permit)
+    a['owner_decision_ref']='owner-approved-تصريح'
+    raw=json.dumps(a,indent=2,ensure_ascii=False).encode('utf-8')
+    assert raw!=op.canonical(a)
+    permit.write_bytes(raw)
+    out=StringIO();op.gate(host['snapshot'],host['repo'],COMMIT,permit,host['now'],StringIO('COMMIT\n'),out)
+    result=json.loads(out.getvalue().splitlines()[-1])
+    claimed=host['root']/'operator-authorizations'/(result['authorization_sha256']+'.claimed')
+    assert claimed.read_bytes()==raw
+    assert op.digest(claimed.read_bytes())==result['authorization_sha256']
+    from tools.atlas_ws_continuity import authority
+    assert authority(host['root'],result['config_sha256'])
