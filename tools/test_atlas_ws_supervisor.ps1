@@ -2,7 +2,7 @@
 $ErrorActionPreference='Stop'
 $source=Join-Path $PSScriptRoot 'atlas_live_research_service_windows.ps1'
 $ast=[System.Management.Automation.Language.Parser]::ParseFile($source,[ref]$null,[ref]$null)
-foreach($name in @('Test-ResetRecovery','Test-OperatorResume','Claim-OperatorResume','Save-ServiceHold')) {
+foreach($name in @('Test-ResetRecovery','Test-ContinuousFault','Test-ContinuousRecovery','Archive-OperatorClaim','Test-OperatorResume','Claim-OperatorResume','Save-ServiceHold')) {
     $node=$ast.Find({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true)
     if (!$node) {throw "MISSING_HELPER_$name"}
     . ([scriptblock]::Create($node.Extent.Text))
@@ -85,6 +85,28 @@ try {
     # Existing HOLD cannot be overwritten by a new rejected request/error receipt.
     $before=Pin $hold;Save-ServiceHold 'LIVE_SERVICE_OPERATOR_TICKET_SCOPE' 0
     Assert ((Pin $hold) -ceq $before) 'HOLD_EVIDENCE_OVERWRITTEN'
+    New-Case 'continuous-transient'
+    $health=Join-Path $root 'health.jsonl'
+    $transient=@{status='TRANSPORT_INTERRUPTED';error='TimeoutError';retry_eligible=$true;is_transport_fault=$true;
+        fault_stage='FRAME_READ';receive_phase='FRAME_BOUNDARY';fault_class='FRAME_BOUNDARY_TRANSIENT'}
+    $events=@(@{status='CONNECTING';attempt=1},$transient,@{status='CONNECTING';attempt=2},$transient,@{status='STOPPED_ERROR';error='TimeoutError'})
+    $events | ForEach-Object {$_|ConvertTo-Json -Compress} | Set-Content $health
+    Assert (Test-ContinuousRecovery $health 'PILOT_STOP_TimeoutError') 'CONTINUOUS_TRANSIENT_REJECTED'
+    $events[3]=$transient.Clone();$events[3].receive_phase='FRAME_PAYLOAD'
+    $events | ForEach-Object {$_|ConvertTo-Json -Compress} | Set-Content $health
+    Assert (!(Test-ContinuousRecovery $health 'PILOT_STOP_TimeoutError')) 'CONTINUOUS_PARTIAL_ALLOWED'
+    $events[3]=$transient.Clone();$events[3].retry_eligible='true'
+    $events | ForEach-Object {$_|ConvertTo-Json -Compress} | Set-Content $health
+    Assert (!(Test-ContinuousRecovery $health 'PILOT_STOP_TimeoutError')) 'CONTINUOUS_BOOLEAN_SCOPE'
+    $events=@(@{status='FAULT_CLASSIFIED';fault_stage='CLOCK_GUARD'},@{status='STOPPED_ERROR';error='FINALIZED_SOURCE_GAP'})
+    $events | ForEach-Object {$_|ConvertTo-Json -Compress} | Set-Content $health
+    Assert (Test-ContinuousRecovery $health 'PILOT_STOP_FINALIZED_SOURCE_GAP') 'CONTINUOUS_EXPLICIT_GAP_REJECTED'
+    Assert (!(Test-ContinuousRecovery $health 'PILOT_STOP_CLOCK_STEP')) 'CONTINUOUS_CLOCK_GUARD_BYPASSED'
+    $script:operatorActive=Join-Path $root 'operator-recovery.active.json'
+    'original' | Set-Content $operatorActive
+    Archive-OperatorClaim
+    Assert (!(Test-Path $operatorActive)) 'CONTINUOUS_CLAIM_NOT_ARCHIVED'
+    Assert (@(Get-ChildItem $root -Filter 'operator-recovery.completed-*.json').Count -eq 1) 'CONTINUOUS_CLAIM_LOST'
     Write-Output 'WS_SUPERVISOR_OFFLINE_PASS'
 } finally {Remove-Item -LiteralPath $base -Recurse -Force}
 

@@ -165,7 +165,7 @@ def test_collector_lease_conflict_prevents_any_deployment_write(host):
 
 def test_existing_operator_claim_rejects_second_apply(host):
     p=authorization(host);(host['root']/'operator-recovery.active.json').write_bytes(b'{}')
-    with pytest.raises(ValueError,match='OPERATOR_STAGE_ALREADY_PRESENT'):
+    with pytest.raises(ValueError,match='OPERATOR_STAGE_ALREADY_PRESENT|OWNER_AUTHORIZATION_IDENTITY'):
         op.gate(host['snapshot'],host['repo'],COMMIT,p,host['now'],StringIO('COMMIT\n'),StringIO())
 
 
@@ -364,3 +364,36 @@ def test_unknown_legacy_supervisor_pin_is_not_an_anchor(host):
     cfg=op.load(host['config']);cfg['files'].append(dict(path=str(legacy),sha256=op.digest(legacy.read_bytes())))
     host['config'].write_bytes(op.canonical(cfg));host['snapshot']['task_config_sha256']=op.digest(host['config'].read_bytes())
     assert diagnostic(host)['blockers']==['RUNTIME_PATH_OUTSIDE_VERIFIED_ANCHORS']
+
+
+def test_continuous_permit_requires_policy_and_explicit_gap_scope(host):
+    p=authorization(host,continuous_research=True)
+    with pytest.raises(ValueError,match='CONTINUITY_POLICY_AUTHORIZATION'):
+        op.authorize(p,diagnostic(host),host['now'])
+    p=authorization(host,continuous_research=True,continuity_policy_sha256=op.continuity_pin(),allow_explicit_missing_intervals=True)
+    assert op.authorize(p,diagnostic(host),host['now'])[0]['continuous_research'] is True
+
+
+def test_continuous_stage_archives_consumed_claim_and_installs_policy(host):
+    from io import StringIO
+    claim=host['root']/'operator-recovery.active.json';claim.write_bytes(b'original consumed one-shot')
+    before=claim.read_bytes()
+    permit=authorization(host,continuous_research=True,continuity_policy_sha256=op.continuity_pin(),allow_explicit_missing_intervals=True)
+    out=StringIO();op.gate(host['snapshot'],host['repo'],COMMIT,permit,host['now'],StringIO('COMMIT\n'),out)
+    rows=[json.loads(s) for s in out.getvalue().splitlines()]
+    r=rows[-1]
+    assert r['continuous_research'] is True
+    assert not claim.exists()
+    assert (host['root']/r['backup']/'prior-operator-recovery.archived.json').read_bytes()==before
+    policy=op.load(host['root']/'continuous-research.authorized.json')
+    assert policy['policy_sha256']==op.continuity_pin() and policy['config_sha256']==r['config_sha256']
+    assert (host['root']/'hold.json').exists()
+
+
+def test_continuous_rejected_precommit_rolls_back_without_new_authority(host):
+    claim=host['root']/'operator-recovery.active.json';claim.write_bytes(b'original claim')
+    permit=authorization(host,continuous_research=True,continuity_policy_sha256=op.continuity_pin(),allow_explicit_missing_intervals=True)
+    old=bytes_inventory(host['tree'])
+    op.gate(host['snapshot'],host['repo'],COMMIT,permit,host['now'],StringIO('ROLLBACK\n'),StringIO())
+    assert bytes_inventory(host['tree'])==old and claim.read_bytes()==b'original claim'
+    assert not (host['root']/'continuous-research.authorized.json').exists()

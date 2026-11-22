@@ -23,7 +23,7 @@ import uuid
 SCHEMA = 'atlas.ws.operator-authorization.v1'
 MAX_JSON = 8 * 1024 * 1024
 CANDIDATES = ('tools/atlas_live_research_cycle.py', 'tools/atlas_ws_receive_diagnostics.py',
-              'tools/atlas_live_research_service_windows.ps1')
+              'tools/atlas_live_research_service_windows.ps1', 'tools/atlas_ws_continuity.py')
 TASK = 'ATLAS-Research-Sustained-Spot-WS'
 LIMITS = 'Limits(rest_weight=2, raw_requests=61000, connections=4, ws_messages=5, subscriptions=1024)'
 HEX = re.compile(r'[0-9a-f]{64}')
@@ -111,7 +111,7 @@ def quota_view(path, now):
 def verify_repo(repo, expected_commit):
     head = subprocess.check_output(['git', '-C', str(repo), 'rev-parse', 'HEAD'], text=True).strip()
     need(head == expected_commit, 'CANDIDATE_COMMIT_MISMATCH')
-    protected = (*CANDIDATES, 'tools/atlas_ws_resilience_operator.py', 'tools/atlas_ws_resilience_windows.ps1')
+    protected = (*CANDIDATES, 'tools/atlas_ws_resilience_operator.py', 'tools/atlas_ws_resilience_windows.ps1', 'tools/ATLAS-WS-CONTINUOUS-RECOVERY.ps1')
     for rel in protected:
         subprocess.run(['git', '-C', str(repo), 'ls-files', '--error-unmatch', rel],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
@@ -212,6 +212,8 @@ def inspect(snapshot, repo, expected_commit, now):
                     hold_sha256=optional_pin(root/'hold.json'),
                     claimed_sha256=optional_pin(root/'reset-recovery.claimed'),
                     pending_sha256=optional_pin(root/'reset-recovery.pending'),
+                    operator_claim_sha256=optional_pin(root/'operator-recovery.active.json'),
+                    continuous_authority_sha256=optional_pin(root/'continuous-research.authorized.json'),
                     activation_sha256=optional_pin(root/'activation.json'),
                     source_rights_sha256=digest(canonical(rights)), candidate_commit=expected_commit,
                     candidates=candidates)
@@ -245,6 +247,14 @@ def inspect(snapshot, repo, expected_commit, now):
                 orders=0, trading_authority='NONE', real_pit_oos='BLOCKED')
 
 
+def continuity_pin():
+    # This helper is also launched by filename from an unrelated owner CWD.
+    import importlib.util
+    spec=importlib.util.spec_from_file_location('atlas_reviewed_continuity',Path(__file__).with_name('atlas_ws_continuity.py'))
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module.PIN
+
+
 def authorize(path, diagnostic, now, *, action='DEPLOY_ONE_RECOVERY'):
     raw = read(path, 65536); auth = load(path)
     need(auth.get('schema') == SCHEMA and auth.get('action') == action, 'OWNER_AUTHORIZATION_SCOPE')
@@ -260,6 +270,12 @@ def authorize(path, diagnostic, now, *, action='DEPLOY_ONE_RECOVERY'):
          auth.get('allow_task_action_pin_update') is True and auth.get('allow_clock_probe') is True and
          auth.get('existing_pilot_quota_only') is True and type(auth.get('owner_decision_ref')) is str and
          auth['owner_decision_ref'].strip(), 'OWNER_AUTHORIZATION_SCOPE')
+    if auth.get('continuous_research') is True:
+        PIN=continuity_pin()
+        need(auth.get('continuity_policy_sha256')==PIN and auth.get('allow_explicit_missing_intervals') is True,
+             'CONTINUITY_POLICY_AUTHORIZATION')
+    else:
+        need(auth.get('continuous_research') in (None,False),'CONTINUITY_POLICY_AUTHORIZATION')
     need(not diagnostic['blockers'], 'OWNER_HOST_PREFLIGHT_BLOCKED')
     return auth, digest(raw)
 
@@ -300,8 +316,10 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
     need(type(clock.get('checked_ms')) is int and 0 <= now-clock['checked_ms'] <= 60000 and
          type(clock.get('uncertainty_ms')) is int and 0 <= clock['uncertainty_ms'] <= 250, 'HOST_CLOCK_QUALIFICATION')
     marker = root/'operator-deployment.in-progress'
+    continuous = auth.get('continuous_research') is True
     need(not marker.exists() and not (root/'operator-resume.authorized.json').exists()
-         and not (root/'operator-recovery.active.json').exists(), 'OPERATOR_STAGE_ALREADY_PRESENT')
+         and (continuous or not (root/'operator-recovery.active.json').exists())
+         and not (root/'continuous-research.authorized.json').exists(), 'OPERATOR_STAGE_ALREADY_PRESENT')
     with collector_lease(root):
         safe(root/'operator-authorizations', exists=False).mkdir(exist_ok=True)
         durable(root/'operator-authorizations'/f'{authpin}.claimed', canonical(auth), create=True)
@@ -327,7 +345,7 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
         durable(backup/'config.json', original_config, create=True)
         durable(backup/'task.xml', snapshot['task_xml'].encode('utf-8'), create=True)
         durable(backup/'task-action.json', canonical(snapshot['task_action']), create=True)
-        for name in ('hold.json','reset-recovery.claimed','reset-recovery.pending','activation.json'):
+        for name in ('hold.json','reset-recovery.claimed','reset-recovery.pending','activation.json','operator-recovery.active.json'):
             p=root/name
             if p.exists():durable(backup/name,read(p),create=True)
         manifest = dict(schema='atlas.ws.operator-backup.v1', files=files,
@@ -372,6 +390,14 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
                 claimed_sha256=diagnostic['identity']['claimed_sha256'],pending_sha256=diagnostic['identity']['pending_sha256'],
                 issued_ms=now2,expires_ms=min(auth['expires_ms'],now2+1800000),max_segments=1,
                 max_connections=2,orders=0,trading_authority='NONE')
+            if continuous:
+                PIN=continuity_pin()
+                prior=root/'operator-recovery.active.json'
+                if prior.exists():prior.rename(backup/'prior-operator-recovery.archived.json')
+                continuous_permit=dict(schema='atlas.ws.continuous-authority.v1',policy_sha256=PIN,
+                    config_sha256=newpin,config_filename=cfgpath.name,authorization_sha256=authpin,activated_ms=now2,
+                    orders=0,trading_authority='NONE')
+                durable(root/'continuous-research.authorized.json',canonical(continuous_permit),create=True)
             durable(root/'operator-resume.authorized.json',canonical(ticket),create=True)
             marker.rename(backup/'deployment-marker.completed.json')
             receipt=dict(schema='atlas.ws.operator-deployment-receipt.v1',
@@ -383,7 +409,7 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
                 task_action_pin_readback=True,clock_checked_ms=clock['checked_ms'],
                 clock_uncertainty_ms=clock['uncertainty_ms'],
                 max_segments=1,max_connections=2,orders=0,trading_authority='NONE',
-                host_reconnection='NOT_ATTESTED',root_cause='ROOT_CAUSE_NOT_PROVEN')
+                host_reconnection='NOT_ATTESTED',continuous_research=continuous,root_cause='ROOT_CAUSE_NOT_PROVEN')
             durable(backup/'deployment-receipt.json',canonical(receipt),create=True)
             print(json.dumps(receipt),file=out,flush=True)
         except BaseException:

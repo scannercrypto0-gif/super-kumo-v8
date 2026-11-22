@@ -1,0 +1,98 @@
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{40}$')][string]$ExpectedCommit,
+    [ValidateSet('ActivateAndObserve','Observe')][string]$Mode='ActivateAndObserve',
+    [string]$OwnerDecisionRef,
+    [ValidateRange(6,48)][int]$ObserveHours=24,
+    [string]$ExpectedInstalledConfig='34bbaa0d7a419d4a45731b03d103753cff6428e22e11003fb3bc433a0d504dd9'
+)
+# One local handoff. Uses the existing task, not a second collector/schedule.
+$ErrorActionPreference='Stop'
+$repo=Split-Path -Parent $PSScriptRoot
+$wrapper=Join-Path $PSScriptRoot 'atlas_ws_resilience_windows.ps1'
+$taskName='ATLAS-Research-Sustained-Spot-WS'
+$policy='7cf6b4ff865fe5fef43ff59fe3f23d7a0cfb555dd76d8b0eb715e8a43f658915'
+$head=& git -C $repo rev-parse HEAD
+if($LASTEXITCODE -or $head -cne $ExpectedCommit){throw 'EXACT_CANDIDATE_COMMIT_REQUIRED'}
+function Read-ConfigPath($Task){
+    $m=[regex]::Match($Task.Actions[0].Arguments,'(?i)(?:^|\s)-Config\s+(?:"([^"]+)"|''([^'']+)''|(\S+))')
+    if(!$m.Success){throw 'CONFIG_PATH_NOT_FOUND'}
+    return [Environment]::ExpandEnvironmentVariables(($m.Groups[1].Value+$m.Groups[2].Value+$m.Groups[3].Value))
+}
+function Write-NewJson([string]$Path,$Value){
+    $bytes=[Text.Encoding]::UTF8.GetBytes(($Value|ConvertTo-Json -Depth 30 -Compress))
+    $stream=[IO.File]::Open($Path,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+    try{$stream.Write($bytes,0,$bytes.Length);$stream.Flush($true)}finally{$stream.Dispose()}
+}
+$t=@(Get-ScheduledTask -TaskName $taskName)
+if($t.Count -ne 1 -or @($t[0].Actions).Count -ne 1){throw 'TASK_NOT_UNIQUE'}
+$config=Read-ConfigPath $t[0];$root=Split-Path -Parent $config
+if($Mode -ceq 'ActivateAndObserve'){
+    if(!$OwnerDecisionRef){throw 'EXPLICIT_CONTINUOUS_OWNER_DECISION_REQUIRED'}
+    if(Test-Path -LiteralPath (Join-Path $root 'continuous-research.authorized.json')){throw 'CONTINUOUS_ALREADY_ACTIVATED_USE_OBSERVE'}
+    $raw=@(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -ExpectedCommit $ExpectedCommit -Mode Diagnose)
+    if($LASTEXITCODE){$raw|Write-Output;throw 'CONTINUOUS_PREFLIGHT_BLOCKED'}
+    $d=($raw -join "`n")|ConvertFrom-Json
+    if($d.identity.config_sha256 -cne $ExpectedInstalledConfig -or $d.hold_slot_ms -ne 1795329900000L -or
+        $d.hold_reason -cne 'PILOT_STOP_ConnectionResetError' -or @($d.blockers).Count -ne 0 -or
+        !$d.manifest_scope.verification_complete){throw 'CONTINUOUS_BASELINE_DRIFT'}
+    $claim=Get-Content -LiteralPath (Join-Path $root 'operator-recovery.active.json') -Raw|ConvertFrom-Json
+    if($claim.authorization_sha256 -cne 'fe42645ec37f9b36f80a0863d24951b67fdd548b231c432e50735bb2e13e0817'){
+        throw 'PRIOR_OPERATOR_AUTHORIZATION_DRIFT'
+    }
+    $now=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    $permit=[ordered]@{schema='atlas.ws.operator-authorization.v1';action='DEPLOY_ONE_RECOVERY';
+        identity_sha256=$d.identity_sha256;candidate_commit=$ExpectedCommit;task_name=$taskName;
+        issued_ms=$now;expires_ms=($now+1800000L);max_segments=1;max_connections=2;orders=0;trading_authority='NONE';
+        allow_task_action_pin_update=$true;allow_clock_probe=$true;existing_pilot_quota_only=$true;
+        owner_decision_ref=$OwnerDecisionRef;continuous_research=$true;continuity_policy_sha256=$policy;
+        allow_explicit_missing_intervals=$true}
+    $file=Join-Path ([IO.Path]::GetTempPath()) ('atlas-continuous-permit-'+[guid]::NewGuid().ToString('N')+'.json')
+    Write-NewJson $file $permit
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -ExpectedCommit $ExpectedCommit -Mode Apply -AuthorizationFile $file
+    if($LASTEXITCODE){throw 'CONTINUOUS_DEPLOYMENT_BLOCKED'}
+}
+$cfg=Get-Content -LiteralPath $config -Raw|ConvertFrom-Json
+$configPin=(Get-FileHash -LiteralPath $config -Algorithm SHA256).Hash.ToLowerInvariant()
+$oldPythonPath=$env:PYTHONPATH
+$deadline=[DateTimeOffset]::UtcNow.AddHours($ObserveHours)
+$outputDir=Join-Path $repo 'owner-results'
+New-Item -ItemType Directory -Force -Path $outputDir|Out-Null
+$output=Join-Path $outputDir ('ws-continuous-'+[guid]::NewGuid().ToString('N')+'.json')
+try{
+    $env:PYTHONPATH="$($cfg.tree)/src;$($cfg.tree)"
+    $lastPrint=[DateTimeOffset]::MinValue
+    do{
+        $raw=@(& $cfg.python -B -m tools.atlas_ws_continuity report --root $root --config-pin $configPin)
+        if($LASTEXITCODE){$raw|Write-Output;throw 'CONTINUOUS_REPORT_INTEGRITY_BLOCKED'}
+        $r=($raw -join "`n")|ConvertFrom-Json
+        if((Get-FileHash -LiteralPath $config -Algorithm SHA256).Hash.ToLowerInvariant() -cne $configPin){throw 'CONTINUOUS_CONFIG_DRIFT'}
+        foreach($binding in $cfg.files){
+            if((Get-FileHash -LiteralPath $binding.path -Algorithm SHA256).Hash.ToLowerInvariant() -cne $binding.sha256){throw 'CONTINUOUS_RUNTIME_DRIFT'}
+        }
+        $task=Get-ScheduledTask -TaskName $taskName
+        $r|Add-Member -NotePropertyName host_task_state -NotePropertyValue ([string]$task.State)
+        if($r.acceptance_ready -and [string]$task.State -ceq 'Running'){
+            $r.status=if(@($r.missing_open_ranges).Count){'CONTINUOUS_RESEARCH_OPERATIONAL_WITH_GAPS_OWNER_LOCAL'}else{'CONTINUOUS_RESEARCH_OPERATIONAL_OWNER_LOCAL'}
+            Write-NewJson $output $r
+            $r|ConvertTo-Json -Depth 15
+            Write-Output ('REPORT_FILE='+$output)
+            return
+        }
+        if($r.hold_reason){
+            Write-NewJson $output $r
+            $r|ConvertTo-Json -Depth 15
+            Write-Output ('REPORT_FILE='+$output)
+            return
+        }
+        if(([DateTimeOffset]::UtcNow-$lastPrint).TotalMinutes -ge 5){
+            $r|Select-Object status,verified_receipts,confirmed_rollovers,real_fault_events,last_receipt_fresh|ConvertTo-Json -Compress
+            $lastPrint=[DateTimeOffset]::UtcNow
+        }
+        Start-Sleep -Seconds 60
+    }while([DateTimeOffset]::UtcNow -lt $deadline)
+    $r.status='OBSERVATION_DEADLINE_OPERATION_NOT_ATTESTED'
+    Write-NewJson $output $r
+    $r|ConvertTo-Json -Depth 15
+    Write-Output ('REPORT_FILE='+$output)
+}finally{$env:PYTHONPATH=$oldPythonPath}

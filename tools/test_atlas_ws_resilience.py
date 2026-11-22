@@ -114,6 +114,76 @@ class ResilienceTests(unittest.TestCase):
 
     def health(self): return [json.loads(s) for s in (self.root/'health.jsonl').read_text().splitlines()]
 
+    def test_continuous_empty_boundary_polls_do_not_consume_connection(self):
+        clock=Clock(); wire=Wire(clock,[boundary_timeout(),final(),final(SLOT+STEP)])
+        with patch('tools.atlas_ws_continuity.authority',return_value={'policy':'test'}), \
+             patch('tools.atlas_ws_continuity.reserve',return_value=0):
+            result=self.execute(wire,clock,sustained=False)
+        # Default/bounded operations cannot silently opt into continuous policy.
+        self.assertEqual(wire.attempts,2)
+
+    def test_continuous_poll_same_socket_and_eight_bar_completion(self):
+        clock=Clock(); wire=Wire(clock,[boundary_timeout(),boundary_timeout(),*[final(SLOT+i*STEP) for i in range(8)]])
+        with patch('tools.atlas_ws_continuity.authority',return_value={'policy':'test'}), \
+             patch('tools.atlas_ws_continuity.reserve',return_value=0):
+            result=self.execute(wire,clock,sustained=True)
+        self.assertEqual((wire.attempts,len(result['bars'])),(1,8))
+        self.assertEqual(sum(e['status']=='IDLE_READ_POLL' for e in self.health()),2)
+        self.assertTrue(all('attempt' in e for e in self.health() if e['status']=='TRANSPORT_INTERRUPTED'))
+
+    def test_continuous_ninety_second_silence_reconnects_but_partial_frame_stops(self):
+        for partial in (False,True):
+            clock=Clock()
+            script=([([b'\x81',websocket.WebSocketTimeoutException('partial')],(0,1,2))] if partial else
+                    [boundary_timeout()]*3)+[final(SLOT+i*STEP) for i in range(8)]
+            wire=Wire(clock,script);original=wire.frame
+            def advance(connection,timeout):
+                clock.current+=31000
+                return original(connection,timeout)
+            wire.frame=advance
+            with patch('tools.atlas_ws_continuity.authority',return_value={'policy':'test'}), \
+                 patch('tools.atlas_ws_continuity.reserve',return_value=0):
+                if partial:
+                    with self.assertRaisesRegex(ValueError,'PILOT_STOP_TimeoutError'):self.execute(wire,clock,sustained=True)
+                    self.assertEqual(wire.attempts,1)
+                else:
+                    result=self.execute(wire,clock,sustained=True)
+                    self.assertEqual((wire.attempts,len(result['bars'])),(2,8))
+                    self.assertEqual(sum(e['status']=='IDLE_READ_POLL' for e in self.health()),2)
+
+    def test_continuous_report_requires_three_real_production_segment_summaries(self):
+        import hashlib
+        from datetime import datetime, timezone
+        from tools import atlas_ws_continuity as policy
+        with tempfile.TemporaryDirectory() as tmp:
+            owner=Path(tmp)/'owner';owner.mkdir()
+            config=owner/'config.json';config.write_bytes(b'pinned offline config')
+            config_pin=hashlib.sha256(config.read_bytes()).hexdigest()
+            (owner/'continuous-research.authorized.json').write_text(json.dumps(dict(
+                schema='atlas.ws.continuous-authority.v1',policy_sha256=policy.PIN,
+                config_sha256=config_pin,config_filename=config.name,activated_ms=SLOT+100,
+                authorization_sha256='a'*64,orders=0,trading_authority='NONE')))
+            origin=SLOT
+            for i in range(3):
+                opened=origin+i*8*STEP
+                with patch.dict(globals(),SLOT=opened):
+                    clock=Clock()
+                    script=([boundary_reset()] if i==0 else [])+[final(opened+j*STEP) for j in range(8)]
+                    self.execute(Wire(clock,script),clock,root=owner/'segments'/str(opened),sustained=True)
+                event=dict(utc=datetime.fromtimestamp(clock.now()/1000,timezone.utc).isoformat(),status='COMPLETE',reason='',slot_ms=opened)
+                with (owner/'supervisor.jsonl').open('a') as f:f.write(json.dumps(event)+'\n')
+                result=policy.report(owner,config_pin,clock.now())
+                self.assertEqual(result['acceptance_ready'],i==2)
+            self.assertEqual((result['verified_receipts'],result['confirmed_rollovers']),(24,2))
+            self.assertTrue(result['later_receipt_after_real_fault'])
+            self.assertEqual(result['missing_open_ranges'],[])
+            (owner/'hold.json').write_text(json.dumps(dict(reason='TERMINAL_GUARD')))
+            held=policy.report(owner,config_pin,clock.now())
+            self.assertFalse(held['acceptance_ready']);self.assertEqual(held['status'],'HELD')
+            receipt=next((owner/'segments'/'receipts').glob('*.json'))
+            body=json.loads(receipt.read_text());body['orders']=1;receipt.write_text(json.dumps(body))
+            with self.assertRaisesRegex(ValueError,'SERVICE_RECEIPT_INTEGRITY'):policy.report(owner,config_pin,clock.now())
+
     def test_clean_and_duplicate_same_bytes_use_one_connection_and_two_logical_acks(self):
         clock=Clock(); wire=Wire(clock,[final(),final(),final(SLOT+STEP)])
         result=self.execute(wire,clock)

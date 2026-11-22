@@ -73,5 +73,15 @@ def classify_transport_fault(error, context, stage):
                 WebSocketBadStatusException, WebSocketTimeoutException))
     if not transport_error:
         kind = "PROTOCOL_DATA_OR_LOCAL_TERMINAL"
-    return dict(fault_stage=stage, fault_class=kind, retry_eligible=eligible,
+    # Numeric OS cause metadata only; never persist exception text/host names.
+    codes = {}
+    wrapped = error
+    for _ in range(4):
+        if wrapped is None: break
+        for name in ('errno', 'winerror'):
+            value = getattr(wrapped, name, None)
+            if type(value) is int and 0 <= value <= 65535:
+                codes.setdefault(name, value)
+        wrapped = wrapped.__cause__
+    return dict(os_codes=codes, fault_stage=stage, fault_class=kind, retry_eligible=eligible,
                 is_transport_fault=bool(transport_error), exception_chain=chain)

@@ -403,8 +403,18 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
         need(remaining > 1, "LEASE_BUDGET_TOO_SHORT")
         return now, min((deadline - clock.now()) / 1000, remaining - 1)
 
+    from tools.atlas_ws_continuity import authority as continuous_authority, reserve as continuous_reserve
+    continuous_root = root.parent.parent
+    continuous = bool(plan.get("sustained_research") and continuous_authority(continuous_root))
     for attempt in range(plan["max_connections"]):
         now, left = time_left()
+        if continuous:
+            while True:
+                delay = continuous_reserve(continuous_root/'continuous-admission.sqlite', now, first)
+                if not delay: break
+                emit(root, "CONTINUITY_BACKOFF", utc_ms=now, wait_ms=delay)
+                wait(min(delay/1000, 30, left))
+                now, left = time_left()
         socket_id = "research-15m"
         with quota.tx() as db:
             used = quota.get(db, "research_connection_attempts")
@@ -419,6 +429,7 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
                 fault_stage = "HANDSHAKE"
                 need(connection.getstatus() == 101, "WS_UPGRADE")
                 heartbeat = now
+                last_frame_ms = now
                 while len(rows) < target:
                     fault_stage = "CLOCK_GUARD"
                     now, left = time_left()
@@ -435,11 +446,22 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
                         kind, raw = read_research_frame(transport, connection, min(left, 30))
                     except (TimeoutError, ConnectionResetError) as exc:
                         failure_context = receive_fault_context(connection, exc)
+                        # A proven empty frame boundary can be polled on this
+                        # same socket; partial/unknown frames NEVER resume.
+                        idle_ms = clock.now() - last_frame_ms
+                        if (continuous and type(exc) is TimeoutError and
+                                failure_context == dict(receive_phase="FRAME_BOUNDARY",
+                                    deadline_origin="UNDERLYING_RECEIVE_TIMEOUT") and
+                                0 <= idle_ms < 90000):
+                            emit(root, "IDLE_READ_POLL", utc_ms=clock.now(),
+                                 idle_ms=idle_ms, attempt=used+1, **failure_context)
+                            continue
                         if isinstance(exc, ConnectionResetError) and str(exc) == 'WS_CONNECTION_CLOSED':
                             failure_context['transport_exception'] = 'WebSocketConnectionClosedException'
                         elif isinstance(exc, ConnectionResetError) and str(exc) == 'WS_GRACEFUL_CLOSE':
                             failure_context['transport_exception'] = 'VERIFIED_GRACEFUL_CLOSE'
                         raise
+                    last_frame_ms = clock.now()
                     fault_stage = "CLOCK_GUARD"
                     received, _ = time_left()
                     fault_stage = "FRAME_ADMISSION"
@@ -473,7 +495,7 @@ def observe_cycle(root, plan, pin, fixture, clock, transport, wait, uncertainty,
             if plan.get("bounded_operations") or plan.get("sustained_research"):
                 last_failure["utc_ms"] = clock.now()
             emit(root, "TRANSPORT_INTERRUPTED" if classification["is_transport_fault"] else
-                 "FAULT_CLASSIFIED", **last_failure, **failure_context, **classification)
+                 "FAULT_CLASSIFIED", **last_failure, attempt=used+1, committed=len(rows), **failure_context, **classification)
             if not classification["retry_eligible"] or attempt or len(rows) == target:
                 raise
         finally:

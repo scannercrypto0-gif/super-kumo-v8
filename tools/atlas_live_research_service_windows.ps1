@@ -67,6 +67,57 @@ function Test-ResetRecovery([string]$HealthLog, [string]$Reason) {
     } catch {return $false}
 }
 
+
+function Test-ContinuousFault($Event) {
+    if ($Event.status -cne 'TRANSPORT_INTERRUPTED' -or $Event.retry_eligible -isnot [bool] -or
+        !$Event.retry_eligible -or $Event.is_transport_fault -ne $true) {return $false}
+    if ($Event.fault_stage -ceq 'FRAME_READ') {
+        return ($Event.receive_phase -ceq 'FRAME_BOUNDARY' -and $Event.fault_class -ceq 'FRAME_BOUNDARY_TRANSIENT')
+    }
+    if ($Event.fault_stage -ceq 'CONNECT') {
+        return @('CONNECT_TIMEOUT','CONNECT_RESET_OR_REFUSED','DNS_FAILURE','HTTP_REJECTION') -ccontains $Event.fault_class
+    }
+    return ($Event.fault_stage -ceq 'PONG' -and $Event.fault_class -ceq 'PONG_LIVENESS_EXPIRED')
+}
+
+function Test-ContinuousRecovery([string]$HealthLog,[string]$Reason) {
+    try {
+        $events=@(Get-Content -LiteralPath $HealthLog | ForEach-Object {$_ | ConvertFrom-Json} |
+            Where-Object status -in @('CONNECTING','TRANSPORT_INTERRUPTED','FAULT_CLASSIFIED','STOPPED_ERROR'))
+        if ($Reason -ceq 'PILOT_STOP_FINALIZED_SOURCE_GAP') {
+            return ($events.Count -ge 2 -and $events[-1].status -ceq 'STOPPED_ERROR' -and
+                $events[-1].error -ceq 'FINALIZED_SOURCE_GAP' -and $events[-2].status -ceq 'FAULT_CLASSIFIED' -and
+                $events[-2].fault_stage -ceq 'CLOCK_GUARD')
+        }
+        return ($events.Count -eq 5 -and $events[0].status -ceq 'CONNECTING' -and $events[0].attempt -eq 1 -and
+            (Test-ContinuousFault $events[1]) -and
+            $events[2].status -ceq 'CONNECTING' -and $events[2].attempt -eq 2 -and
+            (Test-ContinuousFault $events[3]) -and
+            $events[4].status -ceq 'STOPPED_ERROR' -and
+            $Reason -ceq ('PILOT_STOP_'+$events[4].error))
+    } catch {return $false}
+}
+
+function Continuous-Decision([string]$Mode,[long]$SlotMs) {
+    $command=@('-B','-m','tools.atlas_ws_continuity',$Mode,'--root',$root,'--config-pin',$ConfigSha256)
+    if ($Mode -cne 'status') {$command+=@('--slot',[string]$SlotMs)}
+    $oldPythonPath=$env:PYTHONPATH
+    try {
+        $env:PYTHONPATH="$($cfg.tree)/src;$($cfg.tree)"
+        $answer=& $cfg.python @command
+        if ($LASTEXITCODE) {throw 'LIVE_SERVICE_CONTINUITY_STATE_FAILED'}
+        $decision=$answer | ConvertFrom-Json
+        if (!$decision.enabled) {throw 'LIVE_SERVICE_CONTINUITY_AUTHORITY_MISSING'}
+        return $decision
+    } finally {$env:PYTHONPATH=$oldPythonPath}
+}
+
+function Archive-OperatorClaim {
+    if (Test-Path -LiteralPath $operatorActive) {
+        [IO.File]::Move($operatorActive,(Join-Path $root ('operator-recovery.completed-'+[guid]::NewGuid().ToString('N')+'.json')))
+    }
+}
+
 function Test-OperatorResume([string]$TicketPath, [string]$RootPath, [string]$ConfigPin, [long]$NowMs) {
     if (!(Test-Path -LiteralPath $TicketPath -PathType Leaf) -or
         (Get-Item -LiteralPath $TicketPath).Length -gt 65536) {throw 'LIVE_SERVICE_OPERATOR_TICKET_BOUND'}
@@ -131,11 +182,13 @@ $recovery=$null
 $operatorRecovery=$null
 $segmentFailure=$false
 $executionClaim=$false
+$continuous=$false
 try {
     if ((Test-Path -LiteralPath $stop) -or
         ((Test-Path -LiteralPath $hold) -and !(Test-Path -LiteralPath $operatorTicket))) {return}
     if (Test-Path -LiteralPath $executionActive) {throw 'LIVE_SERVICE_INCOMPLETE_SEGMENT_REVIEW_REQUIRED'}
-    if (Test-Path -LiteralPath $operatorActive) {throw 'LIVE_SERVICE_OPERATOR_RECOVERY_ALREADY_CLAIMED'}
+    $continuous=Test-Path -LiteralPath (Join-Path $root 'continuous-research.authorized.json')
+    if ((Test-Path -LiteralPath $operatorActive) -and !$continuous) {throw 'LIVE_SERVICE_OPERATOR_RECOVERY_ALREADY_CLAIMED'}
     if (Test-Path -LiteralPath (Join-Path $root 'operator-deployment.in-progress')) {throw 'LIVE_SERVICE_DEPLOYMENT_IN_PROGRESS'}
     if (Test-Path -LiteralPath $operatorTicket) {
         $operatorRecovery=Test-OperatorResume $operatorTicket $root $ConfigSha256 ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
@@ -157,6 +210,11 @@ try {
             (Get-FileHash -LiteralPath $entry.path).Hash.ToLowerInvariant() -cne $entry.sha256) {
             throw 'LIVE_SERVICE_RUNTIME_PIN'
         }
+    }
+    if ($continuous) {
+        $decision=Continuous-Decision 'status' 0
+        if ($decision.circuit_open) {throw 'LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN'}
+        if ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -lt $decision.wait_until_ms) {return}
     }
     $paths=@(Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction Stop |
         Select-Object -ExpandProperty InterfaceAlias -Unique)
@@ -235,7 +293,10 @@ try {
             throw 'LIVE_SERVICE_SEGMENT_SCOPE'
         }
         Record 'COMPLETE' '' $slot
-        if ($operatorRecovery) {
+        if ($continuous) {
+            $decision=Continuous-Decision 'complete' $slot
+            Archive-OperatorClaim
+        } elseif ($operatorRecovery) {
             # One explicitly authorized segment, not an ongoing service release.
             Save-ServiceHold 'LIVE_SERVICE_OPERATOR_RECOVERY_COMPLETE_REVIEW_REQUIRED' $slot
             Record 'OPERATOR_RECOVERY_COMPLETE_REVIEW_REQUIRED' '' $slot
@@ -246,7 +307,21 @@ try {
     $reason=$_.Exception.Message
     if ($reason -cnotmatch '^[A-Za-z][A-Za-z0-9_]{1,159}$') {$reason='LIVE_SERVICE_LOCAL_FAILURE'}
     Record 'FAILED' $reason $slot
-    if ($segmentFailure -and -not $recovery -and
+    if ($continuous -and $segmentFailure -and
+        -not (Test-Path -LiteralPath $stop) -and
+        (Test-ContinuousRecovery (Join-Path $state 'health.jsonl') $reason)) {
+        try {
+            $decision=Continuous-Decision 'failed' $slot
+            if ($decision.circuit_open) {
+                Save-ServiceHold 'LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN' $slot
+                Record 'CONTINUITY_CIRCUIT_OPEN' $reason $slot
+            } else {Record 'CONTINUITY_BACKOFF_PENDING' $reason $slot}
+            Archive-OperatorClaim
+            Archive-ExecutionClaim 'continuous-failed-outage-recorded'
+            exit 1
+        } catch {$reason='LIVE_SERVICE_CONTINUITY_PERSIST_FAILED'}
+    }
+    if (-not $continuous -and $segmentFailure -and -not $recovery -and
         -not (Test-Path -LiteralPath $stop) -and
         (Test-ResetRecovery (Join-Path $state 'health.jsonl') $reason)) {
         try {
