@@ -165,7 +165,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
-          foreach($path in @('tools/ATLAS-WS-CONTINUOUS-RECOVERY.ps1','tools/atlas_ws_resilience_windows.ps1','tools/atlas_live_research_service_windows.ps1','tools/test_atlas_ws_supervisor.ps1','tools/test_atlas_ws_private_check.ps1')) {
+          foreach($path in @('tools/ATLAS-WS-NETWORK-COMPARE.ps1','tools/ATLAS-WS-CONTINUOUS-RECOVERY.ps1','tools/atlas_ws_resilience_windows.ps1','tools/atlas_live_research_service_windows.ps1','tools/test_atlas_ws_supervisor.ps1','tools/test_atlas_ws_private_check.ps1')) {
             $tokens=$null;$errors=$null
             $null=[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path),[ref]$tokens,[ref]$errors)
             if($errors.Count){throw ($errors | Out-String)}
