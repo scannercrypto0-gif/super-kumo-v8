@@ -10,7 +10,7 @@ param(
 $ErrorActionPreference='Stop'
 $repo=Split-Path -Parent $PSScriptRoot
 $helper=Join-Path $PSScriptRoot 'atlas_ws_resilience_operator.py'
-$lock=$null; $gate=$null; $oldAction=$null; $taskChanged=$false; $commitSent=$false; $gateReady=$false; $privateFailure=$null
+$lock=$null; $gate=$null; $oldAction=$null; $taskChanged=$false; $commitSent=$false; $gateReady=$false; $privateFailure=$null; $gateInput=$null
 function Hash-Text([string]$value) {
     $h=[Security.Cryptography.SHA256]::Create()
     try { return ([BitConverter]::ToString($h.ComputeHash([Text.Encoding]::UTF8.GetBytes($value)))).Replace('-','').ToLowerInvariant() }
@@ -82,6 +82,11 @@ function Set-PrivateUtf8($info) {
     $info.EnvironmentVariables['PYTHONIOENCODING']='utf-8'
     $info.EnvironmentVariables['PYTHONUTF8']='1'
 }
+function New-PrivateInputWriter($process) {
+    # Framework PowerShell lacks StandardInputEncoding: bypass its console-
+    # encoded writer and own the UTF-8 pipe explicitly on every CLR version.
+    return [IO.StreamWriter]::new($process.StandardInput.BaseStream,[Text.UTF8Encoding]::new($false),4096)
+}
 function Invoke-PrivateCheck([string]$mode,$snapshot,[ValidateRange(100,30000)][int]$TimeoutMs=30000) {
     $script:privateFailure=$null
     $process=$null
@@ -103,9 +108,10 @@ function Invoke-PrivateCheck([string]$mode,$snapshot,[ValidateRange(100,30000)][
         $errorChars=[char[]](New-Object char[] 65537)
         $stdout=$process.StandardOutput.ReadBlockAsync($outputChars,0,$outputChars.Length)
         $stderr=$process.StandardError.ReadBlockAsync($errorChars,0,$errorChars.Length)
-        $write=$process.StandardInput.WriteLineAsync($payload)
+        $inputWriter=New-PrivateInputWriter $process
+        $write=$inputWriter.WriteLineAsync($payload)
         if(-not $write.Wait($TimeoutMs)){throw 'PRIVATE_HELPER_INPUT_TIMEOUT'}
-        $process.StandardInput.Close()
+        $inputWriter.Close()
         if(-not $process.WaitForExit($TimeoutMs)){throw 'PRIVATE_HELPER_TIMEOUT'}
         if(-not $stdout.Wait(5000) -or -not $stderr.Wait(5000)){throw 'PRIVATE_HELPER_DRAIN_TIMEOUT'}
         $count=$stdout.Result;$errorCount=$stderr.Result
@@ -194,8 +200,10 @@ try {
     Set-PrivateUtf8 $psi
     $gate=[Diagnostics.Process]::new();$gate.StartInfo=$psi
     if(-not $gate.Start()){throw 'PRIVATE_GATE_START_FAILED'}
-    $gate.StandardInput.WriteLine(($snapshot|ConvertTo-Json -Depth 30 -Compress))
-    $gate.StandardInput.Flush()
+    $gateInput=New-PrivateInputWriter $gate
+    $gateInput.AutoFlush=$true
+    $gateInput.WriteLine(($snapshot|ConvertTo-Json -Depth 30 -Compress))
+    $gateInput.Flush()
     $ready=(Read-GateLine)|ConvertFrom-Json
     if($ready.status -cne 'STAGED_AWAITING_TASK_PIN' -or $ready.config_sha256 -cnotmatch '^[a-f0-9]{64}$'){throw 'PRIVATE_GATE_PREFLIGHT_FAILED'}
     $gateReady=$true
@@ -214,9 +222,9 @@ try {
         $after.Actions[0].WorkingDirectory -cne $oldAction.WorkingDirectory -or [string]$after.State -cne 'Ready' -or
         (Hash-TaskPolicy (Export-ScheduledTask -TaskName $TaskName -TaskPath $task.TaskPath)) -cne $snapshot.task_policy_sha256) {throw 'TASK_ACTION_PIN_READBACK_FAILED'}
     $commitSent=$true
-    $gate.StandardInput.WriteLine('COMMIT');$gate.StandardInput.Flush()
+    $gateInput.WriteLine('COMMIT');$gateInput.Flush()
     $result=(Read-GateLine)|ConvertFrom-Json
-    $gate.StandardInput.Close();Wait-GateExit
+    $gateInput.Close();Wait-GateExit
     if($gate.ExitCode -ne 0 -or $result.status -cne 'WS_ENGINEERING_INSTALLED_ONE_RECOVERY_WAITING_FOR_EXISTING_SCHEDULE'){throw 'PRIVATE_GATE_COMMIT_FAILED'}
     $result | ConvertTo-Json -Depth 15
 } catch {
@@ -225,11 +233,11 @@ try {
     if($gate -and -not $gate.HasExited -and $taskChanged -and -not $commitSent -and $gateReady){
         try {
             Set-ScheduledTask -TaskName $TaskName -TaskPath $task.TaskPath -Action $oldAction | Out-Null
-            $gate.StandardInput.WriteLine('ROLLBACK');$gate.StandardInput.Flush()
-            $null=Read-GateLine;$gate.StandardInput.Close();Wait-GateExit
+            $gateInput.WriteLine('ROLLBACK');$gateInput.Flush()
+            $null=Read-GateLine;$gateInput.Close();Wait-GateExit
         } catch { }
     } elseif($gate -and -not $gate.HasExited -and -not $commitSent -and $gateReady){
-        try {$gate.StandardInput.WriteLine('ROLLBACK');$gate.StandardInput.Flush();$null=Read-GateLine;$gate.StandardInput.Close();Wait-GateExit}catch{}
+        try {$gateInput.WriteLine('ROLLBACK');$gateInput.Flush();$null=Read-GateLine;$gateInput.Close();Wait-GateExit}catch{}
     }
     $reason=$_.Exception.Message
     if($reason -cnotmatch '^[A-Z][A-Z0-9_]{1,119}$'){$reason='PRIVATE_IO_SCHEMA_OR_GATE_FAILURE'}
@@ -239,7 +247,7 @@ try {
 } finally {
     if($gate){
         if(-not $gate.HasExited){
-            try {$gate.StandardInput.Close();if(-not $gate.WaitForExit(5000)){$gate.Kill();$null=$gate.WaitForExit(5000)}}catch{}
+            try {if($gateInput){$gateInput.Close()};if(-not $gate.WaitForExit(5000)){$gate.Kill();$null=$gate.WaitForExit(5000)}}catch{}
         }
         $gate.Dispose()
     }

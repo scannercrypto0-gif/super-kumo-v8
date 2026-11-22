@@ -2,7 +2,7 @@
 $ErrorActionPreference='Stop'
 $source=Join-Path $PSScriptRoot 'atlas_ws_resilience_windows.ps1'
 $ast=[System.Management.Automation.Language.Parser]::ParseFile($source,[ref]$null,[ref]$null)
-foreach($name in @('Hash-Text','Set-PrivateUtf8','Invoke-PrivateCheck')) {
+foreach($name in @('Hash-Text','Set-PrivateUtf8','New-PrivateInputWriter','Invoke-PrivateCheck')) {
     $node=$ast.Find({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true)
     if(!$node){throw 'MISSING_PRIVATE_HELPER'}
     . ([scriptblock]::Create($node.Extent.Text))
