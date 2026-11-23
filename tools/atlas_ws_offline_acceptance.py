@@ -22,7 +22,7 @@ def extract(output, version, *paths):
 def stage(output):
     extract(output,BASE)
     extract(output,TRANSPORT,'tools/binance_live_feed')
-    names=('atlas_live_research_cycle.py','atlas_live_publisher_reconciliation.py','atlas_ws_continuity.py','atlas_ws_receive_diagnostics.py','atlas_single_receipt.py',
+    names=('atlas_live_research_cycle.py','atlas_live_publisher_reconciliation.py','atlas_saved_research_disposition.py','atlas_ws_continuity.py','atlas_ws_receive_diagnostics.py','atlas_single_receipt.py',
            'atlas_single_receipt_runner.py','atlas_research_lease.py',
            'atlas_ws_network_compare.py','atlas_ws_resilience_operator.py','atlas_ws_permit_repair.py','atlas_ws_gap_inventory.py',
            'test_atlas_live_research_cycle.py','test_atlas_live_publisher_reconciliation.py','test_atlas_ws_receive_diagnostics.py',
