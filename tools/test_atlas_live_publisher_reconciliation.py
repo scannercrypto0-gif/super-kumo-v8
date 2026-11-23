@@ -1,16 +1,20 @@
 """Changed-delta acceptance for the two-lane receipt, with generated prices."""
 from copy import deepcopy
 from hashlib import sha256
+from datetime import datetime, timezone
+from io import BytesIO
 import json
 from pathlib import Path
 import socket
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
+from zipfile import ZipFile, ZIP_DEFLATED
 
 from aql.observation.contracts import digest
 from tools.atlas_live_publisher_reconciliation import (
-    DAY, ENDPOINT, MINUTE, STEP, factory_view, observation_meta, publish, reconcile, sealed,
+    DAY, ENDPOINT, MINUTE, STEP, factory_view, observation_meta, publish, publisher_day,
+    reconcile, sealed,
 )
 
 START = 20_000 * DAY
@@ -120,6 +124,62 @@ class ReconciliationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "CANDLE_NOT_FINAL"):
             self.run_receipt(self.day, live_frames={START: raw},
                              live=sealed({k: v for k, v in partial.items() if k != "sha256"}))
+
+    def test_daily_archive_requires_original_zip_checksum_and_native_registry_pins(self):
+        day_start = START - (START % DAY)
+        day_end = day_start + DAY
+        date = datetime.fromtimestamp(day_start / 1000, timezone.utc).date().isoformat()
+        archive = f"BTCUSDT-1m-{date}.zip"
+        csv_name = f"BTCUSDT-1m-{date}.csv"
+        rows = []
+        for i in range(DAY // MINUTE):
+            opened = day_start + i * MINUTE
+            rows.append(f"{opened},1,2,1,1,3,{opened+MINUTE-1},4,1,2,3,0")
+        bundle = BytesIO()
+        with ZipFile(bundle, "w", ZIP_DEFLATED) as zipped:
+            zipped.writestr(csv_name, "\n".join(rows) + "\n")
+        raw = bundle.getvalue()
+        archive_sha = sha256(raw).hexdigest()
+        checksum = f"{archive_sha} *{archive}\n".encode()
+        checksum_sha = sha256(checksum).hexdigest()
+        core_sha = "c" * 64
+        result_sha = "d" * 64
+        temp = TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        run = Path(temp.name) / "run"
+        original = Path(temp.name) / "original"
+        run.mkdir()
+        original.mkdir()
+        manifest = dict(start_ms=day_start, end_exclusive_ms=day_end,
+                        market=["BINANCE", "SPOT", "BTCUSDT", "BTC", "USDT", "UTC"],
+                        native_interval="1m", rights_status="VERIFIED_FOR_EXACT_USE",
+                        archive_sha256=archive_sha, checksum_sha256=checksum_sha,
+                        publisher_first_available_at_ms=day_end + 1000)
+        (run / "source.json").write_text(json.dumps(manifest), encoding="utf-8")
+        (run / "scanner.json").write_text(json.dumps(dict(decision_cutoff_ms=day_end + 60_000,
+                                                           core253=core_sha)), encoding="utf-8")
+        (original / archive).write_bytes(raw)
+        (original / f"{archive}.CHECKSUM").write_bytes(checksum)
+        bars = [dict(bar_open_ms=day_start + i * MINUTE, bar_close_ms=day_start + (i + 1) * MINUTE - 1)
+                for i in range(DAY // MINUTE)]
+        verified = dict(sha256=result_sha, archive_sha256=archive_sha,
+                        checksum_sha256=checksum_sha, core253=core_sha)
+        with patch("tools.atlas_live_publisher_reconciliation.verify", return_value=verified), \
+             patch("tools.atlas_live_publisher_reconciliation.query_local",
+                   return_value=dict(query_sha256=core_sha, bars=bars)) as query:
+            report = publisher_day(run, original, result_sha)
+        self.assertEqual(report["archive_sha256"], archive_sha)
+        self.assertEqual(report["checksum_sha256"], checksum_sha)
+        self.assertEqual(report["core253"], core_sha)
+        self.assertEqual(len(report["bars"]), DAY // MINUTE)
+        self.assertEqual(query.call_args.kwargs["required_source_sha256"], archive_sha)
+
+        (original / f"{archive}.CHECKSUM").write_text("0" * 64 + "  " + archive + "\n", encoding="ascii")
+        with patch("tools.atlas_live_publisher_reconciliation.verify", return_value=verified), \
+             patch("tools.atlas_live_publisher_reconciliation.query_local",
+                   return_value=dict(query_sha256=core_sha, bars=bars)):
+            with self.assertRaisesRegex(ValueError, "PUBLISHER_ZIP_CHECKSUM_CUSTODY"):
+                publisher_day(run, original, result_sha)
 
 
 if __name__ == "__main__":
