@@ -12,6 +12,21 @@ from unittest.mock import patch
 from zipfile import ZipFile, ZIP_DEFLATED
 
 from aql.observation.contracts import digest
+
+# The pinned offline runtime intentionally omits the archive verifier; this test
+# patches its result and isolates publisher_day's checksum/custody contract.
+try:
+    import tools.atlas_authorized_archive_research  # noqa: F401
+except ModuleNotFoundError as exc:
+    if exc.name != "tools.atlas_authorized_archive_research":
+        raise
+    import sys
+    import types
+    archive_verifier = types.ModuleType("tools.atlas_authorized_archive_research")
+    def _unpatched_archive_verify(*args, **kwargs):
+        raise AssertionError("archive verifier must be patched in offline unit test")
+    archive_verifier.verify = _unpatched_archive_verify
+    sys.modules["tools.atlas_authorized_archive_research"] = archive_verifier
 from tools.atlas_live_publisher_reconciliation import (
     DAY, ENDPOINT, MINUTE, STEP, factory_view, observation_meta, publish, publisher_day,
     reconcile, sealed,
