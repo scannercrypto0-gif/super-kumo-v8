@@ -4,6 +4,7 @@ param(
     [ValidateSet('ActivateAndObserve','Observe','RepairPermitAndObserve','ApplyPingCorrectionAndObserve')][string]$Mode='ActivateAndObserve',
     [string]$OwnerDecisionRef,
     [ValidateRange(6,48)][int]$ObserveHours=24,
+    [ValidatePattern('^[a-f0-9]{64}$')][string]$ExpectedPreviousConfigSha256,
     [string]$ExpectedInstalledConfig='34bbaa0d7a419d4a45731b03d103753cff6428e22e11003fb3bc433a0d504dd9'
 )
 # One local handoff. Uses the existing task, not a second collector/schedule.
@@ -24,9 +25,10 @@ function Write-NewJson([string]$Path,$Value){
     $stream=[IO.File]::Open($Path,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
     try{$stream.Write($bytes,0,$bytes.Length);$stream.Flush($true)}finally{$stream.Dispose()}
 }
-function Test-FreshPingBaseline($Diagnostic){
+function Test-FreshPingBaseline($Diagnostic,[string]$ExpectedConfigSha256){
     $failures=@()
-    if($Diagnostic.identity.config_sha256 -cne '857bea957d1da3fa1ef1c01ace44a0bfda27f84c2750523184455936a48f2cf2'){$failures+='INSTALLED_CONFIG_PIN_MISMATCH'}
+    if($ExpectedConfigSha256 -cnotmatch '^[a-f0-9]{64}$' -or
+        $Diagnostic.identity.config_sha256 -cne $ExpectedConfigSha256){$failures+='INSTALLED_CONFIG_PIN_MISMATCH'}
     if($Diagnostic.hold_reason -cne 'LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN'){$failures+='HOLD_REASON_MISMATCH'}
     if($Diagnostic.manifest_scope.verification_complete -ne $true){$failures+='RUNTIME_MANIFEST_NOT_VERIFIED'}
     $blockers=@($Diagnostic.blockers | Where-Object {$null -ne $_ -and [string]$_ -ne ''})
@@ -48,6 +50,9 @@ if($t.Count -ne 1 -or @($t[0].Actions).Count -ne 1){throw 'TASK_NOT_UNIQUE'}
 $config=Read-ConfigPath $t[0];$root=Split-Path -Parent $config
 if($Mode -ceq 'ActivateAndObserve' -or $Mode -ceq 'ApplyPingCorrectionAndObserve'){
     if(!$OwnerDecisionRef){throw 'EXPLICIT_CONTINUOUS_OWNER_DECISION_REQUIRED'}
+    if($Mode -ceq 'ApplyPingCorrectionAndObserve' -and $ExpectedPreviousConfigSha256 -cnotmatch '^[a-f0-9]{64}$'){
+        throw 'EXACT_PREVIOUS_CONFIG_SHA256_REQUIRED'
+    }
     if($Mode -ceq 'ActivateAndObserve' -and (Test-Path -LiteralPath (Join-Path $root 'continuous-research.authorized.json'))){throw 'CONTINUOUS_ALREADY_ACTIVATED_USE_OBSERVE'}
     $baselineDeadline=[DateTimeOffset]::UtcNow.AddMinutes(3)
     do{
@@ -55,7 +60,7 @@ if($Mode -ceq 'ActivateAndObserve' -or $Mode -ceq 'ApplyPingCorrectionAndObserve
         if($LASTEXITCODE){$raw|Write-Output;throw 'CONTINUOUS_PREFLIGHT_BLOCKED'}
         $d=($raw -join "`n")|ConvertFrom-Json
         if($Mode -cne 'ApplyPingCorrectionAndObserve'){break}
-        $assessment=Test-FreshPingBaseline $d
+        $assessment=Test-FreshPingBaseline $d $ExpectedPreviousConfigSha256
         if($assessment.ready){break}
         $assessment|ConvertTo-Json -Depth 15 -Compress|Write-Output
         if(!$assessment.retryable -or [DateTimeOffset]::UtcNow -ge $baselineDeadline){
@@ -86,7 +91,7 @@ if($Mode -ceq 'ActivateAndObserve' -or $Mode -ceq 'ApplyPingCorrectionAndObserve
         allow_task_action_pin_update=$true;allow_clock_probe=$true;existing_pilot_quota_only=$true;
         owner_decision_ref=$OwnerDecisionRef;continuous_research=$true;continuity_policy_sha256=$policy;
         allow_explicit_missing_intervals=$true}
-    if($Mode -ceq 'ApplyPingCorrectionAndObserve'){$permit['fresh_ping_correction']=$true;$permit['expected_previous_config_sha256']=$d.identity.config_sha256}
+    if($Mode -ceq 'ApplyPingCorrectionAndObserve'){$permit['fresh_ping_correction']=$true;$permit['expected_previous_config_sha256']=$ExpectedPreviousConfigSha256}
     $file=Join-Path ([IO.Path]::GetTempPath()) ('atlas-continuous-permit-'+[guid]::NewGuid().ToString('N')+'.json')
     Write-NewJson $file $permit
     $applyRaw=@(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -ExpectedCommit $ExpectedCommit -Mode Apply -AuthorizationFile $file)

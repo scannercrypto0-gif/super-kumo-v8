@@ -51,10 +51,13 @@ framing. Existing12legacy tests remain. No real source run occurred in Work.
 ## One guarded install and original observation
 
 ApplyPingCorrectionAndObserve is a manual, version-pinned correction for the
-KNOWN installed config857bea957d1da3fa1ef1c01ace44a0bfda27f84c2750523184455936a48f2cf2
-and existing circuit HOLD. It requires a fresh explicit owner-local permit
-with fresh_ping_correction and exact previous config binding, existing valid
-continuous authority, no active/uncertain execution, all prior gates/locks,
+existing circuit HOLD. The caller must supply `ExpectedPreviousConfigSha256`
+from the owner's read-only task/config diagnostic; the fresh Diagnose must
+match that exact 64-character digest before any permit is created. This keeps
+the installed config binding exact without assuming that a public historical
+digest is still the owner's current config. It requires a fresh explicit
+owner-local permit with `fresh_ping_correction`, existing valid continuous
+authority, no active/uncertain execution, all prior gates/locks,
 clock/task-policy readback and backups. Generic Apply cannot resume a circuit.
 
 The existing rolling circuit must have NATURALLY expired before staging.

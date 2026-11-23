@@ -124,6 +124,17 @@ try {
         Assert ((& ([scriptblock]::Create($repairCondition))) -eq ($Mode -ceq 'RepairPermitAndObserve')) 'WRONG_REPAIR_MODE_BRANCH'
         Assert ((& ([scriptblock]::Create($stageCondition))) -eq ($Mode -in @('ActivateAndObserve','ApplyPingCorrectionAndObserve'))) 'WRONG_STAGE_MODE_BRANCH'
     }
+    $bootstrapAst=[System.Management.Automation.Language.Parser]::ParseFile($bootstrap,[ref]$null,[ref]$null)
+    $baselineNode=$bootstrapAst.Find({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Test-FreshPingBaseline'},$true)
+    Assert ($null -ne $baselineNode) 'FRESH_PING_BASELINE_HELPER_MISSING'
+    . ([scriptblock]::Create($baselineNode.Extent.Text))
+    $expectedConfig='7c05de1aba8f11ced74373ac99819851297039cda6cd0e61dc1c4663c943c070'
+    $diag=[pscustomobject]@{identity=[pscustomobject]@{config_sha256=$expectedConfig};hold_reason='LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN';manifest_scope=[pscustomobject]@{verification_complete=$true};blockers=@();task_enabled=$true;collector_processes=0;task_state='Ready';supervisor_lock_available=$true;quota=[pscustomobject]@{ready=$true}}
+    Assert ((Test-FreshPingBaseline $diag $expectedConfig).ready) 'FRESH_PING_EXPLICIT_CONFIG_PIN_REJECTED'
+    Assert ((Test-FreshPingBaseline $diag ('a'*64)).failures -contains 'INSTALLED_CONFIG_PIN_MISMATCH') 'FRESH_PING_CONFIG_MISMATCH_ACCEPTED'
+    $baselineParam=$bootstrapAst.ParamBlock.Parameters | Where-Object {$_.Name.VariablePath.UserPath -ceq 'ExpectedPreviousConfigSha256'}
+    Assert ($null -ne $baselineParam) 'FRESH_PING_EXPLICIT_CONFIG_PARAM_MISSING'
+    Assert ($bootstrap -and (Get-Content -LiteralPath $bootstrap -Raw).Contains("throw 'EXACT_PREVIOUS_CONFIG_SHA256_REQUIRED'")) 'FRESH_PING_CONFIG_PIN_NOT_REQUIRED'
     Write-Output 'WS_SUPERVISOR_OFFLINE_PASS'
 } finally {Remove-Item -LiteralPath $base -Recurse -Force}
 
