@@ -1,0 +1,36 @@
+name: ATLAS operational watchdog contract
+on:
+  push:
+    branches: [codex/atlas-ops-watchdog-mcp-001]
+    paths:
+      - '.github/workflows/atlas-ops-watchdog.yml'
+      - 'tools/atlas_ops_watchdog.py'
+      - 'tests/test_atlas_ops_watchdog.py'
+      - 'docs/research/atlas-operational-watchdog-mcp-001.md'
+  pull_request:
+    branches: [integration/package-e-g1-g12-pinned-20261105]
+    paths:
+      - '.github/workflows/atlas-ops-watchdog.yml'
+      - 'tools/atlas_ops_watchdog.py'
+      - 'tests/test_atlas_ops_watchdog.py'
+      - 'docs/research/atlas-operational-watchdog-mcp-001.md'
+permissions:
+  contents: read
+jobs:
+  bounded-read-only:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run synthetic watchdog contract
+        run: python -B -m unittest discover -s tests -p test_atlas_ops_watchdog.py -v
+
