@@ -23,7 +23,7 @@ The first observation is a baseline and will normally be `UNKNOWN`. The next obs
 
 ## Local verification already run
 
-The seven synthetic tests cover baseline behavior, durable progress, invalid Registry seals, missing original-to-commit linkage, preserved live HOLD, create-only output, unchanged inputs, and CLI file-pin checks. They passed on the available Windows Python 3.12 runtime. Exact-branch Windows and Ubuntu CI is configured in `.github/workflows/atlas-ops-watchdog.yml`; the final remote CI result is still pending until the branch is pushed.
+The seven synthetic tests cover baseline behavior, durable progress, invalid Registry seals, missing original-to-commit linkage, preserved live HOLD, create-only output, unchanged inputs, and CLI file-pin checks. They passed on the available Windows Python 3.12 runtime. Exact-branch Windows and Ubuntu CI is configured in `.github/workflows/atlas-ops-watchdog.yml`; Exact-head GitHub Actions passed on both `ubuntu-latest` and `windows-latest` for commit `c290641b8d08cbed908e5f51aec2110f1182a388`.
 
 These tests do not prove current owner-host progress, production freshness, daily task operation, or continuous WS recovery. The latest known host evidence remains limited to the previously recorded process I/O sample. No owner-host proof is claimed here.
 
@@ -54,9 +54,9 @@ Do not build or expose MCP tools until two owner-host observations verify the P0
 
 ## Current delivery status
 
-- **P0 code:** implemented locally; proposed as a separate PR against the existing integration branch after targeted source review.
+- **P0 code:** implemented in draft PR #331 against the existing integration branch.
 - **Local tests:** 7/7 passed on Windows Python 3.12.
-- **Windows/Ubuntu exact-head CI:** pending remote branch execution.
+- **Windows/Ubuntu exact-head CI:** passed on commit `c290641b8d08cbed908e5f51aec2110f1182a388`.
 - **Owner-host two-observation proof:** pending; this Work session has no authorized file-level access to the private E: warehouse or its running task outputs.
 - **P1 MCP:** blocked at its explicit evidence gate.
 - **Unattended execution:** not installed or enabled.
