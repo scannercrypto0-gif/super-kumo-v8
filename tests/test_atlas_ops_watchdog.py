@@ -102,6 +102,29 @@ class WatchdogTests(unittest.TestCase):
             build(values)
 
 
+    def test_existing_history_checkpoint_is_read_as_unverified_progress_evidence(self):
+        view = watchdog.history_view(dict(
+            schema="aql.warehouse.full-history-checkpoint.v1",
+            source_class="RETROSPECTIVE_NON_PIT", trading_authority="NONE",
+            full_history_verified=False, accepted_prefix_unchanged=True,
+            archives_this_run=198, inserted_rows_this_run=4_266_757,
+            continuation_ref="https://github.com/example/repo/pull/330#issuecomment-1"))
+        self.assertEqual(view["status"], "CHECKPOINT_UNVERIFIED")
+        self.assertEqual(view["counters"]["inserted_rows"], 4_266_757)
+
+
+    def test_daily_single_archive_receipt_requires_exact_health_linkage(self):
+        values = list(evidence())
+        receipt = dict(status="ARCHIVE_IMPORTED", source_sha256="c" * 64,
+                       key=values[4]["key"], inserted_rows=100)
+        values[2]["last_success"].update(
+            source_zip_sha256="c" * 64, checksum_sha256="f" * 64,
+            warehouse_receipt_sha256=watchdog.digest(watchdog.canonical(receipt)))
+        values[3] = receipt
+        result = build(values)
+        self.assertTrue(result["lanes"]["daily"]["source_receipt_link_verified"])
+
+
     def test_daily_missing_original_to_commit_link_is_unknown(self):
         values = evidence()
         values[4].pop("checksum_sha256")

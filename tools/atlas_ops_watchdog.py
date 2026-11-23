@@ -96,9 +96,26 @@ def registry_view(doc: dict) -> dict:
 
 
 def history_view(doc: dict) -> dict:
-    require(doc.get("schema") == "aql.warehouse.full-history-continuation.v1"
-            and doc.get("trading_authority") == "NONE"
-            and doc.get("full_history_verified") is False, "HISTORY_CONTRACT")
+    schema = doc.get("schema")
+    require(schema in {"aql.warehouse.full-history-continuation.v1",
+                       "aql.warehouse.full-history-checkpoint.v1"}
+            and doc.get("trading_authority") == "NONE", "HISTORY_CONTRACT")
+    if schema == "aql.warehouse.full-history-checkpoint.v1":
+        require(doc.get("source_class") == "RETROSPECTIVE_NON_PIT"
+                and type(doc.get("full_history_verified")) is bool
+                and type(doc.get("accepted_prefix_unchanged")) is bool,
+                "HISTORY_CHECKPOINT_CONTRACT")
+        for key in ("archives_this_run", "inserted_rows_this_run"):
+            require(type(doc.get(key)) is int and doc[key] >= 0, "HISTORY_COUNTER")
+        return dict(status="CHECKPOINT_UNVERIFIED" if not doc["full_history_verified"]
+                    else "CHECKPOINT_FULL_HISTORY_FLAGGED",
+                    counters=dict(archives_imported=doc["archives_this_run"],
+                                  inserted_rows=doc["inserted_rows_this_run"],
+                                  full_history_verified=doc["full_history_verified"],
+                                  accepted_prefix_unchanged=doc["accepted_prefix_unchanged"]),
+                    unresolved_gaps=0, obstacles=0, started_ms=None, finished_ms=None,
+                    continuation_ref_sha256=digest(str(doc.get("continuation_ref", "")).encode("utf-8")))
+    require(doc.get("full_history_verified") is False, "HISTORY_CONTRACT")
     for key in ("started_ms", "finished_ms"):
         require(type(doc.get(key)) is int and doc[key] >= 0, "HISTORY_CLOCK")
     require(doc["finished_ms"] >= doc["started_ms"], "HISTORY_CLOCK_ORDER")
@@ -114,7 +131,7 @@ def history_view(doc: dict) -> dict:
 
 
 def daily_view(doc: dict, import_receipt: dict, source_receipt: dict,
-               registry: dict) -> dict:
+               registry: dict, import_pin: str) -> dict:
     require(doc.get("schema") == "aql.recurring-runtime.health.v1"
             and doc.get("trading_authority") == "NONE"
             and doc.get("current_entry") == "NO_CURRENT_ENTRY", "DAILY_CONTRACT")
@@ -130,16 +147,29 @@ def daily_view(doc: dict, import_receipt: dict, source_receipt: dict,
                       and source_receipt.get("publisher_integrity") == "ZIP_CHECKSUM_MATCH"
                       and type(source_receipt.get("checksum_sha256")) is str
                       and HEX64.fullmatch(source_receipt["checksum_sha256"]))
-    run_rows = [row for row in imports or [] if type(row) is dict and row.get("status") == "ARCHIVE_IMPORTED"]
+    if type(imports) is list:
+        run_rows = [row for row in imports if type(row) is dict and row.get("status") == "ARCHIVE_IMPORTED"]
+    elif type(import_receipt) is dict and import_receipt.get("status") == "ARCHIVE_IMPORTED":
+        run_rows = [import_receipt]
+    else:
+        run_rows = []
     latest = run_rows[-1] if run_rows else None
     registry_link = any(row.get("source_zip_sha256") == source_pin
                         and row.get("source_receipt_sha256") == source_receipt.get("receipt_sha256")
                         for row in registry.get("sources", []))
-    linked = bool(import_receipt.get("schema") == "aql.research.warehouse-report.v1"
+    report_contract = (import_receipt.get("schema") == "aql.research.warehouse-report.v1"
+                       or import_receipt.get("status") == "ARCHIVE_IMPORTED")
+    receipt_link = (success.get("warehouse_receipt_sha256") == import_pin
+                    if type(success) is dict and success.get("warehouse_receipt_sha256") is not None
+                    else import_receipt.get("schema") == "aql.research.warehouse-report.v1")
+    health_source_link = (type(success) is dict
+                          and success.get("source_zip_sha256") == source_pin
+                          and success.get("checksum_sha256") == source_receipt.get("checksum_sha256"))
+    linked = bool(report_contract
                   and type(latest) is dict and latest.get("source_sha256") == source_pin
                   and latest.get("key") == source_receipt.get("key") and source_seal_ok
                   and registry_link and type(success) is dict
-                  and type(success.get("source_day_ms")) is int)
+                  and type(success.get("source_day_ms")) is int and receipt_link and health_source_link)
     last_success = None
     if linked:
         last_success = dict(source_day_ms=success["source_day_ms"], source_zip_sha256=source_pin,
@@ -237,7 +267,7 @@ def build(registry: dict, history: dict, daily: dict, daily_import: dict,
                 and monotonic_ns >= previous["observed_monotonic_ns"], "MONOTONIC_CLOCK_RESET")
 
     rg, hi = registry_view(registry), history_view(history)
-    dy = daily_view(daily, daily_import, daily_source, registry)
+    dy = daily_view(daily, daily_import, daily_source, registry, daily_import_pin)
     lv = live_view(live)
     fingerprints = {
         "history": digest(canonical([rg["counters"], hi["counters"]])),

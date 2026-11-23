@@ -23,7 +23,11 @@ The first observation is a baseline and will normally be `UNKNOWN`. The next obs
 
 ## Local verification already run
 
-The seven synthetic tests cover baseline behavior, durable progress, invalid Registry seals, missing original-to-commit linkage, preserved live HOLD, create-only output, unchanged inputs, and CLI file-pin checks. They passed on the available Windows Python 3.12 runtime. Exact-branch Windows and Ubuntu CI is configured in `.github/workflows/atlas-ops-watchdog.yml`; Exact-head GitHub Actions passed on both `ubuntu-latest` and `windows-latest` for commit `c290641b8d08cbed908e5f51aec2110f1182a388`.
+The nine synthetic tests cover baseline behavior, durable progress, invalid Registry seals, missing original-to-commit linkage, preserved live HOLD, create-only output, unchanged inputs, CLI file-pin checks, and the current history-checkpoint / per-archive import receipt formats. They passed on the available Windows Python 3.12 runtime. Earlier GitHub Actions passed on both `ubuntu-latest` and `windows-latest` for implementation commit `c290641b8d08cbed908e5f51aec2110f1182a388`; the current compatibility follow-up still needs exact-head CI.
+
+## Observed local evidence contract
+
+A bounded read-only inspection of the available `DataWarehouse` metadata found sealed Registry snapshots and `aql.research.warehouse-source.v1` receipts. The active history evidence uses `aql.warehouse.full-history-checkpoint.v1`, so the reader accepts that checkpoint as unverified progress evidence; it never promotes `full_history_verified=false` to completion. The daily importer also emits individual `ARCHIVE_IMPORTED` receipt rows, which the reader can validate against the daily health export and source catalog receipt. The most recent catalog source receipt inspected was not linked from the selected Registry snapshot, so that daily lineage must remain `UNKNOWN` until a matching committed source exists.
 
 These tests do not prove current owner-host progress, production freshness, daily task operation, or continuous WS recovery. The latest known host evidence remains limited to the previously recorded process I/O sample. No owner-host proof is claimed here.
 
@@ -54,9 +58,9 @@ Do not build or expose MCP tools until two owner-host observations verify the P0
 
 ## Current delivery status
 
-- **P0 code:** implemented in draft PR #331 against the existing integration branch.
-- **Local tests:** 7/7 passed on Windows Python 3.12.
-- **Windows/Ubuntu exact-head CI:** passed on commit `c290641b8d08cbed908e5f51aec2110f1182a388`.
+- **P0 code:** implemented in draft PR #331 against the existing integration branch; current compatibility follow-up accepts the observed checkpoint and per-archive receipt contracts.
+- **Local tests:** 9/9 passed on Windows Python 3.12.
+- **Windows/Ubuntu exact-head CI:** passed on the earlier implementation commit; the current compatibility follow-up still needs exact-head CI.
 - **Owner-host two-observation proof:** pending; this Work session has no authorized file-level access to the private E: warehouse or its running task outputs.
 - **P1 MCP:** blocked at its explicit evidence gate.
 - **Unattended execution:** not installed or enabled.
