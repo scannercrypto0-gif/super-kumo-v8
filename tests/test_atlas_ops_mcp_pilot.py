@@ -23,7 +23,8 @@ def snapshot():
         "source_pins": {k: str(i) * 64 for i, k in enumerate(
             ("registry", "history", "daily", "daily_import", "daily_source", "live"), 1)},
         "registry": {"gaps": 2, "unavailable": 1, "conflicts": 0,
-                     "counters": {"event_watermark": 4, "physical_rows": 100}},
+                     "counters": {"event_watermark": 4, "physical_rows": 100,
+                                  "last_open_ms": 1795499000000}},
         "lanes": {
             "history": {"state": "UNKNOWN", "reason": "BASELINE_REQUIRED", "finished_ms": None,
                          "counters": {"archives_imported": 2, "inserted_rows": 400,
@@ -121,6 +122,8 @@ class McpPilotTests(unittest.TestCase):
              "LANE_TIMESTAMP_CONFLICT"),
             (lambda doc: doc["registry"]["counters"].update(event_watermark=-1),
              "REGISTRY_WATERMARK_INVALID"),
+            (lambda doc: doc["registry"]["counters"].update(last_open_ms=doc["observed_at_ms"] + 1),
+             "REGISTRY_TIMESTAMP_CONFLICT"),
             (lambda doc: doc.update(state="HEALTHY_PROGRESS"), "OVERALL_LANE_STATE_CONFLICT"),
         ):
             with tempfile.TemporaryDirectory() as directory:
@@ -134,13 +137,28 @@ class McpPilotTests(unittest.TestCase):
             self.assertEqual(result["refusal_reason"], code)
 
     def test_expected_wait_and_stale_never_promote_to_healthy(self):
-        lanes = snapshot()["lanes"]
         self.assertEqual(pilot.map_state("EXPECTED_WAIT", "daily"), "EXPECTED_WAIT")
         self.assertEqual(pilot.map_state("STALLED", "history"), "STALE")
         self.assertEqual(pilot.map_state("COMPLETE_WITH_GAPS", "history"), "STALE")
         self.assertEqual(pilot.map_state("CHECKPOINT_UNVERIFIED", "history"), "UNKNOWN")
         self.assertEqual(pilot.map_state("HEALTHY_PROGRESS", "live"), "HEALTHY")
-        self.assertIsInstance(lanes, dict)
+        daily = pilot.make_lane("daily", {"state": "HEALTHY_PROGRESS", "source_receipt_link_verified": True,
+                                           "source_freshness": "STALE", "last_success": {"source_day_ms": 1000}},
+                                observed_ms=2000)
+        live = pilot.make_lane("live", {"state": "HEALTHY_PROGRESS", "last_receipt_fresh": False,
+                                         "last_committed_ms": 1000, "as_of_ms": 2000}, observed_ms=2000)
+        history = pilot.make_lane("history", {"state": "HEALTHY_PROGRESS", "counters": {}},
+                                  observed_ms=2000, registry_gaps=1)
+        self.assertEqual(daily["status"], "STALE")
+        self.assertEqual(daily["reason"], "DAILY_SOURCE_STALE")
+        self.assertEqual(live["status"], "STALE")
+        self.assertEqual(live["freshness"]["source_age_ms_at_snapshot"], 1000)
+        self.assertEqual(history["status"], "STALE")
+        missing_link = pilot.make_lane("daily", {"state": "HEALTHY_PROGRESS",
+                                                  "source_receipt_link_verified": False,
+                                                  "source_freshness": "LATEST_DUE_DAY_RECEIVED"})
+        self.assertEqual(missing_link["status"], "UNKNOWN")
+        self.assertIsNone(missing_link["last_validated_committed_progress"]["source_rows"])
 
     def test_modern_and_legacy_protocol_read_only_surface(self):
         server = pilot.MCPServer(type("Reader", (), {"view": pilot.SnapshotReader.unavailable("TEST")}))

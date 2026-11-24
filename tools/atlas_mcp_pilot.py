@@ -63,12 +63,14 @@ def map_state(state, lane):
     }.get(state, "UNKNOWN")
 
 
-def make_lane(name, lane):
-    source_time = None
+def make_lane(name, lane, *, observed_ms=None, registry_last_open_ms=None, registry_gaps=0):
+    source_ms = None
+    lane_observed_ms = None
     committed = {}
     gaps = {}
     if name == "history":
-        source_time = utc(lane.get("finished_ms"))
+        source_ms = registry_last_open_ms
+        lane_observed_ms = lane.get("finished_ms")
         counters = lane.get("counters") if type(lane.get("counters")) is dict else {}
         committed = {"archives_imported": bounded_int(counters.get("archives_imported")),
                      "inserted_rows": bounded_int(counters.get("inserted_rows")),
@@ -77,15 +79,19 @@ def make_lane(name, lane):
         gaps = {"unresolved_ranges": bounded_int(lane.get("unresolved_gaps")) or 0,
                 "source_obstacles": bounded_int(lane.get("obstacles")) or 0}
     elif name == "daily":
-        source_time = utc(lane.get("observed_at_ms"))
+        lane_observed_ms = lane.get("observed_at_ms")
         success = lane.get("last_success") if type(lane.get("last_success")) is dict else {}
-        committed = {"source_time_utc": utc(success.get("source_day_ms")),
-                     "source_rows": bounded_int(success.get("source_rows")),
-                     "inserted_rows": bounded_int(success.get("inserted_rows")),
-                     "receipt_link_verified": lane.get("source_receipt_link_verified") is True}
-        gaps = {"receipt_link_missing": lane.get("source_receipt_link_verified") is not True}
+        linked = lane.get("source_receipt_link_verified") is True
+        if linked:
+            source_ms = success.get("source_day_ms")
+        committed = {"source_time_utc": utc(success.get("source_day_ms")) if linked else None,
+                     "source_rows": bounded_int(success.get("source_rows")) if linked else None,
+                     "inserted_rows": bounded_int(success.get("inserted_rows")) if linked else None,
+                     "receipt_link_verified": linked}
+        gaps = {"receipt_link_missing": not linked}
     else:
-        source_time = utc(lane.get("as_of_ms"))
+        lane_observed_ms = lane.get("as_of_ms")
+        source_ms = lane.get("last_committed_ms")
         committed = {"verified_receipts": bounded_int(lane.get("verified_receipts")),
                      "last_committed_time_utc": utc(lane.get("last_committed_ms")),
                      "last_receipt_fresh": lane.get("last_receipt_fresh") is True}
@@ -93,15 +99,33 @@ def make_lane(name, lane):
     raw_state = lane.get("state")
     status = map_state(raw_state, name)
     reason = safe_reason(lane.get("reason"))
+    if name == "history" and (registry_gaps or gaps.get("unresolved_ranges", 0) or gaps.get("source_obstacles", 0)):
+        if status in {"HEALTHY", "EXPECTED_WAIT"}:
+            status, reason = "STALE", "REGISTRY_GAPS_PRESENT"
+    if name == "daily":
+        if lane.get("source_receipt_link_verified") is not True:
+            status, reason = "UNKNOWN", "DAILY_SOURCE_LINKAGE_UNPROVEN"
+        elif lane.get("source_freshness") == "STALE" and status not in {"FAILED", "HELD"}:
+            status, reason = "STALE", "DAILY_SOURCE_STALE"
+        elif lane.get("last_failure") is not None and status not in {"FAILED", "HELD"}:
+            status, reason = "FAILED", "DAILY_IMPORT_FAILURE"
+    if name == "live" and lane.get("last_receipt_fresh") is False and status not in {"FAILED", "HELD"}:
+        status, reason = "STALE", "LIVE_LAST_RECEIPT_STALE"
     refusal = safe_reason(lane.get("hold_reason")) if lane.get("hold_reason") else None
     if name == "live" and status == "HELD":
         refusal = safe_reason(lane.get("hold_reason")) or "LIVE_HOLD_REASON_REDACTED"
     elif status in {"FAILED", "STALE"}:
         refusal = reason
+    source_age_ms = observed_ms - source_ms if type(observed_ms) is int and type(source_ms) is int and 0 <= source_ms <= observed_ms else None
     return {"lane": name, "status": status, "progress_state": safe_reason(raw_state) or "UNKNOWN",
-            "reason": reason, "refusal_reason": refusal, "source_time_utc": source_time,
+            "reason": reason, "refusal_reason": refusal, "source_time_utc": utc(source_ms),
+            "observed_at_utc": utc(lane_observed_ms),
             "last_validated_committed_progress": committed,
             "freshness": {"last_progress_time_utc": utc(lane.get("last_progress_at_ms")),
+                          "source_age_ms_at_snapshot": source_age_ms,
+                          "source_state": safe_reason(lane.get("source_freshness")) or (
+                              "FRESH" if name == "live" and lane.get("last_receipt_fresh") is True else
+                              "STALE" if name == "live" and lane.get("last_receipt_fresh") is False else None),
                           "expected_wait": status == "EXPECTED_WAIT"},
             "gaps": gaps,
             "provenance": {"fingerprint_sha256": lane.get("fingerprint") if is_sha256(lane.get("fingerprint")) else None,
@@ -166,21 +190,43 @@ class SnapshotReader:
             if lane_time is not None and (type(lane_time) is not int or lane_time < 0 or lane_time > observed):
                 raise ValueError("LANE_TIMESTAMP_CONFLICT")
         raw_states = {raw_lanes[name].get("state") for name in LANES}
+        if any(state not in watchdog.STATES for state in raw_states):
+            raise ValueError("LANE_STATE_INVALID")
         expected_state = ("FAILED" if "FAILED" in raw_states else "HOLD" if "HOLD" in raw_states else
                           "STALLED" if "STALLED" in raw_states else "UNKNOWN" if "UNKNOWN" in raw_states else
                           "HEALTHY_PROGRESS" if "HEALTHY_PROGRESS" in raw_states else "EXPECTED_WAIT")
         if snapshot.get("state") != expected_state:
             raise ValueError("OVERALL_LANE_STATE_CONFLICT")
-        lanes = {name: make_lane(name, raw_lanes[name]) for name in LANES}
-        states = {lane["status"] for lane in lanes.values()}
-        overall = ("FAILED" if "FAILED" in states else "HELD" if "HELD" in states else
-                   "STALE" if "STALE" in states else "UNKNOWN" if "UNKNOWN" in states else
-                   "HEALTHY" if "HEALTHY" in states else "EXPECTED_WAIT")
         registry = snapshot.get("registry") if type(snapshot.get("registry")) is dict else {}
+        for key in ("gaps", "unavailable", "conflicts"):
+            if type(registry.get(key)) is not int or registry[key] < 0:
+                raise ValueError("REGISTRY_COVERAGE_INVALID")
         registry_counters = registry.get("counters") if type(registry.get("counters")) is dict else {}
         watermark = registry_counters.get("event_watermark")
         if type(watermark) is not int or watermark < 0:
             raise ValueError("REGISTRY_WATERMARK_INVALID")
+        if type(registry_counters.get("physical_rows")) is not int or registry_counters["physical_rows"] < 0:
+            raise ValueError("REGISTRY_COUNTER_INVALID")
+        registry_last_open_ms = registry_counters.get("last_open_ms")
+        if registry_last_open_ms is not None and (type(registry_last_open_ms) is not int or
+                                                   registry_last_open_ms < 0 or registry_last_open_ms > observed):
+            raise ValueError("REGISTRY_TIMESTAMP_CONFLICT")
+        daily_success = raw_lanes["daily"].get("last_success")
+        daily_observed = raw_lanes["daily"].get("observed_at_ms")
+        if type(daily_success) is dict and daily_success.get("source_day_ms") is not None:
+            source_day = daily_success["source_day_ms"]
+            if type(source_day) is not int or source_day < 0 or (type(daily_observed) is int and source_day > daily_observed):
+                raise ValueError("DAILY_SOURCE_TIMESTAMP_CONFLICT")
+        lanes = {name: make_lane(name, raw_lanes[name], observed_ms=observed,
+                                 registry_last_open_ms=registry_last_open_ms,
+                                 registry_gaps=bounded_int(registry.get("gaps")) or 0)
+                 for name in LANES}
+        if any(not is_sha256(raw_lanes[name].get("fingerprint")) for name in LANES):
+            raise ValueError("LANE_FINGERPRINT_INVALID")
+        states = {lane["status"] for lane in lanes.values()}
+        overall = ("FAILED" if "FAILED" in states else "HELD" if "HELD" in states else
+                   "STALE" if "STALE" in states else "UNKNOWN" if "UNKNOWN" in states else
+                   "HEALTHY" if "HEALTHY" in states else "EXPECTED_WAIT")
         source_pins = snapshot.get("source_pins") if type(snapshot.get("source_pins")) is dict else {}
         required_pins = {"registry", "history", "daily", "daily_import", "daily_source", "live"}
         if not required_pins.issubset(source_pins) or any(not is_sha256(source_pins[k]) for k in required_pins):
