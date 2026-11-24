@@ -51,7 +51,7 @@ if($t.Count -ne 1 -or @($t[0].Actions).Count -ne 1){throw 'TASK_NOT_UNIQUE'}
 $config=Read-ConfigPath $t[0];$root=Split-Path -Parent $config
 if($Mode -in @('ActivateAndObserve','ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve')){
     if(!$OwnerDecisionRef){throw 'EXPLICIT_CONTINUOUS_OWNER_DECISION_REQUIRED'}
-    if($Mode -in @('ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve') -and $ExpectedPreviousConfigSha256 -cnotmatch '^[a-f0-9]{64}
+    if($Mode -in @('ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve') -and $ExpectedPreviousConfigSha256 -cnotmatch '\A[a-f0-9]{64}\z'){
         throw 'EXACT_PREVIOUS_CONFIG_SHA256_REQUIRED'
     }
     if($Mode -ceq 'ActivateAndObserve' -and (Test-Path -LiteralPath (Join-Path $root 'continuous-research.authorized.json'))){throw 'CONTINUOUS_ALREADY_ACTIVATED_USE_OBSERVE'}
