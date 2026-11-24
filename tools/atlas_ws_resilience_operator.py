@@ -300,8 +300,13 @@ def authorize(path, diagnostic, now, *, action='DEPLOY_ONE_RECOVERY'):
     else:
         need(auth.get('continuous_research') in (None,False),'CONTINUITY_POLICY_AUTHORIZATION')
     correction=auth.get('fresh_ping_correction') is True
+    disk_correction=auth.get('disk_reserve_correction') is True
+    if diagnostic['hold_reason'] == 'PILOT_STOP_DISK_RESERVE_LOW' or disk_correction:
+        need(disk_correction and not correction and auth.get('continuous_research') is True and
+             auth.get('expected_previous_config_sha256')==diagnostic['identity']['config_sha256'],
+             'DISK_RESERVE_CORRECTION_AUTHORITY_REQUIRED')
     if diagnostic['hold_reason'] in ('LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED') or correction:
-        need(correction and auth.get('continuous_research') is True and
+        need(correction and not disk_correction and auth.get('continuous_research') is True and
              auth.get('expected_previous_config_sha256')==diagnostic['identity']['config_sha256'],
              'FRESH_PING_CORRECTION_AUTHORITY_REQUIRED')
     if diagnostic['blockers']:
@@ -349,6 +354,8 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
     marker = root/'operator-deployment.in-progress'
     continuous = auth.get('continuous_research') is True
     correction=auth.get('fresh_ping_correction') is True
+    disk_correction=auth.get('disk_reserve_correction') is True
+    correction=correction or disk_correction
     if correction:
         need(not (root/'operator-recovery.active.json').exists(),'FRESH_PING_ACTIVE_RECOVERY_REVIEW_REQUIRED')
         module=continuity_module()
@@ -428,7 +435,8 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
                 config_sha256=newpin,hold_sha256=diagnostic['identity']['hold_sha256'],
                 claimed_sha256=diagnostic['identity']['claimed_sha256'],pending_sha256=diagnostic['identity']['pending_sha256'],
                 issued_ms=now2,expires_ms=min(auth['expires_ms'],now2+1800000),max_segments=1,
-                max_connections=2,orders=0,trading_authority='NONE',fresh_ping_correction=correction)
+                max_connections=2,orders=0,trading_authority='NONE',fresh_ping_correction=auth.get('fresh_ping_correction') is True,
+                disk_reserve_correction=auth.get('disk_reserve_correction') is True)
             if continuous:
                 PIN=continuity_pin()
                 prior=root/'operator-recovery.active.json'
