@@ -149,8 +149,13 @@ function Test-OperatorResume([string]$TicketPath, [string]$RootPath, [string]$Co
     $held=Get-Content -LiteralPath (Join-Path $RootPath 'hold.json') -Raw | ConvertFrom-Json
     $freshPingHold=@('LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED') -ccontains $held.reason -and
         $ticket.fresh_ping_correction -is [bool] -and $ticket.fresh_ping_correction
+    $diskReserveHold=($held.reason -ceq 'PILOT_STOP_DISK_RESERVE_LOW') -and
+        $ticket.disk_reserve_correction -is [bool] -and $ticket.disk_reserve_correction
+    if ($diskReserveHold -and [IO.DriveInfo]::new([IO.Path]::GetPathRoot($RootPath)).AvailableFreeSpace -lt 128MB) {
+        throw 'LIVE_SERVICE_DISK_RESERVE_NOT_RESTORED'
+    }
     if (@('PILOT_STOP_TimeoutError','PILOT_STOP_ConnectionResetError') -cnotcontains $held.reason -and
-        !$freshPingHold) {
+        !$freshPingHold -and !$diskReserveHold) {
         throw 'LIVE_SERVICE_OPERATOR_HOLD_NOT_ELIGIBLE'
     }
     return $ticket
