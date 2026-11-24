@@ -15,7 +15,7 @@ $d=Fixture;$d.hold_reason='PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED'
 if(!(Test-FreshPingBaseline $d $expected).ready){throw 'FRESH_PING_PROOF_HOLD_REJECTED'}
 $d=Fixture;$d.hold_reason='PILOT_STOP_PONG_QUOTA_STOP'
 if((Test-FreshPingBaseline $d $expected).failures -notcontains 'HOLD_REASON_MISMATCH'){throw 'UNSCOPED_HOLD_ACCEPTED'}
-$d.blockers=$null
+$d=Fixture;$d.blockers=$null
 if(!(Test-FreshPingBaseline $d $expected).ready){throw 'NULL_BLOCKERS_REJECTED'}
 foreach($blocker in @('QUOTA_NOT_READY','COMPETING_COLLECTOR_OR_PROCESS_INSPECTION_UNKNOWN','OPERATOR_STOP_PRESENT_OR_UNKNOWN','DISK_RESERVE_LOW','UNKNOWN_BLOCKER')){
     $d=Fixture;$d.blockers=@($blocker);$r=Test-FreshPingBaseline $d $expected
