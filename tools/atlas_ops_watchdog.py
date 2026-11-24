@@ -172,7 +172,7 @@ def daily_view(doc: dict, import_receipt: dict, source_receipt: dict,
     health_source_link = (type(success) is dict
                           and success.get("source_zip_sha256") == source_pin
                           and success.get("checksum_sha256") == source_receipt.get("checksum_sha256")
-                          and (native_receipt_link or import_receipt.get("schema") == "aql.research.warehouse-report.v1"))
+                          and (native_receipt_link or legacy_receipt_link))
     linked = bool(report_contract
                   and type(latest) is dict and latest.get("source_sha256") == source_pin
                   and latest.get("key") == source_receipt.get("key") and source_seal_ok
