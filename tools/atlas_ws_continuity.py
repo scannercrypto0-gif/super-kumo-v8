@@ -124,6 +124,24 @@ def next_action(root, config_pin, now, slot=None, failed=False):
     return dict(enabled=True,wait_until_ms=wait,circuit_open=count>=4)
 
 
+def resume_ticket_pending(reason, has_rows, ticket, config_pin, authorization_sha256, now, active_recovery):
+    """Recognize only a live, exact-scope resume ticket awaiting the scheduler."""
+    if has_rows or active_recovery or reason not in (
+        'PILOT_STOP_TimeoutError','PILOT_STOP_ConnectionResetError',
+        'LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED'
+    ):
+        return False
+    correction_required=reason in (
+        'LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED'
+    )
+    return (ticket.get('schema')=='atlas.ws.operator-resume.v1'
+        and ticket.get('config_sha256')==config_pin
+        and ticket.get('authorization_sha256')==authorization_sha256
+        and (not correction_required or ticket.get('fresh_ping_correction') is True)
+        and type(ticket.get('issued_ms')) is int and type(ticket.get('expires_ms')) is int
+        and ticket['issued_ms']<=now<ticket['expires_ms']<=ticket['issued_ms']+1800000)
+
+
 def report(root,config_pin,now):
     from datetime import datetime
     from tools.atlas_live_research_cycle import read_service_receipt,saved_pilot_summary
@@ -193,14 +211,10 @@ def report(root,config_pin,now):
     hold=root/'hold.json';reason=json.loads(bounded(hold)).get('reason') if hold.exists() else None
     awaiting=False
     ticket=root/'operator-resume.authorized.json'
-    if reason in ('PILOT_STOP_TimeoutError','PILOT_STOP_ConnectionResetError','LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN') and not rows and ticket.exists():
+    if ticket.exists():
         t=json.loads(bounded(ticket))
-        awaiting=(t.get('schema')=='atlas.ws.operator-resume.v1' and t.get('config_sha256')==config_pin
-            and t.get('authorization_sha256')==a['authorization_sha256']
-            and (reason!='LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN' or t.get('fresh_ping_correction') is True)
-            and type(t.get('issued_ms')) is int and type(t.get('expires_ms')) is int
-            and t['issued_ms']<=now<t['expires_ms']<=t['issued_ms']+1800000
-            and not (root/'operator-recovery.active.json').exists())
+        awaiting=resume_ticket_pending(reason,bool(rows),t,config_pin,a['authorization_sha256'],now,
+            (root/'operator-recovery.active.json').exists())
     fresh=bool(last and 0<=now-last['slot']-900000<=1200000)
     rollovers=sum(b==a+8*900000 for a,b in zip(complete,complete[1:]))
     ready=not reason and len(complete)>=3 and rollovers>=2 and len(rows)>=24 and fresh and recovered
