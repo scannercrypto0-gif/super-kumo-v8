@@ -15,7 +15,7 @@ from aql.observation.contracts import digest
 
 DAY_MS = 86_400_000
 MAX_BYTES = 64 * 1024
-HEX64 = re.compile(r"[0-9a-f]{64}\\Z")
+HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 REPARSE_POINT = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
 
 
