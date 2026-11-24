@@ -126,7 +126,7 @@ def next_action(root, config_pin, now, slot=None, failed=False):
 
 def resume_ticket_pending(reason, has_rows, ticket, config_pin, authorization_sha256, now, active_recovery):
     """Recognize only a live, exact-scope resume ticket awaiting the scheduler."""
-    if has_rows or active_recovery or reason not in (
+    if active_recovery or reason not in (
         'PILOT_STOP_TimeoutError','PILOT_STOP_ConnectionResetError',
         'LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED',
         'PILOT_STOP_DISK_RESERVE_LOW'
