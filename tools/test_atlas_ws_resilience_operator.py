@@ -911,9 +911,9 @@ def test_disk_reserve_hold_requires_exact_scoped_disk_correction(host):
     auth,_=op.authorize(permit,d,host['now'])
     assert auth['disk_reserve_correction'] is True
     assert auth['expected_previous_config_sha256']==d['identity']['config_sha256']
+    bad_scope=dict(scope);bad_scope['expected_previous_config_sha256']='0'*64
     with pytest.raises(ValueError,match='DISK_RESERVE_CORRECTION_AUTHORITY_REQUIRED'):
-        op.authorize(authorization(host,**scope,disk_reserve_correction=True,
-            expected_previous_config_sha256='0'*64),d,host['now'])
+        op.authorize(authorization(host,**bad_scope,disk_reserve_correction=True),d,host['now'])
     (host['root']/'hold.json').write_bytes(op.canonical(dict(reason='PILOT_STOP_TimeoutError',slot_ms=SLOT)))
     d=diagnostic(host)
     with pytest.raises(ValueError,match='DISK_RESERVE_CORRECTION_AUTHORITY_REQUIRED'):
@@ -941,7 +941,7 @@ def test_disk_reserve_correction_stages_one_ticket_and_preserves_prior_authority
         allow_explicit_missing_intervals=True,disk_reserve_correction=True,
         expected_previous_config_sha256=d['identity']['config_sha256'])
     out=StringIO()
-    op.gate(host['snapshot'],host['repo'],COMMIT,permit,now,StringIO('COMMIT\\n'),out)
+    op.gate(host['snapshot'],host['repo'],COMMIT,permit,now,StringIO('COMMIT\n'),out)
     lines=[json.loads(x) for x in out.getvalue().splitlines()]
     receipt=lines[-1];ticket=op.load(host['root']/'operator-resume.authorized.json')
     assert receipt['status']=='WS_ENGINEERING_INSTALLED_ONE_RECOVERY_WAITING_FOR_EXISTING_SCHEDULE'
