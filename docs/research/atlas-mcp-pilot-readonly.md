@@ -80,3 +80,5 @@ Every MCP tool call and resource read reopens the same manifest-pinned snapshot 
 Registry gaps, unavailable archive boundaries, conflicts, or a missing/zero source count force the history lane and overall snapshot away from healthy/verified-complete. The MCP projection applies the same rule even if a producer snapshot incorrectly marks the overall state healthy.
 
 The focused MCP workflow runs only `test_atlas_ops_mcp*.py` on Ubuntu and Windows. It does not rerun unrelated watchdog-only tests. This remains an unmerged engineering candidate; passing CI does not authorize local host deployment or live use.
+
+An overall `HELD` or `FAILED` state does not freeze child-lane freshness: each healthy/expected-wait lane is independently downgraded on expiry or clock failure, while any lane already `HELD`/`FAILED` preserves its own state and sanitized reason.

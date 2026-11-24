@@ -351,10 +351,10 @@ class MCPServer:
             for lane in data.get("lanes", {}).values():
                 if lane.get("status") in {"HELD", "FAILED"}:
                     continue
-                if not protected_status and clock_bad and lane.get("status") in {"HEALTHY", "EXPECTED_WAIT"}:
+                if clock_bad and lane.get("status") in {"HEALTHY", "EXPECTED_WAIT"}:
                     lane.update(status="UNKNOWN", reason="CLOCK_OR_TIMESTAMP_UNTRUSTED",
                                 refusal_reason="EVIDENCE_UNAVAILABLE")
-                elif not protected_status and stale and lane.get("status") in {"HEALTHY", "EXPECTED_WAIT"}:
+                elif stale and lane.get("status") in {"HEALTHY", "EXPECTED_WAIT"}:
                     lane.update(status="STALE", reason="SNAPSHOT_TTL_EXCEEDED",
                                 refusal_reason="SNAPSHOT_TTL_EXCEEDED")
             return data

@@ -72,6 +72,42 @@ class FreshnessTests(unittest.TestCase):
             result = server.call_tool(2, {"name": "atlas.runtime.health", "arguments": {}}, False)
             self.assertEqual(result["result"]["structuredContent"]["status"], "UNKNOWN")
 
+    def test_held_overall_does_not_hide_expired_healthy_lanes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            doc = healthy_snapshot()
+            doc["state"] = "HOLD"
+            doc["lanes"]["live"].update(state="HOLD",
+                hold_reason="PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED")
+            doc = {**{k: v for k, v in doc.items() if k != "sha256"},
+                   "sha256": watchdog.digest(watchdog.canonical(
+                       {k: v for k, v in doc.items() if k != "sha256"}))}
+            manifest, pin = write_fixture(Path(directory), doc)
+            clock = FakeClock(1_001_000)
+            server = pilot.MCPServer(pilot.SnapshotReader(manifest, pin), clock=clock)
+            clock.advance(pilot.MAX_SNAPSHOT_AGE_MS + 1)
+            daily_tool = server.call_tool(1, {"name": "atlas.lane.latest",
+                "arguments": {"lane": "daily"}}, False)
+            self.assertEqual(daily_tool["result"]["structuredContent"]["status"], "STALE")
+            daily_resource = server.read_resource(2, {"uri": "atlas://lane/daily"}, False)
+            self.assertEqual(json.loads(daily_resource["result"]["contents"][0]["text"])["status"], "STALE")
+            history_tool = server.call_tool(3, {"name": "atlas.lane.latest",
+                "arguments": {"lane": "history"}}, False)
+            self.assertEqual(history_tool["result"]["structuredContent"]["status"], "STALE")
+            live = server.call_tool(4, {"name": "atlas.lane.latest",
+                "arguments": {"lane": "live"}}, False)["result"]["structuredContent"]
+            self.assertEqual(live["status"], "HELD")
+            self.assertEqual(live["refusal_reason"], "PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED")
+            self.assertEqual(live["trading_authority"], "NONE")
+            overall = server.call_tool(5, {"name": "atlas.runtime.health",
+                "arguments": {}}, False)["result"]["structuredContent"]
+            self.assertEqual(overall["status"], "HELD")
+            self.assertEqual(overall["observed_at_ms"], 1_000_000)
+            clock.wall_ms -= 1
+            clock.mono_ns += 1_000_000
+            daily_unknown = server.call_tool(6, {"name": "atlas.lane.latest",
+                "arguments": {"lane": "daily"}}, False)["result"]["structuredContent"]
+            self.assertEqual(daily_unknown["status"], "UNKNOWN")
+
     def test_same_path_snapshot_replacement_fails_closed(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
