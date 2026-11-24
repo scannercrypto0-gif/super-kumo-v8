@@ -65,3 +65,10 @@ Do not build or expose MCP tools until two owner-host observations verify the P0
 - **P1 MCP:** blocked at its explicit evidence gate.
 - **Unattended execution:** not installed or enabled.
 
+
+
+## P1 engineering amendment — 2026-11-24
+
+The owner’s later unified order in PR #331 comment #7123466635 authorizes a **local read-only MCP engineering pilot now**, while retaining all host, remote, merge, trading, and production stop gates. This supersedes the prior proposal to defer even MCP repository implementation until two host observations. It does not waive P0 evidence boundaries: the adapter reads only one pinned sealed watchdog snapshot, reports unknown when evidence is missing or mismatched, and never attests the host. See [ATLAS MCP Pilot — Read Only](atlas-mcp-pilot-readonly.md) for setup, single optional owner-local acceptance, tests, threat boundary, and rollback.
+
+The new state is ENGINEERING_READY_PILOT_NOT_DEPLOYED until exact-head Windows/Ubuntu CI completes. HOST_VALIDATED and PRODUCTION_APPROVED remain separate future gates. Current owner-reported live state remains HOLD with the exact refusal PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED; the engineering session did not independently inspect the private host artifacts.

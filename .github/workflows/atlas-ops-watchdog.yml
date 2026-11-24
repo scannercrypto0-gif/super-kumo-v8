@@ -1,19 +1,27 @@
-name: ATLAS operational watchdog contract
+name: ATLAS operational watchdog and MCP pilot contract
 on:
   push:
     branches: [codex/atlas-ops-watchdog-mcp-001]
     paths:
       - '.github/workflows/atlas-ops-watchdog.yml'
       - 'tools/atlas_ops_watchdog.py'
+      - 'tools/atlas_mcp_pilot.py'
+      - 'tools/atlas_mcp_manifest.py'
       - 'tests/test_atlas_ops_watchdog.py'
+      - 'tests/test_atlas_ops_mcp_pilot.py'
       - 'docs/research/atlas-operational-watchdog-mcp-001.md'
+      - 'docs/research/atlas-mcp-pilot-readonly.md'
   pull_request:
     branches: [integration/package-e-g1-g12-pinned-20261105]
     paths:
       - '.github/workflows/atlas-ops-watchdog.yml'
       - 'tools/atlas_ops_watchdog.py'
+      - 'tools/atlas_mcp_pilot.py'
+      - 'tools/atlas_mcp_manifest.py'
       - 'tests/test_atlas_ops_watchdog.py'
+      - 'tests/test_atlas_ops_mcp_pilot.py'
       - 'docs/research/atlas-operational-watchdog-mcp-001.md'
+      - 'docs/research/atlas-mcp-pilot-readonly.md'
 permissions:
   contents: read
 jobs:
@@ -31,6 +39,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Run synthetic watchdog contract
-        run: python -B -m unittest discover -s tests -p test_atlas_ops_watchdog.py -v
+      - name: Run watchdog and read-only MCP contract
+        run: python -B -m unittest discover -s tests -p 'test_atlas_ops_*.py' -v
 
