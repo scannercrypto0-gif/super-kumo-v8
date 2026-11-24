@@ -114,6 +114,13 @@ try {
     Refused {Test-OperatorResume $ticket $root $cfgPin $now} 'HOLD_NOT_ELIGIBLE'
     $permit.fresh_ping_correction=$true;Save-Ticket
     Assert ((Test-OperatorResume $ticket $root $cfgPin $now).fresh_ping_correction -eq $true) 'FRESH_PING_SCOPED_CIRCUIT_DENIED'
+    New-Case 'fresh-ping-proof-hold-scope'
+    @{reason='PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED';slot_ms=1795259700000L}|ConvertTo-Json|Set-Content $hold
+    $permit.hold_sha256=Pin $hold
+    Save-Ticket
+    Refused {Test-OperatorResume $ticket $root $cfgPin $now} 'HOLD_NOT_ELIGIBLE'
+    $permit.fresh_ping_correction=$true;Save-Ticket
+    Assert ((Test-OperatorResume $ticket $root $cfgPin $now).fresh_ping_correction -eq $true) 'FRESH_PING_PROOF_SCOPED_HOLD_DENIED'
     $bootstrap=Join-Path $PSScriptRoot 'ATLAS-WS-CONTINUOUS-RECOVERY.ps1'
     $bootstrapAst=[System.Management.Automation.Language.Parser]::ParseFile($bootstrap,[ref]$null,[ref]$null)
     $repairCondition=$bootstrapAst.Find({param($n) $n -is [System.Management.Automation.Language.IfStatementAst] -and
