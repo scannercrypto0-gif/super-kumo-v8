@@ -281,3 +281,233 @@ try{
     $r|ConvertTo-Json -Depth 15
     Write-Output ('REPORT_FILE='+$output)
 }finally{$env:PYTHONPATH=$oldPythonPath}
+){
+        throw 'EXACT_PREVIOUS_CONFIG_SHA256_REQUIRED'
+    }
+    if($Mode -ceq 'ActivateAndObserve' -and (Test-Path -LiteralPath (Join-Path $root 'continuous-research.authorized.json'))){throw 'CONTINUOUS_ALREADY_ACTIVATED_USE_OBSERVE'}
+    $baselineDeadline=[DateTimeOffset]::UtcNow.AddMinutes(3)
+    do{
+        $raw=@(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -ExpectedCommit $ExpectedCommit -Mode Diagnose)
+        if($LASTEXITCODE){$raw|Write-Output;throw 'CONTINUOUS_PREFLIGHT_BLOCKED'}
+        $d=($raw -join "`n")|ConvertFrom-Json
+        if($Mode -notin @('ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve')){break}
+        $recoveryKind=if($Mode -ceq 'ApplyDiskReserveRecoveryAndObserve'){'Disk'}else{'Ping'}
+        $assessment=Test-FreshPingBaseline $d $ExpectedPreviousConfigSha256 $recoveryKind
+        if($assessment.ready){break}
+        $assessment|ConvertTo-Json -Depth 15 -Compress|Write-Output
+        if(!$assessment.retryable -or [DateTimeOffset]::UtcNow -ge $baselineDeadline){
+            $outputDir=Join-Path $repo 'owner-results'
+            New-Item -ItemType Directory -Force -Path $outputDir|Out-Null
+            $blockedFile=Join-Path $outputDir ('ws-baseline-blocked-'+[guid]::NewGuid().ToString('N')+'.json')
+            Write-NewJson $blockedFile $assessment
+            Write-Output ('REPORT_FILE='+$blockedFile)
+            throw ('FRESH_PING_BASELINE_BLOCKED:'+($assessment.failures -join ','))
+        }
+        Start-Sleep -Seconds 5
+    }while($true)
+    if($Mode -in @('ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve')){
+        # Exact baseline was verified above; no host state was changed while waiting.
+    }else{
+    if($d.identity.config_sha256 -cne $ExpectedInstalledConfig -or $d.hold_slot_ms -ne 1795329900000L -or
+        $d.hold_reason -cne 'PILOT_STOP_ConnectionResetError' -or @($d.blockers).Count -ne 0 -or
+        !$d.manifest_scope.verification_complete){throw 'CONTINUOUS_BASELINE_DRIFT'}
+    $claim=Get-Content -LiteralPath (Join-Path $root 'operator-recovery.active.json') -Raw|ConvertFrom-Json
+    if($claim.authorization_sha256 -cne 'fe42645ec37f9b36f80a0863d24951b67fdd548b231c432e50735bb2e13e0817'){
+        throw 'PRIOR_OPERATOR_AUTHORIZATION_DRIFT'
+    }
+    }
+    $now=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    $permit=[ordered]@{schema='atlas.ws.operator-authorization.v1';action='DEPLOY_ONE_RECOVERY';
+        identity_sha256=$d.identity_sha256;candidate_commit=$ExpectedCommit;task_name=$taskName;
+        issued_ms=$now;expires_ms=($now+1800000L);max_segments=1;max_connections=2;orders=0;trading_authority='NONE';
+        allow_task_action_pin_update=$true;allow_clock_probe=$true;existing_pilot_quota_only=$true;
+        owner_decision_ref=$OwnerDecisionRef;continuous_research=$true;continuity_policy_sha256=$policy;
+        allow_explicit_missing_intervals=$true}
+    if($Mode -ceq 'ApplyPingCorrectionAndObserve'){$permit['fresh_ping_correction']=$true;$permit['expected_previous_config_sha256']=$ExpectedPreviousConfigSha256}
+    if($Mode -ceq 'ApplyDiskReserveRecoveryAndObserve'){$permit['disk_reserve_correction']=$true;$permit['expected_previous_config_sha256']=$ExpectedPreviousConfigSha256}
+    $file=Join-Path ([IO.Path]::GetTempPath()) ('atlas-continuous-permit-'+[guid]::NewGuid().ToString('N')+'.json')
+    Write-NewJson $file $permit
+    $applyRaw=@(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -ExpectedCommit $ExpectedCommit -Mode Apply -AuthorizationFile $file)
+    $applyExit=$LASTEXITCODE
+    $applyRaw|Write-Output
+    if($applyExit){
+        $outputDir=Join-Path $repo 'owner-results'
+        New-Item -ItemType Directory -Force -Path $outputDir|Out-Null
+        $blockedFile=Join-Path $outputDir ('ws-apply-blocked-'+[guid]::NewGuid().ToString('N')+'.json')
+        $failure=($applyRaw -join "`n")|ConvertFrom-Json
+        Write-NewJson $blockedFile $failure
+        Write-Output ('REPORT_FILE='+$blockedFile)
+        throw 'CONTINUOUS_DEPLOYMENT_BLOCKED_SEE_SAVED_RECEIPT'
+    }
+}
+if($Mode -ceq 'RepairPermitAndObserve'){
+    if(!$OwnerDecisionRef){throw 'EXPLICIT_REPAIR_OWNER_DECISION_REQUIRED'}
+    $repair=Join-Path $PSScriptRoot 'atlas_ws_permit_repair.py'
+    & git -C $repo diff --quiet HEAD -- $repair
+    if($LASTEXITCODE){throw 'REPAIR_CODE_DRIFT'}
+    $cfg=Get-Content -LiteralPath $config -Raw|ConvertFrom-Json
+    $lock=$null
+    try{
+        $lock=[IO.File]::Open((Join-Path $root 'supervisor.lock'),'Open','ReadWrite','None')
+        & $cfg.python -B $repair --config $config --expected-commit $ExpectedCommit --permit-dir ([IO.Path]::GetTempPath()) --owner-ref $OwnerDecisionRef
+        if($LASTEXITCODE){throw 'ORIGINAL_PERMIT_REPAIR_BLOCKED'}
+    }finally{if($lock){$lock.Dispose()}}
+}
+$cfg=Get-Content -LiteralPath $config -Raw|ConvertFrom-Json
+$configPin=(Get-FileHash -LiteralPath $config -Algorithm SHA256).Hash.ToLowerInvariant()
+$oldPythonPath=$env:PYTHONPATH
+$deadline=[DateTimeOffset]::UtcNow.AddHours($ObserveHours)
+$outputDir=Join-Path $repo 'owner-results'
+New-Item -ItemType Directory -Force -Path $outputDir|Out-Null
+$output=Join-Path $outputDir ('ws-continuous-'+[guid]::NewGuid().ToString('N')+'.json')
+try{
+    $env:PYTHONPATH="$($cfg.tree)/src;$($cfg.tree)"
+    $lastPrint=[DateTimeOffset]::MinValue
+    do{
+        $raw=@(& $cfg.python -B -m tools.atlas_ws_continuity report --root $root --config-pin $configPin)
+        if($LASTEXITCODE){$raw|Write-Output;throw 'CONTINUOUS_REPORT_INTEGRITY_BLOCKED'}
+        $r=($raw -join "`n")|ConvertFrom-Json
+        if((Get-FileHash -LiteralPath $config -Algorithm SHA256).Hash.ToLowerInvariant() -cne $configPin){throw 'CONTINUOUS_CONFIG_DRIFT'}
+        foreach($binding in $cfg.files){
+            if((Get-FileHash -LiteralPath $binding.path -Algorithm SHA256).Hash.ToLowerInvariant() -cne $binding.sha256){throw 'CONTINUOUS_RUNTIME_DRIFT'}
+        }
+        $task=Get-ScheduledTask -TaskName $taskName
+        $r|Add-Member -NotePropertyName host_task_state -NotePropertyValue ([string]$task.State)
+        if($r.acceptance_ready -and [string]$task.State -ceq 'Running'){
+            $r.status=if(@($r.missing_open_ranges).Count){'CONTINUOUS_RESEARCH_OPERATIONAL_WITH_GAPS_OWNER_LOCAL'}else{'CONTINUOUS_RESEARCH_OPERATIONAL_OWNER_LOCAL'}
+            Write-NewJson $output $r
+            $r|ConvertTo-Json -Depth 15
+            Write-Output ('REPORT_FILE='+$output)
+            return
+        }
+        if($r.hold_reason -and !$r.initial_resume_pending){
+            Write-NewJson $output $r
+            $r|ConvertTo-Json -Depth 15
+            Write-Output ('REPORT_FILE='+$output)
+            return
+        }
+        if(([DateTimeOffset]::UtcNow-$lastPrint).TotalMinutes -ge 5){
+            $r|Select-Object status,verified_receipts,confirmed_rollovers,real_fault_events,last_receipt_fresh|ConvertTo-Json -Compress
+            $lastPrint=[DateTimeOffset]::UtcNow
+        }
+        Start-Sleep -Seconds 60
+    }while([DateTimeOffset]::UtcNow -lt $deadline)
+    $r.status='OBSERVATION_DEADLINE_OPERATION_NOT_ATTESTED'
+    Write-NewJson $output $r
+    $r|ConvertTo-Json -Depth 15
+    Write-Output ('REPORT_FILE='+$output)
+}finally{$env:PYTHONPATH=$oldPythonPath}
+){
+        throw 'EXACT_PREVIOUS_CONFIG_SHA256_REQUIRED'
+    }
+    if($Mode -ceq 'ActivateAndObserve' -and (Test-Path -LiteralPath (Join-Path $root 'continuous-research.authorized.json'))){throw 'CONTINUOUS_ALREADY_ACTIVATED_USE_OBSERVE'}
+    $baselineDeadline=[DateTimeOffset]::UtcNow.AddMinutes(3)
+    do{
+        $raw=@(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -ExpectedCommit $ExpectedCommit -Mode Diagnose)
+        if($LASTEXITCODE){$raw|Write-Output;throw 'CONTINUOUS_PREFLIGHT_BLOCKED'}
+        $d=($raw -join "`n")|ConvertFrom-Json
+        if($Mode -cne 'ApplyPingCorrectionAndObserve'){break}
+        $assessment=Test-FreshPingBaseline $d $ExpectedPreviousConfigSha256
+        if($assessment.ready){break}
+        $assessment|ConvertTo-Json -Depth 15 -Compress|Write-Output
+        if(!$assessment.retryable -or [DateTimeOffset]::UtcNow -ge $baselineDeadline){
+            $outputDir=Join-Path $repo 'owner-results'
+            New-Item -ItemType Directory -Force -Path $outputDir|Out-Null
+            $blockedFile=Join-Path $outputDir ('ws-baseline-blocked-'+[guid]::NewGuid().ToString('N')+'.json')
+            Write-NewJson $blockedFile $assessment
+            Write-Output ('REPORT_FILE='+$blockedFile)
+            throw ('FRESH_PING_BASELINE_BLOCKED:'+($assessment.failures -join ','))
+        }
+        Start-Sleep -Seconds 5
+    }while($true)
+    if($Mode -ceq 'ApplyPingCorrectionAndObserve'){
+        # Exact baseline was verified above; no host state was changed while waiting.
+    }else{
+    if($d.identity.config_sha256 -cne $ExpectedInstalledConfig -or $d.hold_slot_ms -ne 1795329900000L -or
+        $d.hold_reason -cne 'PILOT_STOP_ConnectionResetError' -or @($d.blockers).Count -ne 0 -or
+        !$d.manifest_scope.verification_complete){throw 'CONTINUOUS_BASELINE_DRIFT'}
+    $claim=Get-Content -LiteralPath (Join-Path $root 'operator-recovery.active.json') -Raw|ConvertFrom-Json
+    if($claim.authorization_sha256 -cne 'fe42645ec37f9b36f80a0863d24951b67fdd548b231c432e50735bb2e13e0817'){
+        throw 'PRIOR_OPERATOR_AUTHORIZATION_DRIFT'
+    }
+    }
+    $now=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    $permit=[ordered]@{schema='atlas.ws.operator-authorization.v1';action='DEPLOY_ONE_RECOVERY';
+        identity_sha256=$d.identity_sha256;candidate_commit=$ExpectedCommit;task_name=$taskName;
+        issued_ms=$now;expires_ms=($now+1800000L);max_segments=1;max_connections=2;orders=0;trading_authority='NONE';
+        allow_task_action_pin_update=$true;allow_clock_probe=$true;existing_pilot_quota_only=$true;
+        owner_decision_ref=$OwnerDecisionRef;continuous_research=$true;continuity_policy_sha256=$policy;
+        allow_explicit_missing_intervals=$true}
+    if($Mode -ceq 'ApplyPingCorrectionAndObserve'){$permit['fresh_ping_correction']=$true;$permit['expected_previous_config_sha256']=$ExpectedPreviousConfigSha256}
+    $file=Join-Path ([IO.Path]::GetTempPath()) ('atlas-continuous-permit-'+[guid]::NewGuid().ToString('N')+'.json')
+    Write-NewJson $file $permit
+    $applyRaw=@(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -ExpectedCommit $ExpectedCommit -Mode Apply -AuthorizationFile $file)
+    $applyExit=$LASTEXITCODE
+    $applyRaw|Write-Output
+    if($applyExit){
+        $outputDir=Join-Path $repo 'owner-results'
+        New-Item -ItemType Directory -Force -Path $outputDir|Out-Null
+        $blockedFile=Join-Path $outputDir ('ws-apply-blocked-'+[guid]::NewGuid().ToString('N')+'.json')
+        $failure=($applyRaw -join "`n")|ConvertFrom-Json
+        Write-NewJson $blockedFile $failure
+        Write-Output ('REPORT_FILE='+$blockedFile)
+        throw 'CONTINUOUS_DEPLOYMENT_BLOCKED_SEE_SAVED_RECEIPT'
+    }
+}
+if($Mode -ceq 'RepairPermitAndObserve'){
+    if(!$OwnerDecisionRef){throw 'EXPLICIT_REPAIR_OWNER_DECISION_REQUIRED'}
+    $repair=Join-Path $PSScriptRoot 'atlas_ws_permit_repair.py'
+    & git -C $repo diff --quiet HEAD -- $repair
+    if($LASTEXITCODE){throw 'REPAIR_CODE_DRIFT'}
+    $cfg=Get-Content -LiteralPath $config -Raw|ConvertFrom-Json
+    $lock=$null
+    try{
+        $lock=[IO.File]::Open((Join-Path $root 'supervisor.lock'),'Open','ReadWrite','None')
+        & $cfg.python -B $repair --config $config --expected-commit $ExpectedCommit --permit-dir ([IO.Path]::GetTempPath()) --owner-ref $OwnerDecisionRef
+        if($LASTEXITCODE){throw 'ORIGINAL_PERMIT_REPAIR_BLOCKED'}
+    }finally{if($lock){$lock.Dispose()}}
+}
+$cfg=Get-Content -LiteralPath $config -Raw|ConvertFrom-Json
+$configPin=(Get-FileHash -LiteralPath $config -Algorithm SHA256).Hash.ToLowerInvariant()
+$oldPythonPath=$env:PYTHONPATH
+$deadline=[DateTimeOffset]::UtcNow.AddHours($ObserveHours)
+$outputDir=Join-Path $repo 'owner-results'
+New-Item -ItemType Directory -Force -Path $outputDir|Out-Null
+$output=Join-Path $outputDir ('ws-continuous-'+[guid]::NewGuid().ToString('N')+'.json')
+try{
+    $env:PYTHONPATH="$($cfg.tree)/src;$($cfg.tree)"
+    $lastPrint=[DateTimeOffset]::MinValue
+    do{
+        $raw=@(& $cfg.python -B -m tools.atlas_ws_continuity report --root $root --config-pin $configPin)
+        if($LASTEXITCODE){$raw|Write-Output;throw 'CONTINUOUS_REPORT_INTEGRITY_BLOCKED'}
+        $r=($raw -join "`n")|ConvertFrom-Json
+        if((Get-FileHash -LiteralPath $config -Algorithm SHA256).Hash.ToLowerInvariant() -cne $configPin){throw 'CONTINUOUS_CONFIG_DRIFT'}
+        foreach($binding in $cfg.files){
+            if((Get-FileHash -LiteralPath $binding.path -Algorithm SHA256).Hash.ToLowerInvariant() -cne $binding.sha256){throw 'CONTINUOUS_RUNTIME_DRIFT'}
+        }
+        $task=Get-ScheduledTask -TaskName $taskName
+        $r|Add-Member -NotePropertyName host_task_state -NotePropertyValue ([string]$task.State)
+        if($r.acceptance_ready -and [string]$task.State -ceq 'Running'){
+            $r.status=if(@($r.missing_open_ranges).Count){'CONTINUOUS_RESEARCH_OPERATIONAL_WITH_GAPS_OWNER_LOCAL'}else{'CONTINUOUS_RESEARCH_OPERATIONAL_OWNER_LOCAL'}
+            Write-NewJson $output $r
+            $r|ConvertTo-Json -Depth 15
+            Write-Output ('REPORT_FILE='+$output)
+            return
+        }
+        if($r.hold_reason -and !$r.initial_resume_pending){
+            Write-NewJson $output $r
+            $r|ConvertTo-Json -Depth 15
+            Write-Output ('REPORT_FILE='+$output)
+            return
+        }
+        if(([DateTimeOffset]::UtcNow-$lastPrint).TotalMinutes -ge 5){
+            $r|Select-Object status,verified_receipts,confirmed_rollovers,real_fault_events,last_receipt_fresh|ConvertTo-Json -Compress
+            $lastPrint=[DateTimeOffset]::UtcNow
+        }
+        Start-Sleep -Seconds 60
+    }while([DateTimeOffset]::UtcNow -lt $deadline)
+    $r.status='OBSERVATION_DEADLINE_OPERATION_NOT_ATTESTED'
+    Write-NewJson $output $r
+    $r|ConvertTo-Json -Depth 15
+    Write-Output ('REPORT_FILE='+$output)
+}finally{$env:PYTHONPATH=$oldPythonPath}
