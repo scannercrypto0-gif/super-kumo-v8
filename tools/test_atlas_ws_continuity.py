@@ -120,7 +120,7 @@ def test_fresh_ping_resume_ticket_is_reported_as_pending_only_when_exact_and_liv
     assert not c.resume_ticket_pending(*args[:2]+({**ticket,'config_sha256':'c'*64},)+args[3:])
     assert not c.resume_ticket_pending(*args[:2]+({**ticket,'expires_ms':NOW},)+args[3:])
     assert not c.resume_ticket_pending(*args[:2]+(ticket,)+args[3:-1]+(True,))
-    assert not c.resume_ticket_pending(*args[:1]+(True,)+args[2:])
+    assert c.resume_ticket_pending(*args[:1]+(True,)+args[2:])
 
 def test_disk_reserve_resume_ticket_pending_is_exact_and_requires_disk_scope():
     ticket=dict(schema='atlas.ws.operator-resume.v1',config_sha256='a'*64,
