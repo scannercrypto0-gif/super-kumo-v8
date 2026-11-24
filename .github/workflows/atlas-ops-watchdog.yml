@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/atlas-ops-watchdog.yml'
       - 'tools/atlas_ops_watchdog.py'
+      - 'tools/atlas_recurring_schedule_windows.ps1'
       - 'tools/atlas_mcp_pilot.py'
       - 'tools/atlas_mcp_manifest.py'
       - 'tests/test_atlas_ops_watchdog.py'
@@ -40,6 +41,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Parse the Windows scheduler script
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'tools/atlas_recurring_schedule_windows.ps1'), [ref]$tokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | Format-List Message,Extent
+            throw 'POWERSHELL_PARSE_FAILED'
+          }
       - name: Run focused read-only MCP contract
         run: python -B -m unittest discover -s tests -p 'test_atlas_ops_mcp*.py' -v
 
