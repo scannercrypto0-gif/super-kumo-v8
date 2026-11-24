@@ -22,7 +22,8 @@ function New-Case([string]$Name) {
     $script:cfgPin='a'*64
     $script:permit=@{schema='atlas.ws.operator-resume.v1';authorization_sha256=('b'*64);config_sha256=$cfgPin;
         hold_sha256=(Pin $hold);claimed_sha256=(Pin $claimed);pending_sha256=$null;
-        issued_ms=($now-1000L);expires_ms=($now+600000L);max_segments=1;max_connections=2;orders=0;trading_authority='NONE'}
+        issued_ms=($now-1000L);expires_ms=($now+600000L);max_segments=1;max_connections=2;orders=0;trading_authority='NONE';
+        fresh_ping_correction=$false;disk_reserve_correction=$false}
 }
 function Save-Ticket {$permit | ConvertTo-Json | Set-Content -LiteralPath $ticket}
 function Refused([scriptblock]$Action,[string]$Expected) {
@@ -126,7 +127,9 @@ try {
     $permit.hold_sha256=Pin $hold
     Save-Ticket
     Refused {Test-OperatorResume $ticket $root $cfgPin $now} 'HOLD_NOT_ELIGIBLE'
-    $permit.disk_reserve_correction=$true;Save-Ticket
+    $permit.disk_reserve_correction=$true;$permit.fresh_ping_correction=$true;Save-Ticket
+    Refused {Test-OperatorResume $ticket $root $cfgPin $now} 'HOLD_NOT_ELIGIBLE'
+    $permit.fresh_ping_correction=$false;Save-Ticket
     Assert ((Test-OperatorResume $ticket $root $cfgPin $now).disk_reserve_correction -eq $true) 'DISK_RESERVE_SCOPED_HOLD_DENIED'
     $bootstrap=Join-Path $PSScriptRoot 'ATLAS-WS-CONTINUOUS-RECOVERY.ps1'
     $bootstrapAst=[System.Management.Automation.Language.Parser]::ParseFile($bootstrap,[ref]$null,[ref]$null)
