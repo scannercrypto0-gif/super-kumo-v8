@@ -5,10 +5,12 @@ on:
     paths:
       - '.github/workflows/atlas-ops-watchdog.yml'
       - 'tools/atlas_ops_watchdog.py'
+      - 'tools/atlas_daily_health_evidence.py'
       - 'tools/atlas_recurring_schedule_windows.ps1'
       - 'tools/atlas_mcp_pilot.py'
       - 'tools/atlas_mcp_manifest.py'
       - 'tests/test_atlas_ops_watchdog.py'
+      - 'tests/test_atlas_daily_health_evidence.py'
       - 'tests/test_atlas_ops_mcp_pilot.py'
       - 'tests/test_atlas_ops_mcp_freshness.py'
       - 'docs/research/atlas-operational-watchdog-mcp-001.md'
@@ -18,10 +20,14 @@ on:
     paths:
       - '.github/workflows/atlas-ops-watchdog.yml'
       - 'tools/atlas_ops_watchdog.py'
+      - 'tools/atlas_daily_health_evidence.py'
+      - 'tools/atlas_recurring_schedule_windows.ps1'
       - 'tools/atlas_mcp_pilot.py'
       - 'tools/atlas_mcp_manifest.py'
       - 'tests/test_atlas_ops_watchdog.py'
+      - 'tests/test_atlas_daily_health_evidence.py'
       - 'tests/test_atlas_ops_mcp_pilot.py'
+      - 'tests/test_atlas_ops_mcp_freshness.py'
       - 'docs/research/atlas-operational-watchdog-mcp-001.md'
       - 'docs/research/atlas-mcp-pilot-readonly.md'
 permissions:
@@ -52,6 +58,9 @@ jobs:
             $parseErrors | Format-List Message,Extent
             throw 'POWERSHELL_PARSE_FAILED'
           }
+      - name: Run focused Daily lineage and watchdog tests
+        run: |
+          python -B -m unittest discover -s tests -p 'test_atlas_daily_health_evidence.py' -v
+          python -B -m unittest discover -s tests -p 'test_atlas_ops_watchdog.py' -v
       - name: Run focused read-only MCP contract
         run: python -B -m unittest discover -s tests -p 'test_atlas_ops_mcp*.py' -v
-
