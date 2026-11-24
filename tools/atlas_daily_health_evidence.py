@@ -68,8 +68,11 @@ def verify_daily_success(state, policy_path, policy_pin, source_day_ms, receipt_
             "DAILY_EVIDENCE_DAY_INVALID")
     require(type(receipt_sha256) is str and HEX64.fullmatch(receipt_sha256),
             "DAILY_EVIDENCE_RECEIPT_INVALID")
-    state = Path(state).resolve(strict=True)
-    policy_path = Path(policy_path).resolve(strict=True)
+    try:
+        state = Path(state).resolve(strict=True)
+        policy_path = Path(policy_path).resolve(strict=True)
+    except OSError:
+        raise ValueError("DAILY_EVIDENCE_UNAVAILABLE") from None
     policy = read_json(policy_path)
     require(set(policy) == {"schema", "first_open_ms", "host", "authorization_ref"}
             and policy.get("schema") == "atlas.vision.daily-research.v1"
