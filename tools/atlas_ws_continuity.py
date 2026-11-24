@@ -128,18 +128,28 @@ def resume_ticket_pending(reason, has_rows, ticket, config_pin, authorization_sh
     """Recognize only a live, exact-scope resume ticket awaiting the scheduler."""
     if has_rows or active_recovery or reason not in (
         'PILOT_STOP_TimeoutError','PILOT_STOP_ConnectionResetError',
-        'LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED'
+        'LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED',
+        'PILOT_STOP_DISK_RESERVE_LOW'
     ):
         return False
-    correction_required=reason in (
+    ping_correction=reason in (
         'LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED'
     )
+    disk_correction=reason=='PILOT_STOP_DISK_RESERVE_LOW'
+    if ping_correction and (ticket.get('fresh_ping_correction') is not True or ticket.get('disk_reserve_correction') is True):
+        return False
+    if disk_correction and (ticket.get('disk_reserve_correction') is not True or ticket.get('fresh_ping_correction') is True):
+        return False
+    if not ping_correction and not disk_correction and (
+        ticket.get('fresh_ping_correction') is True or ticket.get('disk_reserve_correction') is True
+    ):
+        return False
     return (ticket.get('schema')=='atlas.ws.operator-resume.v1'
         and ticket.get('config_sha256')==config_pin
         and ticket.get('authorization_sha256')==authorization_sha256
-        and (not correction_required or ticket.get('fresh_ping_correction') is True)
         and type(ticket.get('issued_ms')) is int and type(ticket.get('expires_ms')) is int
         and ticket['issued_ms']<=now<ticket['expires_ms']<=ticket['issued_ms']+1800000)
+
 
 
 def report(root,config_pin,now):
