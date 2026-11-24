@@ -60,3 +60,25 @@ class ReceiveDiagnostics(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_verified_ping_token_is_bound_one_use_and_complete():
+    import websocket
+    from unittest.mock import patch
+    from tools.atlas_ws_receive_diagnostics import remember_complete_ping,consume_recent_ping
+    c=websocket.WebSocket();other=websocket.WebSocket()
+    f=websocket.ABNF(fin=1,opcode=9,mask_value=0,data=b'ping')
+    with patch('time.monotonic_ns',return_value=100):
+        assert remember_complete_ping(c,f)
+        assert consume_recent_ping(c,b'ping')
+        assert not consume_recent_ping(c,b'ping')
+        assert remember_complete_ping(c,f)
+        other._atlas_verified_ping=c._atlas_verified_ping
+        assert not consume_recent_ping(other,b'ping')
+        assert not consume_recent_ping(c,b'wrong')
+        assert remember_complete_ping(c,f)
+    # A scheduling pause does not invalidate the one-read PING proof; the next read clears it.\n    with patch('time.monotonic_ns',return_value=1000000101):assert consume_recent_ping(c,b'ping')
+    for change in ('fin','mask_value','rsv1'):
+        f=websocket.ABNF(fin=1,opcode=9,mask_value=0,data=b'ping')
+        setattr(f,change,0 if change=='fin' else 1)
+        assert not remember_complete_ping(c,f)

@@ -35,6 +35,11 @@ class Wire:
     def stream(self, endpoint, timeout):
         self.attempts += 1
         yield self
+    @property
+    def frame_buffer(self):
+        # Synthetic fixture explicitly models a known clean parser boundary.
+        from websocket import WebSocket
+        return WebSocket().frame_buffer
     def getstatus(self):
         return 101
     def frame(self, connection, timeout):
@@ -45,7 +50,8 @@ class Wire:
                 return "text", b'{"k":{"t":1794654000000,"s":"BTCUSDT","i":"15m","x":false}}'
         self.calls += 1
         if self.calls == 2:
-            raise TimeoutError("fixture outage")
+            from websocket import WebSocketTimeoutException
+            raise TimeoutError("WS_READ_TIMEOUT") from WebSocketTimeoutException("synthetic timeout")
         candle_slot = slot + (STEP if self.calls == 4 else 0)
         close = candle_slot + STEP - 1
         if self.calls != 3:
