@@ -195,7 +195,7 @@ def inspect(snapshot, repo, expected_commit, now):
     need(type(snapshot.get('task_xml')) is str and digest(snapshot['task_xml'].encode('utf-8')) == snapshot['task_xml_sha256'], 'TASK_XML_SNAPSHOT_MISMATCH')
     need(type(snapshot.get('task_policy_sha256')) is str and HEX.fullmatch(snapshot['task_policy_sha256']), 'TASK_POLICY_PIN')
     hold = load(root/'hold.json')
-    need(hold.get('reason') in ('PILOT_STOP_TimeoutError', 'PILOT_STOP_ConnectionResetError','LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED'), 'HOLD_NOT_RESUMABLE')
+    need(hold.get('reason') in ('PILOT_STOP_TimeoutError', 'PILOT_STOP_ConnectionResetError','LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED','PILOT_STOP_DISK_RESERVE_LOW'), 'HOLD_NOT_RESUMABLE')
     need(type(hold.get('slot_ms')) is int and hold['slot_ms'] % 900000 == 0, 'HOLD_SLOT_IDENTITY')
     rights = {k:cfg.get(k) for k in ('source_rights_ref','region_ref','authorization_ref')}
     need(all(type(v) is str and v.strip() for v in rights.values()), 'SOURCE_RIGHTS_REQUIRED')
