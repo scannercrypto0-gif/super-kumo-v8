@@ -302,7 +302,8 @@ def authorize(path, diagnostic, now, *, action='DEPLOY_ONE_RECOVERY'):
     correction=auth.get('fresh_ping_correction') is True
     disk_correction=auth.get('disk_reserve_correction') is True
     if diagnostic['hold_reason'] == 'PILOT_STOP_DISK_RESERVE_LOW' or disk_correction:
-        need(disk_correction and not correction and auth.get('continuous_research') is True and
+        need(disk_correction and not correction and diagnostic['hold_reason']=='PILOT_STOP_DISK_RESERVE_LOW' and
+             auth.get('continuous_research') is True and
              auth.get('expected_previous_config_sha256')==diagnostic['identity']['config_sha256'],
              'DISK_RESERVE_CORRECTION_AUTHORITY_REQUIRED')
     if diagnostic['hold_reason'] in ('LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED') or correction:
