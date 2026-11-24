@@ -9,6 +9,7 @@ on:
       - 'tools/atlas_mcp_manifest.py'
       - 'tests/test_atlas_ops_watchdog.py'
       - 'tests/test_atlas_ops_mcp_pilot.py'
+      - 'tests/test_atlas_ops_mcp_freshness.py'
       - 'docs/research/atlas-operational-watchdog-mcp-001.md'
       - 'docs/research/atlas-mcp-pilot-readonly.md'
   pull_request:
@@ -39,6 +40,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Run watchdog and read-only MCP contract
-        run: python -B -m unittest discover -s tests -p 'test_atlas_ops_*.py' -v
+      - name: Run focused read-only MCP contract
+        run: python -B -m unittest discover -s tests -p 'test_atlas_ops_mcp*.py' -v
 

@@ -9,6 +9,7 @@ import argparse
 import json
 import re
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -63,7 +64,8 @@ def map_state(state, lane):
     }.get(state, "UNKNOWN")
 
 
-def make_lane(name, lane, *, observed_ms=None, registry_last_open_ms=None, registry_gaps=0):
+def make_lane(name, lane, *, observed_ms=None, registry_last_open_ms=None, registry_gaps=0,
+              registry_unavailable=0, registry_conflicts=0, registry_source_count=None):
     source_ms = None
     lane_observed_ms = None
     committed = {}
@@ -99,9 +101,11 @@ def make_lane(name, lane, *, observed_ms=None, registry_last_open_ms=None, regis
     raw_state = lane.get("state")
     status = map_state(raw_state, name)
     reason = safe_reason(lane.get("reason"))
-    if name == "history" and (registry_gaps or gaps.get("unresolved_ranges", 0) or gaps.get("source_obstacles", 0)):
+    if name == "history" and (registry_gaps or registry_unavailable or registry_conflicts or
+                              registry_source_count == 0 or registry_source_count is None or
+                              gaps.get("unresolved_ranges", 0) or gaps.get("source_obstacles", 0)):
         if status in {"HEALTHY", "EXPECTED_WAIT"}:
-            status, reason = "STALE", "REGISTRY_GAPS_PRESENT"
+            status, reason = "STALE", "REGISTRY_INCOMPLETE_OR_CONFLICTED"
     if name == "daily":
         if lane.get("source_receipt_link_verified") is not True:
             status, reason = "UNKNOWN", "DAILY_SOURCE_LINKAGE_UNPROVEN"
@@ -138,6 +142,10 @@ def make_lane(name, lane, *, observed_ms=None, registry_last_open_ms=None, regis
 class SnapshotReader:
     def __init__(self, manifest_path, expected_manifest_sha):
         self.view = self.unavailable("EVIDENCE_UNAVAILABLE")
+        self.manifest_path = Path(manifest_path)
+        self.expected_manifest_sha = expected_manifest_sha
+        self.snapshot_path = None
+        self.snapshot_file_sha = None
         try:
             manifest, raw_manifest_sha = watchdog.read_json(manifest_path)
             if raw_manifest_sha != expected_manifest_sha:
@@ -149,7 +157,9 @@ class SnapshotReader:
             pinned_sha = manifest.get("snapshot_file_sha256")
             if type(snapshot_path) is not str or not Path(snapshot_path).is_absolute() or not is_sha256(pinned_sha):
                 raise ValueError("MANIFEST_SOURCE_INVALID")
-            snapshot, snapshot_file_sha = watchdog.read_json(snapshot_path)
+            self.snapshot_path = Path(snapshot_path)
+            self.snapshot_file_sha = pinned_sha
+            snapshot, snapshot_file_sha = watchdog.read_json(self.snapshot_path)
             if snapshot_file_sha != pinned_sha:
                 raise ValueError("SNAPSHOT_PIN_MISMATCH")
             watchdog.sealed_hash(snapshot, "sha256", "SNAPSHOT_SEAL_INVALID")
@@ -157,6 +167,26 @@ class SnapshotReader:
         except Exception as exc:  # never return paths or exception text to the MCP client
             code = str(exc) if type(exc) is ValueError else "EVIDENCE_UNAVAILABLE"
             self.view = self.unavailable(code if SAFE_CODE.fullmatch(code) else "EVIDENCE_UNAVAILABLE")
+
+    def read_pinned(self):
+        try:
+            if self.snapshot_path is None:
+                return self.view
+            manifest, manifest_sha = watchdog.read_json(self.manifest_path)
+            if manifest_sha != self.expected_manifest_sha:
+                raise ValueError("MANIFEST_PIN_MISMATCH")
+            watchdog.sealed_hash(manifest, "manifest_sha256", "MANIFEST_SEAL_INVALID")
+            if (manifest.get("snapshot_path") != str(self.snapshot_path)
+                    or manifest.get("snapshot_file_sha256") != self.snapshot_file_sha):
+                raise ValueError("MANIFEST_PIN_MISMATCH")
+            snapshot, raw_sha = watchdog.read_json(self.snapshot_path)
+            if raw_sha != self.snapshot_file_sha:
+                raise ValueError("SNAPSHOT_PIN_MISMATCH")
+            watchdog.sealed_hash(snapshot, "sha256", "SNAPSHOT_SEAL_INVALID")
+            return self.project(snapshot, raw_sha)
+        except Exception as exc:
+            code = str(exc) if type(exc) is ValueError else "EVIDENCE_UNAVAILABLE"
+            return self.unavailable(code if SAFE_CODE.fullmatch(code) else "EVIDENCE_UNAVAILABLE")
 
     @staticmethod
     def unavailable(reason):
@@ -202,12 +232,18 @@ class SnapshotReader:
             if type(registry.get(key)) is not int or registry[key] < 0:
                 raise ValueError("REGISTRY_COVERAGE_INVALID")
         registry_counters = registry.get("counters") if type(registry.get("counters")) is dict else {}
+        registry_blocked = bool(registry.get("gaps") or registry.get("unavailable") or registry.get("conflicts")
+                                or registry_counters.get("source_count") == 0
+                                or registry_counters.get("source_count") is None)
         watermark = registry_counters.get("event_watermark")
         if type(watermark) is not int or watermark < 0:
             raise ValueError("REGISTRY_WATERMARK_INVALID")
         if type(registry_counters.get("physical_rows")) is not int or registry_counters["physical_rows"] < 0:
             raise ValueError("REGISTRY_COUNTER_INVALID")
         registry_last_open_ms = registry_counters.get("last_open_ms")
+        registry_source_count = registry_counters.get("source_count")
+        if registry_source_count is not None and (type(registry_source_count) is not int or registry_source_count < 0):
+            raise ValueError("REGISTRY_COUNTER_INVALID")
         if registry_last_open_ms is not None and (type(registry_last_open_ms) is not int or
                                                    registry_last_open_ms < 0 or registry_last_open_ms > observed):
             raise ValueError("REGISTRY_TIMESTAMP_CONFLICT")
@@ -219,13 +255,16 @@ class SnapshotReader:
                 raise ValueError("DAILY_SOURCE_TIMESTAMP_CONFLICT")
         lanes = {name: make_lane(name, raw_lanes[name], observed_ms=observed,
                                  registry_last_open_ms=registry_last_open_ms,
-                                 registry_gaps=bounded_int(registry.get("gaps")) or 0)
+                                 registry_gaps=bounded_int(registry.get("gaps")) or 0,
+                                 registry_unavailable=bounded_int(registry.get("unavailable")) or 0,
+                                 registry_conflicts=bounded_int(registry.get("conflicts")) or 0,
+                                 registry_source_count=registry_source_count)
                  for name in LANES}
         if any(not is_sha256(raw_lanes[name].get("fingerprint")) for name in LANES):
             raise ValueError("LANE_FINGERPRINT_INVALID")
         states = {lane["status"] for lane in lanes.values()}
         overall = ("FAILED" if "FAILED" in states else "HELD" if "HELD" in states else
-                   "STALE" if "STALE" in states else "UNKNOWN" if "UNKNOWN" in states else
+                   "STALE" if registry_blocked else "STALE" if "STALE" in states else "UNKNOWN" if "UNKNOWN" in states else
                    "HEALTHY" if "HEALTHY" in states else "EXPECTED_WAIT")
         source_pins = snapshot.get("source_pins") if type(snapshot.get("source_pins")) is dict else {}
         required_pins = {"registry", "history", "daily", "daily_import", "daily_source", "live"}
@@ -243,7 +282,8 @@ class SnapshotReader:
         return {"schema": "atlas.mcp.health.v1", "status": overall,
                 "reason": safe_reason(snapshot.get("state")) or "UNKNOWN",
                 "refusal_reason": lanes["live"]["refusal_reason"] if lanes["live"]["status"] == "HELD" else None,
-                "observed_at_utc": utc(observed),
+                "observed_at_utc": utc(observed), "observed_at_ms": observed,
+                "clock_uncertainty_ms": snapshot.get("clock_uncertainty_ms"),
                 "evidence_grade": "SEALED_LOCAL_SNAPSHOT_NOT_HOST_ATTESTED", "lanes": lanes, "gaps": gaps,
                 "provenance": {"snapshot_sha256": file_sha, "source_pins": pins,
                                "registry_event_watermark": watermark, "host_attested": False},
@@ -267,10 +307,59 @@ def resource_specs():
                "description": f"Latest sanitized {lane} lane status and provenance."} for lane in LANES]]
 
 
+MAX_SNAPSHOT_AGE_MS = 300_000
+MAX_CLOCK_DRIFT_MS = 5_000
+
+
 class MCPServer:
-    def __init__(self, reader):
+    def __init__(self, reader, clock=None):
         self.reader = reader
         self.protocol = None
+        self.clock = clock or (lambda: (time.time_ns() // 1_000_000, time.monotonic_ns()))
+        self._anchor = self.clock()
+        self._last_clock = self._anchor
+        self._clock_poisoned = False
+
+    def current_view(self):
+        try:
+            wall_ms, mono_ns = self.clock()
+            anchor_wall, anchor_mono = self._anchor
+            last_wall, last_mono = self._last_clock
+            if (type(wall_ms) is not int or type(mono_ns) is not int or wall_ms < last_wall
+                    or mono_ns < last_mono or mono_ns < anchor_mono):
+                self._clock_poisoned = True
+            elif abs((wall_ms - anchor_wall) - (mono_ns - anchor_mono) // 1_000_000) > MAX_CLOCK_DRIFT_MS:
+                self._clock_poisoned = True
+            self._last_clock = (wall_ms, mono_ns)
+            base = self.reader.read_pinned() if hasattr(self.reader, "read_pinned") else self.reader.view
+            data = json.loads(json.dumps(base))
+            observed = data.get("observed_at_ms")
+            age = wall_ms - observed if type(observed) is int else None
+            protected_status = data.get("status") in {"HELD", "FAILED"}
+            uncertainty = data.get("clock_uncertainty_ms")
+            clock_bad = (self._clock_poisoned or age is None or age < 0 or
+                         type(uncertainty) is not int or uncertainty > MAX_CLOCK_DRIFT_MS)
+            stale = age is not None and age > MAX_SNAPSHOT_AGE_MS
+            data["request_freshness"] = {"checked_at_ms": wall_ms, "snapshot_age_ms": age,
+                "max_snapshot_age_ms": MAX_SNAPSHOT_AGE_MS, "clock_valid": not clock_bad}
+            if not protected_status and data.get("status") in {"HEALTHY", "EXPECTED_WAIT"} and clock_bad:
+                data.update(status="UNKNOWN", reason="CLOCK_OR_TIMESTAMP_UNTRUSTED",
+                            refusal_reason="EVIDENCE_UNAVAILABLE")
+            elif not protected_status and data.get("status") in {"HEALTHY", "EXPECTED_WAIT"} and stale:
+                data.update(status="STALE", reason="SNAPSHOT_TTL_EXCEEDED",
+                            refusal_reason="SNAPSHOT_TTL_EXCEEDED")
+            for lane in data.get("lanes", {}).values():
+                if lane.get("status") in {"HELD", "FAILED"}:
+                    continue
+                if not protected_status and clock_bad and lane.get("status") in {"HEALTHY", "EXPECTED_WAIT"}:
+                    lane.update(status="UNKNOWN", reason="CLOCK_OR_TIMESTAMP_UNTRUSTED",
+                                refusal_reason="EVIDENCE_UNAVAILABLE")
+                elif not protected_status and stale and lane.get("status") in {"HEALTHY", "EXPECTED_WAIT"}:
+                    lane.update(status="STALE", reason="SNAPSHOT_TTL_EXCEEDED",
+                                refusal_reason="SNAPSHOT_TTL_EXCEEDED")
+            return data
+        except Exception:
+            return self.reader.unavailable("EVIDENCE_UNAVAILABLE")
 
     @staticmethod
     def error(request_id, code, message, data=None):
@@ -340,10 +429,11 @@ class MCPServer:
         name, args = params.get("name"), params.get("arguments", {})
         if type(args) is not dict:
             return self.error(request_id, -32602, "Invalid params")
+        view = self.current_view()
         if name == "atlas.runtime.health" and not args:
-            data = self.reader.view
+            data = view
         elif name == "atlas.lane.latest" and set(args) == {"lane"} and args.get("lane") in LANES:
-            data = self.reader.view["lanes"][args["lane"]]
+            data = view["lanes"][args["lane"]]
         else:
             return self.error(request_id, -32602, "Unknown tool or invalid arguments")
         result = {"content": [{"type": "text", "text": json.dumps(data, sort_keys=True, separators=(",", ":"))}],
@@ -352,10 +442,11 @@ class MCPServer:
 
     def read_resource(self, request_id, params, modern):
         uri = params.get("uri")
+        view = self.current_view()
         if uri == "atlas://runtime/health":
-            data = self.reader.view
+            data = view
         elif type(uri) is str and uri in {f"atlas://lane/{lane}" for lane in LANES}:
-            data = self.reader.view["lanes"][uri.rsplit("/", 1)[1]]
+            data = view["lanes"][uri.rsplit("/", 1)[1]]
         else:
             return self.error(request_id, -32602, "Resource not found")
         result = {"contents": [{"uri": uri, "mimeType": "application/json",

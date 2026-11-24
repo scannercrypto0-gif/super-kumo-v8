@@ -71,3 +71,12 @@ Existing watchdog tests remain part of the same job and continue to cover two-ob
 
 The pilot is not installed or auto-started. Stop the local MCP client process and remove its local configuration entry. Keep or remove the local manifest and snapshot according to the owner's data-retention policy. No background service, scheduled task, host process, source file or warehouse record is changed, so there is no runtime rollback operation.
 
+
+
+## Request-time freshness and registry gates
+
+Every MCP tool call and resource read reopens the same manifest-pinned snapshot and verifies both its exact manifest bytes and snapshot bytes. It never discovers or adopts a replacement path. The server recalculates snapshot age on each request; the maximum age is 300,000 ms (5 minutes). An older snapshot is returned as `STALE`. Missing, future-dated, clock-uncertain, backwards-clock, or materially wall/monotonic-skewed evidence is `UNKNOWN`. The allowed clock uncertainty/drift is at most 5,000 ms. An existing live `HELD` refusal retains precedence and its sanitized reason.
+
+Registry gaps, unavailable archive boundaries, conflicts, or a missing/zero source count force the history lane and overall snapshot away from healthy/verified-complete. The MCP projection applies the same rule even if a producer snapshot incorrectly marks the overall state healthy.
+
+The focused MCP workflow runs only `test_atlas_ops_mcp*.py` on Ubuntu and Windows. It does not rerun unrelated watchdog-only tests. This remains an unmerged engineering candidate; passing CI does not authorize local host deployment or live use.

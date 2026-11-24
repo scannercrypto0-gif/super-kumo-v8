@@ -301,6 +301,10 @@ def build(registry: dict, history: dict, daily: dict, daily_import: dict,
                                     clock_uncertainty_ms, stall_after_ms)
         if name == "daily" and not dy["source_receipt_link_verified"]:
             state, reason = "UNKNOWN", "DAILY_SOURCE_LINKAGE_UNPROVEN"
+        registry_blocked = bool(rg["gaps"] or rg["unavailable"] or rg["conflicts"]
+                                or rg["counters"]["source_count"] == 0)
+        if name == "history" and registry_blocked and state not in {"FAILED", "HOLD"}:
+            state, reason = "UNKNOWN", "REGISTRY_INCOMPLETE_OR_CONFLICTED"
         lane.update(state=state, reason=reason)
         lanes[name] = lane
 
