@@ -46,12 +46,14 @@ def evidence():
                  current_entry="NO_CURRENT_ENTRY", observed_at_ms=1_900_000,
                  cycle_evidence="RECENT_RESEARCH_RECEIPT", tick_freshness="RECENT",
                  source_freshness="LATEST_DUE_DAY_RECEIVED", next_check_ms=3_000_000,
-                 last_success=dict(source_day_ms=1_000_000, source_zip_sha256="e" * 64,
-                                   checksum_sha256="f" * 64, warehouse_receipt_sha256="1" * 64),
-                 last_failure=None)
-    daily_import = dict(schema="aql.research.warehouse-report.v1",
-                        this_run=[dict(status="ARCHIVE_IMPORTED", source_sha256="c" * 64,
-                                       key=source["key"], inserted_rows=100)])
+                  last_success=dict(source_day_ms=1_000_000, source_zip_sha256="c" * 64,
+                                    checksum_sha256="f" * 64,
+                                    daily_source_evidence_status="VERIFIED",
+                                    daily_worker_receipt_sha256="2" * 64,
+                                    receipts=["2" * 64]),
+                  last_failure=None)
+    daily_import = dict(status="ARCHIVE_IMPORTED", source_sha256="c" * 64,
+                        key=source["key"], inserted_rows=100)
     live = dict(schema="atlas.ws.continuous-report.v1", status="OBSERVING_CONTINUOUS_ACCEPTANCE",
                 source_class="LIVE_CAPTURE", trading_authority="NONE", orders=0,
                 as_of_ms=2_000_000, verified_receipts=3, last_committed_ms=1_800_000,
@@ -113,17 +115,24 @@ class WatchdogTests(unittest.TestCase):
         self.assertEqual(view["counters"]["inserted_rows"], 4_266_757)
 
 
-    def test_daily_single_archive_receipt_requires_exact_health_linkage(self):
-        values = list(evidence())
-        receipt = dict(status="ARCHIVE_IMPORTED", source_sha256="c" * 64,
-                       key=values[4]["key"], inserted_rows=100)
-        values[2]["last_success"].update(
-            source_zip_sha256="c" * 64, checksum_sha256="f" * 64,
-            warehouse_receipt_sha256=watchdog.digest(watchdog.canonical(receipt)))
-        values[3] = receipt
+    def test_daily_native_report_links_worker_receipt_import_and_registry(self):
+        values = evidence()
         result = build(values)
         self.assertTrue(result["lanes"]["daily"]["source_receipt_link_verified"])
+        success = result["lanes"]["daily"]["last_success"]
+        self.assertEqual(success["daily_worker_receipt_sha256"], "2" * 64)
+        self.assertEqual(success["source_receipt_sha256"], values[4]["receipt_sha256"])
+        self.assertEqual(success["warehouse_receipt_sha256"],
+                         watchdog.digest(watchdog.canonical(values[3])))
 
+
+    def test_daily_native_report_without_verified_worker_receipt_is_unknown(self):
+        values = list(evidence())
+        values[2]["last_success"].pop("daily_source_evidence_status")
+        first = build(values)
+        second = build(values, now=2_060_000, mono=60_000_000_010, prev=first)
+        self.assertFalse(second["lanes"]["daily"]["source_receipt_link_verified"])
+        self.assertEqual(second["lanes"]["daily"]["state"], "UNKNOWN")
 
     def test_daily_missing_original_to_commit_link_is_unknown(self):
         values = evidence()
