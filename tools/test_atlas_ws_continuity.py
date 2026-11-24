@@ -109,3 +109,15 @@ def test_marker_cannot_enable_continuity_without_claimed_owner_permit(tmp_path):
     claim=next((tmp_path/'operator-authorizations').glob('*.claimed'))
     claim.write_bytes(b'changed')
     with pytest.raises(ValueError,match='OWNER_PERMIT_PIN'):c.authority(tmp_path)
+
+def test_fresh_ping_resume_ticket_is_reported_as_pending_only_when_exact_and_live(tmp_path):
+    ticket=dict(schema='atlas.ws.operator-resume.v1',config_sha256='a'*64,
+        authorization_sha256='b'*64,issued_ms=NOW,expires_ms=NOW+60000,
+        fresh_ping_correction=True)
+    args=('PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED',False,ticket,'a'*64,'b'*64,NOW+1,False)
+    assert c.resume_ticket_pending(*args)
+    assert not c.resume_ticket_pending(*args[:2]+({**ticket,'fresh_ping_correction':False},)+args[3:])
+    assert not c.resume_ticket_pending(*args[:2]+({**ticket,'config_sha256':'c'*64},)+args[3:])
+    assert not c.resume_ticket_pending(*args[:2]+({**ticket,'expires_ms':NOW},)+args[3:])
+    assert not c.resume_ticket_pending(*args[:2]+(ticket,)+args[3:-1]+(True,))
+    assert not c.resume_ticket_pending(*args[:1]+(True,)+args[2:])
