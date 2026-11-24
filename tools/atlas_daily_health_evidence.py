@@ -15,7 +15,7 @@ from aql.observation.contracts import digest
 
 DAY_MS = 86_400_000
 MAX_BYTES = 64 * 1024
-HEX64 = re.compile(r"[0-9a-f]{64}\Z")
+HEX64 = re.compile(r"[0-9a-f]{64}\\Z")
 REPARSE_POINT = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
 
 
@@ -24,14 +24,34 @@ def require(ok, reason):
         raise ValueError(reason)
 
 
+def plain_path(path, leaf_kind):
+    """Return an absolute path after rejecting links/reparse points in every component."""
+    path = Path(os.path.abspath(os.fspath(path)))
+    try:
+        chain = list(reversed((path, *path.parents)))
+        for index, item in enumerate(chain):
+            st = item.lstat()
+            attrs = getattr(st, "st_file_attributes", 0)
+            require(not item.is_symlink() and not (attrs & REPARSE_POINT),
+                    "DAILY_EVIDENCE_PATH_LINK")
+            is_leaf = index == len(chain) - 1
+            if not is_leaf:
+                require(stat.S_ISDIR(st.st_mode), "DAILY_EVIDENCE_PATH_SCOPE")
+            elif leaf_kind == "file":
+                require(stat.S_ISREG(st.st_mode), "DAILY_EVIDENCE_FILE_SCOPE")
+            else:
+                require(stat.S_ISDIR(st.st_mode), "DAILY_EVIDENCE_STATE_SCOPE")
+        return path
+    except OSError:
+        raise ValueError("DAILY_EVIDENCE_UNAVAILABLE") from None
+
+
 def read_json(path):
-    path = Path(path)
+    path = plain_path(path, "file")
     try:
         st = path.lstat()
-        attrs = getattr(st, "st_file_attributes", 0)
-        require(stat.S_ISREG(st.st_mode) and not path.is_symlink()
-                and not (attrs & REPARSE_POINT) and st.st_nlink == 1
-                and 0 <= st.st_size <= MAX_BYTES, "DAILY_EVIDENCE_FILE_SCOPE")
+        require(st.st_nlink == 1 and 0 <= st.st_size <= MAX_BYTES,
+                "DAILY_EVIDENCE_FILE_SCOPE")
         with path.open("rb") as stream:
             raw = stream.read(MAX_BYTES + 1)
         require(len(raw) <= MAX_BYTES, "DAILY_EVIDENCE_FILE_SCOPE")
@@ -49,13 +69,11 @@ def read_json(path):
 
 
 def read_claim(path):
-    path = Path(path)
+    path = plain_path(path, "file")
     try:
         st = path.lstat()
-        attrs = getattr(st, "st_file_attributes", 0)
-        require(stat.S_ISREG(st.st_mode) and not path.is_symlink()
-                and not (attrs & REPARSE_POINT) and st.st_nlink == 1
-                and 0 < st.st_size <= 256, "DAILY_EVIDENCE_CLAIM_SCOPE")
+        require(st.st_nlink == 1 and 0 < st.st_size <= 256,
+                "DAILY_EVIDENCE_CLAIM_SCOPE")
         raw = path.read_bytes()
         require(len(raw) <= 256, "DAILY_EVIDENCE_CLAIM_SCOPE")
         return raw.decode("ascii").strip()
@@ -68,11 +86,8 @@ def verify_daily_success(state, policy_path, policy_pin, source_day_ms, receipt_
             "DAILY_EVIDENCE_DAY_INVALID")
     require(type(receipt_sha256) is str and HEX64.fullmatch(receipt_sha256),
             "DAILY_EVIDENCE_RECEIPT_INVALID")
-    try:
-        state = Path(state).resolve(strict=True)
-        policy_path = Path(policy_path).resolve(strict=True)
-    except OSError:
-        raise ValueError("DAILY_EVIDENCE_UNAVAILABLE") from None
+    state = plain_path(state, "directory")
+    policy_path = plain_path(policy_path, "file")
     policy = read_json(policy_path)
     require(set(policy) == {"schema", "first_open_ms", "host", "authorization_ref"}
             and policy.get("schema") == "atlas.vision.daily-research.v1"
@@ -82,8 +97,10 @@ def verify_daily_success(state, policy_path, policy_pin, source_day_ms, receipt_
             and policy.get("host") == os.environ.get("COMPUTERNAME")
             and type(policy.get("authorization_ref")) is str
             and bool(policy["authorization_ref"].strip()), "DAILY_EVIDENCE_POLICY_PIN")
-    marker = state / "atlas-authorized-periodic-v1"
-    require(marker.is_file() and not marker.is_symlink(), "DAILY_EVIDENCE_STATE_SCOPE")
+    marker = plain_path(state / "atlas-authorized-periodic-v1", "file")
+    marker_stat = marker.lstat()
+    require(marker_stat.st_nlink == 1 and marker_stat.st_size == 0,
+            "DAILY_EVIDENCE_STATE_SCOPE")
     day = str(source_day_ms)
     daily = policy_path.parent / "daily"
     done = read_json(daily / f"{day}.done.json")
