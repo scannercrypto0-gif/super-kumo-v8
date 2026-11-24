@@ -159,12 +159,20 @@ def daily_view(doc: dict, import_receipt: dict, source_receipt: dict,
                         for row in registry.get("sources", []))
     report_contract = (import_receipt.get("schema") == "aql.research.warehouse-report.v1"
                        or import_receipt.get("status") == "ARCHIVE_IMPORTED")
-    receipt_link = (success.get("warehouse_receipt_sha256") == import_pin
-                    if type(success) is dict and success.get("warehouse_receipt_sha256") is not None
-                    else import_receipt.get("schema") == "aql.research.warehouse-report.v1")
+    worker_receipts = success.get("receipts") if type(success) is dict else None
+    worker_receipt = success.get("daily_worker_receipt_sha256") if type(success) is dict else None
+    native_receipt_link = (success.get("daily_source_evidence_status") == "VERIFIED"
+                           and type(worker_receipts) is list and len(worker_receipts) == 1
+                           and type(worker_receipt) is str and HEX64.fullmatch(worker_receipt)
+                           and worker_receipts[0] == worker_receipt)
+    legacy_receipt_link = (success.get("warehouse_receipt_sha256") == import_pin
+                           if type(success) is dict and success.get("warehouse_receipt_sha256") is not None
+                           else import_receipt.get("schema") == "aql.research.warehouse-report.v1")
+    receipt_link = native_receipt_link or legacy_receipt_link
     health_source_link = (type(success) is dict
                           and success.get("source_zip_sha256") == source_pin
-                          and success.get("checksum_sha256") == source_receipt.get("checksum_sha256"))
+                          and success.get("checksum_sha256") == source_receipt.get("checksum_sha256")
+                          and (native_receipt_link or import_receipt.get("schema") == "aql.research.warehouse-report.v1"))
     linked = bool(report_contract
                   and type(latest) is dict and latest.get("source_sha256") == source_pin
                   and latest.get("key") == source_receipt.get("key") and source_seal_ok
@@ -174,7 +182,9 @@ def daily_view(doc: dict, import_receipt: dict, source_receipt: dict,
     if linked:
         last_success = dict(source_day_ms=success["source_day_ms"], source_zip_sha256=source_pin,
                             checksum_sha256=source_receipt["checksum_sha256"],
-                            warehouse_receipt_sha256=source_receipt["receipt_sha256"],
+                            daily_worker_receipt_sha256=worker_receipt if native_receipt_link else None,
+                            warehouse_receipt_sha256=import_pin,
+                            source_receipt_sha256=source_receipt["receipt_sha256"],
                             source_rows=source_receipt.get("rows"), inserted_rows=latest.get("inserted_rows"))
     return dict(observed_at_ms=observed, cycle_evidence=doc.get("cycle_evidence"),
                 tick_freshness=doc.get("tick_freshness"), source_freshness=doc.get("source_freshness"),
