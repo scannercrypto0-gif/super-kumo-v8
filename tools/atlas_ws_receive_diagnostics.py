@@ -88,9 +88,9 @@ def classify_transport_fault(error, context, stage):
 
 
 class _PingProof:
-    __slots__=('connection_id','payload','observed_ns')
-    def __init__(self,connection,payload,observed_ns):
-        self.connection_id=id(connection);self.payload=bytes(payload);self.observed_ns=observed_ns
+    __slots__=('connection_id','payload')
+    def __init__(self,connection,payload):
+        self.connection_id=id(connection);self.payload=bytes(payload)
 
 
 def clear_ping_proof(connection):
@@ -99,23 +99,18 @@ def clear_ping_proof(connection):
 
 
 def remember_complete_ping(connection,frame):
-    import time
     from websocket import ABNF
     clear_ping_proof(connection)
     if (not isinstance(frame,ABNF) or frame.opcode!=ABNF.OPCODE_PING or not frame.fin
         or frame.mask_value or frame.rsv1 or frame.rsv2 or frame.rsv3
         or type(frame.data) not in (bytes,bytearray) or len(frame.data)>125):return False
-    try:connection._atlas_verified_ping=_PingProof(connection,frame.data,time.monotonic_ns())
+    try:connection._atlas_verified_ping=_PingProof(connection,frame.data)
     except AttributeError:return False
     return True
 
 
 def consume_recent_ping(connection,payload):
-    import time
     proof=getattr(connection,'_atlas_verified_ping',None)
     clear_ping_proof(connection) # one use, including rejected attempts
-    if not isinstance(proof,_PingProof):return False
-    buffer=getattr(connection,'frame_buffer',None)
-    return (proof.connection_id==id(connection) and type(payload) in (bytes,bytearray)
-        and proof.payload==bytes(payload) and 0<=time.monotonic_ns()-proof.observed_ns<=1000000000
-        and buffer is not None and buffer.needs_header() and not buffer.recv_buffer)
+    return (isinstance(proof,_PingProof) and proof.connection_id==id(connection)
+        and type(payload) in (bytes,bytearray) and proof.payload==bytes(payload))
