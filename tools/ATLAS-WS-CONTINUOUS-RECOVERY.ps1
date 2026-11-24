@@ -29,7 +29,7 @@ function Test-FreshPingBaseline($Diagnostic,[string]$ExpectedConfigSha256){
     $failures=@()
     if($ExpectedConfigSha256 -cnotmatch '^[a-f0-9]{64}$' -or
         $Diagnostic.identity.config_sha256 -cne $ExpectedConfigSha256){$failures+='INSTALLED_CONFIG_PIN_MISMATCH'}
-    if($Diagnostic.hold_reason -cne 'LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN'){$failures+='HOLD_REASON_MISMATCH'}
+    if($Diagnostic.hold_reason -cnotin @('LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED')){$failures+='HOLD_REASON_MISMATCH'}
     if($Diagnostic.manifest_scope.verification_complete -ne $true){$failures+='RUNTIME_MANIFEST_NOT_VERIFIED'}
     $blockers=@($Diagnostic.blockers | Where-Object {$null -ne $_ -and [string]$_ -ne ''})
     $failures+=@($blockers)
