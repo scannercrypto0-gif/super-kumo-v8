@@ -147,8 +147,10 @@ function Test-OperatorResume([string]$TicketPath, [string]$RootPath, [string]$Co
         } elseif ($null -ne $expected) {throw 'LIVE_SERVICE_OPERATOR_EVIDENCE_MISSING'}
     }
     $held=Get-Content -LiteralPath (Join-Path $RootPath 'hold.json') -Raw | ConvertFrom-Json
+    $freshPingHold=@('LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED') -ccontains $held.reason -and
+        $ticket.fresh_ping_correction -is [bool] -and $ticket.fresh_ping_correction
     if (@('PILOT_STOP_TimeoutError','PILOT_STOP_ConnectionResetError') -cnotcontains $held.reason -and
-        !($held.reason -ceq 'LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN' -and $ticket.fresh_ping_correction -is [bool] -and $ticket.fresh_ping_correction)) {
+        !$freshPingHold) {
         throw 'LIVE_SERVICE_OPERATOR_HOLD_NOT_ELIGIBLE'
     }
     return $ticket
