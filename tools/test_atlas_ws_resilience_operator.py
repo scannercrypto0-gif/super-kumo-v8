@@ -899,3 +899,23 @@ def test_preflight_failure_is_exact_sanitized_and_narrow(blockers,enabled,collec
     assert error.preflight['blockers']==blockers
     assert error.preflight['retryable_scheduler_only'] is retryable
     assert 'PRIVATE' not in json.dumps(error.preflight)
+
+def test_disk_reserve_hold_requires_exact_scoped_disk_correction(host):
+    (host['root']/'hold.json').write_bytes(op.canonical(dict(reason='PILOT_STOP_DISK_RESERVE_LOW',slot_ms=SLOT)))
+    d=diagnostic(host)
+    scope=dict(continuous_research=True,continuity_policy_sha256=op.continuity_pin(),
+        allow_explicit_missing_intervals=True,expected_previous_config_sha256=d['identity']['config_sha256'])
+    with pytest.raises(ValueError,match='DISK_RESERVE_CORRECTION_AUTHORITY_REQUIRED'):
+        op.authorize(authorization(host,**scope),d,host['now'])
+    permit=authorization(host,**scope,disk_reserve_correction=True)
+    auth,_=op.authorize(permit,d,host['now'])
+    assert auth['disk_reserve_correction'] is True
+    assert auth['expected_previous_config_sha256']==d['identity']['config_sha256']
+    with pytest.raises(ValueError,match='DISK_RESERVE_CORRECTION_AUTHORITY_REQUIRED'):
+        op.authorize(authorization(host,**scope,disk_reserve_correction=True,
+            expected_previous_config_sha256='0'*64),d,host['now'])
+    (host['root']/'hold.json').write_bytes(op.canonical(dict(reason='PILOT_STOP_TimeoutError',slot_ms=SLOT)))
+    d=diagnostic(host)
+    with pytest.raises(ValueError,match='DISK_RESERVE_CORRECTION_AUTHORITY_REQUIRED'):
+        op.authorize(authorization(host,**scope,disk_reserve_correction=True,
+            expected_previous_config_sha256=d['identity']['config_sha256']),d,host['now'])
