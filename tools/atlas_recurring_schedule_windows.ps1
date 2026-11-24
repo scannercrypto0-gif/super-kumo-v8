@@ -158,6 +158,10 @@ if ($Mode -in 'prepare','install') {
     }
     $first = (Get-Date).AddSeconds(35)
     $duration = New-TimeSpan -Minutes ($IntervalMinutes * ($Ticks - 1)) -Seconds 15
+    $dailyFirstCheckMs = $null
+    if ($DailyPolicy) {
+        $dailyFirstCheckMs = $opening.AddDays(1).AddHours(6).ToUnixTimeMilliseconds()
+    }
     $settings = [ordered]@{
         python = $Python; tree = $tree; state = $State; task = $TaskName
         log = Join-Path $stage 'ticks.jsonl'
@@ -166,7 +170,7 @@ if ($Mode -in 'prepare','install') {
         pin = if ($DailyPolicy) {$DailyPolicySha256} else {$AuthorizedPlanSha256}
         authorized_plan = $AuthorizedPlan
         daily_policy = $DailyPolicy
-        daily_first_check_ms = if ($DailyPolicy) {$opening.AddDays(1).AddHours(6).ToUnixTimeMilliseconds()}
+        daily_first_check_ms = $dailyFirstCheckMs
         prepared_only = ($Mode -eq 'prepare')
         runtime_pin_version = 2
         runtime = @($runtime | ForEach-Object { @{path=$_;sha256=(Get-FileHash -LiteralPath $_).Hash} })
