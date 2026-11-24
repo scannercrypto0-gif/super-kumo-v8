@@ -7,6 +7,8 @@ import types
 import unittest
 from pathlib import Path
 
+from tools.atlas_ws_receive_diagnostics import _PingProof, consume_recent_ping
+
 cycle_path, quota_path = map(Path, sys.argv[1:3])
 sys.argv = sys.argv[:1]
 sys.path.insert(0,str(cycle_path.resolve().parents[1]))
@@ -35,6 +37,25 @@ class PongAdmission(unittest.TestCase):
     def test_fresh_pong_sent(self):
         send(self.quota, "research-15m", self.start + 20000, self.connection, b"ping")
         self.assertEqual(self.sent, [b"ping"])
+
+    def test_fresh_ping_proof_allows_buffered_following_frame(self):
+        self.connection.frame_buffer = types.SimpleNamespace(
+            needs_header=lambda: True, recv_buffer=b"next-frame"
+        )
+        self.connection._atlas_verified_ping = _PingProof(self.connection, b"ping")
+        send(self.quota, "research-15m", self.start + 71038, self.connection, b"ping")
+        self.assertEqual(self.sent, [b"ping"])
+        self.assertFalse(hasattr(self.connection, "_atlas_verified_ping"))
+
+    def test_ping_proof_is_one_use_and_bound_to_connection_and_payload(self):
+        self.connection._atlas_verified_ping = _PingProof(self.connection, b"ping")
+        self.assertTrue(consume_recent_ping(self.connection, b"ping"))
+        self.assertFalse(consume_recent_ping(self.connection, b"ping"))
+        self.connection._atlas_verified_ping = _PingProof(self.connection, b"ping")
+        other = types.SimpleNamespace(_atlas_verified_ping=self.connection._atlas_verified_ping)
+        self.assertFalse(consume_recent_ping(other, b"ping"))
+        self.connection._atlas_verified_ping = _PingProof(self.connection, b"ping")
+        self.assertFalse(consume_recent_ping(self.connection, b"replay"))
 
     def test_stale_socket_is_retryable_without_sending(self):
         with self.assertRaisesRegex(TimeoutError, "^PONG_LIVENESS_EXPIRED$"):
