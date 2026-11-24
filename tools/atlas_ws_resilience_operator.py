@@ -459,7 +459,8 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
                 task_action_pin_readback=True,clock_checked_ms=clock['checked_ms'],
                 clock_uncertainty_ms=clock['uncertainty_ms'],
                 max_segments=1,max_connections=2,orders=0,trading_authority='NONE',
-                host_reconnection='NOT_ATTESTED',continuous_research=continuous,fresh_ping_correction=correction,root_cause='ROOT_CAUSE_NOT_PROVEN')
+                host_reconnection='NOT_ATTESTED',continuous_research=continuous,fresh_ping_correction=auth.get('fresh_ping_correction') is True,
+                disk_reserve_correction=auth.get('disk_reserve_correction') is True,root_cause='ROOT_CAUSE_NOT_PROVEN')
             durable(backup/'deployment-receipt.json',canonical(receipt),create=True)
             print(json.dumps(receipt),file=out,flush=True)
         except BaseException:
