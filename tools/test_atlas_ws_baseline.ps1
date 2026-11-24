@@ -13,6 +13,11 @@ $d=Fixture
 if(!(Test-FreshPingBaseline $d $expected).ready){throw 'EMPTY_ARRAY_REJECTED'}
 $d=Fixture;$d.hold_reason='PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED'
 if(!(Test-FreshPingBaseline $d $expected).ready){throw 'FRESH_PING_PROOF_HOLD_REJECTED'}
+$d=Fixture;$d.hold_reason='PILOT_STOP_DISK_RESERVE_LOW'
+if((Test-FreshPingBaseline $d $expected).failures -notcontains 'HOLD_REASON_MISMATCH'){throw 'PING_MODE_ACCEPTED_DISK_HOLD'}
+if(!(Test-FreshPingBaseline $d $expected 'Disk').ready){throw 'DISK_RESERVE_EXACT_HOLD_REJECTED'}
+$d.blockers=@('DISK_RESERVE_LOW')
+if((Test-FreshPingBaseline $d $expected 'Disk').ready){throw 'DISK_RESERVE_LOW_BYPASSED'}
 $d=Fixture;$d.hold_reason='PILOT_STOP_PONG_QUOTA_STOP'
 if((Test-FreshPingBaseline $d $expected).failures -notcontains 'HOLD_REASON_MISMATCH'){throw 'UNSCOPED_HOLD_ACCEPTED'}
 $d=Fixture;$d.blockers=$null
