@@ -7,11 +7,11 @@ import types
 import unittest
 from pathlib import Path
 
-from tools.atlas_ws_receive_diagnostics import _PingProof, consume_recent_ping
 
 cycle_path, quota_path = map(Path, sys.argv[1:3])
 sys.argv = sys.argv[:1]
 sys.path.insert(0,str(cycle_path.resolve().parents[1]))
+from tools.atlas_ws_receive_diagnostics import _PingProof, consume_recent_ping
 tree = ast.parse(cycle_path.read_text(encoding="utf-8"))
 helpers = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in {"send_research_pong", "read_research_frame"}]
 scope = {}
