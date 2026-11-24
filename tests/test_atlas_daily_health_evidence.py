@@ -47,7 +47,7 @@ class DailyHealthEvidenceTests(unittest.TestCase):
     def test_verified_completion_returns_only_source_pins(self):
         with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"COMPUTERNAME": "TESTHOST"}):
             args = self.evidence_tree(Path(folder))
-            result = verify_daily_success(*args[:4], args[4])
+            result = verify_daily_success(args[0], args[1], args[2], args[3], args[4])
         self.assertEqual(result["status"], "VERIFIED")
         self.assertEqual(result["source_zip_sha256"], "a" * 64)
         self.assertEqual(result["checksum_sha256"], "b" * 64)
@@ -61,7 +61,18 @@ class DailyHealthEvidenceTests(unittest.TestCase):
             job["archive_sha256"] = "c" * 64
             write_json(job_path, job)
             with self.assertRaisesRegex(ValueError, "DAILY_EVIDENCE_LINK_UNPROVEN"):
-                verify_daily_success(*args[:4], args[4])
+                verify_daily_success(args[0], args[1], args[2], args[3], args[4])
+
+    def test_rejects_symlinked_policy_path(self):
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"COMPUTERNAME": "TESTHOST"}):
+            args = self.evidence_tree(Path(folder))
+            linked = Path(folder) / "policy-link.json"
+            try:
+                linked.symlink_to(args[1])
+            except (OSError, NotImplementedError):
+                self.skipTest("symlink creation unavailable on this runner")
+            with self.assertRaisesRegex(ValueError, "DAILY_EVIDENCE_PATH_LINK"):
+                verify_daily_success(args[0], linked, args[2], args[3], args[4])
 
     def test_receipt_mismatch_fails_closed(self):
         with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"COMPUTERNAME": "TESTHOST"}):
