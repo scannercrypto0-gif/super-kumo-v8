@@ -1,4 +1,5 @@
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -96,6 +97,23 @@ class McpPilotTests(unittest.TestCase):
             result = pilot.SnapshotReader(manifest, watchdog.digest(manifest.read_bytes())).view
         self.assertEqual(result["status"], "UNKNOWN")
         self.assertEqual(result["refusal_reason"], "SNAPSHOT_SEAL_INVALID")
+
+    def test_manifest_helper_prints_raw_pin_and_never_overwrites(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            snap_path = root / "input.json"
+            snap_path.write_bytes(watchdog.canonical(snapshot()))
+            manifest_path = root / "manifest.json"
+            command = [sys.executable, "-B", str(ROOT / "tools" / "atlas_mcp_manifest.py"),
+                       "--snapshot", str(snap_path), "--output", str(manifest_path)]
+            first = subprocess.run(command, capture_output=True, text=True, timeout=30)
+            self.assertEqual(first.returncode, 0, first.stderr)
+            original = manifest_path.read_bytes()
+            self.assertEqual(first.stdout.strip(), watchdog.digest(original))
+            self.assertEqual(pilot.SnapshotReader(manifest_path, first.stdout.strip()).view["status"], "HELD")
+            second = subprocess.run(command, capture_output=True, text=True, timeout=30)
+            self.assertNotEqual(second.returncode, 0)
+            self.assertEqual(manifest_path.read_bytes(), original)
 
     def test_timestamp_watermark_and_overall_state_conflicts_fail_closed(self):
         for mutate, code in (

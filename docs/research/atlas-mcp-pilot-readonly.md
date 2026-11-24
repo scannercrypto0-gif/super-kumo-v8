@@ -54,7 +54,7 @@ No repeated PowerShell probes are needed. This procedure is optional and cannot 
 
 ## Test and evidence boundary
 
-The deterministic test suite uses synthetic, sealed fixtures (`SYNTHETIC_TESTED`) for status conversion, current reported `HELD`/gap shape, missing and tampered source, path/data redaction, timestamp and watermark conflicts, protocol discovery, tools/resources allowlists, and refused write-like or arbitrary-file requests. The real WS values above are labeled `OWNER_REPORTED_LOCAL`; no private E: files or running tasks were read by this engineering environment. Exact Windows/Ubuntu results must be taken from GitHub Actions for the final PR head, not inferred from a local synthetic test.
+The deterministic test suite uses synthetic, sealed fixtures (`SYNTHETIC_TESTED`) for status conversion, current reported `HELD`/gap shape, missing and tampered source, path/data redaction, timestamp and watermark conflicts, protocol discovery, tools/resources allowlists, and refused write-like or arbitrary-file requests. The real WS values above are labeled `OWNER_REPORTED_LOCAL`; no private E: files or running tasks were read by this engineering environment. Exact Windows/Ubuntu results must be taken from GitHub Actions for the final PR head, not inferred from a local synthetic test. The final #331 delivery comment records the exact candidate SHA, run ID, platforms, and test count.
 
 Existing watchdog tests remain part of the same job and continue to cover two-observation progress rules, history checkpoint semantics, sealed Registry evidence and daily source/import linkage. This MCP adapter does not create new source receipts or claim that either owner-host observation has been independently validated.
 
