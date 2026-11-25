@@ -17,7 +17,7 @@ The builder accepts only explicit file arguments, at most one each:
 - `--live`: existing authorized `atlas.ws.continuous-report.v1` handoff from Work 1.
 - `--previous`: optional sealed EARLY_OBSERVATION snapshot used for a two-observation comparison.
 
-No directory traversal, archive opening, database access, network calls, subprocesses, scheduler or service control are used. Each input is bounded to 256 KiB; maximum explicit file count including the prior observation is five; maximum total bytes are 1,310,720. Output is a new create-only file in an already-existing directory and is bounded to 256 KiB. Refresh is manual only, at least five minutes apart when a prior snapshot is supplied. A refresh stops if input budget or its two-second wall / one-second CPU budget is exceeded. The deterministic fixture test measures Python allocator peak and elapsed time against the test budget.
+No directory traversal, archive opening, database access, network calls, subprocesses, scheduler or service control are used. The CLI requires separate existing approved input and output roots; each supplied report must be a direct child of the input root, and output is create-only as a direct child of the distinct output root. The prior snapshot is read only from the output root. This blocks arbitrary path arguments; the operator must select approved directories outside protected trial paths. Each report is bounded to 256 KiB; maximum explicit file count including the prior observation is five; maximum total bytes are 1,310,720. Output is bounded to 256 KiB. Refresh is manual only, at least five minutes apart when a prior snapshot is supplied. Valid wait times are limited to 24 hours. A refresh stops if input budget or its two-second wall / one-second CPU budget is exceeded. The deterministic fixture test measures Python allocator peak and elapsed time against the test budget.
 
 Paths never enter the output. Each supplied input includes its actual byte digest, schema, observation time, freshness and evidence grade; absent or untrusted inputs have no pin and appear as `UNKNOWN`.
 
@@ -35,7 +35,7 @@ The strict six-input full pilot remains unchanged. Its manifest schema and snaps
 
 ## Fixture verification
 
-CI runs the early-profile unit suite and the existing strict MCP suite on Ubuntu and Windows. The fixture stdio test performs initialize, list, health call, resource read and normal EOF exit. It checks missing inputs, partial lanes, stale/future times, wall-clock uncertainty, HELD/FAILED precedence, worker-without-import linkage, source/session mismatch, two-observation progress, malformed/duplicate JSON keys, symlink/hardlink/path traversal refusal, replacement during read, request-time TTL, file-size refusal, bounded fixture resources, create-only output, manifest pinning and redaction/read-only contracts.
+CI runs the early-profile unit suite and the existing strict MCP suite on Ubuntu and Windows. The fixture stdio test performs initialize, list, health call, resource read and normal EOF exit. It checks missing inputs, partial lanes, stale/future times, wall-clock uncertainty, bounded expected waits, HELD/FAILED precedence, worker-without-import linkage, source/session mismatch, two-observation progress, malformed/duplicate JSON keys, symlink/hardlink/path traversal refusal, replacement during read, request-time TTL, file-size and approved-root refusal, bounded fixture resources, create-only output, manifest pinning, malicious-field redaction in both snapshot and MCP projections, and read-only contracts.
 
 These are `SYNTHETIC_TESTED` results. They are not owner-host evidence. The known live 24-hour trial remains `UNKNOWN` until Work 1 supplies its exact genuine report. No host pilot ran in this qualification because no approved host-capable path and complete report handoff were available; product protections were not bypassed.
 
@@ -44,7 +44,7 @@ These are `SYNTHETIC_TESTED` results. They are not owner-host evidence. The know
 Only after the exact head is independently accepted, authentic bounded exports are available outside protected trial paths, and an approved output directory exists:
 
 ```powershell
-python.exe -B .\tools\atlas_early_observation.py --history '<one sanitized history report>' --registry '<one existing sealed Registry snapshot>' --daily '<one current Daily health export>' --live '<one Work 1 report>' --output '<new file path>' --clock-uncertainty-ms <measured value>
+python.exe -B .\tools\atlas_early_observation.py --approved-input-root '<approved sanitized handoff directory>' --approved-output-root '<separate approved pilot output directory>' --history '<direct child of approved input root>' --registry '<direct child of approved input root>' --daily '<direct child of approved input root>' --live '<direct child of approved input root>' --output '<new direct-child file in approved output root>' --clock-uncertainty-ms <measured value>
 ```
 
 For a later observation, use new current report files, a new output path, and `--previous '<prior EARLY_OBSERVATION snapshot>'`. Do not point this profile at raw ZIPs, SQLite files, service directories or the running 24-hour trial. Missing evidence yields `UNKNOWN`; there is no fallback search.
