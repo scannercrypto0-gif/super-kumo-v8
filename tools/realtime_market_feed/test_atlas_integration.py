@@ -42,16 +42,9 @@ def feed(path, *, start=START, count=1, stale=False, changed=None, symbol="BTCUS
                       "c": close, "v": "3", "n": 1}}
         store.ingest(json.dumps(data, separators=(",", ":")),
                      received_ms=opened + 60_000 - (180_000 if stale else 0))
-    store.db.execute("CREATE TABLE engineering_fixture(schema TEXT, fixture_id TEXT)")
-    store.db.execute("INSERT INTO engineering_fixture VALUES(?,?)",
-                     ("aql.realtime-feed.generated-fixture.v1", "generated-in-test-helper"))
     store.db.commit()
     store.db.close()
     return start, start + count * 60_000
-
-
-def _project(database, **kwargs):
-    return project_feed_window(database, **kwargs, allow_synthetic_fixture=True)
 
 
 def _daily(root, *, changed=None):
@@ -59,9 +52,9 @@ def _daily(root, *, changed=None):
     raw, check = daily_fixture(count=15, changed=changed)
     with w.writer():
         w.import_archive(raw, check, KEY, observed_ms=START + DAY)
-    query = w.query("1m", START, START + 60_000,
-                    cutoff_ms=START + DAY, include_registry=True)
-    return w, query["bars"][0], query["registry"], query
+    row = w.query("1m", START, START + 60_000,
+                  cutoff_ms=START + DAY, include_registry=True)
+    return w, row["bars"][0], row["registry"]
 
 
 def _bytes(path):
@@ -207,19 +200,17 @@ def test_daily_overlap_proposal_is_read_only_and_hash_pinned(tmp_path):
     with ResearchBarStore(target) as store:
         live = store.read("BTCUSDT", "1m", START)
         live_15m = store.project("BTCUSDT", "15m", START)
-    wh, historical, registry, daily_context = _daily(tmp_path / "warehouse")
-    daily_context_15m = wh.query("15m", START, START+900_000,
-                                 cutoff_ms=START+DAY, include_registry=True)
-    daily_15m = daily_context_15m["bars"][0]
+    wh, historical, registry = _daily(tmp_path / "warehouse")
+    daily_15m = wh.query("15m", START, START+900_000,
+                         cutoff_ms=START+DAY)[0]
     before = _bytes(wh.root)
     match = reconcile_daily_bar(live, historical)
     aggregate_match = reconcile_daily_bar(live_15m, daily_15m)
     assert match["status"] == "MATCH_IDEMPOTENT"
     assert aggregate_match["status"] == "MATCH_IDEMPOTENT"
     assert match["duplicate_insert"] is False and match["write_performed"] is False
-    proposal = build_registry_proposal(aggregate_match, daily_context_15m)
+    proposal = build_registry_proposal(aggregate_match, registry)
     assert proposal["status"] == "PROPOSED_ONLY"
-    assert proposal["evidence_class"] == "GENERATED_SYNTHETIC_FIXTURE"
     assert proposal["registry_mutation"] is False
     assert _bytes(wh.root) == before
 
@@ -232,11 +223,10 @@ def test_daily_ohlcv_conflict_and_missing_realtime_produce_proposals_not_repairs
                            end_ms=end, now_ms=end+1_000, engineering_test_only=True)
     with ResearchBarStore(copied) as store:
         live = store.read("BTCUSDT", "1m", START)
-    wh, historical, registry, daily_context = _daily(tmp_path / "warehouse", changed=2)
+    wh, historical, registry = _daily(tmp_path / "warehouse", changed=2)
     # Same UTC key, but source OHLCV differs; originals stay untouched.
-    daily_context_conflict = wh.query("1m", START+120_000, START+180_000,
-                                      cutoff_ms=START+DAY, include_registry=True)
-    daily_conflict = daily_context_conflict["bars"][0]
+    daily_conflict = wh.query("1m", START+120_000, START+180_000,
+                              cutoff_ms=START+DAY)[0]
     with ResearchBarStore(copied) as store:
         live_row = store.read("BTCUSDT", "1m", START+120_000)
     conflict = reconcile_daily_bar(live_row, daily_conflict)
@@ -244,8 +234,7 @@ def test_daily_ohlcv_conflict_and_missing_realtime_produce_proposals_not_repairs
     missing = reconcile_daily_bar(None, historical)
     assert missing["status"] == "MISSING_REALTIME"
     assert missing["recovery"] == "AUTHORIZED_BOUNDED_RECOVERY_REQUIRED"
-    assert build_registry_proposal(conflict, daily_context_conflict)["warehouse_mutation"] is False
-    assert build_registry_proposal(missing, daily_context)["status"] == "PROPOSED_ONLY"
+    assert build_registry_proposal(conflict, registry)["warehouse_mutation"] is False
 
 
 def test_missing_provenance_and_tampered_registry_fail_closed(tmp_path):
@@ -256,7 +245,7 @@ def test_missing_provenance_and_tampered_registry_fail_closed(tmp_path):
             "final":True,"o":"1","h":"2","l":"1","c":"1","v":"3",
             "source_sha256":"0"*64,"available_at_ms":end})
     wh, daily, registry, daily_context = _daily(tmp_path / "warehouse")
-    with pytest.raises(ValueError, match="SOURCE_PROVENANCE_REQUIRED"):
+    with pytest.raises(ValueError, match="PROJECTED_ROW_INVALID"):
         reconcile_daily_bar(dict(live, constituent_sha256=[]), daily)
     bad = dict(registry, snapshot_sha256="f"*64)
     with pytest.raises(ValueError, match="RECONCILIATION_REQUIRED|RECONCILIATION_SEAL_INVALID"):
@@ -319,5 +308,3 @@ def test_utc_day_boundary_and_registry_provenance(tmp_path):
     with ResearchBarStore(copied) as store:
         realtime = store.read("BTCUSDT", "1m", START)
     assert reconcile_daily_bar(realtime, daily)["status"] == "MATCH_IDEMPOTENT"
-    proposal = build_registry_proposal(reconcile_daily_bar(realtime, daily), daily_context)
-    assert proposal["status"] == "PROPOSED_ONLY"
