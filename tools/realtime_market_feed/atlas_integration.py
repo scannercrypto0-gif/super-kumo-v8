@@ -139,14 +139,14 @@ def _verify_lineage(row, *, expected_producer_code_sha256):
               and body["available_at_ms"] == row["received_ms"]
               and body["finality"] == "FINAL",
               "FEED_LINEAGE_IDENTITY_MISMATCH")
+        _need(type(body["event_payload_sha256"]) is str
+              and HEX.fullmatch(body["event_payload_sha256"]) is not None,
+              "FEED_RECEIPT_INVALID")
         ohlcv = {"o": row["open"], "h": row["high"], "l": row["low"],
                  "c": row["close"], "v": row["volume"]}
         _need(body["ohlcv"] == ohlcv and body["trades"] == row["trades"]
               and body["event_payload_sha256"] == row["payload_sha256"],
               "FEED_LINEAGE_ROW_MISMATCH")
-        _need(type(body["event_payload_sha256"]) is str
-              and HEX.fullmatch(body["event_payload_sha256"]) is not None,
-              "FEED_RECEIPT_INVALID")
         normalized = {
             "provider":body["provider"], "market":body["market"],
             "symbol":body["symbol"], "interval":body["interval"],
