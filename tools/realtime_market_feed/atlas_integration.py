@@ -307,7 +307,7 @@ def _verify_reconciliation(reconciliation):
           and digest == seal(canonical(body)), "RECONCILIATION_SEAL_INVALID")
     expected = _reconciliation_body(body.get("realtime_row"), body.get("daily_row"))
     _need(body == expected, "RECONCILIATION_STATUS_OR_LINEAGE_INVALID")
-    return expected
+    return {**expected, "reconciliation_sha256": digest}
 
 
 def _registry_snapshot(snapshot):
