@@ -345,7 +345,7 @@ def _live(item, previous, now, clock_ok):
                     "confirmed_rollovers": doc.get("confirmed_rollovers") if type(doc.get("confirmed_rollovers")) is int else None,
                     "acceptance_ready": doc.get("acceptance_ready") if type(doc.get("acceptance_ready")) is bool else None,
                     "source_identity": identity,
-                    "hold_reason": safe_reason(doc.get("hold_reason")) if doc.get("hold_reason") else None},
+                    "hold_reason": "LIVE_HOLD_REASON_REPORTED" if doc.get("hold_reason") else None},
                 "scope": "WORK1_HANDOFF_REPORT_ONLY",
                 "evidence_grade": "OWNER_SUPPLIED_LIVE_REPORT_NOT_HOST_ATTESTED"}
     except Exception:
