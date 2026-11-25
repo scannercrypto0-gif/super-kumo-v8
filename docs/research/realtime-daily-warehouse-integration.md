@@ -6,7 +6,7 @@ Status: `INTEGRATION_SEAM_SYNTHETIC_PASS_AUDIT_PENDING / LIVE_ACTIVATION_BLOCKED
 
 | Seam | Existing implementation | Result |
 |---|---|---|
-| Realtime finalized 1m producer | PR #333, `tools/realtime_market_feed/service.py::Store.final_bar`, `reader.py::read_snapshot`, head `eab5d240580e982bb298ed51d20633fd240e04c6` | Read-only adapter validates finality, grid, receipt hash, freshness, gaps and conflict events. |
+| Realtime finalized 1m producer | PR #333, `tools/realtime_market_feed/service.py::Store.final_bar`, `reader.py::read_snapshot`, head `eab5d240580e982bb298ed51d20633fd240e04c6` | Read-only adapter checks finality, grid, freshness, gaps and conflicts, but blocks production admission because the raw-event digest cannot be verified against the persisted normalized OHLCV row. |
 | 1m validation and timeframe building | PR #330, `src/aql/research_timeframes.py::project_finalized_1m`, `ResearchBarStore`, head `5df7f6c9e0d6448db6aa700fa80158b443c5b3db` | Reused, no second bar schema. Complete 5m/15m/30m/1h/1d/1w projections require full membership. |
 | Daily source + history registry | PR #330, `HistoricalWarehouse.query(..., include_registry=True)`, `aql.warehouse.registry.snapshot`; `daily.import_retained` | Read-only synthetic query and hash-pinned reconciliation proposal. Original Vision archives remain retrospective authority. Existing Registry C remains authoritative; the approved September 2017 420-minute exception remains the only explicit historical gap policy and is not generalized or rewritten here. |
 | Daily operational health | PR #312, head `73d677852725a4af51868c6906b23fc2825db6f0` | Health/freshness evidence only; not the daily data publisher. |
