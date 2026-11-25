@@ -312,22 +312,48 @@ def _registry_snapshot(snapshot):
     return snapshot
 
 
-def _daily_context_binding(context, daily_row):
+def _native_daily_context(context, daily_row, warehouse_root):
+    """Re-read the requested bars and Registry from the pinned native warehouse.
+
+    Caller-provided query objects are claims only. A proposal is possible only
+    when the native Warehouse query reproduces both the complete row set and
+    exact Registry snapshot from the same read-only source root.
+    """
     _need(type(context) is dict and type(context.get("bars")) is list
           and type(context.get("requested_window")) is list
           and len(context["requested_window"]) == 2
           and type(context.get("cutoff_ms")) is int,
           "DAILY_QUERY_CONTEXT_REQUIRED")
-    rows = context["bars"]
-    _need(daily_row is not None and daily_row in rows,
-          "DAILY_QUERY_ROW_NOT_BOUND")
-    row = daily_row
     start, end = context["requested_window"]
-    _need(type(start) is int and type(end) is int
-          and start <= row["open_ms"] and row["close_exclusive_ms"] <= end
-          and row["available_at_ms"] <= context["cutoff_ms"],
+    _need(type(start) is int and type(end) is int and start < end
+          and daily_row is not None
+          and type(daily_row.get("interval")) is str,
+          "DAILY_QUERY_CONTEXT_INVALID")
+    _need(warehouse_root is not None, "NATIVE_WAREHOUSE_ROOT_REQUIRED")
+    root = Path(warehouse_root).resolve()
+    from aql.warehouse.engine import HistoricalWarehouse
+    warehouse = HistoricalWarehouse(root, test_root=_in_temp(root))
+    native = warehouse.query(
+        daily_row["interval"], start, end,
+        cutoff_ms=context["cutoff_ms"], include_registry=True)
+    _need(native["requested_window"] == [start, end]
+          and native["cutoff_ms"] == context["cutoff_ms"]
+          and native["bars"] == context["bars"]
+          and native["registry"] == context.get("registry"),
+          "DAILY_NATIVE_READBACK_MISMATCH")
+    _need(daily_row in native["bars"], "DAILY_QUERY_ROW_NOT_BOUND")
+    return native
+
+
+def _daily_context_binding(context, daily_row, warehouse_root):
+    native = _native_daily_context(context, daily_row, warehouse_root)
+    row = daily_row
+    snapshot = _registry_snapshot(native["registry"])
+    _need(type(row.get("open_ms")) is int
+          and type(row.get("close_exclusive_ms")) is int
+          and row["open_ms"] < row["close_exclusive_ms"]
+          and row["available_at_ms"] <= native["cutoff_ms"],
           "DAILY_QUERY_WINDOW_MISMATCH")
-    snapshot = _registry_snapshot(context.get("registry"))
     _need(any(type(span) is list and len(span) == 2
               and type(span[0]) is int and type(span[1]) is int
               and span[0] <= row["open_ms"]
@@ -364,13 +390,14 @@ def _daily_context_binding(context, daily_row):
     return snapshot, candidates
 
 
-def build_registry_proposal(reconciliation, daily_query_context):
-    """Create a proposal only when a sealed daily query and Registry cover the same bar."""
+def build_registry_proposal(reconciliation, daily_query_context, *, warehouse_root=None):
+    """Propose only after a read-only native query reproduces bars and Registry."""
     from aql.warehouse.storage import canonical, seal
     verified = _verify_reconciliation(reconciliation)
     daily_row = verified["daily_row"]
     _need(daily_row is not None, "NOT_VERIFIABLE_DAILY_ROW_ABSENT")
-    snapshot, sources = _daily_context_binding(daily_query_context, daily_row)
+    snapshot, sources = _daily_context_binding(
+        daily_query_context, daily_row, warehouse_root)
     source_pins = sorted({item["source_zip_sha256"] for item in sources})
     receipt_pins = sorted({item["source_receipt_sha256"] for item in sources})
     proposal = {
