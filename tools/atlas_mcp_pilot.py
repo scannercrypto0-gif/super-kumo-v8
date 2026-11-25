@@ -355,11 +355,18 @@ class SnapshotReader:
             if name == "history":
                 counters = report.get("counters") if type(report.get("counters")) is dict else {}
                 gaps = {"unresolved_ranges": bounded_int(report.get("unresolved_gaps")) or 0,
+                        "unresolved_gap_ranges": report.get("unresolved_gap_ranges", [])[:32],
                         "source_obstacles": bounded_int(report.get("source_obstacles")) or 0,
-                        "registry_gaps": bounded_int(counters.get("registry_gaps")) or 0}
-                progress = {key: bounded_int(value) for key, value in counters.items()
+                        "registry_gaps": bounded_int(counters.get("registry_gaps")) or 0,
+                        "registry_gap_ranges": report.get("registry_gap_ranges", [])[:32],
+                        "registry_unavailable_ranges": report.get("registry_unavailable_ranges", [])[:32]}
+                progress = {key: value for key, value in counters.items()
                             if key in {"archives_imported", "inserted_rows", "event_watermark",
-                                       "physical_rows", "source_count", "last_open_ms"}}
+                                       "physical_rows", "source_count", "last_open_ms",
+                                       "full_history_verified", "accepted_prefix_unchanged",
+                                       "all_published_partitions_ingested", "source_scan_exhausted",
+                                       "latest_published_close_reached"}
+                            and type(value) in (int, bool)}
             elif name == "daily":
                 progress = {key: report.get(key) for key in
                             ("task_state", "scheduler_state", "runtime_state", "cycle_evidence",
@@ -368,8 +375,9 @@ class SnapshotReader:
             else:
                 progress = {key: report.get(key) for key in
                             ("source_class", "status", "verified_receipts", "last_committed_ms",
-                             "last_receipt_fresh", "missing_ranges", "hold_reason")}
-                gaps = {"missing_ranges": bounded_int(report.get("missing_ranges")) or 0}
+                             "last_receipt_fresh", "missing_ranges", "missing_open_ranges", "hold_reason")}
+                gaps = {"missing_ranges": bounded_int(report.get("missing_ranges")) or 0,
+                        "missing_open_ranges": report.get("missing_open_ranges", [])[:32]}
             status = allowed[raw["status"]]
             reason = safe_reason(raw.get("reason")) or "EARLY_EVIDENCE_UNTRUSTED"
             age = bounded_int(raw.get("age_ms"))
@@ -382,9 +390,13 @@ class SnapshotReader:
                               "source_age_ms_at_snapshot": age,
                               "max_snapshot_age_ms": 300_000,
                               "expected_wait": status == "EXPECTED_WAIT"},
-                "gaps": gaps,
+                "gaps": gaps, "scope": safe_reason(raw.get("scope")) or "REPORT_ONLY",
                 "provenance": {"source_schema": raw.get("source_schema"),
                                "source_file_sha256": pin,
+                               "source_identity": raw.get("source_identity")
+                                  if name == "live" and type(raw.get("source_identity")) is dict
+                                  and is_sha256(raw["source_identity"].get("config_sha256"))
+                                  and is_sha256(raw["source_identity"].get("policy_sha256")) else None,
                                "evidence_grade": safe_reason(raw.get("evidence_grade")) or "UNAVAILABLE"},
                 "scientific_authority": "NONE", "trading_authority": "NONE"}
         statuses = {item["status"] for item in lanes.values()}
