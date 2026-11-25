@@ -148,7 +148,7 @@ try {
         $n.Clauses[0].Item1.Extent.Text -cmatch "ActivateAndObserve"},$true).Clauses[0].Item1.Extent.Text
     foreach($Mode in @('Observe','RepairPermitAndObserve','ActivateAndObserve','ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve','ApplySustainedRootCorrectionAndObserve')){
         Assert ((& ([scriptblock]::Create($repairCondition))) -eq ($Mode -ceq 'RepairPermitAndObserve')) 'WRONG_REPAIR_MODE_BRANCH'
-        Assert ((& ([scriptblock]::Create($stageCondition))) -eq ($Mode -in @('ActivateAndObserve','ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve'))) 'WRONG_STAGE_MODE_BRANCH'
+        Assert ((& ([scriptblock]::Create($stageCondition))) -eq ($Mode -in @('ActivateAndObserve','ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve','ApplySustainedRootCorrectionAndObserve'))) 'WRONG_STAGE_MODE_BRANCH'
     }
     $bootstrapAst=[System.Management.Automation.Language.Parser]::ParseFile($bootstrap,[ref]$null,[ref]$null)
     $baselineNode=$bootstrapAst.Find({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Test-FreshPingBaseline'},$true)
@@ -161,6 +161,11 @@ try {
     $diag.hold_reason='PILOT_STOP_DISK_RESERVE_LOW'
     Assert ((Test-FreshPingBaseline $diag $expectedConfig).failures -contains 'HOLD_REASON_MISMATCH') 'PING_BASELINE_ACCEPTED_DISK_HOLD'
     Assert ((Test-FreshPingBaseline $diag $expectedConfig 'Disk').ready) 'DISK_RESERVE_EXACT_HOLD_REJECTED'
+    $diag.hold_reason='LIVE_SERVICE_SEGMENT_FAILED';$diag.blockers=@('QUOTA_NOT_READY')
+    $diag | Add-Member -NotePropertyName prestart_evidence -NotePropertyValue ([pscustomobject]@{safe_quota_bootstrap=$true}) -Force
+    Assert ((Test-FreshPingBaseline $diag $expectedConfig 'SustainedRoot').ready) 'SUSTAINED_ROOT_PRESTART_QUOTA_BOOTSTRAP_REJECTED'
+    $diag.prestart_evidence.safe_quota_bootstrap=$false
+    Assert (!(Test-FreshPingBaseline $diag $expectedConfig 'SustainedRoot').ready) 'SUSTAINED_ROOT_QUOTA_GUARD_BYPASSED'
     $diag.blockers=@('DISK_RESERVE_LOW')
     Assert (!(Test-FreshPingBaseline $diag $expectedConfig 'Disk').ready) 'DISK_RESERVE_GUARD_BYPASSED'
     $baselineParam=$bootstrapAst.ParamBlock.Parameters | Where-Object {$_.Name.VariablePath.UserPath -ceq 'ExpectedPreviousConfigSha256'}
