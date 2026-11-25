@@ -166,11 +166,18 @@ def reconcile_daily_bar(realtime_bar, daily_bar):
         row = realtime_bar
         _need(_provenance(row, realtime=True), "SOURCE_PROVENANCE_REQUIRED")
         return {"status": "REALTIME_ONLY_WAIT_DAILY", "realtime_sha256": row["sha256"],
-                "daily_sha256": None, "write_performed": False}
+                "daily_sha256": None,
+                "realtime_constituent_sha256": row["constituent_sha256"],
+                "daily_constituent_sha256": None,
+                "source_class": {"realtime": row["source_class"], "daily": None},
+                "write_performed": False}
     if realtime_bar is None:
         _need(_provenance(daily_bar, realtime=False), "SOURCE_PROVENANCE_REQUIRED")
         return {"status": "MISSING_REALTIME", "realtime_sha256": None,
                 "daily_sha256": daily_bar["sha256"],
+                "realtime_constituent_sha256": None,
+                "daily_constituent_sha256": daily_bar["constituent_sha256"],
+                "source_class": {"realtime": None, "daily": daily_bar["source_class"]},
                 "recovery": "AUTHORIZED_BOUNDED_RECOVERY_REQUIRED",
                 "write_performed": False}
     _need(_provenance(realtime_bar, realtime=True)
@@ -179,21 +186,46 @@ def reconcile_daily_bar(realtime_bar, daily_bar):
     if any(realtime_bar.get(k) != daily_bar.get(k) for k in identity):
         return {"status": "CONFLICT", "reason": "SOURCE_KEY_MISMATCH",
                 "realtime_sha256": realtime_bar["sha256"],
-                "daily_sha256": daily_bar["sha256"], "write_performed": False}
+                "daily_sha256": daily_bar["sha256"],
+                "realtime_constituent_sha256": realtime_bar["constituent_sha256"],
+                "daily_constituent_sha256": daily_bar["constituent_sha256"],
+                "source_class": {"realtime": realtime_bar["source_class"],
+                                 "daily": daily_bar["source_class"]},
+                "realtime_key": {k: realtime_bar.get(k) for k in identity},
+                "daily_key": {k: daily_bar.get(k) for k in identity},
+                "write_performed": False}
     if realtime_bar.get("close_exclusive_ms") != daily_bar.get("close_exclusive_ms"):
         return {"status": "CONFLICT", "reason": "CLOSE_TIME_MISMATCH",
                 "realtime_sha256": realtime_bar["sha256"],
-                "daily_sha256": daily_bar["sha256"], "write_performed": False}
+                "daily_sha256": daily_bar["sha256"],
+                "realtime_constituent_sha256": realtime_bar["constituent_sha256"],
+                "daily_constituent_sha256": daily_bar["constituent_sha256"],
+                "realtime_close_exclusive_ms": realtime_bar.get("close_exclusive_ms"),
+                "daily_close_exclusive_ms": daily_bar.get("close_exclusive_ms"),
+                "source_class": {"realtime": realtime_bar["source_class"],
+                                 "daily": daily_bar["source_class"]},
+                "write_performed": False}
     for field in ("o", "h", "l", "c", "v"):
         if _decimal(realtime_bar[field]) != _decimal(daily_bar[field]):
             return {"status": "CONFLICT", "reason": "OHLCV_MISMATCH",
                     "field": field, "realtime_value": realtime_bar[field],
                     "daily_value": daily_bar[field],
                     "realtime_sha256": realtime_bar["sha256"],
-                    "daily_sha256": daily_bar["sha256"], "write_performed": False}
+                    "daily_sha256": daily_bar["sha256"],
+                    "realtime_constituent_sha256": realtime_bar["constituent_sha256"],
+                    "daily_constituent_sha256": daily_bar["constituent_sha256"],
+                    "source_class": {"realtime": realtime_bar["source_class"],
+                                     "daily": daily_bar["source_class"]},
+                    "realtime_ohlcv": {k: realtime_bar[k] for k in ("o","h","l","c","v")},
+                    "daily_ohlcv": {k: daily_bar[k] for k in ("o","h","l","c","v")},
+                    "write_performed": False}
     return {"status": "MATCH_IDEMPOTENT", "realtime_sha256": realtime_bar["sha256"],
-            "daily_sha256": daily_bar["sha256"], "duplicate_insert": False,
-            "write_performed": False}
+            "daily_sha256": daily_bar["sha256"],
+            "realtime_constituent_sha256": realtime_bar["constituent_sha256"],
+            "daily_constituent_sha256": daily_bar["constituent_sha256"],
+            "source_class": {"realtime": realtime_bar["source_class"],
+                             "daily": daily_bar["source_class"]},
+            "duplicate_insert": False, "write_performed": False}
 
 
 def _provenance(row, *, realtime):
@@ -224,12 +256,23 @@ def build_registry_proposal(reconciliation, registry_snapshot):
     _need(reconciliation.get("status") in {
         "MATCH_IDEMPOTENT", "MISSING_REALTIME", "CONFLICT", "REALTIME_ONLY_WAIT_DAILY"},
         "RECONCILIATION_REQUIRED")
+    daily_pins = [item.get("source_zip_sha256") for item in registry_snapshot.get("sources", [])]
+    _need(all(type(pin) is str and HEX.fullmatch(pin) for pin in daily_pins),
+          "REGISTRY_SOURCE_PINS_INVALID")
     proposal = {
         "schema": "aql.realtime-warehouse-reconciliation-proposal.v1",
         "status": "PROPOSED_ONLY",
+        "venue": "BINANCE_SPOT", "market": "SPOT",
         "reconciliation": reconciliation,
         "registry_snapshot_sha256": registry_snapshot["snapshot_sha256"],
         "registry_event_watermark": registry_snapshot["event_watermark"],
+        "daily_source_zip_sha256s": daily_pins,
+        "registry_coverage": {
+            "covered_intervals": registry_snapshot["covered_intervals"],
+            "internal_gaps": registry_snapshot["internal_gaps"],
+            "archive_unavailable_boundaries": registry_snapshot["archive_unavailable_boundaries"],
+            "conflicts": registry_snapshot["conflicts"],
+        },
         "source_classes": ["FORWARD_UNQUALIFIED", "RETROSPECTIVE_NON_PIT"],
         "registry_mutation": False, "warehouse_mutation": False,
         "original_data_mutation": False, "trading_authority": "NONE",
