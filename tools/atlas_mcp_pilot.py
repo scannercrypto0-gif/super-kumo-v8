@@ -361,7 +361,7 @@ class SnapshotReader:
                 "reason": safe_reason(snapshot.get("state")) or "UNKNOWN",
                 "refusal_reason": lanes["live"]["refusal_reason"] if lanes["live"]["status"] == "HELD" else None,
                 "observed_at_utc": utc(observed), "observed_at_ms": observed,
-                "clock_uncertainty_ms": snapshot.get("clock_uncertainty_ms"),
+                "clock_uncertainty_ms": bounded_int(snapshot.get("clock_uncertainty_ms")) if bounded_int(snapshot.get("clock_uncertainty_ms")) is not None and snapshot.get("clock_uncertainty_ms") <= MAX_CLOCK_DRIFT_MS else None,
                 "evidence_grade": "SEALED_LOCAL_SNAPSHOT_NOT_HOST_ATTESTED", "lanes": lanes, "gaps": gaps,
                 "provenance": {"snapshot_sha256": file_sha, "source_pins": pins,
                                "registry_event_watermark": watermark, "host_attested": False},
@@ -398,11 +398,11 @@ class SnapshotReader:
             if name == "history":
                 counters = report.get("counters") if type(report.get("counters")) is dict else {}
                 gaps = {"unresolved_ranges": bounded_int(report.get("unresolved_gaps")) or 0,
-                        "unresolved_gap_ranges": report.get("unresolved_gap_ranges", [])[:32],
+                        "unresolved_gap_ranges": early_ranges(report.get("unresolved_gap_ranges")),
                         "source_obstacles": bounded_int(report.get("source_obstacles")) or 0,
                         "registry_gaps": bounded_int(counters.get("registry_gaps")) or 0,
-                        "registry_gap_ranges": report.get("registry_gap_ranges", [])[:32],
-                        "registry_unavailable_ranges": report.get("registry_unavailable_ranges", [])[:32]}
+                        "registry_gap_ranges": early_ranges(report.get("registry_gap_ranges")),
+                        "registry_unavailable_ranges": early_ranges(report.get("registry_unavailable_ranges"))}
                 progress = {key: value for key, value in counters.items()
                             if key in {"archives_imported", "inserted_rows", "event_watermark",
                                        "physical_rows", "source_count", "last_open_ms",
