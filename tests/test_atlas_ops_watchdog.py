@@ -8,6 +8,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import atlas_ops_watchdog as watchdog
+import atlas_mcp_pilot as mcp
 
 
 def seal_doc(body, field):
@@ -16,7 +17,7 @@ def seal_doc(body, field):
 
 def evidence():
     source = seal_doc(dict(schema="aql.research.warehouse-source.v1",
-                           key="data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2020-01-01.zip",
+                           key="data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-1970-01-02.zip",
                            source_zip_sha256="c" * 64, checksum_sha256="f" * 64, rows=100,
                            publisher_integrity="ZIP_CHECKSUM_MATCH", trading_authority="NONE"),
                       "receipt_sha256")
@@ -42,11 +43,11 @@ def evidence():
                    all_published_partitions_ingested=False, source_scan_exhausted=False,
                    latest_published_close_reached=False, unresolved_gap_ranges=[],
                    unresolved_source_obstacles=[], receipt_file="d" * 64 + ".json")
-    daily = dict(schema="aql.recurring-runtime.health.v1", trading_authority="NONE",
-                 current_entry="NO_CURRENT_ENTRY", observed_at_ms=1_900_000,
+    daily = dict(schema="aql.recurring-runtime.health.v1", source_cadence="DAILY_UTC", trading_authority="NONE",
+                 current_entry="NO_CURRENT_ENTRY", observed_at_ms=100_000_000,
                  cycle_evidence="RECENT_RESEARCH_RECEIPT", tick_freshness="RECENT",
-                 source_freshness="LATEST_DUE_DAY_RECEIVED", next_check_ms=3_000_000,
-                  last_success=dict(source_day_ms=1_000_000, source_zip_sha256="c" * 64,
+                 source_freshness="LATEST_DUE_DAY_RECEIVED", next_check_ms=300_000_000,
+                  last_success=dict(source_day_ms=86_400_000, source_zip_sha256="c" * 64,
                                     checksum_sha256="f" * 64,
                                     daily_source_evidence_status="VERIFIED",
                                     daily_worker_receipt_sha256="2" * 64,
@@ -66,7 +67,7 @@ def pins(values):
     return [watchdog.digest(watchdog.canonical(value)) for value in values]
 
 
-def build(values, *, now=2_000_000, mono=10, prev=None):
+def build(values, *, now=200_000_000, mono=10, prev=None):
     p = pins(values)
     return watchdog.build(*values, registry_pin=p[0], history_pin=p[1], daily_pin=p[2],
                           daily_import_pin=p[3], daily_source_pin=p[4], live_pin=p[5],
@@ -93,7 +94,7 @@ class WatchdogTests(unittest.TestCase):
         values[0]["snapshot_sha256"] = watchdog.digest(watchdog.canonical(
             {k: v for k, v in values[0].items() if k != "snapshot_sha256"}))
         values[1]["inserted_rows"] += 5
-        second = build(values, now=2_060_000, mono=60_000_000_010, prev=first)
+        second = build(values, now=200_060_000, mono=60_000_000_010, prev=first)
         self.assertEqual(second["lanes"]["history"]["state"], "HEALTHY_PROGRESS")
 
 
@@ -133,6 +134,45 @@ class WatchdogTests(unittest.TestCase):
         second = build(values, now=2_060_000, mono=60_000_000_010, prev=first)
         self.assertFalse(second["lanes"]["daily"]["source_receipt_link_verified"])
         self.assertEqual(second["lanes"]["daily"]["state"], "UNKNOWN")
+
+    def assert_worker_proof_required(self, values):
+        first = build(values)
+        second = build(values, now=200_060_000, mono=60_000_000_010, prev=first)
+        self.assertFalse(second["lanes"]["daily"]["source_receipt_link_verified"])
+        self.assertEqual(second["lanes"]["daily"]["state"], "UNKNOWN")
+        self.assertEqual(second["state"], "UNKNOWN")
+        projected = mcp.SnapshotReader.project(second, "e" * 64)
+        self.assertEqual(projected["lanes"]["daily"]["status"], "UNKNOWN")
+        self.assertNotEqual(projected["status"], "HEALTHY")
+        self.assertEqual(projected["trading_authority"], "NONE")
+
+    def test_legacy_import_pin_cannot_replace_daily_worker_proof(self):
+        values = list(evidence())
+        values[2]["last_success"]["warehouse_receipt_sha256"] = watchdog.digest(
+            watchdog.canonical(values[3]))
+        values[2]["last_success"].pop("daily_source_evidence_status")
+        values[2]["last_success"].pop("daily_worker_receipt_sha256")
+        values[2]["last_success"]["receipts"] = []
+        self.assert_worker_proof_required(values)
+
+    def test_warehouse_report_schema_cannot_replace_daily_worker_proof(self):
+        values = list(evidence())
+        imported = dict(status="ARCHIVE_IMPORTED", source_sha256=values[4]["source_zip_sha256"],
+                        key=values[4]["key"], inserted_rows=100)
+        values[3] = dict(schema="aql.research.warehouse-report.v1", this_run=[imported])
+        values[2]["last_success"].pop("daily_source_evidence_status")
+        values[2]["last_success"].pop("daily_worker_receipt_sha256")
+        values[2]["last_success"]["receipts"] = []
+        self.assert_worker_proof_required(values)
+
+    def test_daily_source_day_must_match_archive_utc_date(self):
+        values = list(evidence())
+        values[2]["last_success"]["source_day_ms"] += 86_400_000
+        first = build(values)
+        second = build(values, now=200_060_000, mono=60_000_000_010, prev=first)
+        self.assertFalse(second["lanes"]["daily"]["source_receipt_link_verified"])
+        self.assertEqual(second["lanes"]["daily"]["state"], "UNKNOWN")
+        self.assertNotEqual(second["state"], "HEALTHY_PROGRESS")
 
     def test_daily_missing_original_to_commit_link_is_unknown(self):
         values = evidence()
