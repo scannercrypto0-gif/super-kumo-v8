@@ -34,11 +34,11 @@ ranges, and no daily-loader interface is called by this service.
 BTCUSDT is the default vertical slice. Symbol universe is configurable, capped
 at 64 symbols (192 streams) on one socket. The implementation preserves latest
 trade/quote state and finalized 1m candles, not every raw trade payload. No
-REST backfill, private endpoints, order calls, market-data entitlement check,
-shared-NAT quota inventory, or host deployment has been performed. Provider
+private endpoints, order calls, market-data entitlement check, shared-NAT
+quota inventory, or persistent host deployment has been performed. Provider
 terms and the current host's shared-IP usage must be independently cleared
-before owner-host use. This is engineering code, not a claim that the provider
-connection was tested.
+before persistent owner-host use. The E: smoke run proved live reception only
+for its short observation window; it did not prove sustained acceptance.
 
 ## Offline tests
 
@@ -67,11 +67,21 @@ test must prove reconnect and REST gap closure before integration.
 $env:PYTHONPATH='C:\path\to\checkout'; & 'C:\path\to\python.exe' -B -m tools.realtime_market_feed.service --root 'E:\ATLAS\realtime-market-feed' --symbols BTCUSDT --observe-seconds 600
 ```
 
-A successful process start is not a successful feed. After the bounded run, get a structured local status snapshot with `python -B -m tools.realtime_market_feed.service --root 'E:\\ATLAS\\realtime-market-feed' --report`. Confirm fresh rows in
-`latest_trade`, `latest_quote`, and `final_bar`, no unexplained OPEN gaps,
-and an advancing `service_event` history. A provider rejection or repeated
-disconnect remains a failed smoke test. Do not enable this as a background
-service until the repository's source-rights and owner-host gates are cleared.
+After the 10-minute smoke passes, run the 24-hour rotation acceptance window:
+
+```powershell
+$env:PYTHONPATH='C:\\path\\to\\checkout'; & 'C:\\path\\to\\python.exe' -B -m tools.realtime_market_feed.service --root 'E:\\ATLAS\\realtime-market-feed' --symbols BTCUSDT --observe-seconds 86400
+```
+
+A successful process start is not a successful feed. After each run, get a
+read-only local report with
+`python -B -m tools.realtime_market_feed.service --root 'E:\\ATLAS\\realtime-market-feed' --report`.
+Confirm fresh rows in `latest_trade`, `latest_quote`, and `final_bar`, zero
+OPEN gaps after the recovery worker has settled, at least one
+`PLANNED_ROTATION` followed by a new `CONNECTED` event in the 24-hour run,
+and no unexplained message rejections. The separate offline injected-outage
+test must pass as well. Do not enable a persistent background service until
+provider-rights and owner-host gates are cleared.
 
 ## Consumer handoff
 
