@@ -147,14 +147,6 @@ class SnapshotReader:
         self.expected_manifest_sha = expected_manifest_sha
         self.snapshot_path = None
         self.snapshot_file_sha = None
-
-    def __init__(self, manifest_path, expected_manifest_sha):
-        self.profile = "strict"
-        self.view = self.unavailable("EVIDENCE_UNAVAILABLE")
-        self.manifest_path = Path(manifest_path)
-        self.expected_manifest_sha = expected_manifest_sha
-        self.snapshot_path = None
-        self.snapshot_file_sha = None
         try:
             manifest, raw_manifest_sha = watchdog.read_json(self.manifest_path)
             if raw_manifest_sha != expected_manifest_sha:
@@ -504,7 +496,8 @@ class MCPServer:
                                 refusal_reason="SNAPSHOT_TTL_EXCEEDED")
             return data
         except Exception:
-            return self.reader.unavailable("EVIDENCE_UNAVAILABLE")
+            return self.reader.unavailable("EVIDENCE_UNAVAILABLE",
+                                              early=getattr(self.reader, "profile", "strict") == "early")
 
     @staticmethod
     def error(request_id, code, message, data=None):
