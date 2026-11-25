@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{40}$')][string]$ExpectedCommit,
-    [ValidateSet('ActivateAndObserve','Observe','RepairPermitAndObserve','ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve')][string]$Mode='ActivateAndObserve',
+    [ValidateSet('ActivateAndObserve','Observe','RepairPermitAndObserve','ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve','ApplySustainedRootCorrectionAndObserve')][string]$Mode='ActivateAndObserve',
     [string]$OwnerDecisionRef,
     [ValidateRange(6,48)][int]$ObserveHours=24,
     [ValidatePattern('^[a-f0-9]{64}$')][string]$ExpectedPreviousConfigSha256,
@@ -28,7 +28,7 @@ function Write-NewJson([string]$Path,$Value){
 function Test-FreshPingBaseline($Diagnostic,[string]$ExpectedConfigSha256,[string]$RecoveryKind='Ping'){
     $failures=@()
     if($ExpectedConfigSha256 -cnotmatch '^[a-f0-9]{64}$' -or $Diagnostic.identity.config_sha256 -cne $ExpectedConfigSha256){$failures+='INSTALLED_CONFIG_PIN_MISMATCH'}
-    $allowedHolds=if($RecoveryKind -ceq 'Disk'){@('PILOT_STOP_DISK_RESERVE_LOW')}else{@('LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED')}
+    $allowedHolds=if($RecoveryKind -ceq 'Disk'){@('PILOT_STOP_DISK_RESERVE_LOW')}elseif($RecoveryKind -ceq 'SustainedRoot'){@('LIVE_SERVICE_SEGMENT_FAILED')}else{@('LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED')}
     if($Diagnostic.hold_reason -cnotin $allowedHolds){$failures+='HOLD_REASON_MISMATCH'}
     if($Diagnostic.manifest_scope.verification_complete -ne $true){$failures+='RUNTIME_MANIFEST_NOT_VERIFIED'}
     $blockers=@($Diagnostic.blockers | Where-Object {$null -ne $_ -and [string]$_ -ne ''})
@@ -48,17 +48,17 @@ function Test-FreshPingBaseline($Diagnostic,[string]$ExpectedConfigSha256,[strin
 $t=@(Get-ScheduledTask -TaskName $taskName)
 if($t.Count -ne 1 -or @($t[0].Actions).Count -ne 1){throw 'TASK_NOT_UNIQUE'}
 $config=Read-ConfigPath $t[0];$root=Split-Path -Parent $config
-if($Mode -in @('ActivateAndObserve','ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve')){
+if($Mode -in @('ActivateAndObserve','ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve','ApplySustainedRootCorrectionAndObserve')){
     if(!$OwnerDecisionRef){throw 'EXPLICIT_CONTINUOUS_OWNER_DECISION_REQUIRED'}
-    if($Mode -in @('ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve') -and $ExpectedPreviousConfigSha256 -cnotmatch '\A[a-f0-9]{64}\z'){throw 'EXACT_PREVIOUS_CONFIG_SHA256_REQUIRED'}
+    if($Mode -in @('ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve','ApplySustainedRootCorrectionAndObserve') -and $ExpectedPreviousConfigSha256 -cnotmatch '\A[a-f0-9]{64}\z'){throw 'EXACT_PREVIOUS_CONFIG_SHA256_REQUIRED'}
     if($Mode -ceq 'ActivateAndObserve' -and (Test-Path -LiteralPath (Join-Path $root 'continuous-research.authorized.json'))){throw 'CONTINUOUS_ALREADY_ACTIVATED_USE_OBSERVE'}
     $baselineDeadline=[DateTimeOffset]::UtcNow.AddMinutes(3)
     do{
         $raw=@(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -ExpectedCommit $ExpectedCommit -Mode Diagnose)
         if($LASTEXITCODE){$raw|Write-Output;throw 'CONTINUOUS_PREFLIGHT_BLOCKED'}
         $d=($raw -join "`n")|ConvertFrom-Json
-        if($Mode -notin @('ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve')){break}
-        $recoveryKind=if($Mode -ceq 'ApplyDiskReserveRecoveryAndObserve'){'Disk'}else{'Ping'}
+        if($Mode -notin @('ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve','ApplySustainedRootCorrectionAndObserve')){break}
+        $recoveryKind=if($Mode -ceq 'ApplyDiskReserveRecoveryAndObserve'){'Disk'}elseif($Mode -ceq 'ApplySustainedRootCorrectionAndObserve'){'SustainedRoot'}else{'Ping'}
         $assessment=Test-FreshPingBaseline $d $ExpectedPreviousConfigSha256 $recoveryKind
         if($assessment.ready){break}
         $assessment|ConvertTo-Json -Depth 15 -Compress|Write-Output
@@ -72,7 +72,7 @@ if($Mode -in @('ActivateAndObserve','ApplyPingCorrectionAndObserve','ApplyDiskRe
         }
         Start-Sleep -Seconds 5
     }while($true)
-    if($Mode -in @('ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve')){
+    if($Mode -in @('ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve','ApplySustainedRootCorrectionAndObserve')){
         # Exact baseline was verified above; no host state was changed while waiting.
     }else{
     if($d.identity.config_sha256 -cne $ExpectedInstalledConfig -or $d.hold_slot_ms -ne 1795329900000L -or
@@ -92,6 +92,7 @@ if($Mode -in @('ActivateAndObserve','ApplyPingCorrectionAndObserve','ApplyDiskRe
         allow_explicit_missing_intervals=$true}
     if($Mode -ceq 'ApplyPingCorrectionAndObserve'){$permit['fresh_ping_correction']=$true;$permit['expected_previous_config_sha256']=$ExpectedPreviousConfigSha256}
     if($Mode -ceq 'ApplyDiskReserveRecoveryAndObserve'){$permit['disk_reserve_correction']=$true;$permit['expected_previous_config_sha256']=$ExpectedPreviousConfigSha256}
+    if($Mode -ceq 'ApplySustainedRootCorrectionAndObserve'){$permit['sustained_root_correction']=$true;$permit['expected_previous_config_sha256']=$ExpectedPreviousConfigSha256}
     $file=Join-Path ([IO.Path]::GetTempPath()) ('atlas-continuous-permit-'+[guid]::NewGuid().ToString('N')+'.json')
     Write-NewJson $file $permit
     $applyRaw=@(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -ExpectedCommit $ExpectedCommit -Mode Apply -AuthorizationFile $file)
