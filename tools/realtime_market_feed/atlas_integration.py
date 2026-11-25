@@ -1,7 +1,10 @@
-"""Fail-closed, read-only bridge from the independent feed to research fixtures.
+"""Fail-closed engineering bridge from feed SQLite to isolated research fixtures.
 
-This module is engineering-only. It never starts a socket, repairs a gap,
-mutates the Binance feed database, or enables live Scanner/Factory routing.
+The current feed stores a SHA of the original WebSocket event but not the event
+bytes. It therefore cannot prove that persisted OHLCV still matches that SHA.
+Production feed rows are explicitly blocked as UNVERIFIED. Generated fixtures
+are admitted only from the OS temporary directory and only through the
+engineering-test-only writer.
 """
 from __future__ import annotations
 
@@ -16,12 +19,16 @@ import tempfile
 FEED_SCHEMA_COLUMNS = {
     "final_bar": {"symbol", "interval", "open_ms", "close_ms", "open", "high",
                   "low", "close", "volume", "received_ms", "payload_sha256"},
-    "open_gap": {"symbol", "interval", "start_ms", "end_ms", "status"},
+    "open_gap": {"symbol", "interval", "start_ms", "end_ms", "reason", "status"},
     "service_event": {"at_ms", "kind", "detail"},
+    "engineering_fixture": {"schema", "fixture_id"},
 }
 HEX = re.compile(r"^[0-9a-f]{64}$")
 MINUTE_MS = 60_000
+DAY_MS = 86_400_000
 MAX_WINDOW_BARS = 10_080
+_FIXTURE_SCHEMA = "aql.realtime-feed.generated-fixture.v1"
+_SNAPSHOT_TEST_HOOK = None
 
 
 def _need(ok: bool, code: str) -> None:
@@ -39,18 +46,45 @@ def _decimal(value):
     return number
 
 
-def _feed_db(path):
+def _in_temp(path: Path) -> bool:
+    try:
+        path.resolve().relative_to(Path(tempfile.gettempdir()).resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def _feed_db(path, *, allow_synthetic_fixture=False):
     path = Path(path).resolve()
     _need(path.is_file(), "FEED_DATABASE_MISSING")
+    if allow_synthetic_fixture:
+        _need(_in_temp(path), "SYNTHETIC_SOURCE_OUTSIDE_TEMP")
     db = None
     try:
-        db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
+        db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=2.0)
         db.row_factory = sqlite3.Row
+        db.execute("PRAGMA busy_timeout=2000")
+        # Every subsequent validation/read must share this same SQLite snapshot.
+        db.execute("BEGIN")
         check = db.execute("PRAGMA quick_check").fetchone()[0]
         _need(check == "ok", "FEED_DATABASE_CORRUPT")
+        tables = {r[0] for r in db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
         for table, required in FEED_SCHEMA_COLUMNS.items():
+            if table == "engineering_fixture" and not allow_synthetic_fixture:
+                continue
+            _need(table in tables, "FEED_SCHEMA_INCOMPATIBLE")
             found = {r[1] for r in db.execute(f"PRAGMA table_info({table})")}
             _need(required <= found, "FEED_SCHEMA_INCOMPATIBLE")
+        if not allow_synthetic_fixture:
+            # Producer currently persists only the raw-event digest, not the raw
+            # bytes or a normalized-row receipt. A 64-hex string is not proof.
+            raise ValueError("FEED_SOURCE_LINEAGE_UNVERIFIED")
+        marker = db.execute(
+            "SELECT schema,fixture_id FROM engineering_fixture").fetchall()
+        _need(len(marker) == 1 and marker[0]["schema"] == _FIXTURE_SCHEMA
+              and marker[0]["fixture_id"] == "generated-in-test-helper",
+              "SYNTHETIC_FIXTURE_MARKER_INVALID")
         return db
     except sqlite3.Error as exc:
         if db is not None:
@@ -63,8 +97,9 @@ def _feed_db(path):
 
 
 def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
-                        max_age_ms=120_000, max_bars=MAX_WINDOW_BARS):
-    """Read an exact finalized 1m range and project it with #330's native rules."""
+                        max_age_ms=120_000, max_bars=MAX_WINDOW_BARS,
+                        allow_synthetic_fixture=False):
+    """Read one coherent finalized 1m window; production feed lineage is blocked."""
     _need(type(symbol) is str and symbol.isalnum() and symbol == symbol.upper(),
           "SYMBOL_REQUIRED")
     _need(all(type(x) is int and x >= 0 for x in (start_ms, end_ms, now_ms))
@@ -73,17 +108,20 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
     count = (end_ms - start_ms) // MINUTE_MS
     _need(0 < count <= max_bars <= MAX_WINDOW_BARS, "WINDOW_BOUND")
     _need(end_ms <= now_ms, "WINDOW_NOT_FINAL")
-    _need(type(max_age_ms) is int and 0 < max_age_ms <= 86_400_000,
+    _need(type(max_age_ms) is int and 0 < max_age_ms <= DAY_MS,
           "FRESHNESS_BOUND")
 
     from aql.research_timeframes import project_finalized_1m
-    db = _feed_db(database)
+    db = _feed_db(database, allow_synthetic_fixture=allow_synthetic_fixture)
     try:
         gaps = db.execute(
             """SELECT start_ms,end_ms,reason FROM open_gap
                WHERE symbol=? AND interval='1m' AND status='OPEN'
                  AND start_ms < ? AND end_ms > ? ORDER BY start_ms""",
             (symbol, end_ms, start_ms)).fetchall()
+        hook = _SNAPSHOT_TEST_HOOK
+        if hook is not None:
+            hook()
         _need(not gaps, "OPEN_HISTORY_GAP")
         conflicts = db.execute(
             """SELECT detail FROM service_event
@@ -103,6 +141,8 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
     except sqlite3.Error as exc:
         raise ValueError("FEED_DATABASE_INVALID") from exc
     finally:
+        if db.in_transaction:
+            db.rollback()
         db.close()
 
     _need(rows, "SYMBOL_OR_WINDOW_MISSING")
@@ -137,15 +177,15 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
 
 def copy_to_research_store(database, research_store_path, *, symbol, start_ms,
                            end_ms, now_ms, engineering_test_only=False):
-    """Explicit synthetic-only writer; refuses targets outside the OS temp root."""
+    """Write generated test fixtures only; refuses non-temp sources and targets."""
     _need(engineering_test_only is True, "INTEGRATION_DISABLED")
     source = Path(database).resolve()
     target = Path(research_store_path).resolve()
-    temp_root = Path(tempfile.gettempdir()).resolve()
-    _need(target != source and target.is_relative_to(temp_root),
+    _need(_in_temp(source) and _in_temp(target) and target != source,
           "ISOLATED_RESEARCH_STORE_REQUIRED")
     rows = project_feed_window(source, symbol=symbol, start_ms=start_ms,
-                               end_ms=end_ms, now_ms=now_ms)
+                               end_ms=end_ms, now_ms=now_ms,
+                               allow_synthetic_fixture=True)
     from aql.research_bar_store import ResearchBarStore
     with ResearchBarStore(target) as store:
         store.insert_batch(rows)
@@ -155,123 +195,210 @@ def copy_to_research_store(database, research_store_path, *, symbol, start_ms,
     return {"status": "SYNTHETIC_FORWARD_BARS_COPIED",
             "rows": len(verified), "first_open_ms": start_ms,
             "last_open_ms": end_ms - MINUTE_MS,
+            "evidence_class": "GENERATED_TEST_FIXTURE",
             "trading_authority": "NONE"}
 
 
-def reconcile_daily_bar(realtime_bar, daily_bar):
-    """Compare exact source keys and decimal OHLCV; never writes either source."""
+def _verified_projection(row, *, source_class):
+    if type(row) is not dict:
+        return False
+    try:
+        from aql.research_timeframes import WIDTHS, WEEK_ORIGIN_MS
+        from aql.warehouse.storage import canonical, seal
+        if row.get("schema") != "aql.research.finalized-timeframe.v1":
+            return False
+        if row.get("source_class") != source_class:
+            return False
+        if row.get("trading_authority") != "NONE" or row.get("pit_oos") != "NOT_ATTESTED":
+            return False
+        symbol, interval, opened = row.get("symbol"), row.get("interval"), row.get("open_ms")
+        if type(symbol) is not str or not symbol.isalnum() or symbol != symbol.upper():
+            return False
+        if interval not in WIDTHS or type(opened) is not int or opened < 0:
+            return False
+        width = WIDTHS[interval]
+        origin = WEEK_ORIGIN_MS if interval == "1w" else 0
+        if (opened - origin) % (width * MINUTE_MS):
+            return False
+        if type(row.get("close_exclusive_ms")) is not int or row["close_exclusive_ms"] != opened + width * MINUTE_MS:
+            return False
+        available = row.get("available_at_ms")
+        if type(available) is not int or available < row["close_exclusive_ms"]:
+            return False
+        if type(row.get("constituent_count")) is not int or row["constituent_count"] != width:
+            return False
+        members = row.get("constituent_sha256")
+        if type(members) is not list or len(members) != width or any(
+            type(x) is not str or not HEX.fullmatch(x) for x in members
+        ):
+            return False
+        vals = [_decimal(row.get(k)) for k in ("o", "h", "l", "c", "v")]
+        o, h, l, c, _v = vals
+        if not l <= min(o, c) <= max(o, c) <= h:
+            return False
+        digest = row.get("sha256")
+        if type(digest) is not str or not HEX.fullmatch(digest):
+            return False
+        body = {k: v for k, v in row.items() if k != "sha256"}
+        return digest == seal(canonical(body))
+    except (KeyError, TypeError, ValueError, InvalidOperation):
+        return False
+
+
+def _reconciliation_body(realtime_bar, daily_bar):
     if realtime_bar is None and daily_bar is None:
         raise ValueError("BOTH_SOURCE_ROWS_MISSING")
-    if daily_bar is None:
-        row = realtime_bar
-        _need(_provenance(row, realtime=True), "SOURCE_PROVENANCE_REQUIRED")
-        return {"status": "REALTIME_ONLY_WAIT_DAILY", "realtime_sha256": row["sha256"],
-                "daily_sha256": None,
-                "realtime_constituent_sha256": row["constituent_sha256"],
-                "daily_constituent_sha256": None,
-                "source_class": {"realtime": row["source_class"], "daily": None},
-                "write_performed": False}
+    if realtime_bar is not None and not _verified_projection(
+            realtime_bar, source_class="FORWARD_UNQUALIFIED"):
+        raise ValueError("PROJECTED_ROW_INVALID")
+    if daily_bar is not None and not _verified_projection(
+            daily_bar, source_class="RETROSPECTIVE_NON_PIT"):
+        raise ValueError("PROJECTED_ROW_INVALID")
+    identity = ("symbol", "interval", "open_ms", "close_exclusive_ms")
+    rkey = {k: realtime_bar.get(k) for k in identity} if realtime_bar else None
+    dkey = {k: daily_bar.get(k) for k in identity} if daily_bar else None
+    body = {
+        "schema": "aql.realtime-daily-reconciliation.v2",
+        "venue": "BINANCE",
+        "market": "SPOT",
+        "realtime_row": realtime_bar,
+        "daily_row": daily_bar,
+        "realtime_row_sha256": realtime_bar["sha256"] if realtime_bar else None,
+        "daily_row_sha256": daily_bar["sha256"] if daily_bar else None,
+        "realtime_key": rkey,
+        "daily_key": dkey,
+        "write_performed": False,
+        "duplicate_insert": False,
+        "trading_authority": "NONE",
+    }
     if realtime_bar is None:
-        _need(_provenance(daily_bar, realtime=False), "SOURCE_PROVENANCE_REQUIRED")
-        return {"status": "MISSING_REALTIME", "realtime_sha256": None,
-                "daily_sha256": daily_bar["sha256"],
-                "realtime_constituent_sha256": None,
-                "daily_constituent_sha256": daily_bar["constituent_sha256"],
-                "source_class": {"realtime": None, "daily": daily_bar["source_class"]},
-                "recovery": "AUTHORIZED_BOUNDED_RECOVERY_REQUIRED",
-                "write_performed": False}
-    _need(_provenance(realtime_bar, realtime=True)
-          and _provenance(daily_bar, realtime=False), "SOURCE_PROVENANCE_REQUIRED")
-    identity = ("symbol", "interval", "open_ms")
-    if any(realtime_bar.get(k) != daily_bar.get(k) for k in identity):
-        return {"status": "CONFLICT", "reason": "SOURCE_KEY_MISMATCH",
-                "realtime_sha256": realtime_bar["sha256"],
-                "daily_sha256": daily_bar["sha256"],
-                "realtime_constituent_sha256": realtime_bar["constituent_sha256"],
-                "daily_constituent_sha256": daily_bar["constituent_sha256"],
-                "source_class": {"realtime": realtime_bar["source_class"],
-                                 "daily": daily_bar["source_class"]},
-                "realtime_key": {k: realtime_bar.get(k) for k in identity},
-                "daily_key": {k: daily_bar.get(k) for k in identity},
-                "write_performed": False}
-    if realtime_bar.get("close_exclusive_ms") != daily_bar.get("close_exclusive_ms"):
-        return {"status": "CONFLICT", "reason": "CLOSE_TIME_MISMATCH",
-                "realtime_sha256": realtime_bar["sha256"],
-                "daily_sha256": daily_bar["sha256"],
-                "realtime_constituent_sha256": realtime_bar["constituent_sha256"],
-                "daily_constituent_sha256": daily_bar["constituent_sha256"],
-                "realtime_close_exclusive_ms": realtime_bar.get("close_exclusive_ms"),
-                "daily_close_exclusive_ms": daily_bar.get("close_exclusive_ms"),
-                "source_class": {"realtime": realtime_bar["source_class"],
-                                 "daily": daily_bar["source_class"]},
-                "write_performed": False}
-    for field in ("o", "h", "l", "c", "v"):
-        if _decimal(realtime_bar[field]) != _decimal(daily_bar[field]):
-            return {"status": "CONFLICT", "reason": "OHLCV_MISMATCH",
-                    "field": field, "realtime_value": realtime_bar[field],
-                    "daily_value": daily_bar[field],
-                    "realtime_sha256": realtime_bar["sha256"],
-                    "daily_sha256": daily_bar["sha256"],
-                    "realtime_constituent_sha256": realtime_bar["constituent_sha256"],
-                    "daily_constituent_sha256": daily_bar["constituent_sha256"],
-                    "source_class": {"realtime": realtime_bar["source_class"],
-                                     "daily": daily_bar["source_class"]},
-                    "realtime_ohlcv": {k: realtime_bar[k] for k in ("o","h","l","c","v")},
-                    "daily_ohlcv": {k: daily_bar[k] for k in ("o","h","l","c","v")},
-                    "write_performed": False}
-    return {"status": "MATCH_IDEMPOTENT", "realtime_sha256": realtime_bar["sha256"],
-            "daily_sha256": daily_bar["sha256"],
-            "realtime_constituent_sha256": realtime_bar["constituent_sha256"],
-            "daily_constituent_sha256": daily_bar["constituent_sha256"],
-            "source_class": {"realtime": realtime_bar["source_class"],
-                             "daily": daily_bar["source_class"]},
-            "duplicate_insert": False, "write_performed": False}
+        body.update(status="MISSING_REALTIME",
+                    recovery="AUTHORIZED_BOUNDED_RECOVERY_REQUIRED")
+        return body
+    if daily_bar is None:
+        body.update(status="REALTIME_ONLY_WAIT_DAILY")
+        return body
+    if rkey != dkey:
+        body.update(status="CONFLICT", reason="SOURCE_KEY_MISMATCH")
+    elif any(_decimal(realtime_bar[k]) != _decimal(daily_bar[k])
+             for k in ("o", "h", "l", "c", "v")):
+        body.update(status="CONFLICT", reason="OHLCV_MISMATCH")
+    else:
+        body.update(status="MATCH_IDEMPOTENT")
+    return body
 
 
-def _provenance(row, *, realtime):
-    if type(row) is not dict or not HEX.fullmatch(str(row.get("sha256", ""))):
-        return False
-    if realtime:
-        hashes = row.get("constituent_sha256")
-        return (row.get("source_class") == "FORWARD_UNQUALIFIED"
-                and type(hashes) is list and bool(hashes)
-                and all(type(h) is str and HEX.fullmatch(h) for h in hashes))
-    hashes = row.get("constituent_sha256")
-    return (row.get("source_class") == "RETROSPECTIVE_NON_PIT"
-            and type(hashes) is list and bool(hashes)
-            and all(type(h) is str and HEX.fullmatch(h) for h in hashes))
-
-
-def build_registry_proposal(reconciliation, registry_snapshot):
-    """Return a content-addressed proposal; Registry C remains read-only."""
+def reconcile_daily_bar(realtime_bar, daily_bar):
+    """Reconcile sealed projections; no hash-shape-only or status-only verdicts."""
     from aql.warehouse.storage import canonical, seal
-    _need(type(registry_snapshot) is dict
-          and registry_snapshot.get("schema") == "aql.warehouse.registry-snapshot.v1",
+    body = _reconciliation_body(realtime_bar, daily_bar)
+    body["reconciliation_sha256"] = seal(canonical(body))
+    return body
+
+
+def _verify_reconciliation(reconciliation):
+    from aql.warehouse.storage import canonical, seal
+    _need(type(reconciliation) is dict
+          and reconciliation.get("schema") == "aql.realtime-daily-reconciliation.v2",
+          "RECONCILIATION_REQUIRED")
+    digest = reconciliation.get("reconciliation_sha256")
+    body = {k: v for k, v in reconciliation.items() if k != "reconciliation_sha256"}
+    _need(type(digest) is str and HEX.fullmatch(digest)
+          and digest == seal(canonical(body)), "RECONCILIATION_SEAL_INVALID")
+    expected = _reconciliation_body(body.get("realtime_row"), body.get("daily_row"))
+    _need(body == expected, "RECONCILIATION_STATUS_OR_LINEAGE_INVALID")
+    return expected
+
+
+def _registry_snapshot(snapshot):
+    from aql.warehouse.storage import canonical, seal
+    _need(type(snapshot) is dict
+          and snapshot.get("schema") == "aql.warehouse.registry-snapshot.v1",
           "REGISTRY_SNAPSHOT_REQUIRED")
-    body = {k: v for k, v in registry_snapshot.items() if k != "snapshot_sha256"}
-    _need(registry_snapshot.get("snapshot_sha256") == seal(canonical(body))
-          and registry_snapshot.get("source_class") == "RETROSPECTIVE_NON_PIT"
-          and registry_snapshot.get("trading_authority") == "NONE",
+    body = {k: v for k, v in snapshot.items() if k != "snapshot_sha256"}
+    _need(snapshot.get("snapshot_sha256") == seal(canonical(body))
+          and snapshot.get("source_class") == "RETROSPECTIVE_NON_PIT"
+          and snapshot.get("trading_authority") == "NONE",
           "REGISTRY_SNAPSHOT_INVALID")
-    _need(reconciliation.get("status") in {
-        "MATCH_IDEMPOTENT", "MISSING_REALTIME", "CONFLICT", "REALTIME_ONLY_WAIT_DAILY"},
-        "RECONCILIATION_REQUIRED")
-    daily_pins = [item.get("source_zip_sha256") for item in registry_snapshot.get("sources", [])]
-    _need(all(type(pin) is str and HEX.fullmatch(pin) for pin in daily_pins),
-          "REGISTRY_SOURCE_PINS_INVALID")
+    _need(type(snapshot.get("sources")) is list
+          and type(snapshot.get("covered_intervals")) is list
+          and type(snapshot.get("internal_gaps")) is list
+          and type(snapshot.get("conflicts")) is list,
+          "REGISTRY_SNAPSHOT_INCOMPLETE")
+    return snapshot
+
+
+def _daily_context_binding(context, daily_row):
+    _need(type(context) is dict and type(context.get("bars")) is list
+          and type(context.get("requested_window")) is list
+          and len(context["requested_window"]) == 2
+          and type(context.get("cutoff_ms")) is int,
+          "DAILY_QUERY_CONTEXT_REQUIRED")
+    rows = context["bars"]
+    _need(daily_row is not None and daily_row in rows,
+          "DAILY_QUERY_ROW_NOT_BOUND")
+    row = daily_row
+    start, end = context["requested_window"]
+    _need(type(start) is int and type(end) is int
+          and start <= row["open_ms"] and row["close_exclusive_ms"] <= end
+          and row["available_at_ms"] <= context["cutoff_ms"],
+          "DAILY_QUERY_WINDOW_MISMATCH")
+    snapshot = _registry_snapshot(context.get("registry"))
+    _need(any(type(span) is list and len(span) == 2
+              and type(span[0]) is int and type(span[1]) is int
+              and span[0] <= row["open_ms"]
+              and row["close_exclusive_ms"] <= span[1]
+              for span in snapshot["covered_intervals"]),
+          "DAILY_REGISTRY_COVERAGE_MISMATCH")
+    _need(not any(type(gap) is list and len(gap) == 2
+                  and type(gap[0]) is int and type(gap[1]) is int
+                  and gap[0] < row["close_exclusive_ms"]
+                  and gap[1] > row["open_ms"]
+                  for gap in snapshot["internal_gaps"]),
+          "DAILY_REGISTRY_GAP")
+    _need(not snapshot["conflicts"], "DAILY_REGISTRY_CONFLICTS_PRESENT")
+    from datetime import datetime, timezone
+    date = datetime.fromtimestamp(row["open_ms"] / 1000, tz=timezone.utc).date().isoformat()
+    key = f"data/spot/daily/klines/{row['symbol']}/1m/{row['symbol']}-1m-{date}.zip"
+    candidates = [source for source in snapshot["sources"]
+                  if type(source) is dict and source.get("key") == key
+                  and source.get("first_open_ms") <= row["open_ms"]
+                  and source.get("last_open_ms") + MINUTE_MS >= row["close_exclusive_ms"]
+                  and type(source.get("source_zip_sha256")) is str
+                  and HEX.fullmatch(source["source_zip_sha256"])
+                  and type(source.get("source_receipt_sha256")) is str
+                  and HEX.fullmatch(source["source_receipt_sha256"])]
+    _need(candidates, "DAILY_ARCHIVE_RECEIPT_NOT_BOUND")
+    return snapshot, candidates
+
+
+def build_registry_proposal(reconciliation, daily_query_context):
+    """Create a proposal only when a sealed daily query and Registry cover the same bar."""
+    from aql.warehouse.storage import canonical, seal
+    verified = _verify_reconciliation(reconciliation)
+    daily_row = verified["daily_row"]
+    _need(daily_row is not None, "NOT_VERIFIABLE_DAILY_ROW_ABSENT")
+    snapshot, sources = _daily_context_binding(daily_query_context, daily_row)
+    source_pins = sorted({item["source_zip_sha256"] for item in sources})
+    receipt_pins = sorted({item["source_receipt_sha256"] for item in sources})
     proposal = {
-        "schema": "aql.realtime-warehouse-reconciliation-proposal.v1",
+        "schema": "aql.realtime-warehouse-reconciliation-proposal.v2",
         "status": "PROPOSED_ONLY",
-        "venue": "BINANCE_SPOT", "market": "SPOT",
-        "reconciliation": reconciliation,
-        "registry_snapshot_sha256": registry_snapshot["snapshot_sha256"],
-        "registry_event_watermark": registry_snapshot["event_watermark"],
-        "daily_source_zip_sha256s": daily_pins,
+        "evidence_class": "GENERATED_SYNTHETIC_FIXTURE",
+        "venue": verified["venue"], "market": verified["market"],
+        "bar_key": verified["daily_key"],
+        "reconciliation_sha256": verified["reconciliation_sha256"],
+        "realtime_row_sha256": verified["realtime_row_sha256"],
+        "daily_row_sha256": verified["daily_row_sha256"],
+        "registry_snapshot_sha256": snapshot["snapshot_sha256"],
+        "registry_event_watermark": snapshot["event_watermark"],
+        "daily_source_zip_sha256s": source_pins,
+        "daily_source_receipt_sha256s": receipt_pins,
         "registry_coverage": {
-            "covered_intervals": registry_snapshot["covered_intervals"],
-            "internal_gaps": registry_snapshot["internal_gaps"],
-            "archive_unavailable_boundaries": registry_snapshot["archive_unavailable_boundaries"],
-            "conflicts": registry_snapshot["conflicts"],
+            "covered_intervals": snapshot["covered_intervals"],
+            "internal_gaps": snapshot["internal_gaps"],
+            "archive_unavailable_boundaries": snapshot["archive_unavailable_boundaries"],
+            "conflicts": snapshot["conflicts"],
         },
         "source_classes": ["FORWARD_UNQUALIFIED", "RETROSPECTIVE_NON_PIT"],
         "registry_mutation": False, "warehouse_mutation": False,
