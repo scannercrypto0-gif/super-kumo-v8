@@ -47,7 +47,15 @@ Only after the exact head is independently accepted, authentic bounded exports a
 python.exe -B .\tools\atlas_early_observation.py --approved-input-root '<approved sanitized handoff directory>' --approved-output-root '<separate approved pilot output directory>' --history '<direct child of approved input root>' --registry '<direct child of approved input root>' --daily '<direct child of approved input root>' --live '<direct child of approved input root>' --output '<new direct-child file in approved output root>' --clock-uncertainty-ms <measured value>
 ```
 
-For a later observation, use new current report files, a new output path, and `--previous '<prior EARLY_OBSERVATION snapshot>'`. Do not point this profile at raw ZIPs, SQLite files, service directories or the running 24-hour trial. Missing evidence yields `UNKNOWN`; there is no fallback search.
+For a later observation, use new current report files, a new output path, and `--previous '<prior EARLY_OBSERVATION snapshot>'` from the approved output root. Do not point this profile at raw ZIPs, SQLite files, service directories or the running 24-hour trial. Missing evidence yields `UNKNOWN`; there is no fallback search.
+
+Create the local early manifest and run the transient stdio server with the same approved output root:
+
+```powershell
+python.exe -B .\\tools\\atlas_mcp_manifest.py --profile early --approved-output-root '<approved pilot output directory>' --snapshot '<direct child early snapshot>' --output '<direct child manifest>'
+python.exe -B .\\tools\\atlas_mcp_pilot.py --profile early --approved-output-root '<approved pilot output directory>' --manifest '<direct child manifest>' --manifest-sha256 '<printed manifest SHA-256>'
+```
+
 
 ## Current gate
 
