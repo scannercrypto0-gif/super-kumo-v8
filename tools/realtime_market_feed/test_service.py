@@ -185,3 +185,18 @@ def test_live_service_reconnects_after_transport_close(tmp_path, monkeypatch):
         assert "RECONNECT_WAIT" in kinds
     finally:
         store.db.close()
+
+
+
+def test_final_bar_and_lineage_receipt_commit_atomically(tmp_path):
+    store=Store(tmp_path/"atomic.sqlite")
+    store.db.execute("DROP TABLE final_bar_lineage")
+    store.db.commit()
+    bar={"e":"kline","s":"BTCUSDT","k":{"i":"1m","t":0,"T":59_999,
+        "o":"10","h":"11","l":"9","c":"10.5","v":"2.5","n":4,"x":True}}
+    try:
+        with pytest.raises(Exception):
+            store.ingest(json.dumps(bar),received_ms=60_000)
+        assert store.db.execute("SELECT count(*) FROM final_bar").fetchone()[0] == 0
+    finally:
+        store.db.close()
