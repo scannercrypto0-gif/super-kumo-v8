@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import stat
 import time
@@ -33,6 +34,12 @@ MAX_REPORTED_RANGES = 32
 def require(ok, code):
     if not ok:
         raise ValueError(code)
+
+
+def safe_reason(value):
+    if type(value) is str and re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", value):
+        return value
+    return "REFUSAL_REDACTED"
 
 
 def _identity(st):
