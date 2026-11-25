@@ -7,7 +7,7 @@ on:
       - ".github/workflows/realtime-market-feed.yml"
       - "docs/research/realtime-daily-warehouse-integration.md"
   push:
-    branches: [main]
+    branches: [main, codex/realtime-market-feed-e-20261125]
     paths:
       - "tools/realtime_market_feed/**"
       - ".github/workflows/realtime-market-feed.yml"
