@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from tools.realtime_market_feed.reader import read_snapshot
 from tools.realtime_market_feed.service import Store, build_report, make_url, normalize_symbols
 
 
@@ -80,3 +81,46 @@ def test_report_is_read_only_and_marks_only_observed_state(tmp_path):
     assert result["schema"] == "atlas.realtime-market-feed.report.v1"
     assert result["readiness"] == "NOT_READY"
     assert result["orders"] == 0
+
+
+def test_consumer_snapshot_requires_fresh_trade_quote_and_final_bar(tmp_path):
+    path=tmp_path/"market.sqlite"
+    store=Store(path)
+    trade={"e":"trade","s":"BTCUSDT","t":1,"p":"100","q":"1","T":119000,"m":False}
+    quote={"s":"BTCUSDT","u":2,"b":"99.9","B":"2","a":"100.1","A":"3"}
+    bar={"e":"kline","s":"BTCUSDT","k":{"i":"1m","t":120000,"T":179999,
+        "o":"100","h":"101","l":"99","c":"100.5","v":"10","n":4,"x":True}}
+    store.ingest(json.dumps(trade),199500)
+    store.ingest(json.dumps(quote),199500)
+    store.ingest(json.dumps(bar),199500)
+    before=store.db.execute("SELECT count(*) FROM service_event").fetchone()[0]
+    store.db.close()
+    result=read_snapshot(path,"BTCUSDT",now_ms=200000)
+    assert result["status"] == "LIVE_FRESH"
+    assert result["symbols"][0]["quote"]["bid"] == "99.9"
+    assert result["symbols"][0]["latest_final_bar"]["close"] == "100.5"
+    db=__import__("sqlite3").connect(path)
+    assert db.execute("SELECT count(*) FROM service_event").fetchone()[0] == before
+    db.close()
+
+
+def test_consumer_snapshot_holds_stale_data_and_open_history_gap(tmp_path):
+    path=tmp_path/"market.sqlite"
+    store=Store(path)
+    trade={"e":"trade","s":"BTCUSDT","t":1,"p":"100","q":"1","T":119000,"m":False}
+    quote={"s":"BTCUSDT","u":2,"b":"99.9","B":"2","a":"100.1","A":"3"}
+    bar={"e":"kline","s":"BTCUSDT","k":{"i":"1m","t":120000,"T":179999,
+        "o":"100","h":"101","l":"99","c":"100.5","v":"10","n":4,"x":True}}
+    store.ingest(json.dumps(trade),199500)
+    store.ingest(json.dumps(quote),199500)
+    store.ingest(json.dumps(bar),199500)
+    with store.db:
+        store.db.execute("""INSERT INTO open_gap
+          (symbol,interval,start_ms,end_ms,reason,detected_ms)
+          VALUES('BTCUSDT','1m',60000,120000,'TEST_GAP',199500)""")
+    store.db.close()
+    result=read_snapshot(path,"BTCUSDT",now_ms=240000,history_lookback_ms=300000)
+    assert result["status"] == "HELD"
+    assert "BTCUSDT:TRADE_STALE" in result["blockers"]
+    assert "BTCUSDT:QUOTE_STALE" in result["blockers"]
+    assert "BTCUSDT:OPEN_HISTORY_GAP" in result["blockers"]
