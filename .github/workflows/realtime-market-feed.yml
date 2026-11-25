@@ -1,0 +1,27 @@
+name: Realtime feed offline tests
+
+on:
+  pull_request:
+    paths:
+      - "tools/realtime_market_feed/**"
+      - ".github/workflows/realtime-market-feed.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/realtime_market_feed/**"
+      - ".github/workflows/realtime-market-feed.yml"
+
+jobs:
+  offline-tests:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python: ["3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -r tools/realtime_market_feed/requirements.txt pytest
+      - run: python -m pytest tools/realtime_market_feed/test_service.py -q
