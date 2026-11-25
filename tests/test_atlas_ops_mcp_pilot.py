@@ -189,6 +189,10 @@ class McpPilotTests(unittest.TestCase):
         self.assertEqual(health["schema"], "atlas.mcp.health.v1")
         self.assertEqual(health["status"], "HELD")
         self.assertEqual(health["trading_authority"], "NONE")
+        self.assertEqual(health["gaps"]["history_registry_gaps"], 2)
+        self.assertEqual(health["gaps"]["history_unavailable_boundaries"], 1)
+        self.assertFalse(health["lanes"]["history"]["last_validated_committed_progress"]["full_history_verified"])
+        self.assertEqual(health["lanes"]["daily"]["status"], "UNKNOWN")
         tool_lanes = [row["result"]["structuredContent"] for row in responses[2:5]]
         resource_views = [json.loads(row["result"]["contents"][0]["text"]) for row in responses[5:]]
         self.assertEqual([row["lane"] for row in tool_lanes], ["history", "daily", "live"])
