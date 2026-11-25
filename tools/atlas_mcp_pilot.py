@@ -427,7 +427,7 @@ class SnapshotReader:
                                 if type(report.get("last_receipt_fresh")) is bool else None,
                             "missing_ranges": bounded_int(report.get("missing_ranges")) or 0,
                             "missing_open_ranges": early_ranges(report.get("missing_open_ranges")),
-                            "hold_reason": safe_reason(report.get("hold_reason"))}
+                            "hold_reason": "LIVE_HOLD_REASON_REPORTED" if report.get("hold_reason") else None}
                 gaps = {"missing_ranges": bounded_int(report.get("missing_ranges")) or 0,
                         "missing_open_ranges": early_ranges(report.get("missing_open_ranges"))}
             status = allowed[raw["status"]]
