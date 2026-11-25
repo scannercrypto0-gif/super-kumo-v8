@@ -72,6 +72,7 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
           and end_ms % MINUTE_MS == 0, "UTC_WINDOW_INVALID")
     count = (end_ms - start_ms) // MINUTE_MS
     _need(0 < count <= max_bars <= MAX_WINDOW_BARS, "WINDOW_BOUND")
+    _need(end_ms <= now_ms, "WINDOW_NOT_FINAL")
     _need(type(max_age_ms) is int and 0 < max_age_ms <= 86_400_000,
           "FRESHNESS_BOUND")
 
@@ -117,7 +118,8 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
         received = row["received_ms"]
         _need(type(received) is int and received <= now_ms,
               "FEED_RECEIPT_CLOCK_INVALID")
-        _need(now_ms - received <= max_age_ms, "FEED_STALE")
+        if i == count - 1:
+            _need(now_ms - received <= max_age_ms, "FEED_STALE")
         receipt = row["payload_sha256"]
         _need(type(receipt) is str and HEX.fullmatch(receipt) is not None,
               "FEED_RECEIPT_INVALID")
