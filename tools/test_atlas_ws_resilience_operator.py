@@ -983,7 +983,12 @@ def test_disk_reserve_correction_rebinds_valid_prior_grant_after_config_relocati
     assert op.load(host['root']/'hold.json')['reason']=='PILOT_STOP_DISK_RESERVE_LOW'
 def test_sustained_root_recovery_requires_exact_segment_failure_scope(host):
     (host['root']/'hold.json').write_bytes(op.canonical(dict(reason='LIVE_SERVICE_SEGMENT_FAILED',slot_ms=SLOT)))
+    # The failed attempt never created segment state or a per-segment quota DB.
+    quota=host['root']/'segments'/str(SLOT)/'quota.sqlite'
+    quota.unlink();quota.parent.rmdir()
     d=diagnostic(host)
+    assert d['prestart_evidence']['safe_quota_bootstrap'] is True
+    assert d['blockers']==['QUOTA_NOT_READY']
     scope=dict(continuous_research=True,continuity_policy_sha256=op.continuity_pin(),
         allow_explicit_missing_intervals=True,expected_previous_config_sha256=d['identity']['config_sha256'])
     with pytest.raises(ValueError,match='SUSTAINED_ROOT_CORRECTION_AUTHORITY_REQUIRED'):
