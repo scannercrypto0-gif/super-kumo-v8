@@ -286,6 +286,10 @@ class EarlyObservationTests(unittest.TestCase):
             def read_pinned(self):
                 raise ValueError("SYNTHETIC_READER_FAILURE")
 
+            @staticmethod
+            def unavailable(reason, early=False):
+                return pilot.SnapshotReader.unavailable(reason, early=early)
+
         server = pilot.MCPServer(BrokenReader(), clock=lambda: (NOW, 1_000_000_000))
         view = server.current_view()
         self.assertEqual(view["schema"], "atlas.mcp.early-observation.v1")
