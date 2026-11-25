@@ -148,3 +148,40 @@ def test_live_service_dispatches_final_bar_to_gap_recovery_worker(tmp_path, monk
         assert store.db.execute("SELECT count(*) FROM final_bar").fetchone()[0] == 1
     finally:
         store.db.close()
+
+
+
+def test_live_service_reconnects_after_transport_close(tmp_path, monkeypatch):
+    import tools.realtime_market_feed.service as service_module
+    from tools.realtime_market_feed.service import LiveService
+
+    attempts=[]
+    service_holder={}
+    class FakeSocket:
+        def __init__(self,url,on_open,on_message,on_error,on_close):
+            self.on_open=on_open
+            self.on_close=on_close
+        def close(self):
+            self.on_close(self,1000,"timer")
+        def run_forever(self,**kwargs):
+            self.on_open(self)
+            self.on_close(self,1006,"injected-drop")
+            attempts.append(1)
+            if len(attempts) == 2:
+                service_holder["service"].stop=True
+
+    monkeypatch.setattr(service_module.websocket,"WebSocketApp",FakeSocket)
+    monkeypatch.setattr(service_module.time,"sleep",lambda _seconds: None)
+    store=Store(tmp_path/"market.sqlite")
+    service=LiveService(["btcusdt"],store)
+    service_holder["service"]=service
+    try:
+        service.run()
+        kinds=[row[0] for row in store.db.execute("SELECT kind FROM service_event ORDER BY id")]
+        assert len(attempts) == 2
+        assert kinds.count("CONNECTING") == 2
+        assert kinds.count("CONNECTED") == 2
+        assert kinds.count("DISCONNECTED") == 2
+        assert "RECONNECT_WAIT" in kinds
+    finally:
+        store.db.close()
