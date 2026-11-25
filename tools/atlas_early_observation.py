@@ -68,16 +68,19 @@ def read_bounded(path):
 
 def _load(path):
     if path is None:
-        return {"doc": None, "pin": None, "bytes": 0, "reason": "INPUT_NOT_SUPPLIED"}
+        return {"doc": None, "pin": None, "bytes": 0, "reason": "INPUT_NOT_SUPPLIED",
+                "attempted": False}
     try:
         doc, pin, size = read_bounded(path)
     except ValueError as exc:
         if str(exc) in {"INPUT_BUDGET_EXCEEDED", "INPUT_REPLACED"}:
             raise
-        return {"doc": None, "pin": None, "bytes": 0, "reason": "INPUT_UNTRUSTED"}
+        return {"doc": None, "pin": None, "bytes": MAX_FILE_BYTES,
+                "reason": "INPUT_UNTRUSTED", "attempted": True}
     except OSError:
-        return {"doc": None, "pin": None, "bytes": 0, "reason": "INPUT_UNAVAILABLE"}
-    return {"doc": doc, "pin": pin, "bytes": size, "reason": None}
+        return {"doc": None, "pin": None, "bytes": MAX_FILE_BYTES,
+                "reason": "INPUT_UNAVAILABLE", "attempted": True}
+    return {"doc": doc, "pin": pin, "bytes": size, "reason": None, "attempted": True}
 
 
 def _age_state(observed, now):
@@ -138,7 +141,10 @@ def _history(item, registry_item, previous, now, clock_ok):
             cursor.update(registry_event_watermark=reg_view["counters"]["event_watermark"],
                           physical_rows=reg_view["counters"]["physical_rows"],
                           source_count=reg_view["counters"]["source_count"],
-                          last_open_ms=reg_view["counters"]["last_open_ms"])
+                          last_open_ms=reg_view["counters"]["last_open_ms"],
+                          registry_gaps=reg_view["gaps"],
+                          registry_unavailable=reg_view["unavailable"],
+                          registry_conflicts=reg_view["conflicts"])
         else:
             state, reason = "UNKNOWN", "REGISTRY_REPORT_NOT_SUPPLIED"
         if state is None:
@@ -195,6 +201,8 @@ def _daily(item, now):
             require(watchdog.HEX64.fullmatch(receipt) is not None, "DAILY_RECEIPT_PIN_INVALID")
         if state is None and doc.get("last_failure") is not None:
             state, reason = "FAILED", "DAILY_WORKER_FAILURE_REPORTED"
+        if state is None and doc.get("source_freshness") == "STALE":
+            state, reason = "STALE", "DAILY_SOURCE_REPORTED_STALE"
         if state is None and doc.get("cycle_evidence") == "WAIT_FOR_SOURCE":
             next_check = doc.get("next_check_ms")
             state, reason = (("EXPECTED_WAIT", "DAILY_SOURCE_WAIT")
@@ -233,7 +241,7 @@ def _live(item, previous, now, clock_ok):
         cursor = {"last_committed_ms": view.get("last_committed_ms"),
                   "verified_receipts": view.get("verified_receipts"),
                   "last_receipt_sha256": view.get("last_receipt_sha256")}
-        if state is None and doc.get("hold_reason"):
+        if state is None and (doc.get("hold_reason") or doc.get("status") in {"HELD", "HOLD"}):
             state, reason = "HELD", "LIVE_EXPLICIT_HOLD"
         if state is None and doc.get("status") in {"FAILED", "WS_OPERATOR_BLOCKED"}:
             state, reason = "FAILED", "LIVE_REPORT_FAILURE"
@@ -294,10 +302,10 @@ def build(paths, *, now_ms, monotonic_ns, boot_id, clock_uncertainty_ms,
     total = sum(item["bytes"] for item in loaded.values())
     if prev_item:
         total += prev_item["bytes"]
-    count = sum(item["doc"] is not None for item in loaded.values()) + bool(prev_item)
+    count = sum(item.get("attempted", item["doc"] is not None) for item in loaded.values()) + bool(prev_item and prev_item.get("attempted", True))
     require(count <= MAX_FILES and total <= MAX_TOTAL_BYTES, "INPUT_BUDGET_EXCEEDED")
-    if previous is None and prev_item:
-        candidate = prev_item["doc"]
+    candidate = previous if previous is not None else (prev_item["doc"] if prev_item else None)
+    if candidate is not None:
         try:
             watchdog.sealed_hash(candidate, "sha256", "PREVIOUS_SEAL_INVALID")
             require(candidate.get("schema") == SCHEMA and candidate.get("profile") == PROFILE,
@@ -307,9 +315,12 @@ def build(paths, *, now_ms, monotonic_ns, boot_id, clock_uncertainty_ms,
                     and monotonic_ns >= candidate["observed_monotonic_ns"],
                     "PREVIOUS_CLOCK_INVALID")
             age = now_ms - candidate.get("observed_at_ms", now_ms + 1)
-            require(MIN_REFRESH_INTERVAL_MS <= age <= MAX_PREVIOUS_AGE_MS,
-                    "REFRESH_INTERVAL_OR_PREVIOUS_AGE_INVALID")
-            previous = candidate
+            require(age >= MIN_REFRESH_INTERVAL_MS, "REFRESH_INTERVAL_NOT_ELAPSED")
+            previous = candidate if age <= MAX_PREVIOUS_AGE_MS else None
+        except ValueError as exc:
+            if str(exc) == "REFRESH_INTERVAL_NOT_ELAPSED":
+                raise
+            previous = None
         except Exception:
             previous = None
     clock_ok = type(clock_uncertainty_ms) is int and 0 <= clock_uncertainty_ms <= 5_000
