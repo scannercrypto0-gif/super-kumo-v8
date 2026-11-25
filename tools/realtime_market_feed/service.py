@@ -212,12 +212,37 @@ class LiveService:
             LOG.exception("Rejected feed message")
 
 
+def build_report(path: str | Path) -> dict:
+    db = sqlite3.connect(f"file:{Path(path).resolve().as_posix()}?mode=ro", uri=True)
+    db.row_factory = sqlite3.Row
+    try:
+        trade = db.execute("SELECT * FROM latest_trade ORDER BY symbol").fetchall()
+        quotes = db.execute("SELECT * FROM latest_quote ORDER BY symbol").fetchall()
+        bars = db.execute("""SELECT symbol,open_ms,close_ms,close,received_ms FROM final_bar
+                             WHERE (symbol,open_ms) IN
+                             (SELECT symbol,MAX(open_ms) FROM final_bar GROUP BY symbol)
+                             ORDER BY symbol""").fetchall()
+        gaps = db.execute("""SELECT symbol,interval,start_ms,end_ms,reason,detected_ms
+                             FROM open_gap WHERE status='OPEN' ORDER BY symbol,start_ms""").fetchall()
+        events = db.execute("""SELECT at_ms,kind,detail FROM service_event
+                               ORDER BY id DESC LIMIT 20""").fetchall()
+        return {"schema":"atlas.realtime-market-feed.report.v1","as_of_ms":utc_ms(),
+                "trades":[dict(row) for row in trade],"quotes":[dict(row) for row in quotes],
+                "latest_final_bars":[dict(row) for row in bars],
+                "open_gaps":[dict(row) for row in gaps],"recent_events":[dict(row) for row in events],
+                "readiness":"OBSERVED_ONLY" if trade and quotes and bars and not gaps else "NOT_READY",
+                "orders":0,"trading_authority":"NONE"}
+    finally:
+        db.close()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", required=True, help="Persistent data directory on E:")
     parser.add_argument("--symbols", default="BTCUSDT", help="Comma-separated Spot symbols")
     parser.add_argument("--observe-seconds", type=int, default=0,
                         help="Optional bounded live check; zero means continuous")
+    parser.add_argument("--report", action="store_true", help="Read-only local status report")
     args = parser.parse_args()
     root = Path(args.root)
     if os.name == "nt" and root.drive.upper() != "E:":
@@ -226,7 +251,11 @@ def main() -> None:
         raise SystemExit("OBSERVE_DURATION_OUT_OF_RANGE")
     symbols = normalize_symbols(args.symbols)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    store = Store(root / "market-feed.sqlite")
+    db_path = root / "market-feed.sqlite"
+    if args.report:
+        print(json.dumps(build_report(db_path),sort_keys=True))
+        return
+    store = Store(db_path)
     store.event("SERVICE_START", f"symbols={len(symbols)}")
     try:
         LiveService(symbols, store, args.observe_seconds).run()
