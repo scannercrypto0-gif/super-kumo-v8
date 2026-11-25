@@ -215,7 +215,7 @@ class EarlyObservationTests(unittest.TestCase):
     def test_create_only_output_and_profile_manifest_stdio(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            snapshot = self.build({})
+            snapshot = self.build({}, now=time.time_ns() // 1_000_000)
             snap_path = root / "early.json"
             early.publish(snap_path, snapshot)
             with self.assertRaisesRegex(ValueError, "OUTPUT_CREATE_ONLY_PATH_REQUIRED"):
@@ -276,6 +276,54 @@ class EarlyObservationTests(unittest.TestCase):
         self.assertEqual(view["lanes"]["history"]["status"], "STALE")
         self.assertEqual(view["lanes"]["live"]["status"], "STALE")
         self.assertEqual(view["lanes"]["daily"]["status"], "UNKNOWN")
+
+    def test_mcp_request_error_preserves_early_schema(self):
+        import atlas_mcp_pilot as pilot
+
+        class BrokenReader:
+            profile = "early"
+
+            def read_pinned(self):
+                raise ValueError("SYNTHETIC_READER_FAILURE")
+
+        server = pilot.MCPServer(BrokenReader(), clock=lambda: (NOW, 1_000_000_000))
+        view = server.current_view()
+        self.assertEqual(view["schema"], "atlas.mcp.early-observation.v1")
+        self.assertEqual(view["status"], "UNKNOWN")
+
+    def test_symlink_input_is_refused(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            original = write_doc(root, "daily-real", daily())
+            link = root / "daily-link.json"
+            try:
+                link.symlink_to(original)
+            except OSError:
+                self.skipTest("symlinks unavailable on this runner")
+            result = self.build({"daily": link})
+        self.assertEqual(result["lanes"]["daily"]["status"], "UNKNOWN")
+        self.assertIsNone(result["lanes"]["daily"]["source_file_sha256"])
+
+    def test_replacement_between_stat_and_open_is_rejected(self):
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            target = write_doc(root, "daily", daily())
+            replacement = write_doc(root, "replacement", daily(NOW - 1))
+            original_open = Path.open
+            replaced = False
+
+            def replace_before_open(path, *args, **kwargs):
+                nonlocal replaced
+                if path == target and not replaced:
+                    replacement.replace(target)
+                    replaced = True
+                return original_open(path, *args, **kwargs)
+
+            with patch.object(Path, "open", replace_before_open):
+                with self.assertRaisesRegex(ValueError, "INPUT_REPLACED"):
+                    early.read_bounded(target)
 
     def test_fixture_resource_budget_is_measured_and_bounded(self):
         with tempfile.TemporaryDirectory() as folder:
