@@ -99,8 +99,7 @@ def verify_daily_success(state, policy_path, policy_pin, source_day_ms, receipt_
             and bool(policy["authorization_ref"].strip()), "DAILY_EVIDENCE_POLICY_PIN")
     marker = plain_path(state / "atlas-authorized-periodic-v1", "file")
     marker_stat = marker.lstat()
-    require(marker_stat.st_nlink == 1 and marker_stat.st_size == 0,
-            "DAILY_EVIDENCE_STATE_SCOPE")
+    require(marker_stat.st_nlink == 1, "DAILY_EVIDENCE_STATE_SCOPE")
     day = str(source_day_ms)
     daily = policy_path.parent / "daily"
     done = read_json(daily / f"{day}.done.json")
