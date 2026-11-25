@@ -126,7 +126,7 @@ def test_stale_and_open_gap_fail_closed(tmp_path):
     source = tmp_path / "stale.sqlite"
     start, end = feed(source, stale=True)
     with pytest.raises(ValueError, match="FEED_STALE"):
-        project_feed_window(source, symbol="BTCUSDT", start_ms=start, end_ms=end,
+        _project(source, symbol="BTCUSDT", start_ms=start, end_ms=end,
                             now_ms=end+1_000)
     source = tmp_path / "gap.sqlite"
     start, end = feed(source)
@@ -136,7 +136,7 @@ def test_stale_and_open_gap_fail_closed(tmp_path):
     db.commit()
     db.close()
     with pytest.raises(ValueError, match="OPEN_HISTORY_GAP"):
-        project_feed_window(source, symbol="BTCUSDT", start_ms=start, end_ms=end,
+        _project(source, symbol="BTCUSDT", start_ms=start, end_ms=end,
                             now_ms=end+1_000)
 
 
@@ -150,7 +150,7 @@ def test_duplicate_reconnect_is_idempotent_and_conflict_is_held(tmp_path):
     store.ingest(json.dumps(data), received_ms=end)
     store.db.commit()
     store.db.close()
-    assert len(project_feed_window(source, symbol="BTCUSDT", start_ms=start,
+    assert len(_project(source, symbol="BTCUSDT", start_ms=start,
                                   end_ms=end, now_ms=end+1_000)) == 1
 
     source = tmp_path / "conflict.sqlite"
@@ -161,7 +161,7 @@ def test_duplicate_reconnect_is_idempotent_and_conflict_is_held(tmp_path):
     store.db.commit()
     store.db.close()
     with pytest.raises(ValueError, match="FEED_BAR_CONFLICT"):
-        project_feed_window(source, symbol="BTCUSDT", start_ms=start, end_ms=end,
+        _project(source, symbol="BTCUSDT", start_ms=start, end_ms=end,
                             now_ms=end+1_000)
 
 
@@ -173,11 +173,11 @@ def test_missing_receipt_bad_utc_grid_and_incomplete_aggregation_fail_closed(tmp
     db.commit()
     db.close()
     with pytest.raises(ValueError, match="FEED_RECEIPT_INVALID"):
-        project_feed_window(source, symbol="BTCUSDT", start_ms=start,
+        _project(source, symbol="BTCUSDT", start_ms=start,
                             end_ms=start+60_000, now_ms=start+61_000)
 
     with pytest.raises(ValueError, match="UTC_WINDOW_INVALID"):
-        project_feed_window(source, symbol="BTCUSDT", start_ms=start+1,
+        _project(source, symbol="BTCUSDT", start_ms=start+1,
                             end_ms=start+60_001, now_ms=end+1_000)
 
     source = tmp_path / "short.sqlite"
@@ -194,7 +194,7 @@ def test_corrupt_database_is_held(tmp_path):
     source = tmp_path / "corrupt.sqlite"
     source.write_bytes(b"not sqlite")
     with pytest.raises(ValueError, match="FEED_DATABASE_INVALID|FEED_DATABASE_CORRUPT"):
-        project_feed_window(source, symbol="BTCUSDT", start_ms=START,
+        _project(source, symbol="BTCUSDT", start_ms=START,
                             end_ms=START+60_000, now_ms=START+61_000)
 
 
@@ -316,7 +316,6 @@ def test_utc_day_boundary_and_registry_provenance(tmp_path):
     assert registry["event_watermark"] >= 1
     assert registry["sources"][0]["source_zip_sha256"]
     assert daily_context["registry"]["snapshot_sha256"] == registry["snapshot_sha256"]
-    assert daily_context["registry"]["snapshot_sha256"] == registry["snapshot_sha256"]
     with ResearchBarStore(copied) as store:
         realtime = store.read("BTCUSDT", "1m", START)
     assert reconcile_daily_bar(realtime, daily)["status"] == "MATCH_IDEMPOTENT"
@@ -366,7 +365,7 @@ def test_feed_reader_uses_one_coherent_sqlite_snapshot(tmp_path, monkeypatch):
 
     def read_snapshot():
         try:
-            received.extend(project_feed_window(source, symbol="BTCUSDT", start_ms=start,
+            received.extend(_project(source, symbol="BTCUSDT", start_ms=start,
                                      end_ms=end, now_ms=end+1_000))
         except Exception as exc:  # captured for assertion in the owner thread
             failures.append(exc)
@@ -392,7 +391,7 @@ def test_feed_reader_uses_one_coherent_sqlite_snapshot(tmp_path, monkeypatch):
     assert len(received) == 1
     # The next read observes the committed gap; the in-flight read saw pre-commit.
     with pytest.raises(ValueError, match="OPEN_HISTORY_GAP"):
-        project_feed_window(source, symbol="BTCUSDT", start_ms=start,
+        _project(source, symbol="BTCUSDT", start_ms=start,
                  end_ms=end, now_ms=end+1_000)
 
 
