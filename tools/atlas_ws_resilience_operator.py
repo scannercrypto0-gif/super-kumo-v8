@@ -357,6 +357,7 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
     correction=auth.get('fresh_ping_correction') is True
     disk_correction=auth.get('disk_reserve_correction') is True
     correction=correction or disk_correction
+    activation_expected_pin=diagnostic['identity']['config_sha256']
     if correction:
         need(not (root/'operator-recovery.active.json').exists(),'FRESH_PING_ACTIVE_RECOVERY_REVIEW_REQUIRED')
         module=continuity_module()
@@ -374,6 +375,7 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
                 need(prior is not None and prior['config_sha256']!=current_pin and
                      activation.get('config_sha256')==prior['config_sha256'],
                      'MIGRATED_CONTINUITY_AUTHORITY_NOT_PROVEN')
+                activation_expected_pin=prior['config_sha256']
             need(prior is not None,'FRESH_PING_PRIOR_CONTINUITY_AUTHORITY_REQUIRED')
             if prior['config_sha256']==current_pin:
                 need(not module.next_action(root,current_pin,now)['circuit_open'],
@@ -439,7 +441,7 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
             durable(cfgpath,canonical(cfg));newpin=digest(read(cfgpath))
             active=root/'activation.json'
             if active.exists():
-                a=load(active);need(a.get('config_sha256')==diagnostic['identity']['config_sha256'],'ACTIVATION_PIN_MISMATCH')
+                a=load(active);need(a.get('config_sha256')==activation_expected_pin,'ACTIVATION_PIN_MISMATCH')
                 a['config_sha256']=newpin;durable(active,canonical(a))
             print(json.dumps(dict(status='STAGED_AWAITING_TASK_PIN',config_sha256=newpin)),file=out,flush=True)
             answer=inp.readline().strip()
