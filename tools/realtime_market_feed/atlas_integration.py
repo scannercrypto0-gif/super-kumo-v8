@@ -1,10 +1,9 @@
-"""Fail-closed engineering bridge from feed SQLite to isolated research fixtures.
+"""Fail-closed bridge from normalized feed receipts to isolated research fixtures.
 
-The current feed stores a SHA of the original WebSocket event but not the event
-bytes. It therefore cannot prove that persisted OHLCV still matches that SHA.
-Production feed rows are explicitly blocked as UNVERIFIED. Generated fixtures
-are admitted only from the OS temporary directory and only through the
-engineering-test-only writer.
+The producer records a forward-only normalized row attestation bound to an
+event digest and code identity. It does not retain original event bytes and is
+not an external signature or provider-origin/rights proof. Legacy rows remain
+blocked. Generated fixtures are admitted only from OS temporary storage.
 """
 from __future__ import annotations
 
@@ -19,7 +18,7 @@ import time
 
 FEED_SCHEMA_COLUMNS = {
     "final_bar": {"symbol", "interval", "open_ms", "close_ms", "open", "high",
-                  "low", "close", "volume", "received_ms", "payload_sha256"},
+                  "low", "close", "volume", "trades", "received_ms", "payload_sha256"},
     "open_gap": {"symbol", "interval", "start_ms", "end_ms", "reason", "status"},
     "service_event": {"at_ms", "kind", "detail"},
     "engineering_fixture": {"schema", "fixture_id"},
@@ -210,11 +209,11 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
           "FEED_SOURCE_LINEAGE_UNVERIFIED")
 
     from aql.research_timeframes import project_finalized_1m
-    deadline = _QUERY_CLOCK() + query_budget_ms / 1000
+    read_started = _QUERY_CLOCK()
+    deadline = read_started + query_budget_ms / 1000
     db = _feed_db(database, allow_synthetic_fixture=allow_synthetic_fixture,
                   expected_producer_code_sha256=expected_producer_code_sha256,
                   query_deadline=deadline)
-    read_started = _QUERY_CLOCK()
     try:
         gaps = db.execute(
             """SELECT start_ms,end_ms,reason FROM open_gap
