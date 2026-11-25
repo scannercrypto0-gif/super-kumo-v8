@@ -124,3 +124,27 @@ def test_consumer_snapshot_holds_stale_data_and_open_history_gap(tmp_path):
     assert "BTCUSDT:TRADE_STALE" in result["blockers"]
     assert "BTCUSDT:QUOTE_STALE" in result["blockers"]
     assert "BTCUSDT:OPEN_HISTORY_GAP" in result["blockers"]
+
+
+def test_live_service_dispatches_final_bar_to_gap_recovery_worker(tmp_path, monkeypatch):
+    import threading
+    from tools.realtime_market_feed import backfill
+    from tools.realtime_market_feed.service import LiveService
+
+    called=threading.Event()
+    observed=[]
+    def recover(path,symbol):
+        observed.append((path,symbol))
+        called.set()
+    monkeypatch.setattr(backfill,"recover_open_gaps",recover)
+    store=Store(tmp_path/"market.sqlite")
+    service=LiveService(["btcusdt"],store)
+    bar={"e":"kline","s":"BTCUSDT","k":{"i":"1m","t":0,"T":59_999,
+        "o":"10","h":"11","l":"9","c":"10.5","v":"2.5","n":4,"x":True}}
+    try:
+        service._on_message(json.dumps(bar))
+        assert called.wait(2)
+        assert observed == [(store.path,"BTCUSDT")]
+        assert store.db.execute("SELECT count(*) FROM final_bar").fetchone()[0] == 1
+    finally:
+        store.db.close()
