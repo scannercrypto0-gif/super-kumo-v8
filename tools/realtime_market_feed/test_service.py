@@ -16,7 +16,7 @@ def test_combined_stream_url_is_one_read_only_market_socket():
     assert url.startswith("wss://data-stream.binance.vision/stream?streams=")
     assert "btcusdt@bookTicker" in url
     assert "btcusdt@kline_1m" in url
-    assert url.count("btcusdt@") == 2
+    assert url.count("btcusdt@") == 3
 
 
 def test_trade_quote_final_bar_and_gap_are_durable(tmp_path):
