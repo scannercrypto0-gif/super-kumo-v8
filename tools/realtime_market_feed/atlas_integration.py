@@ -296,9 +296,17 @@ def _registry_snapshot(snapshot):
           and snapshot.get("source_class") == "RETROSPECTIVE_NON_PIT"
           and snapshot.get("trading_authority") == "NONE",
           "REGISTRY_SNAPSHOT_INVALID")
+    _need(snapshot.get("dataset_id") == "BINANCE_VISION:SPOT:BTCUSDT:1m:RETROSPECTIVE_NON_PIT"
+          and type(snapshot.get("event_watermark")) is int
+          and snapshot.get("event_watermark") > 0
+          and type(snapshot.get("event_head_sha256")) is str
+          and HEX.fullmatch(snapshot["event_head_sha256"]) is not None
+          and type(snapshot.get("as_of_ms")) is int,
+          "REGISTRY_SNAPSHOT_INCOMPLETE")
     _need(type(snapshot.get("sources")) is list
           and type(snapshot.get("covered_intervals")) is list
           and type(snapshot.get("internal_gaps")) is list
+          and type(snapshot.get("archive_unavailable_boundaries")) is list
           and type(snapshot.get("conflicts")) is list,
           "REGISTRY_SNAPSHOT_INCOMPLETE")
     return snapshot
@@ -326,24 +334,32 @@ def _daily_context_binding(context, daily_row):
               and row["close_exclusive_ms"] <= span[1]
               for span in snapshot["covered_intervals"]),
           "DAILY_REGISTRY_COVERAGE_MISMATCH")
-    _need(not any(type(gap) is list and len(gap) == 2
-                  and type(gap[0]) is int and type(gap[1]) is int
-                  and gap[0] < row["close_exclusive_ms"]
-                  and gap[1] > row["open_ms"]
-                  for gap in snapshot["internal_gaps"]),
-          "DAILY_REGISTRY_GAP")
+    for gap_collection in (snapshot["internal_gaps"],
+                           snapshot["archive_unavailable_boundaries"]):
+        _need(not any(type(gap) is list and len(gap) == 2
+                      and type(gap[0]) is int and type(gap[1]) is int
+                      and gap[0] < row["close_exclusive_ms"]
+                      and gap[1] > row["open_ms"]
+                      for gap in gap_collection), "DAILY_REGISTRY_GAP")
+    _need(snapshot["as_of_ms"] >= row["available_at_ms"],
+          "DAILY_REGISTRY_AS_OF_TOO_OLD")
     _need(not snapshot["conflicts"], "DAILY_REGISTRY_CONFLICTS_PRESENT")
     from datetime import datetime, timezone
     date = datetime.fromtimestamp(row["open_ms"] / 1000, tz=timezone.utc).date().isoformat()
     key = f"data/spot/daily/klines/{row['symbol']}/1m/{row['symbol']}-1m-{date}.zip"
-    candidates = [source for source in snapshot["sources"]
-                  if type(source) is dict and source.get("key") == key
-                  and source.get("first_open_ms") <= row["open_ms"]
-                  and source.get("last_open_ms") + MINUTE_MS >= row["close_exclusive_ms"]
-                  and type(source.get("source_zip_sha256")) is str
-                  and HEX.fullmatch(source["source_zip_sha256"])
-                  and type(source.get("source_receipt_sha256")) is str
-                  and HEX.fullmatch(source["source_receipt_sha256"])]
+    candidates = []
+    for source in snapshot["sources"]:
+        if type(source) is not dict:
+            continue
+        first, last = source.get("first_open_ms"), source.get("last_open_ms")
+        zip_sha = source.get("source_zip_sha256")
+        receipt_sha = source.get("source_receipt_sha256")
+        if (source.get("key") == key and type(first) is int and type(last) is int
+                and first <= row["open_ms"]
+                and last + MINUTE_MS >= row["close_exclusive_ms"]
+                and type(zip_sha) is str and HEX.fullmatch(zip_sha)
+                and type(receipt_sha) is str and HEX.fullmatch(receipt_sha)):
+            candidates.append(source)
     _need(candidates, "DAILY_ARCHIVE_RECEIPT_NOT_BOUND")
     return snapshot, candidates
 
