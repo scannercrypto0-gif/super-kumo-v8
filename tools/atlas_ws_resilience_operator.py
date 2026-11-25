@@ -195,7 +195,7 @@ def inspect(snapshot, repo, expected_commit, now):
     need(type(snapshot.get('task_xml')) is str and digest(snapshot['task_xml'].encode('utf-8')) == snapshot['task_xml_sha256'], 'TASK_XML_SNAPSHOT_MISMATCH')
     need(type(snapshot.get('task_policy_sha256')) is str and HEX.fullmatch(snapshot['task_policy_sha256']), 'TASK_POLICY_PIN')
     hold = load(root/'hold.json')
-    need(hold.get('reason') in ('PILOT_STOP_TimeoutError', 'PILOT_STOP_ConnectionResetError','LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED','PILOT_STOP_DISK_RESERVE_LOW'), 'HOLD_NOT_RESUMABLE')
+    need(hold.get('reason') in ('PILOT_STOP_TimeoutError', 'PILOT_STOP_ConnectionResetError','LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED','PILOT_STOP_DISK_RESERVE_LOW','LIVE_SERVICE_SEGMENT_FAILED'), 'HOLD_NOT_RESUMABLE')
     need(type(hold.get('slot_ms')) is int and hold['slot_ms'] % 900000 == 0, 'HOLD_SLOT_IDENTITY')
     rights = {k:cfg.get(k) for k in ('source_rights_ref','region_ref','authorization_ref')}
     need(all(type(v) is str and v.strip() for v in rights.values()), 'SOURCE_RIGHTS_REQUIRED')
@@ -301,6 +301,14 @@ def authorize(path, diagnostic, now, *, action='DEPLOY_ONE_RECOVERY'):
         need(auth.get('continuous_research') in (None,False),'CONTINUITY_POLICY_AUTHORIZATION')
     correction=auth.get('fresh_ping_correction') is True
     disk_correction=auth.get('disk_reserve_correction') is True
+    root_correction=auth.get('sustained_root_correction') is True
+    need(sum((correction,disk_correction,root_correction))<=1,'RECOVERY_CORRECTION_FLAGS_CONFLICT')
+    if diagnostic['hold_reason'] == 'LIVE_SERVICE_SEGMENT_FAILED' or root_correction:
+        need(root_correction and not correction and not disk_correction and
+             diagnostic['hold_reason']=='LIVE_SERVICE_SEGMENT_FAILED' and
+             auth.get('continuous_research') is True and
+             auth.get('expected_previous_config_sha256')==diagnostic['identity']['config_sha256'],
+             'SUSTAINED_ROOT_CORRECTION_AUTHORITY_REQUIRED')
     if diagnostic['hold_reason'] == 'PILOT_STOP_DISK_RESERVE_LOW' or disk_correction:
         need(disk_correction and not correction and diagnostic['hold_reason']=='PILOT_STOP_DISK_RESERVE_LOW' and
              auth.get('continuous_research') is True and
@@ -356,13 +364,21 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
     continuous = auth.get('continuous_research') is True
     correction=auth.get('fresh_ping_correction') is True
     disk_correction=auth.get('disk_reserve_correction') is True
-    correction=correction or disk_correction
+    root_correction=auth.get('sustained_root_correction') is True
+    correction=correction or disk_correction or root_correction
     activation_expected_pin=diagnostic['identity']['config_sha256']
     if correction:
         need(not (root/'operator-recovery.active.json').exists(),'FRESH_PING_ACTIVE_RECOVERY_REVIEW_REQUIRED')
         module=continuity_module()
         current_pin=diagnostic['identity']['config_sha256']
-        if disk_correction:
+        if root_correction:
+            prior=module.authority(root,current_pin)
+            activation=load(root/'activation.json')
+            need(prior is not None and activation.get('config_sha256')==current_pin,
+                 'SUSTAINED_ROOT_PRIOR_AUTHORITY_NOT_PROVEN')
+            need(not module.next_action(root,current_pin,now)['circuit_open'],
+                 'SUSTAINED_ROOT_CONTINUITY_CIRCUIT_OPEN')
+        elif disk_correction:
             try:
                 prior=module.authority(root,current_pin)
             except ValueError as exc:
@@ -458,7 +474,8 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
                 claimed_sha256=diagnostic['identity']['claimed_sha256'],pending_sha256=diagnostic['identity']['pending_sha256'],
                 issued_ms=now2,expires_ms=min(auth['expires_ms'],now2+1800000),max_segments=1,
                 max_connections=2,orders=0,trading_authority='NONE',fresh_ping_correction=auth.get('fresh_ping_correction') is True,
-                disk_reserve_correction=auth.get('disk_reserve_correction') is True)
+                disk_reserve_correction=auth.get('disk_reserve_correction') is True,
+                sustained_root_correction=auth.get('sustained_root_correction') is True)
             if continuous:
                 PIN=continuity_pin()
                 prior=root/'operator-recovery.active.json'
@@ -482,7 +499,9 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
                 clock_uncertainty_ms=clock['uncertainty_ms'],
                 max_segments=1,max_connections=2,orders=0,trading_authority='NONE',
                 host_reconnection='NOT_ATTESTED',continuous_research=continuous,fresh_ping_correction=auth.get('fresh_ping_correction') is True,
-                disk_reserve_correction=auth.get('disk_reserve_correction') is True,root_cause='ROOT_CAUSE_NOT_PROVEN')
+                disk_reserve_correction=auth.get('disk_reserve_correction') is True,
+                sustained_root_correction=auth.get('sustained_root_correction') is True,
+                root_cause='E_DRIVE_REJECTED_BY_GENERIC_ROOT_GUARD' if root_correction else 'ROOT_CAUSE_NOT_PROVEN')
             durable(backup/'deployment-receipt.json',canonical(receipt),create=True)
             print(json.dumps(receipt),file=out,flush=True)
         except BaseException:
