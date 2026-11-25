@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from tools.realtime_market_feed.service import Store, make_url, normalize_symbols
+from tools.realtime_market_feed.service import Store, build_report, make_url, normalize_symbols
 
 
 def test_symbol_normalization_and_bound():
@@ -69,3 +69,14 @@ def test_invalid_instrument_and_interval_fail_closed(tmp_path):
             store.ingest(json.dumps(bad))
     finally:
         store.db.close()
+
+
+def test_report_is_read_only_and_marks_only_observed_state(tmp_path):
+    path=tmp_path/"market.sqlite"
+    store=Store(path)
+    store.event("CONNECTED","synthetic")
+    store.db.close()
+    result=build_report(path)
+    assert result["schema"] == "atlas.realtime-market-feed.report.v1"
+    assert result["readiness"] == "NOT_READY"
+    assert result["orders"] == 0
