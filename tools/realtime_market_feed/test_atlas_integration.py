@@ -608,3 +608,34 @@ def test_feed_row_and_digest_substitution_fail_closed(tmp_path):
     with pytest.raises(ValueError,match="FEED_LINEAGE_ROW_MISMATCH"):
         project_feed_window(source,symbol="BTCUSDT",start_ms=start,end_ms=end,
             now_ms=end+1_000,expected_producer_code_sha256=producer.PRODUCER_CODE_SHA256)
+
+
+
+def test_all_native_timeframes_preserve_utc_grid_and_availability():
+    from aql.research_timeframes import WIDTHS, WEEK_ORIGIN_MS, project_finalized_1m
+
+    start=WEEK_ORIGIN_MS
+    source=[
+        {"symbol":"BTCUSDT","interval":"1m","open_ms":start+i*60_000,
+         "final":True,"o":"1","h":"2","l":"1","c":"1.5","v":"3",
+         "source_sha256":f"{i+1:064x}","available_at_ms":start+(i+1)*60_000}
+        for i in range(WIDTHS["1w"])
+    ]
+    for interval,width in WIDTHS.items():
+        projection=project_finalized_1m(source[:width],interval,
+                                        source_class="FORWARD_UNQUALIFIED")
+        assert projection["interval"] == interval
+        assert projection["open_ms"] == start
+        assert projection["close_exclusive_ms"] == start+width*60_000
+        assert projection["available_at_ms"] == start+width*60_000
+        assert projection["constituent_count"] == width
+        assert len(projection["constituent_sha256"]) == width
+
+
+def test_daily_warehouse_query_enforces_availability_cutoff(tmp_path):
+    wh, _daily_bar, _registry, _context = _daily(tmp_path/"warehouse")
+    with pytest.raises(ValueError,match="SOURCE_UNAVAILABLE_AT_CUTOFF"):
+        wh.query("1m",START,START+60_000,cutoff_ms=START+DAY-1)
+    result=wh.query("1m",START,START+60_000,cutoff_ms=START+DAY)
+    assert len(result) == 1
+    assert result[0]["available_at_ms"] <= START+DAY
