@@ -189,12 +189,19 @@ def _history(item, registry_item, previous, now, clock_ok):
                     state, reason = "HEALTHY_PROGRESS", "COMMITTED_HISTORY_COUNTER_ADVANCED"
                 else:
                     state, reason = "UNKNOWN", "SECOND_OBSERVATION_OR_SOURCE_LINK_REQUIRED"
+        accepted_sources = []
+        if registry is not None:
+            accepted_sources = [{"source_zip_sha256": row["source_zip_sha256"],
+                                 "source_receipt_sha256": row["source_receipt_sha256"],
+                                 "rows": row["rows"]}
+                                for row in registry.get("sources", [])[-4:]]
         report = {"status": view.get("status"), "counters": cursor,
                   "unresolved_gaps": view.get("unresolved_gaps", 0),
                   "unresolved_gap_ranges": history_ranges,
                   "source_obstacles": view.get("obstacles", 0),
                   "registry_gap_ranges": registry_gaps if reg_view else [],
                   "registry_unavailable_ranges": registry_unavailable if reg_view else [],
+                  "accepted_sources": accepted_sources,
                   "registry_snapshot_sha256": reg_view["snapshot_sha256"] if reg_view else None}
         return {"lane": "history", "status": state, "reason": reason,
                 "observed_at_ms": observed, "source_schema": schema,
@@ -218,6 +225,10 @@ def _daily(item, now):
                 and doc.get("source_cadence") == "DAILY_UTC", "DAILY_SCHEMA_INVALID")
         state, reason, age = _age_state(observed, now)
         last = doc.get("last_success") if type(doc.get("last_success")) is dict else {}
+        failure = doc.get("last_failure")
+        failure_reason = (watchdog.safe_reason(failure.get("reason"))
+                          if type(failure) is dict else
+                          watchdog.safe_reason(failure) if type(failure) is str else None)
         receipt = last.get("daily_worker_receipt_sha256")
         if receipt is not None:
             require(watchdog.HEX64.fullmatch(receipt) is not None, "DAILY_RECEIPT_PIN_INVALID")
@@ -243,7 +254,9 @@ def _daily(item, now):
                     "cycle_evidence": doc.get("cycle_evidence"),
                     "source_freshness": doc.get("source_freshness"),
                     "last_success_source_day_ms": last.get("source_day_ms"),
-                    "worker_receipt_sha256": receipt},
+                    "worker_receipt_sha256": receipt,
+                    "last_failure_reported": failure is not None,
+                    "last_failure_reason": failure_reason},
                 "scope": "WORKER_REPORT_IMPORT_REGISTRY_LINK_UNVERIFIED",
                 "evidence_grade": "OWNER_SUPPLIED_DAILY_WORKER_REPORT_IMPORT_UNVERIFIED"}
     except Exception:
@@ -299,6 +312,9 @@ def _live(item, previous, now, clock_ok):
                     "last_receipt_fresh": view.get("last_receipt_fresh"),
                     "missing_ranges": view.get("missing_ranges"),
                     "missing_open_ranges": missing_ranges,
+                    "real_fault_events": doc.get("real_fault_events") if type(doc.get("real_fault_events")) is int else None,
+                    "confirmed_rollovers": doc.get("confirmed_rollovers") if type(doc.get("confirmed_rollovers")) is int else None,
+                    "acceptance_ready": doc.get("acceptance_ready") if type(doc.get("acceptance_ready")) is bool else None,
                     "source_identity": identity,
                     "hold_reason": watchdog.safe_reason(doc.get("hold_reason")) if doc.get("hold_reason") else None},
                 "scope": "WORK1_HANDOFF_REPORT_ONLY",
