@@ -999,7 +999,7 @@ def test_sustained_root_recovery_requires_exact_segment_failure_scope(host):
     for bad in (
         dict(**scope,sustained_root_correction=True,fresh_ping_correction=True),
         dict(**scope,sustained_root_correction=True,disk_reserve_correction=True),
-        dict(**scope,sustained_root_correction=True,expected_previous_config_sha256='0'*64),
+        dict({**scope,'sustained_root_correction':True,'expected_previous_config_sha256':'0'*64}),
     ):
         with pytest.raises(ValueError):
             op.authorize(authorization(host,**bad),d,host['now'])
