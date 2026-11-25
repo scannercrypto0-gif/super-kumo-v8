@@ -92,6 +92,58 @@ def test_one_pinned_daily_archive_reaches_watchdog_and_replay_is_idempotent(tmp_
     ("zip", "DAILY_INPUT_PIN_MISMATCH"),
     ("checksum", "DAILY_INPUT_PIN_MISMATCH"),
 ])
+
+def test_one_archive_retry_recovers_after_source_catalog_io_failure(tmp_path, monkeypatch):
+    day_ms = 1_704_067_200_000
+    archive, day_ms, zip_pin, checksum_pin = archive_fixture(
+        tmp_path / "retained", day_ms, rows=2)
+    w = HistoricalWarehouse(tmp_path / "warehouse", reserve=0, test_root=True)
+    original_write_once = w.write_once
+    injected = [False]
+
+    def fail_source_receipt_once(relative, raw):
+        if relative == f"catalog/{zip_pin}.json" and not injected[0]:
+            injected[0] = True
+            raise OSError("injected source receipt publication failure")
+        return original_write_once(relative, raw)
+
+    monkeypatch.setattr(w, "write_once", fail_source_receipt_once)
+    args = dict(source_day_ms=day_ms, expected_zip_sha256=zip_pin,
+                expected_checksum_sha256=checksum_pin,
+                observed_ms=day_ms + 2 * 86_400_000)
+    with pytest.raises(OSError, match="injected source receipt publication failure"):
+        import_one_retained(w, archive, **args)
+
+    # The failure is visible: validated raw inputs and the atomically published
+    # day shard may exist, but no source receipt or successful CLI result exists.
+    assert injected[0]
+    assert w.path(f"raw/{zip_pin}.zip").read_bytes() == archive.read_bytes()
+    assert w.path(f"raw/{checksum_pin}.CHECKSUM").read_bytes() == archive.with_name(
+        archive.name + ".CHECKSUM").read_bytes()
+    assert not w.path(f"catalog/{zip_pin}.json").exists()
+    assert list(w.path("bars").glob("????-??-??.sqlite"))
+
+    # The controlled retry reuses identical source bytes, verifies the partial
+    # state through the native importer, publishes the missing receipt and seals
+    # the Registry/report without re-inserting rows or changing source bytes.
+    monkeypatch.setattr(w, "write_once", original_write_once)
+    recovered = import_one_retained(w, archive, **args)
+    assert recovered["this_run"][0]["status"] == "ARCHIVE_IMPORTED"
+    assert recovered["this_run"][0]["inserted_rows"] == 0
+    assert recovered["this_run"][0]["duplicate_rows"] == 2
+    assert recovered["this_run"][0]["conflicts"] == 0
+    source = json.loads(w.path(f"catalog/{zip_pin}.json").read_bytes())
+    assert source["schema"] == "aql.research.warehouse-source.v1"
+    assert source["source_zip_sha256"] == zip_pin
+    assert source["receipt_sha256"]
+    assert recovered["warehouse_receipt_sha256"]
+    assert w.path(f"receipts/{recovered['warehouse_receipt_sha256']}.json").is_file()
+    registry = recovered["registry"]
+    assert any(item["source_zip_sha256"] == zip_pin
+               for item in registry["sources"])
+    assert registry["physical_rows"] == 2
+
+
 def test_daily_identity_mismatch_fails_before_warehouse_admission(tmp_path, mutation, reason):
     day_ms = 1_704_067_200_000
     archive, day_ms, zip_pin, checksum_pin = archive_fixture(tmp_path / "retained", day_ms, rows=2)
