@@ -96,14 +96,22 @@ def test_integration_writer_is_disabled_without_test_only_switch(tmp_path):
 
 
 def test_provisional_and_missing_symbol_fail_closed(tmp_path):
-    source = tmp_path / "feed.sqlite"
-    start, end = feed(source)
-    db = sqlite3.connect(source)
-    db.execute("DELETE FROM final_bar")
-    db.commit()
-    db.close()
+    source = tmp_path / "provisional.sqlite"
+    store = FeedStore(source)
+    start = START
+    provisional = {"e":"kline","s":"BTCUSDT","E":start+30_000,
+                   "k":{"s":"BTCUSDT","i":"1m","x":False,"t":start,
+                        "T":start+59_999,"o":"1","h":"2","l":"1","c":"1","v":"3","n":1}}
+    assert store.ingest(json.dumps(provisional), received_ms=start+30_000) == "provisional_ignored"
+    store.db.close()
     with pytest.raises(ValueError, match="SYMBOL_OR_WINDOW_MISSING"):
-        project_feed_window(source, symbol="BTCUSDT", start_ms=start, end_ms=end,
+        project_feed_window(source, symbol="BTCUSDT", start_ms=start,
+                            end_ms=start+60_000, now_ms=start+61_000)
+
+    source = tmp_path / "missing-symbol.sqlite"
+    start, end = feed(source)
+    with pytest.raises(ValueError, match="SYMBOL_OR_WINDOW_MISSING"):
+        project_feed_window(source, symbol="ETHUSDT", start_ms=start, end_ms=end,
                             now_ms=end+1_000)
 
 
@@ -285,5 +293,6 @@ def test_utc_day_boundary_and_registry_provenance(tmp_path):
     wh, daily, registry = _daily(tmp_path / "warehouse")
     assert registry["event_watermark"] >= 1
     assert registry["sources"][0]["source_zip_sha256"]
-    assert reconcile_daily_bar(
-        ResearchBarStore(copied).read("BTCUSDT","1m",START), daily)["status"] == "MATCH_IDEMPOTENT"
+    with ResearchBarStore(copied) as store:
+        realtime = store.read("BTCUSDT", "1m", START)
+    assert reconcile_daily_bar(realtime, daily)["status"] == "MATCH_IDEMPOTENT"
