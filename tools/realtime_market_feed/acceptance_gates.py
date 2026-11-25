@@ -124,7 +124,7 @@ def verify_sanitized_live_projection(report, live_view):
     if not isinstance(report, dict) or not isinstance(live_view, dict):
         raise ValueError("LIVE_PROJECTION_INVALID")
     allowed = {"status","as_of_ms","verified_receipts","last_committed_ms",
-               "last_receipt_fresh","missing_open_range_count","hold_reason",
+               "last_receipt_fresh","missing_ranges","hold_reason",
                "last_receipt_sha256"}
     if set(live_view) != allowed:
         raise ValueError("LIVE_PROJECTION_ALLOWLIST_MISMATCH")
