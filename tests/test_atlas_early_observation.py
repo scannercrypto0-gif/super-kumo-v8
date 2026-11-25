@@ -161,6 +161,50 @@ class EarlyObservationTests(unittest.TestCase):
         self.assertEqual(future["lanes"]["daily"]["status"], "UNKNOWN")
         self.assertEqual(future["lanes"]["daily"]["reason"], "SOURCE_TIME_IN_FUTURE")
 
+    def test_live_wait_requires_a_bounded_schedule(self):
+        report = live()
+        report["status"] = "AWAITING_EXISTING_SCHEDULE"
+        with tempfile.TemporaryDirectory() as folder:
+            unknown = self.build(paths_for(Path(folder), ws=report))
+        self.assertEqual(unknown["lanes"]["live"]["status"], "UNKNOWN")
+        self.assertEqual(unknown["lanes"]["live"]["reason"], "LIVE_WAIT_CADENCE_UNVERIFIED")
+        report["next_check_ms"] = NOW + 60_000
+        with tempfile.TemporaryDirectory() as folder:
+            expected = self.build(paths_for(Path(folder), ws=report))
+        self.assertEqual(expected["lanes"]["live"]["status"], "EXPECTED_WAIT")
+
+    def test_mcp_projection_redacts_untrusted_snapshot_fields(self):
+        import copy
+        import atlas_mcp_pilot as pilot
+
+        secret = r"C:\\private\\credential.txt"
+        with tempfile.TemporaryDirectory() as folder:
+            paths = paths_for(Path(folder), hist=history(), reg=registry(),
+                              day=daily(), ws=live())
+            snapshot = self.build(paths)
+        snapshot = copy.deepcopy(snapshot)
+        daily_report = snapshot["lanes"]["daily"]["reported"]
+        daily_report["task_state"] = secret
+        daily_report["cycle_evidence"] = {"credential": secret}
+        daily_report["last_success_source_day_ms"] = {"raw": secret}
+        live_report = snapshot["lanes"]["live"]["reported"]
+        live_report["status"] = secret
+        live_report["hold_reason"] = secret
+        snapshot["lanes"]["live"]["scope"] = secret
+        snapshot["lanes"]["live"]["source_schema"] = secret
+        snapshot["lanes"]["live"]["freshness"] = secret
+        snapshot["lanes"]["live"]["reason"] = secret
+        view = pilot.SnapshotReader.project_early(snapshot, "a" * 64)
+        encoded = json.dumps(view, sort_keys=True)
+        self.assertNotIn(secret, encoded)
+        self.assertEqual(view["lanes"]["daily"]["last_validated_committed_progress"]["task_state"],
+                         "UNRECOGNIZED")
+        self.assertIsNone(view["lanes"]["daily"]["last_validated_committed_progress"]["last_success_source_day_ms"])
+        self.assertEqual(view["lanes"]["live"]["last_validated_committed_progress"]["status"],
+                         "UNRECOGNIZED")
+        self.assertEqual(view["lanes"]["live"]["scope"], "WORK1_HANDOFF_REPORT_ONLY")
+        self.assertEqual(view["lanes"]["live"]["provenance"]["source_schema"], "UNRECOGNIZED_SCHEMA")
+
     def test_untrusted_report_fields_are_allowlisted_before_snapshot(self):
         secret = r"C:\\private\\credentials\\access_token.txt"
         daily_report = daily()
@@ -219,7 +263,7 @@ class EarlyObservationTests(unittest.TestCase):
             result = self.build(paths)
         lane = result["lanes"]["daily"]
         self.assertEqual(lane["status"], "FAILED")
-        self.assertEqual(lane["reported"]["last_failure_reason"], "DAILY_IMPORT_FAILED")
+        self.assertEqual(lane["reported"]["last_failure_reason"], "DAILY_FAILURE_REASON_REPORTED")
 
     def test_held_live_precedence_survives_other_unknown_lanes(self):
         with tempfile.TemporaryDirectory() as folder:
