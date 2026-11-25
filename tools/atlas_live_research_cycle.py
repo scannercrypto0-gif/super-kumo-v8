@@ -26,7 +26,7 @@ from tools.atlas_ws_receive_diagnostics import receive_fault_context, classify_t
 
 MARKER = "atlas-live-research-v1"
 
-def dedicated_research_root(raw, marker, *, sustained):
+def dedicated_research_root(raw, marker, *, sustained, synthetic=False):
     """Create live segment state under its authorized runtime root.
 
     The generic public-observation helper intentionally rejects E: as a
@@ -34,7 +34,7 @@ def dedicated_research_root(raw, marker, *, sustained):
     custody model: it is pinned beneath the configured runtime's segments/
     directory, and only its existing continuous authorization permits it.
     """
-    if not sustained:
+    if not sustained or synthetic:
         return dedicated_root(raw, marker)
     path = Path(raw).absolute()
     service_root = path.parent.parent
@@ -175,7 +175,7 @@ def run(root, plan, pin, fixture, *, verifier, clock, transport, wait=time.sleep
          type(uncertainty) is int and 0 <= uncertainty <= 250 and
          all(qualification.get(k) for k in ("source_rights_ref", "region_ref", "custody_ref")),
          "HOST_QUALIFICATION_REQUIRED")
-    root = dedicated_research_root(root, MARKER, sustained=sustained)
+    root = dedicated_research_root(root, MARKER, sustained=sustained, synthetic=synthetic)
     scope = dict(plan_pin=pin, endpoint=ENDPOINT, state_path=str(root.resolve()),
                  connections=plan["max_connections"], rest_requests=0,
                  deadline_ms=plan["slot"] + plan["wall_ms"])
