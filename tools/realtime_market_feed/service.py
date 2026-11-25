@@ -13,6 +13,7 @@ import os
 import random
 import sqlite3
 import time
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
@@ -43,7 +44,7 @@ def normalize_symbols(value: str) -> list[str]:
 def make_url(symbols: list[str]) -> str:
     streams = []
     for symbol in symbols:
-        streams.extend((f"{symbol}@bookTicker", f"{symbol}@kline_1m"))
+        streams.extend((f"{symbol}@trade", f"{symbol}@bookTicker", f"{symbol}@kline_1m"))
     return f"wss://{WS_HOST}/stream?streams=" + quote("/".join(streams), safe="@/")
 
 
@@ -60,7 +61,7 @@ class Store:
           symbol TEXT PRIMARY KEY, bid TEXT NOT NULL, bid_qty TEXT NOT NULL,
           ask TEXT NOT NULL, ask_qty TEXT NOT NULL, update_id INTEGER NOT NULL,
           received_ms INTEGER NOT NULL);
-        CREATE TABLE IF NOT EXISTS final_bar(
+        CREATE TABLE IF NOT EXISTS latest_trade(\n          symbol TEXT PRIMARY KEY, trade_id INTEGER NOT NULL, price TEXT NOT NULL,\n          quantity TEXT NOT NULL, event_ms INTEGER NOT NULL, received_ms INTEGER NOT NULL,\n          buyer_is_maker INTEGER NOT NULL);\n        CREATE TABLE IF NOT EXISTS final_bar(
           symbol TEXT NOT NULL, interval TEXT NOT NULL, open_ms INTEGER NOT NULL,
           close_ms INTEGER NOT NULL, open TEXT NOT NULL, high TEXT NOT NULL,
           low TEXT NOT NULL, close TEXT NOT NULL, volume TEXT NOT NULL,
@@ -90,7 +91,7 @@ class Store:
         symbol = str(data.get("s", "")).upper()
         if not symbol:
             raise ValueError("MISSING_SYMBOL")
-        if kind == "bookTicker":
+        if kind == "trade":\n            trade_id, event_ms = int(data["t"]), int(data["T"])\n            with self.db:\n                self.db.execute("""INSERT INTO latest_trade VALUES(?,?,?,?,?,?,?)\n                    ON CONFLICT(symbol) DO UPDATE SET trade_id=excluded.trade_id,\n                    price=excluded.price,quantity=excluded.quantity,event_ms=excluded.event_ms,\n                    received_ms=excluded.received_ms,buyer_is_maker=excluded.buyer_is_maker\n                    WHERE excluded.trade_id > latest_trade.trade_id""",\n                    (symbol,trade_id,str(data["p"]),str(data["q"]),event_ms,received_ms,int(bool(data["m"]))))\n            return "trade"\n        if kind == "bookTicker":
             bid, ask = data.get("b"), data.get("a")
             bid_qty, ask_qty = data.get("B"), data.get("A")
             update_id = int(data["u"])
@@ -122,7 +123,7 @@ class Store:
                       VALUES(?,'1m',?,?,?,?)""",
                       (symbol, previous[0]+60_000, opened, "MISSING_FINALIZED_MINUTES", received_ms))
                 cur = self.db.execute("""INSERT OR IGNORE INTO final_bar VALUES
-                  (?,'1m',?,?,?,?,?,?,?,?,?,?,?)""",
+                  (?,'1m',?,?,?,?,?,?,?,?,?,?)""",
                   (symbol,opened,closed,str(k["o"]),str(k["h"]),str(k["l"]),str(k["c"]),
                    str(k["v"]),int(k["n"]),received_ms,digest))
                 existing = self.db.execute(
@@ -162,16 +163,31 @@ class LiveService:
                 on_message=lambda _app,msg: self._on_message(msg),
                 on_error=lambda _app,err: self.store.event("SOCKET_ERROR", type(err).__name__),
                 on_close=lambda _app,code,msg: self.store.event("DISCONNECTED", str(code or "")[:40]))
+            elapsed = time.monotonic()-self.started
+            lifetime = MAX_SOCKET_AGE_SECONDS
+            if self.stop_after_seconds:
+                lifetime = min(lifetime, max(0.1, self.stop_after_seconds-elapsed))
+            timer = threading.Timer(lifetime, app.close)
+            timer.daemon = True
+            timer.start()
             try:
                 app.run_forever(ping_interval=0, ping_timeout=None,
                     sslopt={"cert_reqs": 2, "check_hostname": True},
                     reconnect=0, skip_utf8_validation=False)
             except Exception as exc:
                 self.store.event("SOCKET_EXCEPTION", type(exc).__name__)
-            if time.monotonic()-opened >= MAX_SOCKET_AGE_SECONDS:
+            finally:
+                timer.cancel()
+            lived = time.monotonic()-opened
+            if lived >= MAX_SOCKET_AGE_SECONDS-1:
                 self.store.event("PLANNED_ROTATION")
+            if lived >= 300:
+                delay = 2.0
             self.store.event("RECONNECT_WAIT", f"seconds={delay:.1f}")
-            time.sleep(delay + random.uniform(0, min(1.0, delay/4)))
+            pause = delay + random.uniform(0, min(1.0, delay/4))
+            if self.stop_after_seconds:
+                pause = min(pause, max(0, self.stop_after_seconds-(time.monotonic()-self.started)))
+            time.sleep(pause)
             delay = min(MAX_BACKOFF_SECONDS, delay*2)
 
     def _on_message(self, raw: str) -> None:
