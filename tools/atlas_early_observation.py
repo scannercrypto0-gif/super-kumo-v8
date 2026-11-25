@@ -313,7 +313,10 @@ def _live(item, previous, now, clock_ok):
         if state is None and view.get("last_receipt_fresh") is False:
             state, reason = "STALE", "LIVE_LAST_RECEIPT_STALE"
         if state is None and doc.get("status") == "AWAITING_EXISTING_SCHEDULE":
-            state, reason = "EXPECTED_WAIT", "LIVE_EXISTING_SCHEDULE_WAIT"
+            next_check = doc.get("next_check_ms")
+            state, reason = (("EXPECTED_WAIT", "LIVE_EXISTING_SCHEDULE_WAIT")
+                             if type(next_check) is int and now <= next_check <= now + MAX_EXPECTED_WAIT_MS
+                             else ("UNKNOWN", "LIVE_WAIT_CADENCE_UNVERIFIED"))
         if state is None:
             old = _prior(previous, "live")
             old_cursor = old.get("progress_cursor", {}) if old else {}
