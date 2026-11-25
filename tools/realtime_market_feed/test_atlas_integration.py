@@ -456,7 +456,7 @@ def test_unrelated_registry_or_daily_query_context_cannot_bind_bar(tmp_path):
     wh, daily, _, context = _daily(tmp_path / "warehouse")
     reconciliation = reconcile_daily_bar(live, daily)
     wrong = dict(context, requested_window=[start+60_000, start+120_000])
-    with pytest.raises(ValueError, match="DAILY_QUERY_ROW_NOT_BOUND|DAILY_QUERY_WINDOW_MISMATCH"):
+    with pytest.raises(ValueError, match="DAILY_NATIVE_READBACK_MISMATCH"):
         build_registry_proposal(reconciliation, wrong, warehouse_root=wh.root)
     realtime_only = reconcile_daily_bar(live, None)
     with pytest.raises(ValueError, match="NOT_VERIFIABLE_DAILY_ROW_ABSENT"):
