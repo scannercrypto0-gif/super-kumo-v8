@@ -948,3 +948,36 @@ def test_disk_reserve_correction_stages_one_ticket_and_preserves_prior_authority
     assert ticket['disk_reserve_correction'] is True and ticket['fresh_ping_correction'] is False
     assert (host['root']/receipt['backup']/'continuous-authority.prior.json').read_bytes()==op.canonical(grant)
     assert op.load(host['root']/'hold.json')['reason']=='PILOT_STOP_DISK_RESERVE_LOW'
+
+
+
+def test_disk_reserve_correction_rebinds_valid_prior_grant_after_config_relocation(host):
+    module=op.continuity_module()
+    now=host['now'];current_pin=op.digest(host['config'].read_bytes());old_pin='b'*64
+    prior=dict(schema='atlas.ws.operator-authorization.v1',action='DEPLOY_ONE_RECOVERY',
+        continuous_research=True,continuity_policy_sha256=module.PIN,allow_explicit_missing_intervals=True,
+        max_connections=2,max_segments=1,orders=0,trading_authority='NONE',
+        issued_ms=now-1000,expires_ms=now+600000)
+    prior_raw=op.canonical(prior);prior_pin=op.digest(prior_raw)
+    claims=host['root']/'operator-authorizations';claims.mkdir()
+    (claims/(prior_pin+'.claimed')).write_bytes(prior_raw)
+    grant=dict(schema='atlas.ws.continuous-authority.v1',policy_sha256=module.PIN,
+        config_sha256=old_pin,config_filename=host['config'].name,authorization_sha256=prior_pin,
+        activated_ms=now-500,orders=0,trading_authority='NONE')
+    (host['root']/'continuous-research.authorized.json').write_bytes(op.canonical(grant))
+    (host['root']/'activation.json').write_bytes(op.canonical(dict(config_sha256=old_pin)))
+    (host['root']/'hold.json').write_bytes(op.canonical(dict(reason='PILOT_STOP_DISK_RESERVE_LOW',slot_ms=SLOT)))
+    d=diagnostic(host)
+    permit=authorization(host,continuous_research=True,continuity_policy_sha256=module.PIN,
+        allow_explicit_missing_intervals=True,disk_reserve_correction=True,
+        expected_previous_config_sha256=d['identity']['config_sha256'])
+    out=StringIO()
+    op.gate(host['snapshot'],host['repo'],COMMIT,permit,now,StringIO('COMMIT\\n'),out)
+    rows=[json.loads(s) for s in out.getvalue().splitlines()]
+    receipt=rows[-1];ticket=op.load(host['root']/'operator-resume.authorized.json')
+    assert receipt['disk_reserve_correction'] is True and receipt['task_started'] is False
+    assert ticket['disk_reserve_correction'] is True and ticket['config_sha256']==op.digest(host['config'].read_bytes())
+    rebound=module.authority(host['root'],ticket['config_sha256'])
+    assert rebound['config_sha256']==ticket['config_sha256']
+    assert (host['root']/receipt['backup']/'continuous-authority.prior.json').exists()
+    assert op.load(host['root']/'hold.json')['reason']=='PILOT_STOP_DISK_RESERVE_LOW'
