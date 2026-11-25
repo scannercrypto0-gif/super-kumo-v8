@@ -226,9 +226,9 @@ def _daily(item, now):
         state, reason, age = _age_state(observed, now)
         last = doc.get("last_success") if type(doc.get("last_success")) is dict else {}
         failure = doc.get("last_failure")
-        failure_reason = (watchdog.safe_reason(failure.get("reason"))
+        failure_reason = (safe_reason(failure.get("reason"))
                           if type(failure) is dict else
-                          watchdog.safe_reason(failure) if type(failure) is str else None)
+                          safe_reason(failure) if type(failure) is str else None)
         receipt = last.get("daily_worker_receipt_sha256")
         if receipt is not None:
             require(watchdog.HEX64.fullmatch(receipt) is not None, "DAILY_RECEIPT_PIN_INVALID")
@@ -316,7 +316,7 @@ def _live(item, previous, now, clock_ok):
                     "confirmed_rollovers": doc.get("confirmed_rollovers") if type(doc.get("confirmed_rollovers")) is int else None,
                     "acceptance_ready": doc.get("acceptance_ready") if type(doc.get("acceptance_ready")) is bool else None,
                     "source_identity": identity,
-                    "hold_reason": watchdog.safe_reason(doc.get("hold_reason")) if doc.get("hold_reason") else None},
+                    "hold_reason": safe_reason(doc.get("hold_reason")) if doc.get("hold_reason") else None},
                 "scope": "WORK1_HANDOFF_REPORT_ONLY",
                 "evidence_grade": "OWNER_SUPPLIED_LIVE_REPORT_NOT_HOST_ATTESTED"}
     except Exception:
