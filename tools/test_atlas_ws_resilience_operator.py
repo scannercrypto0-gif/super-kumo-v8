@@ -972,7 +972,7 @@ def test_disk_reserve_correction_rebinds_valid_prior_grant_after_config_relocati
         allow_explicit_missing_intervals=True,disk_reserve_correction=True,
         expected_previous_config_sha256=d['identity']['config_sha256'])
     out=StringIO()
-    op.gate(host['snapshot'],host['repo'],COMMIT,permit,now,StringIO('COMMIT\\n'),out)
+    op.gate(host['snapshot'],host['repo'],COMMIT,permit,now,StringIO('COMMIT\n'),out)
     rows=[json.loads(s) for s in out.getvalue().splitlines()]
     receipt=rows[-1];ticket=op.load(host['root']/'operator-resume.authorized.json')
     assert receipt['disk_reserve_correction'] is True and receipt['task_started'] is False
