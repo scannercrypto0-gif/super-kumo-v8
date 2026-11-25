@@ -574,7 +574,7 @@ def test_missing_schema_locked_database_and_reader_rollback(tmp_path):
     locker = sqlite3.connect(source, timeout=1)
     locker.execute("PRAGMA journal_mode=DELETE")
     locker.execute("BEGIN EXCLUSIVE")
-    with pytest.raises(ValueError, match="FEED_DATABASE_INVALID"):
+    with pytest.raises(ValueError, match="FEED_DATABASE_BUSY"):
         _project(source, symbol="BTCUSDT", start_ms=start, end_ms=end,
                  now_ms=end+1_000)
     locker.rollback()
