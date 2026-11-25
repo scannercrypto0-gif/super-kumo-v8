@@ -24,7 +24,7 @@ def test_trade_quote_final_bar_and_gap_are_durable(tmp_path):
     try:
         trade = {"e":"trade","s":"BTCUSDT","t":7,"p":"90000.10","q":"0.01","T":60001,"m":False}
         assert store.ingest(json.dumps({"stream":"btcusdt@trade","data":trade}), 60002) == "trade"
-        quote = {"e":"bookTicker","s":"BTCUSDT","u":8,"b":"90000.00","B":"1","a":"90001.00","A":"2"}
+        quote = {"s":"BTCUSDT","u":8,"b":"90000.00","B":"1","a":"90001.00","A":"2"}
         assert store.ingest(json.dumps(quote), 60003) == "bookTicker"
 
         def bar(open_ms, close, final=True):
