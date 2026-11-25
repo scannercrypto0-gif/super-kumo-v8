@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -133,6 +134,7 @@ def history_view(doc: dict) -> dict:
 def daily_view(doc: dict, import_receipt: dict, source_receipt: dict,
                registry: dict, import_pin: str) -> dict:
     require(doc.get("schema") == "aql.recurring-runtime.health.v1"
+            and doc.get("source_cadence") == "DAILY_UTC"
             and doc.get("trading_authority") == "NONE"
             and doc.get("current_entry") == "NO_CURRENT_ENTRY", "DAILY_CONTRACT")
     observed = doc.get("observed_at_ms")
@@ -142,6 +144,7 @@ def daily_view(doc: dict, import_receipt: dict, source_receipt: dict,
     source_body = {key: value for key, value in source_receipt.items() if key != "receipt_sha256"} \
         if type(source_receipt) is dict else {}
     source_pin = source_receipt.get("source_zip_sha256") if type(source_receipt) is dict else None
+    source_key = source_receipt.get("key") if type(source_receipt) is dict else None
     source_seal_ok = (type(source_pin) is str and HEX64.fullmatch(source_pin)
                       and source_receipt.get("receipt_sha256") == digest(canonical(source_body))
                       and source_receipt.get("publisher_integrity") == "ZIP_CHECKSUM_MATCH"
@@ -156,6 +159,7 @@ def daily_view(doc: dict, import_receipt: dict, source_receipt: dict,
     latest = run_rows[-1] if run_rows else None
     registry_link = any(row.get("source_zip_sha256") == source_pin
                         and row.get("source_receipt_sha256") == source_receipt.get("receipt_sha256")
+                        and row.get("key") == source_key
                         for row in registry.get("sources", []))
     report_contract = (import_receipt.get("schema") == "aql.research.warehouse-report.v1"
                        or import_receipt.get("status") == "ARCHIVE_IMPORTED")
@@ -165,24 +169,26 @@ def daily_view(doc: dict, import_receipt: dict, source_receipt: dict,
                            and type(worker_receipts) is list and len(worker_receipts) == 1
                            and type(worker_receipt) is str and HEX64.fullmatch(worker_receipt)
                            and worker_receipts[0] == worker_receipt)
-    legacy_receipt_link = (success.get("warehouse_receipt_sha256") == import_pin
-                           if type(success) is dict and success.get("warehouse_receipt_sha256") is not None
-                           else import_receipt.get("schema") == "aql.research.warehouse-report.v1")
-    receipt_link = native_receipt_link or legacy_receipt_link
-    health_source_link = (type(success) is dict
+    source_day_ms = success.get("source_day_ms") if type(success) is dict else None
+    source_day_valid = (type(source_day_ms) is int and source_day_ms > 0
+                        and source_day_ms % 86_400_000 == 0)
+    archive_matches_day = False
+    if source_day_valid and type(source_key) is str:
+        archive_date = datetime.fromtimestamp(source_day_ms / 1000, timezone.utc).strftime("%Y-%m-%d")
+        archive_matches_day = source_key.rsplit("/", 1)[-1] == f"BTCUSDT-1m-{archive_date}.zip"
+    health_source_link = (type(success) is dict and source_day_valid and archive_matches_day
                           and success.get("source_zip_sha256") == source_pin
                           and success.get("checksum_sha256") == source_receipt.get("checksum_sha256")
-                          and (native_receipt_link or legacy_receipt_link))
+                          and native_receipt_link)
     linked = bool(report_contract
                   and type(latest) is dict and latest.get("source_sha256") == source_pin
-                  and latest.get("key") == source_receipt.get("key") and source_seal_ok
-                  and registry_link and type(success) is dict
-                  and type(success.get("source_day_ms")) is int and receipt_link and health_source_link)
+                  and latest.get("key") == source_key and source_seal_ok
+                  and registry_link and health_source_link)
     last_success = None
     if linked:
-        last_success = dict(source_day_ms=success["source_day_ms"], source_zip_sha256=source_pin,
+        last_success = dict(source_day_ms=source_day_ms, source_zip_sha256=source_pin,
                             checksum_sha256=source_receipt["checksum_sha256"],
-                            daily_worker_receipt_sha256=worker_receipt if native_receipt_link else None,
+                            daily_worker_receipt_sha256=worker_receipt,
                             warehouse_receipt_sha256=import_pin,
                             source_receipt_sha256=source_receipt["receipt_sha256"],
                             source_rows=source_receipt.get("rows"), inserted_rows=latest.get("inserted_rows"))
