@@ -24,6 +24,7 @@ jobs:
         os: [windows-latest, ubuntu-latest]
         python: ["3.12", "3.13"]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,15 +32,21 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: scannercrypto0-gif/super-kumo-v8
-          ref: 5df7f6c9e0d6448db6aa700fa80158b443c5b3db
+          ref: ae60b3e367241fec14753ac78e08147603b7af84
           path: .integration/warehouse
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: 9d9e873fbaba8742280846285bd0b5db154ec455
+          path: .integration/watchdog
           persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
       - run: python -m pip install -r tools/realtime_market_feed/requirements.txt pytest
       - name: Run feed and integration fixture suites
-        run: python -m pytest --timeout=60 tools/realtime_market_feed/test_service.py tools/realtime_market_feed/test_backfill.py tools/realtime_market_feed/test_atlas_integration.py -q
+        run: python -m pytest --timeout=60 tools/realtime_market_feed/test_service.py tools/realtime_market_feed/test_backfill.py tools/realtime_market_feed/test_atlas_integration.py tools/realtime_market_feed/test_acceptance_gates.py -q
       - name: Build machine-readable isolated evidence
         run: python -B -m tools.realtime_market_feed.integration_acceptance --output integration-evidence.json
       - uses: actions/upload-artifact@v4
