@@ -474,6 +474,7 @@ class MCPServer:
             data = json.loads(json.dumps(base))
             observed = data.get("observed_at_ms")
             age = wall_ms - observed if type(observed) is int else None
+            early_profile = getattr(self.reader, "profile", "strict") == "early"
             protected_status = data.get("status") in {"HELD", "FAILED"}
             uncertainty = data.get("clock_uncertainty_ms")
             clock_bad = (self._clock_poisoned or age is None or age < 0 or
@@ -481,19 +482,24 @@ class MCPServer:
             stale = age is not None and age > MAX_SNAPSHOT_AGE_MS
             data["request_freshness"] = {"checked_at_ms": wall_ms, "snapshot_age_ms": age,
                 "max_snapshot_age_ms": MAX_SNAPSHOT_AGE_MS, "clock_valid": not clock_bad}
-            if not protected_status and data.get("status") in {"HEALTHY", "EXPECTED_WAIT"} and clock_bad:
+            claim_states = {"HEALTHY", "EXPECTED_WAIT", "HEALTHY_PROGRESS"}
+            if (not protected_status and early_profile and stale):
+                data.update(status="STALE", reason="SNAPSHOT_TTL_EXCEEDED",
+                            refusal_reason="SNAPSHOT_TTL_EXCEEDED")
+            elif not protected_status and data.get("status") in claim_states and clock_bad:
                 data.update(status="UNKNOWN", reason="CLOCK_OR_TIMESTAMP_UNTRUSTED",
                             refusal_reason="EVIDENCE_UNAVAILABLE")
-            elif not protected_status and data.get("status") in {"HEALTHY", "EXPECTED_WAIT"} and stale:
+            elif not protected_status and data.get("status") in claim_states and stale:
                 data.update(status="STALE", reason="SNAPSHOT_TTL_EXCEEDED",
                             refusal_reason="SNAPSHOT_TTL_EXCEEDED")
             for lane in data.get("lanes", {}).values():
                 if lane.get("status") in {"HELD", "FAILED"}:
                     continue
-                if clock_bad and lane.get("status") in {"HEALTHY", "EXPECTED_WAIT"}:
+                if clock_bad and lane.get("status") in claim_states:
                     lane.update(status="UNKNOWN", reason="CLOCK_OR_TIMESTAMP_UNTRUSTED",
                                 refusal_reason="EVIDENCE_UNAVAILABLE")
-                elif stale and lane.get("status") in {"HEALTHY", "EXPECTED_WAIT"}:
+                elif stale and (lane.get("status") in claim_states or
+                                (early_profile and lane.get("source_file_sha256"))):
                     lane.update(status="STALE", reason="SNAPSHOT_TTL_EXCEEDED",
                                 refusal_reason="SNAPSHOT_TTL_EXCEEDED")
             return data
