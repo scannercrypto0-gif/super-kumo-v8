@@ -353,6 +353,14 @@ class EarlyObservationTests(unittest.TestCase):
         self.assertLessEqual(result["measurements"]["refresh_cpu_ms"], early.MAX_REFRESH_CPU_MS)
         self.assertLess(peak, 32 * 1024 * 1024)
         self.assertLessEqual(result["measurements"]["input_bytes"], early.MAX_TOTAL_BYTES)
+        print("EARLY_RESOURCE_METRICS " + json.dumps({
+            "input_files": result["measurements"]["input_files"],
+            "input_bytes": result["measurements"]["input_bytes"],
+            "refresh_wall_ms": elapsed_ms,
+            "refresh_cpu_ms": result["measurements"]["refresh_cpu_ms"],
+            "python_peak_bytes": peak,
+            "fixture_limit_python_peak_bytes": 32 * 1024 * 1024,
+        }, sort_keys=True))
 
     def test_linked_inputs_and_path_traversal_fail_closed(self):
         with tempfile.TemporaryDirectory() as folder:
