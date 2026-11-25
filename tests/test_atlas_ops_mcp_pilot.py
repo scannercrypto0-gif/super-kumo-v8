@@ -180,7 +180,7 @@ class McpPilotTests(unittest.TestCase):
             ]
             command = [sys.executable, "-B", str(ROOT / "tools" / "atlas_mcp_pilot.py"),
                        "--manifest", str(manifest), "--manifest-sha256", pin]
-            result = subprocess.run(command, input="".join(json.dumps(row) + "\\n" for row in requests),
+            result = subprocess.run(command, input="".join(json.dumps(row) + "\n" for row in requests),
                                     capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stderr)
             responses = [json.loads(line) for line in result.stdout.splitlines()]
@@ -199,7 +199,7 @@ class McpPilotTests(unittest.TestCase):
                          ["STALE", "UNKNOWN", "HELD"])
         for view in (health, *tool_lanes, *resource_views):
             self.assertEqual(view["trading_authority"], "NONE")
-            self.assertNotIn("C:\\\\private", json.dumps(view))
+            self.assertNotIn("C:\\private", json.dumps(view))
             self.assertNotIn("raw_candles", json.dumps(view))
 
     def test_modern_and_legacy_protocol_read_only_surface(self):
