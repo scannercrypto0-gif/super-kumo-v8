@@ -47,7 +47,7 @@ def feed(path, *, start=START, count=1, stale=False, changed=None, symbol="BTCUS
     return start, start + count * 60_000
 
 
-def _daily(root, *, changed=None):
+def _project(database, **kwargs):\n    return project_feed_window(database, **kwargs, allow_synthetic_fixture=True)\n\n\ndef _daily(root, *, changed=None):
     w = HistoricalWarehouse(root, reserve=0, test_root=True)
     raw, check = daily_fixture(count=15, changed=changed)
     with w.writer():
@@ -209,9 +209,9 @@ def test_daily_overlap_proposal_is_read_only_and_hash_pinned(tmp_path):
     assert match["status"] == "MATCH_IDEMPOTENT"
     assert aggregate_match["status"] == "MATCH_IDEMPOTENT"
     assert match["duplicate_insert"] is False and match["write_performed"] is False
-    proposal = build_registry_proposal(aggregate_match, registry)
+    proposal = build_registry_proposal(aggregate_match, daily_context_15m)
     assert proposal["status"] == "PROPOSED_ONLY"
-    assert proposal["registry_mutation"] is False
+    assert proposal["registry_mutation"] is False\n    assert proposal["evidence_class"] == "GENERATED_SYNTHETIC_FIXTURE"
     assert _bytes(wh.root) == before
 
 
@@ -223,7 +223,7 @@ def test_daily_ohlcv_conflict_and_missing_realtime_produce_proposals_not_repairs
                            end_ms=end, now_ms=end+1_000, engineering_test_only=True)
     with ResearchBarStore(copied) as store:
         live = store.read("BTCUSDT", "1m", START)
-    wh, historical, registry = _daily(tmp_path / "warehouse", changed=2)
+    wh, historical, registry, daily_context = _daily(tmp_path / "warehouse", changed=2)
     # Same UTC key, but source OHLCV differs; originals stay untouched.
     daily_conflict = wh.query("1m", START+120_000, START+180_000,
                               cutoff_ms=START+DAY)[0]
@@ -234,7 +234,7 @@ def test_daily_ohlcv_conflict_and_missing_realtime_produce_proposals_not_repairs
     missing = reconcile_daily_bar(None, historical)
     assert missing["status"] == "MISSING_REALTIME"
     assert missing["recovery"] == "AUTHORIZED_BOUNDED_RECOVERY_REQUIRED"
-    assert build_registry_proposal(conflict, registry)["warehouse_mutation"] is False
+    assert build_registry_proposal(conflict, daily_context_conflict)["warehouse_mutation"] is False\n    assert build_registry_proposal(missing, daily_context)["status"] == "PROPOSED_ONLY"
 
 
 def test_missing_provenance_and_tampered_registry_fail_closed(tmp_path):
@@ -244,7 +244,7 @@ def test_missing_provenance_and_tampered_registry_fail_closed(tmp_path):
         live = store.insert_1m({"symbol":"BTCUSDT","interval":"1m","open_ms":start,
             "final":True,"o":"1","h":"2","l":"1","c":"1","v":"3",
             "source_sha256":"0"*64,"available_at_ms":end})
-    wh, daily, registry = _daily(tmp_path / "warehouse")
+    wh, daily, registry, daily_context = _daily(tmp_path / "warehouse")
     with pytest.raises(ValueError, match="SOURCE_PROVENANCE_REQUIRED"):
         reconcile_daily_bar(dict(live, constituent_sha256=[]), daily)
     bad = dict(registry, snapshot_sha256="f"*64)
@@ -295,9 +295,9 @@ def test_utc_day_boundary_and_registry_provenance(tmp_path):
     copied = tmp_path / "research.sqlite"
     copy_to_research_store(source, copied, symbol="BTCUSDT", start_ms=start,
                            end_ms=end, now_ms=end+1_000, engineering_test_only=True)
-    wh, daily, registry = _daily(tmp_path / "warehouse")
+    wh, daily, registry, daily_context = _daily(tmp_path / "warehouse")
     assert registry["event_watermark"] >= 1
-    assert registry["sources"][0]["source_zip_sha256"]
+    assert registry["sources"][0]["source_zip_sha256"]\n    assert daily_context["registry"]["snapshot_sha256"] == registry["snapshot_sha256"]
     with ResearchBarStore(copied) as store:
         realtime = store.read("BTCUSDT", "1m", START)
-    assert reconcile_daily_bar(realtime, daily)["status"] == "MATCH_IDEMPOTENT"
+    assert reconcile_daily_bar(realtime, daily)["status"] == "MATCH_IDEMPOTENT"\n    proposal = build_registry_proposal(reconcile_daily_bar(realtime, daily), daily_context)\n    assert proposal["status"] == "PROPOSED_ONLY"
