@@ -61,7 +61,11 @@ class Store:
           symbol TEXT PRIMARY KEY, bid TEXT NOT NULL, bid_qty TEXT NOT NULL,
           ask TEXT NOT NULL, ask_qty TEXT NOT NULL, update_id INTEGER NOT NULL,
           received_ms INTEGER NOT NULL);
-        CREATE TABLE IF NOT EXISTS latest_trade(\n          symbol TEXT PRIMARY KEY, trade_id INTEGER NOT NULL, price TEXT NOT NULL,\n          quantity TEXT NOT NULL, event_ms INTEGER NOT NULL, received_ms INTEGER NOT NULL,\n          buyer_is_maker INTEGER NOT NULL);\n        CREATE TABLE IF NOT EXISTS final_bar(
+        CREATE TABLE IF NOT EXISTS latest_trade(
+          symbol TEXT PRIMARY KEY, trade_id INTEGER NOT NULL, price TEXT NOT NULL,
+          quantity TEXT NOT NULL, event_ms INTEGER NOT NULL, received_ms INTEGER NOT NULL,
+          buyer_is_maker INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS final_bar(
           symbol TEXT NOT NULL, interval TEXT NOT NULL, open_ms INTEGER NOT NULL,
           close_ms INTEGER NOT NULL, open TEXT NOT NULL, high TEXT NOT NULL,
           low TEXT NOT NULL, close TEXT NOT NULL, volume TEXT NOT NULL,
@@ -91,7 +95,17 @@ class Store:
         symbol = str(data.get("s", "")).upper()
         if not symbol:
             raise ValueError("MISSING_SYMBOL")
-        if kind == "trade":\n            trade_id, event_ms = int(data["t"]), int(data["T"])\n            with self.db:\n                self.db.execute("""INSERT INTO latest_trade VALUES(?,?,?,?,?,?,?)\n                    ON CONFLICT(symbol) DO UPDATE SET trade_id=excluded.trade_id,\n                    price=excluded.price,quantity=excluded.quantity,event_ms=excluded.event_ms,\n                    received_ms=excluded.received_ms,buyer_is_maker=excluded.buyer_is_maker\n                    WHERE excluded.trade_id > latest_trade.trade_id""",\n                    (symbol,trade_id,str(data["p"]),str(data["q"]),event_ms,received_ms,int(bool(data["m"]))))\n            return "trade"\n        if kind == "bookTicker":
+        if kind == "trade":
+            trade_id, event_ms = int(data["t"]), int(data["T"])
+            with self.db:
+                self.db.execute("""INSERT INTO latest_trade VALUES(?,?,?,?,?,?,?)
+                    ON CONFLICT(symbol) DO UPDATE SET trade_id=excluded.trade_id,
+                    price=excluded.price,quantity=excluded.quantity,event_ms=excluded.event_ms,
+                    received_ms=excluded.received_ms,buyer_is_maker=excluded.buyer_is_maker
+                    WHERE excluded.trade_id > latest_trade.trade_id""",
+                    (symbol,trade_id,str(data["p"]),str(data["q"]),event_ms,received_ms,int(bool(data["m"]))))
+            return "trade"
+        if kind == "bookTicker":
             bid, ask = data.get("b"), data.get("a")
             bid_qty, ask_qty = data.get("B"), data.get("A")
             update_id = int(data["u"])
