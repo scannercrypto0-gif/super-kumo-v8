@@ -60,7 +60,7 @@ $expectedCode = '1f9a637aae21fee6dfd17c9a1cdcad969617916e'
 $head = (git -C $repo rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $head -cne $expectedCode) { throw 'EXACT_REVIEWED_CODE_REQUIRED' }
 $env:PYTHONPATH = Join-Path $repo 'src'
-& $py -B -m aql.warehouse.daily --root 'E:\\ATLAS\\DataWarehouse' --archive $archive --source-day-ms 1795478400000 --expected-zip-sha256 40ef687c70c5fd5cd52a35e372dfdc1a6c01d098ec79320977c383dce14e5fbc --expected-checksum-sha256 b3861ffa7a1fba395d874d3096c44f6e8bcd8b9cfc3cba7b175c119571845342
+& $py -B -m aql.warehouse.daily --root 'E:\ATLAS\DataWarehouse' --archive $archive --source-day-ms 1795478400000 --expected-zip-sha256 40ef687c70c5fd5cd52a35e372dfdc1a6c01d098ec79320977c383dce14e5fbc --expected-checksum-sha256 b3861ffa7a1fba395d874d3096c44f6e8bcd8b9cfc3cba7b175c119571845342
 if ($LASTEXITCODE -ne 0) { throw "DAILY_IMPORT_FAILED_$LASTEXITCODE" }
 ```
 
@@ -87,7 +87,7 @@ There is no destructive rollback command. Raw publisher originals and append-onl
 
 ## Isolated failure/recovery regression
 
-A generated temporary-warehouse test injects one I/O failure while publishing the source catalog receipt after the day shard is published. It asserts that the CLI path reports failure and has no false source receipt, then restores `write_once`, retries the identical pinned bytes through the same `import_one_retained` API, and verifies zero re-inserted rows, the genuine source receipt, Registry lineage and report receipt. It uses no network, host paths or owner data.
+A generated temporary-warehouse test injects one I/O failure while publishing the source catalog receipt after the day shard is published. It asserts that the same `import_one_retained` path used by the CLI fails without publishing a false source receipt, then restores `write_once` and retries the identical pinned bytes through that API, and verifies zero re-inserted rows, the genuine source receipt, Registry lineage and report receipt. It uses no network, host paths or owner data.
 
 ## Decision matrix
 
