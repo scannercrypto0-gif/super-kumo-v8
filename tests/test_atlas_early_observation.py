@@ -3,6 +3,8 @@ import json
 import subprocess
 import sys
 import tempfile
+import time
+import tracemalloc
 import unittest
 from pathlib import Path
 
@@ -247,6 +249,36 @@ class EarlyObservationTests(unittest.TestCase):
         self.assertEqual(responses[2]["result"]["structuredContent"]["status"], "UNKNOWN")
         self.assertEqual(responses[2]["result"]["structuredContent"]["trading_authority"], "NONE")
         self.assertEqual(responses[3]["result"]["contents"][0]["uri"], "atlas://runtime/health")
+
+    def test_fixture_resource_budget_is_measured_and_bounded(self):
+        with tempfile.TemporaryDirectory() as folder:
+            paths = paths_for(Path(folder), hist=history(), reg=registry(),
+                              day=daily(wait=True), ws=live())
+            tracemalloc.start()
+            started = time.perf_counter_ns()
+            result = self.build(paths)
+            elapsed_ms = (time.perf_counter_ns() - started) // 1_000_000
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+        self.assertLessEqual(elapsed_ms, early.MAX_REFRESH_WALL_MS)
+        self.assertLessEqual(result["measurements"]["refresh_cpu_ms"], early.MAX_REFRESH_CPU_MS)
+        self.assertLess(peak, 32 * 1024 * 1024)
+        self.assertLessEqual(result["measurements"]["input_bytes"], early.MAX_TOTAL_BYTES)
+
+    def test_linked_inputs_and_path_traversal_fail_closed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            original = write_doc(root, "daily-original", daily())
+            hard = root / "daily-hardlink.json"
+            try:
+                hard.hardlink_to(original)
+            except OSError:
+                self.skipTest("hard links unavailable on this runner")
+            result = self.build({"daily": hard})
+            self.assertEqual(result["lanes"]["daily"]["status"], "UNKNOWN")
+            self.assertIsNone(result["lanes"]["daily"]["source_file_sha256"])
+            with self.assertRaisesRegex(ValueError, "OUTPUT_PATH_TRAVERSAL"):
+                early.publish(Path("..") / "escape.json", self.build({}))
 
     def test_early_profile_contains_no_filesystem_or_market_database_access(self):
         source = (ROOT / "tools" / "atlas_early_observation.py").read_text(encoding="utf-8")
