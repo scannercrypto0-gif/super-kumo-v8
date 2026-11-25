@@ -184,7 +184,7 @@ class McpPilotTests(unittest.TestCase):
                                     capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stderr)
             responses = [json.loads(line) for line in result.stdout.splitlines()]
-        self.assertEqual(len(responses), 8)
+        self.assertEqual(len(responses), 9)
         health = responses[1]["result"]["structuredContent"]
         self.assertEqual(health["schema"], "atlas.mcp.health.v1")
         self.assertEqual(health["status"], "HELD")
