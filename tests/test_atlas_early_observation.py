@@ -194,6 +194,7 @@ class EarlyObservationTests(unittest.TestCase):
         snapshot["lanes"]["live"]["source_schema"] = secret
         snapshot["lanes"]["live"]["freshness"] = secret
         snapshot["lanes"]["live"]["reason"] = secret
+        snapshot["clock_uncertainty_ms"] = secret
         view = pilot.SnapshotReader.project_early(snapshot, "a" * 64)
         encoded = json.dumps(view, sort_keys=True)
         self.assertNotIn(secret, encoded)
@@ -204,6 +205,7 @@ class EarlyObservationTests(unittest.TestCase):
                          "UNRECOGNIZED")
         self.assertEqual(view["lanes"]["live"]["scope"], "WORK1_HANDOFF_REPORT_ONLY")
         self.assertEqual(view["lanes"]["live"]["provenance"]["source_schema"], "UNRECOGNIZED_SCHEMA")
+        self.assertIsNone(view["clock_uncertainty_ms"])
 
     def test_untrusted_report_fields_are_allowlisted_before_snapshot(self):
         secret = r"C:\\private\\credentials\\access_token.txt"
