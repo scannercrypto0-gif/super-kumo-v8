@@ -87,12 +87,6 @@ def test_one_pinned_daily_archive_reaches_watchdog_and_replay_is_idempotent(tmp_
     assert linked["last_success"]["daily_worker_receipt_sha256"] == worker
 
 
-@pytest.mark.parametrize("mutation,reason", [
-    ("day", "DAILY_ARCHIVE_DAY_MISMATCH"),
-    ("zip", "DAILY_INPUT_PIN_MISMATCH"),
-    ("checksum", "DAILY_INPUT_PIN_MISMATCH"),
-])
-
 def test_one_archive_retry_recovers_after_source_catalog_io_failure(tmp_path, monkeypatch):
     day_ms = 1_704_067_200_000
     archive, day_ms, zip_pin, checksum_pin = archive_fixture(
@@ -144,6 +138,11 @@ def test_one_archive_retry_recovers_after_source_catalog_io_failure(tmp_path, mo
     assert registry["physical_rows"] == 2
 
 
+@pytest.mark.parametrize("mutation,reason", [
+    ("day", "DAILY_ARCHIVE_DAY_MISMATCH"),
+    ("zip", "DAILY_INPUT_PIN_MISMATCH"),
+    ("checksum", "DAILY_INPUT_PIN_MISMATCH"),
+])
 def test_daily_identity_mismatch_fails_before_warehouse_admission(tmp_path, mutation, reason):
     day_ms = 1_704_067_200_000
     archive, day_ms, zip_pin, checksum_pin = archive_fixture(tmp_path / "retained", day_ms, rows=2)
