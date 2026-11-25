@@ -193,7 +193,7 @@ def test_missing_receipt_bad_utc_grid_and_incomplete_aggregation_fail_closed(tmp
     db.execute("UPDATE final_bar SET payload_sha256='missing' WHERE open_ms=?", (start,))
     db.commit()
     db.close()
-    with pytest.raises(ValueError, match="FEED_RECEIPT_INVALID"):
+    with pytest.raises(ValueError, match="FEED_LINEAGE_ROW_MISMATCH"):
         _project(source, symbol="BTCUSDT", start_ms=start,
                             end_ms=start+60_000, now_ms=start+61_000)
 
