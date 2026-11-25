@@ -27,6 +27,7 @@ MAX_REFRESH_CPU_MS = 1_000
 MIN_REFRESH_INTERVAL_MS = 300_000
 MAX_PREVIOUS_AGE_MS = 1_800_000
 MAX_SNAPSHOT_AGE_MS = 300_000
+MAX_REPORTED_RANGES = 32
 
 
 def require(ok, code):
@@ -83,6 +84,19 @@ def _load(path):
     return {"doc": doc, "pin": pin, "bytes": size, "reason": None, "attempted": True}
 
 
+def _safe_ranges(value, code):
+    if value is None:
+        return []
+    require(type(value) is list and len(value) <= MAX_REPORTED_RANGES, code)
+    result = []
+    for pair in value:
+        require(type(pair) is list and len(pair) == 2
+                and all(type(x) is int and x >= 0 for x in pair)
+                and pair[0] < pair[1], code)
+        result.append([pair[0], pair[1]])
+    return result
+
+
 def _age_state(observed, now):
     if type(observed) is not int or observed < 0:
         return "UNKNOWN", "SOURCE_TIME_MISSING", None
@@ -130,10 +144,14 @@ def _history(item, registry_item, previous, now, clock_ok):
                          if type(doc.get(k)) is int), None)
         state, reason, age = _age_state(observed, now)
         cursor = dict(view.get("counters", {}))
+        history_ranges = _safe_ranges(doc.get("unresolved_gap_ranges"), "HISTORY_RANGES_INVALID")
         registry = registry_item["doc"]
         reg_view = None
         if registry is not None:
             reg_view = watchdog.registry_view(registry)
+            registry_gaps = _safe_ranges(registry.get("internal_gaps"), "REGISTRY_RANGES_INVALID")
+            registry_unavailable = _safe_ranges(registry.get("archive_unavailable_boundaries"),
+                                                "REGISTRY_RANGES_INVALID")
             reg_age = registry.get("as_of_ms")
             rstate, _, _ = _age_state(reg_age, now)
             if rstate is not None:
@@ -173,14 +191,18 @@ def _history(item, registry_item, previous, now, clock_ok):
                     state, reason = "UNKNOWN", "SECOND_OBSERVATION_OR_SOURCE_LINK_REQUIRED"
         report = {"status": view.get("status"), "counters": cursor,
                   "unresolved_gaps": view.get("unresolved_gaps", 0),
+                  "unresolved_gap_ranges": history_ranges,
                   "source_obstacles": view.get("obstacles", 0),
+                  "registry_gap_ranges": registry_gaps if reg_view else [],
+                  "registry_unavailable_ranges": registry_unavailable if reg_view else [],
                   "registry_snapshot_sha256": reg_view["snapshot_sha256"] if reg_view else None}
         return {"lane": "history", "status": state, "reason": reason,
                 "observed_at_ms": observed, "source_schema": schema,
                 "source_file_sha256": item["pin"], "freshness": "FRESH" if age is not None and age <= MAX_SNAPSHOT_AGE_MS else state,
                 "age_ms": age, "progress_cursor": cursor,
                 "source_identity": view.get("continuation_ref_sha256"),
-                "reported": report, "evidence_grade": "OWNER_SUPPLIED_SEALED_REPORT_NOT_RECONCILED"}
+                "reported": report, "scope": "REPORT_ONLY_NO_PHYSICAL_REVALIDATION",
+                "evidence_grade": "OWNER_SUPPLIED_SEALED_REPORT_NOT_RECONCILED"}
     except Exception:
         return _unknown("history", "HISTORY_EVIDENCE_UNTRUSTED", item,
                         doc.get("schema"), doc.get("finished_ms"))
@@ -222,6 +244,7 @@ def _daily(item, now):
                     "source_freshness": doc.get("source_freshness"),
                     "last_success_source_day_ms": last.get("source_day_ms"),
                     "worker_receipt_sha256": receipt},
+                "scope": "WORKER_REPORT_IMPORT_REGISTRY_LINK_UNVERIFIED",
                 "evidence_grade": "OWNER_SUPPLIED_DAILY_WORKER_REPORT_IMPORT_UNVERIFIED"}
     except Exception:
         return _unknown("daily", "DAILY_EVIDENCE_UNTRUSTED", item, doc.get("schema"), observed)
@@ -237,7 +260,10 @@ def _live(item, previous, now, clock_ok):
         state, reason, age = _age_state(observed, now)
         config = doc.get("config_sha256")
         policy = doc.get("policy_sha256")
-        identity = (config, policy) if watchdog.HEX64.fullmatch(config or "") and watchdog.HEX64.fullmatch(policy or "") else None
+        identity = ({"config_sha256": config, "policy_sha256": policy}
+                    if watchdog.HEX64.fullmatch(config or "") and watchdog.HEX64.fullmatch(policy or "")
+                    else None)
+        missing_ranges = _safe_ranges(doc.get("missing_open_ranges"), "LIVE_RANGES_INVALID")
         cursor = {"last_committed_ms": view.get("last_committed_ms"),
                   "verified_receipts": view.get("verified_receipts"),
                   "last_receipt_sha256": view.get("last_receipt_sha256")}
@@ -252,7 +278,7 @@ def _live(item, previous, now, clock_ok):
         if state is None:
             old = _prior(previous, "live")
             old_cursor = old.get("progress_cursor", {}) if old else {}
-            same_source = old and identity is not None and old.get("source_identity") == list(identity)
+            same_source = old and identity is not None and old.get("source_identity") == identity
             advanced = (same_source and type(cursor["last_committed_ms"]) is int
                         and type(old_cursor.get("last_committed_ms")) is int
                         and cursor["last_committed_ms"] > old_cursor["last_committed_ms"]
@@ -272,7 +298,10 @@ def _live(item, previous, now, clock_ok):
                     "last_committed_ms": view.get("last_committed_ms"),
                     "last_receipt_fresh": view.get("last_receipt_fresh"),
                     "missing_ranges": view.get("missing_ranges"),
+                    "missing_open_ranges": missing_ranges,
+                    "source_identity": identity,
                     "hold_reason": watchdog.safe_reason(doc.get("hold_reason")) if doc.get("hold_reason") else None},
+                "scope": "WORK1_HANDOFF_REPORT_ONLY",
                 "evidence_grade": "OWNER_SUPPLIED_LIVE_REPORT_NOT_HOST_ATTESTED"}
     except Exception:
         return _unknown("live", "LIVE_EVIDENCE_UNTRUSTED", item, doc.get("schema"), doc.get("as_of_ms"))
