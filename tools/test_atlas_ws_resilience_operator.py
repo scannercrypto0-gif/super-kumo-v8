@@ -981,3 +981,20 @@ def test_disk_reserve_correction_rebinds_valid_prior_grant_after_config_relocati
     assert rebound['config_sha256']==ticket['config_sha256']
     assert (host['root']/receipt['backup']/'continuous-authority.prior.json').exists()
     assert op.load(host['root']/'hold.json')['reason']=='PILOT_STOP_DISK_RESERVE_LOW'
+def test_sustained_root_recovery_requires_exact_segment_failure_scope(host):
+    (host['root']/'hold.json').write_bytes(op.canonical(dict(reason='LIVE_SERVICE_SEGMENT_FAILED',slot_ms=SLOT)))
+    d=diagnostic(host)
+    scope=dict(continuous_research=True,continuity_policy_sha256=op.continuity_pin(),
+        allow_explicit_missing_intervals=True,expected_previous_config_sha256=d['identity']['config_sha256'])
+    with pytest.raises(ValueError,match='SUSTAINED_ROOT_CORRECTION_AUTHORITY_REQUIRED'):
+        op.authorize(authorization(host,**scope),d,host['now'])
+    permit=authorization(host,**scope,sustained_root_correction=True)
+    auth,_=op.authorize(permit,d,host['now'])
+    assert auth['sustained_root_correction'] is True
+    for bad in (
+        dict(**scope,sustained_root_correction=True,fresh_ping_correction=True),
+        dict(**scope,sustained_root_correction=True,disk_reserve_correction=True),
+        dict(**scope,sustained_root_correction=True,expected_previous_config_sha256='0'*64),
+    ):
+        with pytest.raises(ValueError):
+            op.authorize(authorization(host,**bad),d,host['now'])
