@@ -312,7 +312,7 @@ def _live(item, previous, now, clock_ok):
                 "observed_at_ms": observed, "source_schema": doc["schema"],
                 "source_file_sha256": item["pin"], "freshness": "FRESH" if age is not None and age <= MAX_SNAPSHOT_AGE_MS else state,
                 "age_ms": age, "progress_cursor": cursor,
-                "source_identity": list(identity) if identity else None,
+                "source_identity": identity,
                 "reported": {"source_class": doc.get("source_class"), "status": doc.get("status"),
                     "verified_receipts": view.get("verified_receipts"),
                     "last_committed_ms": view.get("last_committed_ms"),
