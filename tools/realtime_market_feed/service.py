@@ -92,6 +92,8 @@ class Store:
         envelope = json.loads(raw)
         data = envelope.get("data", envelope)
         kind = data.get("e")
+        if kind is None and {"u", "b", "B", "a", "A"}.issubset(data):
+            kind = "bookTicker"
         symbol = str(data.get("s", "")).upper()
         if not symbol:
             raise ValueError("MISSING_SYMBOL")
