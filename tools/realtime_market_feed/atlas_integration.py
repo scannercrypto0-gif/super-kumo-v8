@@ -42,6 +42,7 @@ def _decimal(value):
 def _feed_db(path):
     path = Path(path).resolve()
     _need(path.is_file(), "FEED_DATABASE_MISSING")
+    db = None
     try:
         db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
         db.row_factory = sqlite3.Row
@@ -52,7 +53,13 @@ def _feed_db(path):
             _need(required <= found, "FEED_SCHEMA_INCOMPATIBLE")
         return db
     except sqlite3.Error as exc:
+        if db is not None:
+            db.close()
         raise ValueError("FEED_DATABASE_INVALID") from exc
+    except Exception:
+        if db is not None:
+            db.close()
+        raise
 
 
 def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
