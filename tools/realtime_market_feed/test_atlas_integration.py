@@ -108,18 +108,15 @@ def test_finalized_feed_to_native_research_store_is_idempotent_and_read_only(tmp
     assert hashlib.sha256(source.read_bytes()).hexdigest() == before
 
 
-def test_integration_writer_is_disabled_without_test_only_switch(tmp_path):
+def test_production_adapter_has_no_writer_and_blocks_unverified_feed(tmp_path):
+    import tools.realtime_market_feed.atlas_integration as adapter
+
+    assert not hasattr(adapter, "copy_to_research_store")
     source = tmp_path / "feed.sqlite"
     start, end = feed(source)
-    with pytest.raises(ValueError, match="INTEGRATION_DISABLED"):
-        _copy_generated_fixture_to_research_store(source, tmp_path / "research.sqlite",
-                               symbol="BTCUSDT", start_ms=start, end_ms=end,
-                               now_ms=end+1_000)
-    outside = Path(__import__("tempfile").gettempdir()).parent / "forbidden.sqlite"
-    with pytest.raises(ValueError, match="ISOLATED_RESEARCH_STORE_REQUIRED"):
-        _copy_generated_fixture_to_research_store(source, outside, symbol="BTCUSDT",
-                               start_ms=start, end_ms=end, now_ms=end+1_000,
-                               engineering_test_only=True)
+    with pytest.raises(ValueError, match="FEED_SOURCE_LINEAGE_UNVERIFIED"):
+        project_feed_window(source, symbol="BTCUSDT", start_ms=start,
+                            end_ms=end, now_ms=end+1_000)
 
 
 def test_provisional_and_missing_symbol_fail_closed(tmp_path):
@@ -130,6 +127,10 @@ def test_provisional_and_missing_symbol_fail_closed(tmp_path):
                    "k":{"s":"BTCUSDT","i":"1m","x":False,"t":start,
                         "T":start+59_999,"o":"1","h":"2","l":"1","c":"1","v":"3","n":1}}
     assert store.ingest(json.dumps(provisional), received_ms=start+30_000) == "provisional_ignored"
+    store.db.execute("CREATE TABLE engineering_fixture(schema TEXT, fixture_id TEXT)")
+    store.db.execute("INSERT INTO engineering_fixture VALUES(?,?)",
+                     ("aql.realtime-feed.generated-fixture.v1", "generated-in-test-helper"))
+    store.db.commit()
     store.db.close()
     with pytest.raises(ValueError, match="SYMBOL_OR_WINDOW_MISSING"):
         _project(source, symbol="BTCUSDT", start_ms=start,
