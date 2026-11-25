@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import sqlite3
 import tempfile
+import time
 
 FEED_SCHEMA_COLUMNS = {
     "final_bar": {"symbol", "interval", "open_ms", "close_ms", "open", "high",
@@ -22,6 +23,7 @@ FEED_SCHEMA_COLUMNS = {
     "open_gap": {"symbol", "interval", "start_ms", "end_ms", "reason", "status"},
     "service_event": {"at_ms", "kind", "detail"},
     "engineering_fixture": {"schema", "fixture_id"},
+    "final_bar_lineage": {"symbol", "interval", "open_ms", "receipt_json", "receipt_sha256"},
 }
 HEX = re.compile(r"^[0-9a-f]{64}$")
 MINUTE_MS = 60_000
@@ -54,41 +56,51 @@ def _in_temp(path: Path) -> bool:
         return False
 
 
-def _feed_db(path, *, allow_synthetic_fixture=False):
+def _feed_db(path, *, allow_synthetic_fixture=False,
+             expected_producer_code_sha256=None, query_deadline=None):
     path = Path(path).resolve()
     _need(path.is_file(), "FEED_DATABASE_MISSING")
     if allow_synthetic_fixture:
         _need(_in_temp(path), "SYNTHETIC_SOURCE_OUTSIDE_TEMP")
+    if type(expected_producer_code_sha256) is not str or not HEX.fullmatch(
+            expected_producer_code_sha256):
+        raise ValueError("FEED_SOURCE_LINEAGE_UNVERIFIED")
     db = None
     try:
         db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=2.0)
         db.row_factory = sqlite3.Row
         db.execute("PRAGMA busy_timeout=2000")
-        # Every subsequent validation/read must share this same SQLite snapshot.
+        if query_deadline is not None:
+            db.set_progress_handler(
+                lambda: 1 if time.monotonic() >= query_deadline else 0, 500)
+        # Every integrity check/read uses this one immutable SQLite snapshot.
         db.execute("BEGIN")
         check = db.execute("PRAGMA quick_check").fetchone()[0]
         _need(check == "ok", "FEED_DATABASE_CORRUPT")
         tables = {r[0] for r in db.execute(
             "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "final_bar_lineage" not in tables:
+            raise ValueError("FEED_SOURCE_LINEAGE_UNVERIFIED")
         for table, required in FEED_SCHEMA_COLUMNS.items():
             if table == "engineering_fixture" and not allow_synthetic_fixture:
                 continue
-            _need(table in tables, "FEED_SCHEMA_INCOMPATIBLE")
             found = {r[1] for r in db.execute(f"PRAGMA table_info({table})")}
             _need(required <= found, "FEED_SCHEMA_INCOMPATIBLE")
-        if not allow_synthetic_fixture:
-            # Producer currently persists only the raw-event digest, not the raw
-            # bytes or a normalized-row receipt. A 64-hex string is not proof.
-            raise ValueError("FEED_SOURCE_LINEAGE_UNVERIFIED")
-        marker = db.execute(
-            "SELECT schema,fixture_id FROM engineering_fixture").fetchall()
-        _need(len(marker) == 1 and marker[0]["schema"] == _FIXTURE_SCHEMA
-              and marker[0]["fixture_id"] == "generated-in-test-helper",
-              "SYNTHETIC_FIXTURE_MARKER_INVALID")
+        if allow_synthetic_fixture:
+            marker = db.execute(
+                "SELECT schema,fixture_id FROM engineering_fixture").fetchall()
+            _need(len(marker) == 1 and marker[0]["schema"] == _FIXTURE_SCHEMA
+                  and marker[0]["fixture_id"] == "generated-in-test-helper",
+                  "SYNTHETIC_FIXTURE_MARKER_INVALID")
         return db
     except sqlite3.Error as exc:
         if db is not None:
             db.close()
+        if query_deadline is not None and time.monotonic() >= query_deadline:
+            raise ValueError("FEED_QUERY_BUDGET_EXCEEDED") from None
+        message = str(exc).lower()
+        if "locked" in message or "busy" in message:
+            raise ValueError("FEED_DATABASE_BUSY") from None
         raise ValueError("FEED_DATABASE_INVALID") from exc
     except Exception:
         if db is not None:
@@ -96,10 +108,85 @@ def _feed_db(path, *, allow_synthetic_fixture=False):
         raise
 
 
+def _verify_lineage(row, *, expected_producer_code_sha256):
+    try:
+        def unique(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError("FEED_LINEAGE_DUPLICATE_KEY")
+                result[key] = value
+            return result
+        body = json.loads(row["lineage_json"], object_pairs_hook=unique)
+        required = {
+            "schema", "producer_id", "producer_code_sha256", "provider", "market",
+            "symbol", "interval", "open_ms", "close_ms", "available_at_ms",
+            "finality", "ohlcv", "trades", "event_payload_sha256",
+            "replay_identity_sha256", "normalized_row_sha256",
+        }
+        _need(type(body) is dict and set(body) == required,
+              "FEED_LINEAGE_SCHEMA_INVALID")
+        _need(body["schema"] == "atlas.realtime-market-feed.normalized-bar-attestation.v1"
+              and body["producer_id"] == "atlas.realtime_market_feed.service.Store.ingest"
+              and body["producer_code_sha256"] == expected_producer_code_sha256,
+              "FEED_PRODUCER_IDENTITY_MISMATCH")
+        _need(body["provider"] == "BINANCE" and body["market"] == "SPOT"
+              and body["symbol"] == row["symbol"] and body["interval"] == row["interval"]
+              and body["interval"] == "1m" and body["open_ms"] == row["open_ms"]
+              and body["close_ms"] == row["close_ms"]
+              and body["available_at_ms"] == row["received_ms"]
+              and body["finality"] == "FINAL",
+              "FEED_LINEAGE_IDENTITY_MISMATCH")
+        ohlcv = {"o": row["open"], "h": row["high"], "l": row["low"],
+                 "c": row["close"], "v": row["volume"]}
+        _need(body["ohlcv"] == ohlcv and body["trades"] == row["trades"]
+              and body["event_payload_sha256"] == row["payload_sha256"],
+              "FEED_LINEAGE_ROW_MISMATCH")
+        _need(type(body["event_payload_sha256"]) is str
+              and HEX.fullmatch(body["event_payload_sha256"]) is not None,
+              "FEED_RECEIPT_INVALID")
+        normalized = {
+            "provider":body["provider"], "market":body["market"],
+            "symbol":body["symbol"], "interval":body["interval"],
+            "open_ms":body["open_ms"], "close_ms":body["close_ms"],
+            "available_at_ms":body["available_at_ms"], "finality":body["finality"],
+            "ohlcv":body["ohlcv"], "trades":body["trades"],
+            "event_payload_sha256":body["event_payload_sha256"],
+        }
+        _need(body["normalized_row_sha256"] == hashlib.sha256(
+                  json.dumps(normalized,sort_keys=True,separators=(",",":"),
+                             ensure_ascii=True,allow_nan=False).encode()).hexdigest(),
+              "FEED_NORMALIZED_ROW_DIGEST_MISMATCH")
+        replay = {key: body[key] for key in
+                  ("provider","market","symbol","interval","open_ms","close_ms",
+                   "event_payload_sha256")}
+        replay_sha = hashlib.sha256(json.dumps(replay,sort_keys=True,
+            separators=(",",":"),ensure_ascii=True,allow_nan=False).encode()).hexdigest()
+        _need(body["replay_identity_sha256"] == replay_sha,
+              "FEED_REPLAY_IDENTITY_MISMATCH")
+        canonical_body = json.dumps(body,sort_keys=True,separators=(",",":"),
+                                    ensure_ascii=True,allow_nan=False)
+        _need(row["lineage_json"] == canonical_body
+              and row["lineage_sha256"] == hashlib.sha256(canonical_body.encode()).hexdigest(),
+              "FEED_LINEAGE_SEAL_INVALID")
+        return body, row["lineage_sha256"]
+    except (KeyError, TypeError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        if isinstance(exc, ValueError) and str(exc).startswith("FEED_"):
+            raise
+        raise ValueError("FEED_LINEAGE_INVALID") from None
+
+
 def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
                         max_age_ms=120_000, max_bars=MAX_WINDOW_BARS,
-                        allow_synthetic_fixture=False):
-    """Read one coherent finalized 1m window; production feed lineage is blocked."""
+                        allow_synthetic_fixture=False,
+                        expected_producer_code_sha256=None,
+                        query_budget_ms=5_000, metrics=None):
+    """Read one coherent finalized 1m window and verify its pinned producer receipts.
+
+    Legacy rows without a forward-only normalized producer receipt remain blocked.
+    The receipt is a local producer attestation, not a Binance signature or rights
+    proof. The bounded read never writes the source database.
+    """
     _need(type(symbol) is str and symbol.isalnum() and symbol == symbol.upper(),
           "SYMBOL_REQUIRED")
     _need(all(type(x) is int and x >= 0 for x in (start_ms, end_ms, now_ms))
@@ -110,9 +197,21 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
     _need(end_ms <= now_ms, "WINDOW_NOT_FINAL")
     _need(type(max_age_ms) is int and 0 < max_age_ms <= DAY_MS,
           "FRESHNESS_BOUND")
+    _need(type(query_budget_ms) is int and 1 <= query_budget_ms <= 60_000,
+          "QUERY_BUDGET_INVALID")
+    if allow_synthetic_fixture and expected_producer_code_sha256 is None:
+        from tools.realtime_market_feed.service import PRODUCER_CODE_SHA256
+        expected_producer_code_sha256 = PRODUCER_CODE_SHA256
+    _need(type(expected_producer_code_sha256) is str
+          and HEX.fullmatch(expected_producer_code_sha256) is not None,
+          "FEED_SOURCE_LINEAGE_UNVERIFIED")
 
     from aql.research_timeframes import project_finalized_1m
-    db = _feed_db(database, allow_synthetic_fixture=allow_synthetic_fixture)
+    deadline = time.monotonic() + query_budget_ms / 1000
+    db = _feed_db(database, allow_synthetic_fixture=allow_synthetic_fixture,
+                  expected_producer_code_sha256=expected_producer_code_sha256,
+                  query_deadline=deadline)
+    read_started = time.monotonic()
     try:
         gaps = db.execute(
             """SELECT start_ms,end_ms,reason FROM open_gap
@@ -133,12 +232,22 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
             opened = int(match.group(1))
             _need(not start_ms <= opened < end_ms, "FEED_BAR_CONFLICT")
         rows = db.execute(
-            """SELECT symbol,interval,open_ms,close_ms,open,high,low,close,volume,
-                      received_ms,payload_sha256
-               FROM final_bar WHERE symbol=? AND interval='1m'
-                 AND open_ms>=? AND open_ms<? ORDER BY open_ms""",
+            """SELECT f.symbol,f.interval,f.open_ms,f.close_ms,f.open,f.high,f.low,f.close,
+                      f.volume,f.trades,f.received_ms,f.payload_sha256,
+                      l.receipt_json AS lineage_json,l.receipt_sha256 AS lineage_sha256
+               FROM final_bar AS f LEFT JOIN final_bar_lineage AS l
+                 ON l.symbol=f.symbol AND l.interval=f.interval AND l.open_ms=f.open_ms
+               WHERE f.symbol=? AND f.interval='1m' AND f.open_ms>=? AND f.open_ms<?
+               ORDER BY f.open_ms""",
             (symbol, start_ms, end_ms)).fetchall()
+        _need(time.monotonic() <= deadline, "FEED_QUERY_BUDGET_EXCEEDED")
+        snapshot_ms = round((time.monotonic() - read_started) * 1000, 3)
     except sqlite3.Error as exc:
+        if time.monotonic() >= deadline:
+            raise ValueError("FEED_QUERY_BUDGET_EXCEEDED") from None
+        message = str(exc).lower()
+        if "locked" in message or "busy" in message:
+            raise ValueError("FEED_DATABASE_BUSY") from None
         raise ValueError("FEED_DATABASE_INVALID") from exc
     finally:
         if db.in_transaction:
@@ -148,7 +257,9 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
     _need(rows, "SYMBOL_OR_WINDOW_MISSING")
     _need(len(rows) == count, "WINDOW_INCOMPLETE")
     normalized = []
+    decoded_source_bytes = 0
     for i, row in enumerate(rows):
+        _need(time.monotonic() <= deadline, "FEED_QUERY_BUDGET_EXCEEDED")
         opened = start_ms + i * MINUTE_MS
         _need(row["symbol"] == symbol and row["interval"] == "1m"
               and type(row["open_ms"]) is int and row["open_ms"] == opened
@@ -160,17 +271,23 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
               "FEED_RECEIPT_CLOCK_INVALID")
         if i == count - 1:
             _need(now_ms - received <= max_age_ms, "FEED_STALE")
-        receipt = row["payload_sha256"]
-        _need(type(receipt) is str and HEX.fullmatch(receipt) is not None,
-              "FEED_RECEIPT_INVALID")
+        body, receipt_sha = _verify_lineage(
+            row, expected_producer_code_sha256=expected_producer_code_sha256)
         values = {key: row[col] for key, col in
                   (("o", "open"), ("h", "high"), ("l", "low"),
                    ("c", "close"), ("v", "volume"))}
         o, h, l, c, v = (_decimal(values[k]) for k in ("o", "h", "l", "c", "v"))
         _need(l <= min(o, c) <= max(o, c) <= h, "OHLC_INVALID")
         normalized.append(dict(symbol=symbol, interval="1m", open_ms=opened,
-                               final=True, **values, source_sha256=receipt,
-                               available_at_ms=received))
+                               final=True, **values, source_sha256=receipt_sha,
+                               available_at_ms=body["available_at_ms"]))
+        decoded_source_bytes += len(row["lineage_json"].encode("utf-8")) + sum(
+            len(str(row[key]).encode("utf-8")) for key in
+            ("symbol","interval","open_ms","close_ms","open","high","low","close",
+             "volume","trades","received_ms","payload_sha256"))
+    if metrics is not None:
+        metrics.update({"selected_bars":len(rows), "decoded_source_bytes":decoded_source_bytes,
+                        "read_snapshot_ms":snapshot_ms, "query_budget_ms":query_budget_ms})
     return [project_finalized_1m([bar], "1m", source_class="FORWARD_UNQUALIFIED")
             for bar in normalized]
 
