@@ -1,0 +1,258 @@
+"""Bounded EARLY_OBSERVATION profile and local stdio contract tests."""
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+import atlas_early_observation as early
+import atlas_ops_watchdog as watchdog
+
+
+NOW = 20_000_000
+BOOT = "synthetic-test-boot"
+
+
+def sealed(doc, field):
+    body = dict(doc)
+    body.pop(field, None)
+    doc[field] = watchdog.digest(watchdog.canonical(body))
+    return doc
+
+
+def registry(now=NOW, watermark=10, rows=100):
+    return sealed({
+        "schema": "aql.warehouse.registry-snapshot.v1",
+        "version": 1,
+        "dataset_id": watchdog.DATASET,
+        "as_of_ms": now,
+        "event_watermark": watermark,
+        "event_head_sha256": "1" * 64,
+        "physical_rows": rows,
+        "first_open_ms": now - rows * 60_000,
+        "last_open_ms": now - 60_000,
+        "internal_gaps": [],
+        "archive_unavailable_boundaries": [],
+        "conflicts": [],
+        "sources": [{"source_zip_sha256": "2" * 64, "source_receipt_sha256": "3" * 64,
+                     "rows": rows, "first_open_ms": now - rows * 60_000,
+                     "last_open_ms": now - 60_000}],
+        "source_class": "RETROSPECTIVE_NON_PIT",
+        "trading_authority": "NONE",
+    }, "snapshot_sha256")
+
+
+def history(now=NOW, archives=4, rows=100):
+    return {
+        "schema": "aql.warehouse.full-history-continuation.v1",
+        "trading_authority": "NONE",
+        "full_history_verified": False,
+        "started_ms": now - 60_000,
+        "finished_ms": now,
+        "archives_imported": archives,
+        "inserted_rows": rows,
+        "all_published_partitions_ingested": False,
+        "source_scan_exhausted": False,
+        "latest_published_close_reached": False,
+        "unresolved_gap_ranges": [],
+        "unresolved_source_obstacles": [],
+        "continuation_ref": "immutable-continuation-token",
+        "status": "CONTINUING",
+    }
+
+
+def daily(now=NOW, *, wait=False):
+    return {
+        "schema": "aql.recurring-runtime.health.v1",
+        "source_cadence": "DAILY_UTC",
+        "trading_authority": "NONE",
+        "observed_at_ms": now,
+        "task_state": "Ready",
+        "scheduler_state": "Ready",
+        "runtime_state": "PIN_VERIFIED",
+        "cycle_evidence": "WAIT_FOR_SOURCE" if wait else "RECENT_RESEARCH_RECEIPT",
+        "source_freshness": "LATEST_DUE_DAY_RECEIVED",
+        "next_check_ms": now + 60_000 if wait else None,
+        "last_failure": None,
+        "last_success": {"status": "COMPLETE", "source_day_ms": now - 86_400_000,
+                         "daily_worker_receipt_sha256": "4" * 64},
+    }
+
+
+def live(now=NOW, *, hold=False, committed=None, receipts=2, receipt="5" * 64,
+         config="6" * 64):
+    return {
+        "schema": "atlas.ws.continuous-report.v1",
+        "source_class": "LIVE_CAPTURE",
+        "trading_authority": "NONE",
+        "orders": 0,
+        "status": "HELD" if hold else "OBSERVING_CONTINUOUS_ACCEPTANCE",
+        "hold_reason": "PILOT_STOP_SAMPLE_HOLD" if hold else None,
+        "as_of_ms": now,
+        "verified_receipts": receipts,
+        "last_committed_ms": committed if committed is not None else now - 60_000,
+        "last_receipt_fresh": not hold,
+        "verified_receipt_sha256": [receipt] * receipts,
+        "missing_open_ranges": [],
+        "config_sha256": config,
+        "policy_sha256": "7" * 64,
+    }
+
+
+def write_doc(root, name, doc):
+    path = root / f"{name}.json"
+    path.write_bytes(watchdog.canonical(doc))
+    return path
+
+
+def paths_for(root, *, hist=None, reg=None, day=None, ws=None, previous=None):
+    return {
+        "history": write_doc(root, "history", hist) if hist is not None else None,
+        "registry": write_doc(root, "registry", reg) if reg is not None else None,
+        "daily": write_doc(root, "daily", day) if day is not None else None,
+        "live": write_doc(root, "live", ws) if ws is not None else None,
+        "previous": previous,
+    }
+
+
+class EarlyObservationTests(unittest.TestCase):
+    def build(self, paths, now=NOW, mono=1_000_000_000, previous=None, uncertainty=100):
+        return early.build(paths, now_ms=now, monotonic_ns=mono, boot_id=BOOT,
+                           clock_uncertainty_ms=uncertainty, previous=previous)
+
+    def test_missing_reports_are_absence_unknown_not_fake_pins(self):
+        result = self.build({})
+        self.assertEqual(result["profile"], "EARLY_OBSERVATION")
+        self.assertEqual(result["state"], "UNKNOWN")
+        for lane in result["lanes"].values():
+            self.assertEqual(lane["status"], "UNKNOWN")
+            self.assertIsNone(lane["source_file_sha256"])
+        self.assertEqual(result["trading_authority"], "NONE")
+        self.assertFalse(result["source_paths_exposed"])
+
+    def test_worker_success_without_import_registry_link_stays_unknown(self):
+        with tempfile.TemporaryDirectory() as folder:
+            paths = paths_for(Path(folder), day=daily(wait=False))
+            result = self.build(paths)
+        self.assertEqual(result["lanes"]["daily"]["status"], "UNKNOWN")
+        self.assertEqual(result["lanes"]["daily"]["reason"], "DAILY_IMPORT_REGISTRY_LINK_NOT_SUPPLIED")
+
+    def test_expected_wait_requires_valid_next_check_and_clock(self):
+        with tempfile.TemporaryDirectory() as folder:
+            paths = paths_for(Path(folder), day=daily(wait=True))
+            result = self.build(paths)
+            self.assertEqual(result["lanes"]["daily"]["status"], "EXPECTED_WAIT")
+            uncertain = self.build(paths, uncertainty=None)
+        self.assertEqual(uncertain["lanes"]["daily"]["status"], "UNKNOWN")
+        self.assertEqual(uncertain["state"], "UNKNOWN")
+
+    def test_expired_and_future_reports_fail_closed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            stale_paths = paths_for(Path(folder), day=daily(now=NOW - early.MAX_SNAPSHOT_AGE_MS - 1))
+            stale = self.build(stale_paths)
+        self.assertEqual(stale["lanes"]["daily"]["status"], "STALE")
+        with tempfile.TemporaryDirectory() as folder:
+            future_paths = paths_for(Path(folder), day=daily(now=NOW + 1))
+            future = self.build(future_paths)
+        self.assertEqual(future["lanes"]["daily"]["status"], "UNKNOWN")
+        self.assertEqual(future["lanes"]["daily"]["reason"], "SOURCE_TIME_IN_FUTURE")
+
+    def test_held_live_precedence_survives_other_unknown_lanes(self):
+        with tempfile.TemporaryDirectory() as folder:
+            paths = paths_for(Path(folder), ws=live(hold=True))
+            result = self.build(paths)
+        self.assertEqual(result["lanes"]["live"]["status"], "HELD")
+        self.assertEqual(result["state"], "HELD")
+
+    def test_two_observations_report_only_committed_progress_for_same_sources(self):
+        with tempfile.TemporaryDirectory() as first_dir, tempfile.TemporaryDirectory() as second_dir:
+            first_paths = paths_for(Path(first_dir), hist=history(), reg=registry(),
+                                    day=daily(wait=True), ws=live())
+            first = self.build(first_paths)
+            now2 = NOW + early.MIN_REFRESH_INTERVAL_MS
+            second_paths = paths_for(Path(second_dir),
+                hist=history(now2, archives=5, rows=140),
+                reg=registry(now2, watermark=11, rows=140),
+                day=daily(now2, wait=True),
+                ws=live(now2, committed=now2 - 30_000, receipts=3, receipt="8" * 64))
+            second = self.build(second_paths, now=now2, mono=2_000_000_000,
+                                previous=first)
+        self.assertEqual(second["lanes"]["history"]["status"], "HEALTHY_PROGRESS")
+        self.assertEqual(second["lanes"]["live"]["status"], "HEALTHY_PROGRESS")
+        self.assertEqual(second["lanes"]["daily"]["status"], "EXPECTED_WAIT")
+        self.assertEqual(second["state"], "HEALTHY_PROGRESS")
+
+    def test_live_source_change_is_not_same_session_progress(self):
+        with tempfile.TemporaryDirectory() as first_dir, tempfile.TemporaryDirectory() as second_dir:
+            first_paths = paths_for(Path(first_dir), ws=live())
+            first = self.build(first_paths)
+            now2 = NOW + early.MIN_REFRESH_INTERVAL_MS
+            second_paths = paths_for(Path(second_dir),
+                ws=live(now2, committed=now2 - 1_000, receipts=3, receipt="9" * 64, config="a" * 64))
+            second = self.build(second_paths, now=now2, mono=2_000_000_000, previous=first)
+        self.assertEqual(second["lanes"]["live"]["status"], "UNKNOWN")
+        self.assertEqual(second["lanes"]["live"]["reason"], "SECOND_OBSERVATION_OR_SESSION_LINK_REQUIRED")
+
+    def test_malformed_duplicate_key_is_unknown_without_untrusted_pin(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "daily.json"
+            path.write_text('{"schema":"a","schema":"b"}', encoding="utf-8")
+            result = self.build({"daily": path})
+        self.assertEqual(result["lanes"]["daily"]["status"], "UNKNOWN")
+        self.assertIsNone(result["lanes"]["daily"]["source_file_sha256"])
+
+    def test_input_and_total_budgets_refuse_oversized_files(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "large.json"
+            path.write_bytes(b" " * (early.MAX_FILE_BYTES + 1))
+            with self.assertRaisesRegex(ValueError, "INPUT_BUDGET_EXCEEDED"):
+                self.build({"daily": path})
+
+    def test_create_only_output_and_profile_manifest_stdio(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            snapshot = self.build({})
+            snap_path = root / "early.json"
+            early.publish(snap_path, snapshot)
+            with self.assertRaisesRegex(ValueError, "OUTPUT_CREATE_ONLY_PATH_REQUIRED"):
+                early.publish(snap_path, snapshot)
+            manifest = root / "manifest.json"
+            made = subprocess.run([sys.executable, "-B", str(ROOT / "tools" / "atlas_mcp_manifest.py"),
+                                   "--profile", "early", "--snapshot", str(snap_path),
+                                   "--output", str(manifest)], capture_output=True, text=True, timeout=10)
+            self.assertEqual(made.returncode, 0, made.stderr)
+            pin = made.stdout.strip()
+            requests = [
+                {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                 "params": {"protocolVersion": "2025-11-25", "capabilities": {},
+                            "clientInfo": {"name": "early-fixture", "version": "1"}}},
+                {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+                {"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+                 "params": {"name": "atlas.runtime.health", "arguments": {}}},
+                {"jsonrpc": "2.0", "id": 4, "method": "resources/read",
+                 "params": {"uri": "atlas://runtime/health"}},
+            ]
+            proc = subprocess.run([sys.executable, "-B", str(ROOT / "tools" / "atlas_mcp_pilot.py"),
+                                   "--manifest", str(manifest), "--manifest-sha256", pin],
+                                  input="".join(json.dumps(x) + "\n" for x in requests),
+                                  capture_output=True, text=True, timeout=10)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            responses = [json.loads(line) for line in proc.stdout.splitlines()]
+        self.assertEqual(len(responses), 4)
+        self.assertEqual(responses[2]["result"]["structuredContent"]["schema"],
+                         "atlas.mcp.early-observation.v1")
+        self.assertEqual(responses[2]["result"]["structuredContent"]["status"], "UNKNOWN")
+        self.assertEqual(responses[2]["result"]["structuredContent"]["trading_authority"], "NONE")
+        self.assertEqual(responses[3]["result"]["contents"][0]["uri"], "atlas://runtime/health")
+
+    def test_early_profile_contains_no_filesystem_or_market_database_access(self):
+        source = (ROOT / "tools" / "atlas_early_observation.py").read_text(encoding="utf-8")
+        for denied in ("sqlite3", "subprocess", "socket", "os.walk", "glob("):
+            self.assertNotIn(denied, source)
+
+
+if __name__ == "__main__":
+    unittest.main()
