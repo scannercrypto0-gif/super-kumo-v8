@@ -360,10 +360,29 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
     if correction:
         need(not (root/'operator-recovery.active.json').exists(),'FRESH_PING_ACTIVE_RECOVERY_REVIEW_REQUIRED')
         module=continuity_module()
-        need(module.authority(root,diagnostic['identity']['config_sha256']) is not None,
-             'FRESH_PING_PRIOR_CONTINUITY_AUTHORITY_REQUIRED')
-        need(not module.next_action(root,diagnostic['identity']['config_sha256'],now)['circuit_open'],
-             'FRESH_PING_EXISTING_CIRCUIT_WINDOW_NOT_EXPIRED')
+        current_pin=diagnostic['identity']['config_sha256']
+        if disk_correction:
+            try:
+                prior=module.authority(root,current_pin)
+            except ValueError as exc:
+                if str(exc)!='CONTINUITY_CONFIG_PIN':raise
+                # E-drive relocation changes config bytes. Permit a one-time
+                # rebind only when the prior claimed continuous grant remains
+                # valid and activation still pins that same prior config.
+                prior=module.authority(root,allow_stale_config=True)
+                activation=load(root/'activation.json')
+                need(prior is not None and prior['config_sha256']!=current_pin and
+                     activation.get('config_sha256')==prior['config_sha256'],
+                     'MIGRATED_CONTINUITY_AUTHORITY_NOT_PROVEN')
+            need(prior is not None,'FRESH_PING_PRIOR_CONTINUITY_AUTHORITY_REQUIRED')
+            if prior['config_sha256']==current_pin:
+                need(not module.next_action(root,current_pin,now)['circuit_open'],
+                     'FRESH_PING_EXISTING_CIRCUIT_WINDOW_NOT_EXPIRED')
+        else:
+            need(module.authority(root,current_pin) is not None,
+                 'FRESH_PING_PRIOR_CONTINUITY_AUTHORITY_REQUIRED')
+            need(not module.next_action(root,current_pin,now)['circuit_open'],
+                 'FRESH_PING_EXISTING_CIRCUIT_WINDOW_NOT_EXPIRED')
     need(not marker.exists() and not (root/'operator-resume.authorized.json').exists()
          and (continuous or not (root/'operator-recovery.active.json').exists())
          and (correction or not (root/'continuous-research.authorized.json').exists()), 'OPERATOR_STAGE_ALREADY_PRESENT')
