@@ -339,10 +339,23 @@ class EarlyObservationTests(unittest.TestCase):
                  "params": {"protocolVersion": "2025-11-25", "capabilities": {},
                             "clientInfo": {"name": "early-fixture", "version": "1"}}},
                 {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
-                {"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+                {"jsonrpc": "2.0", "id": 3, "method": "resources/list", "params": {}},
+                {"jsonrpc": "2.0", "id": 4, "method": "tools/call",
                  "params": {"name": "atlas.runtime.health", "arguments": {}}},
-                {"jsonrpc": "2.0", "id": 4, "method": "resources/read",
+                {"jsonrpc": "2.0", "id": 5, "method": "tools/call",
+                 "params": {"name": "atlas.lane.latest", "arguments": {"lane": "live"}}},
+                {"jsonrpc": "2.0", "id": 6, "method": "resources/read",
                  "params": {"uri": "atlas://runtime/health"}},
+                {"jsonrpc": "2.0", "id": 7, "method": "resources/read",
+                 "params": {"uri": "atlas://lane/history"}},
+                {"jsonrpc": "2.0", "id": 8, "method": "resources/read",
+                 "params": {"uri": "atlas://lane/daily"}},
+                {"jsonrpc": "2.0", "id": 9, "method": "resources/read",
+                 "params": {"uri": "atlas://lane/live"}},
+                {"jsonrpc": "2.0", "id": 10, "method": "tools/call",
+                 "params": {"name": "atlas.source.write", "arguments": {"path": "private-file"}}},
+                {"jsonrpc": "2.0", "id": 11, "method": "resources/read",
+                 "params": {"uri": "file:///private/credential.txt"}},
             ]
             proc = subprocess.run([sys.executable, "-B", str(ROOT / "tools" / "atlas_mcp_pilot.py"),
                                    "--manifest", str(manifest), "--manifest-sha256", pin],
@@ -350,12 +363,22 @@ class EarlyObservationTests(unittest.TestCase):
                                   capture_output=True, text=True, timeout=10)
             self.assertEqual(proc.returncode, 0, proc.stderr)
             responses = [json.loads(line) for line in proc.stdout.splitlines()]
-        self.assertEqual(len(responses), 4)
-        self.assertEqual(responses[2]["result"]["structuredContent"]["schema"],
+        self.assertEqual(len(responses), 11)
+        listed_tools = {item["name"] for item in responses[1]["result"]["tools"]}
+        self.assertEqual(listed_tools, {"atlas.runtime.health", "atlas.lane.latest"})
+        listed_resources = {item["uri"] for item in responses[2]["result"]["resources"]}
+        self.assertEqual(listed_resources, {
+            "atlas://runtime/health", "atlas://lane/history",
+            "atlas://lane/daily", "atlas://lane/live"})
+        self.assertEqual(responses[3]["result"]["structuredContent"]["schema"],
                          "atlas.mcp.early-observation.v1")
-        self.assertEqual(responses[2]["result"]["structuredContent"]["status"], "UNKNOWN")
-        self.assertEqual(responses[2]["result"]["structuredContent"]["trading_authority"], "NONE")
-        self.assertEqual(responses[3]["result"]["contents"][0]["uri"], "atlas://runtime/health")
+        self.assertEqual(responses[3]["result"]["structuredContent"]["status"], "UNKNOWN")
+        self.assertEqual(responses[3]["result"]["structuredContent"]["trading_authority"], "NONE")
+        self.assertEqual(responses[4]["result"]["structuredContent"]["lane"], "live")
+        self.assertEqual({responses[i]["result"]["contents"][0]["uri"] for i in range(5, 9)},
+                         listed_resources)
+        self.assertIn("error", responses[9])
+        self.assertIn("error", responses[10])
 
     def test_mcp_request_ttl_stales_early_progress_but_keeps_absence_unknown(self):
         import atlas_mcp_pilot as pilot
