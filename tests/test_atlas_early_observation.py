@@ -29,7 +29,6 @@ def registry(now=NOW, watermark=10, rows=100):
     return sealed({
         "schema": "aql.warehouse.registry-snapshot.v1",
         "version": 1,
-        "dataset_id": watchdog.DATASET,
         "as_of_ms": now,
         "event_watermark": watermark,
         "event_head_sha256": "1" * 64,
@@ -249,6 +248,34 @@ class EarlyObservationTests(unittest.TestCase):
         self.assertEqual(responses[2]["result"]["structuredContent"]["status"], "UNKNOWN")
         self.assertEqual(responses[2]["result"]["structuredContent"]["trading_authority"], "NONE")
         self.assertEqual(responses[3]["result"]["contents"][0]["uri"], "atlas://runtime/health")
+
+    def test_mcp_request_ttl_stales_early_progress_but_keeps_absence_unknown(self):
+        import atlas_mcp_pilot as pilot
+
+        class Reader:
+            profile = "early"
+
+            def read_pinned(self):
+                return {
+                    "schema": "atlas.mcp.early-observation.v1",
+                    "profile": "EARLY_OBSERVATION",
+                    "status": "HEALTHY_PROGRESS",
+                    "observed_at_ms": NOW,
+                    "clock_uncertainty_ms": 10,
+                    "lanes": {
+                        "history": {"status": "HEALTHY_PROGRESS", "source_file_sha256": "a" * 64},
+                        "daily": {"status": "UNKNOWN", "source_file_sha256": None},
+                        "live": {"status": "EXPECTED_WAIT", "source_file_sha256": "b" * 64},
+                    },
+                }
+
+        tick = [NOW + early.MAX_SNAPSHOT_AGE_MS + 1, 5_000_000_000]
+        server = pilot.MCPServer(Reader(), clock=lambda: (tick[0], tick[1]))
+        view = server.current_view()
+        self.assertEqual(view["status"], "STALE")
+        self.assertEqual(view["lanes"]["history"]["status"], "STALE")
+        self.assertEqual(view["lanes"]["live"]["status"], "STALE")
+        self.assertEqual(view["lanes"]["daily"]["status"], "UNKNOWN")
 
     def test_fixture_resource_budget_is_measured_and_bounded(self):
         with tempfile.TemporaryDirectory() as folder:
