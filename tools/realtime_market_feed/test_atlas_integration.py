@@ -375,7 +375,6 @@ def test_utc_day_boundary_and_registry_provenance(tmp_path):
 
 def test_forward_only_lineage_detects_mutation_and_untrusted_receipt(tmp_path):
     import tools.realtime_market_feed.service as producer
-    from tools.realtime_market_feed.atlas_integration import _project if False else project_feed_window
 
     source = tmp_path / "lineage.sqlite"
     start, end = feed(source)
@@ -393,16 +392,6 @@ def test_forward_only_lineage_detects_mutation_and_untrusted_receipt(tmp_path):
         expected_producer_code_sha256=producer.PRODUCER_CODE_SHA256)
     assert len(projected) == 1 and projected[0]["source_class"] == "FORWARD_UNQUALIFIED"
 
-    # Legacy or torn rows without the new receipt cannot be retrofitted/admitted.
-    db = sqlite3.connect(source)
-    db.execute("DELETE FROM final_bar_lineage WHERE open_ms=?", (start,))
-    db.commit()
-    db.close()
-    with pytest.raises(ValueError, match="FEED_SOURCE_LINEAGE_UNVERIFIED"):
-        project_feed_window(source, symbol="BTCUSDT", start_ms=start,
-            end_ms=end, now_ms=end+1_000,
-            expected_producer_code_sha256=producer.PRODUCER_CODE_SHA256)
-
     # Restart/replay keeps exactly the original lineage receipt; it is not rewritten.
     store = FeedStore(source)
     data = {"e":"kline","s":"BTCUSDT","E":start+59_999,
@@ -412,8 +401,16 @@ def test_forward_only_lineage_detects_mutation_and_untrusted_receipt(tmp_path):
     store.db.commit()
     store.db.close()
     db = sqlite3.connect(source)
-    assert db.execute("SELECT count(*) FROM final_bar_lineage").fetchone()[0] == 0
+    assert db.execute("SELECT count(*) FROM final_bar_lineage").fetchone()[0] == 1
+    assert db.execute("SELECT receipt_sha256 FROM final_bar_lineage").fetchone()[0] == receipt_pin
+    # Legacy or torn rows without the new receipt cannot be retrofitted/admitted.
+    db.execute("DELETE FROM final_bar_lineage WHERE open_ms=?", (start,))
+    db.commit()
     db.close()
+    with pytest.raises(ValueError, match="FEED_SOURCE_LINEAGE_UNVERIFIED"):
+        project_feed_window(source, symbol="BTCUSDT", start_ms=start,
+            end_ms=end, now_ms=end+1_000,
+            expected_producer_code_sha256=producer.PRODUCER_CODE_SHA256)
 
     # A changed bar plus a self-consistent but foreign producer receipt fails
     # the independently supplied producer-code pin.
