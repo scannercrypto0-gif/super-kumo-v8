@@ -27,6 +27,22 @@ MAX_BACKOFF_SECONDS = 60
 MIN_RECONNECT_INTERVAL_SECONDS = 15
 MAX_SOCKET_AGE_SECONDS = 23 * 60 * 60 + 50 * 60
 
+# A code-pinned normalized producer attestation. It binds each newly inserted
+# finalized bar to its event digest and exact normalized row. It is not a
+# Binance signature or external origin proof; old rows are never backfilled.
+LINEAGE_SCHEMA = "atlas.realtime-market-feed.normalized-bar-attestation.v1"
+PRODUCER_ID = "atlas.realtime_market_feed.service.Store.ingest"
+PRODUCER_CODE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+
+
+def _canonical(value: object) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=True, allow_nan=False).encode("utf-8")
+
+
+def _sha256(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
 
 def utc_ms() -> int:
     return time.time_ns() // 1_000_000
@@ -79,6 +95,10 @@ class Store:
         CREATE TABLE IF NOT EXISTS service_event(
           id INTEGER PRIMARY KEY, at_ms INTEGER NOT NULL, kind TEXT NOT NULL,
           detail TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS final_bar_lineage(
+          symbol TEXT NOT NULL, interval TEXT NOT NULL, open_ms INTEGER NOT NULL,
+          receipt_json TEXT NOT NULL, receipt_sha256 TEXT NOT NULL,
+          PRIMARY KEY(symbol, interval, open_ms));
         """)
         self.db.commit()
 
@@ -128,7 +148,29 @@ class Store:
             if not k.get("x"):
                 return "provisional_ignored"
             opened, closed = int(k["t"]), int(k["T"])
-            digest = hashlib.sha256(json.dumps(data,sort_keys=True,separators=(",",":")).encode()).hexdigest()
+            event_digest = _sha256(_canonical(data))
+            ohlcv = {"o":str(k["o"]), "h":str(k["h"]), "l":str(k["l"]),
+                     "c":str(k["c"]), "v":str(k["v"])}
+            normalized = {
+                "provider":"BINANCE", "market":"SPOT", "symbol":symbol,
+                "interval":"1m", "open_ms":opened, "close_ms":closed,
+                "available_at_ms":received_ms, "finality":"FINAL",
+                "ohlcv":ohlcv, "trades":int(k["n"]),
+                "event_payload_sha256":event_digest,
+            }
+            replay_identity = _sha256(_canonical({
+                "provider":"BINANCE", "market":"SPOT", "symbol":symbol,
+                "interval":"1m", "open_ms":opened, "close_ms":closed,
+                "event_payload_sha256":event_digest,
+            }))
+            body = {
+                "schema":LINEAGE_SCHEMA, "producer_id":PRODUCER_ID,
+                "producer_code_sha256":PRODUCER_CODE_SHA256,
+                **normalized, "replay_identity_sha256":replay_identity,
+                "normalized_row_sha256":_sha256(_canonical(normalized)),
+            }
+            receipt_json = _canonical(body).decode("utf-8")
+            receipt_sha = _sha256(_canonical(body))
             with self.db:
                 previous = self.db.execute(
                     "SELECT open_ms FROM final_bar WHERE symbol=? AND interval='1m' ORDER BY open_ms DESC LIMIT 1",
@@ -140,17 +182,23 @@ class Store:
                       (symbol, previous[0]+60_000, opened, "MISSING_FINALIZED_MINUTES", received_ms))
                 cur = self.db.execute("""INSERT OR IGNORE INTO final_bar VALUES
                   (?,'1m',?,?,?,?,?,?,?,?,?,?)""",
-                  (symbol,opened,closed,str(k["o"]),str(k["h"]),str(k["l"]),str(k["c"]),
-                   str(k["v"]),int(k["n"]),received_ms,digest))
+                  (symbol,opened,closed,ohlcv["o"],ohlcv["h"],ohlcv["l"],ohlcv["c"],
+                   ohlcv["v"],normalized["trades"],received_ms,event_digest))
                 existing = self.db.execute(
                     """SELECT close_ms,open,high,low,close,volume,trades
                        FROM final_bar WHERE symbol=? AND interval='1m' AND open_ms=?""",
                     (symbol,opened)).fetchone()
-                candidate = (closed,str(k["o"]),str(k["h"]),str(k["l"]),str(k["c"]),
-                             str(k["v"]),int(k["n"]))
+                candidate = (closed,ohlcv["o"],ohlcv["h"],ohlcv["l"],ohlcv["c"],
+                             ohlcv["v"],normalized["trades"])
                 if existing and tuple(existing) != candidate:
                     self.db.execute("INSERT INTO service_event(at_ms,kind,detail) VALUES(?,?,?)",
                                     (received_ms,"FINAL_BAR_CONFLICT",symbol+":"+str(opened)))
+                elif cur.rowcount == 1:
+                    # Forward-only: legacy rows are never retrofitted on replay.
+                    self.db.execute("""INSERT INTO final_bar_lineage
+                      (symbol,interval,open_ms,receipt_json,receipt_sha256)
+                      VALUES(?,'1m',?,?,?)""",
+                      (symbol,opened,receipt_json,receipt_sha))
             return "final_bar"
         return "ignored"
 
