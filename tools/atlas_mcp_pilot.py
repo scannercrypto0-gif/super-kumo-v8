@@ -141,17 +141,29 @@ def make_lane(name, lane, *, observed_ms=None, registry_last_open_ms=None, regis
 
 class SnapshotReader:
     def __init__(self, manifest_path, expected_manifest_sha):
+        self.profile = "strict"
         self.view = self.unavailable("EVIDENCE_UNAVAILABLE")
         self.manifest_path = Path(manifest_path)
         self.expected_manifest_sha = expected_manifest_sha
         self.snapshot_path = None
         self.snapshot_file_sha = None
+
+    def _project(self, snapshot, file_sha):
+        return (self.project_early(snapshot, file_sha) if self.profile == "early"
+                else self.project(snapshot, file_sha))
         try:
             manifest, raw_manifest_sha = watchdog.read_json(manifest_path)
             if raw_manifest_sha != expected_manifest_sha:
                 raise ValueError("MANIFEST_PIN_MISMATCH")
             watchdog.sealed_hash(manifest, "manifest_sha256", "MANIFEST_SEAL_INVALID")
-            if manifest.get("schema") != "atlas.mcp.source-manifest.v1":
+            manifest_schema = manifest.get("schema")
+            if manifest_schema == "atlas.mcp.source-manifest.v1":
+                self.profile = "strict"
+                expected_snapshot_schema = "atlas.operator.health-snapshot.v1"
+            elif manifest_schema == "atlas.mcp.early-source-manifest.v1":
+                self.profile = "early"
+                expected_snapshot_schema = "atlas.operator.early-observation.v1"
+            else:
                 raise ValueError("MANIFEST_SCHEMA_INVALID")
             snapshot_path = manifest.get("snapshot_path")
             pinned_sha = manifest.get("snapshot_file_sha256")
@@ -163,10 +175,13 @@ class SnapshotReader:
             if snapshot_file_sha != pinned_sha:
                 raise ValueError("SNAPSHOT_PIN_MISMATCH")
             watchdog.sealed_hash(snapshot, "sha256", "SNAPSHOT_SEAL_INVALID")
-            self.view = self.project(snapshot, snapshot_file_sha)
+            if snapshot.get("schema") != expected_snapshot_schema:
+                raise ValueError("SNAPSHOT_PROFILE_MISMATCH")
+            self.view = self._project(snapshot, snapshot_file_sha)
         except Exception as exc:  # never return paths or exception text to the MCP client
             code = str(exc) if type(exc) is ValueError else "EVIDENCE_UNAVAILABLE"
-            self.view = self.unavailable(code if SAFE_CODE.fullmatch(code) else "EVIDENCE_UNAVAILABLE")
+            self.view = self.unavailable(code if SAFE_CODE.fullmatch(code) else "EVIDENCE_UNAVAILABLE",
+                                          early=self.profile == "early")
 
     def read_pinned(self):
         try:
@@ -176,20 +191,40 @@ class SnapshotReader:
             if manifest_sha != self.expected_manifest_sha:
                 raise ValueError("MANIFEST_PIN_MISMATCH")
             watchdog.sealed_hash(manifest, "manifest_sha256", "MANIFEST_SEAL_INVALID")
-            if (manifest.get("snapshot_path") != str(self.snapshot_path)
+            expected_manifest_schema = ("atlas.mcp.early-source-manifest.v1" if self.profile == "early"
+                                        else "atlas.mcp.source-manifest.v1")
+            expected_snapshot_schema = ("atlas.operator.early-observation.v1" if self.profile == "early"
+                                        else "atlas.operator.health-snapshot.v1")
+            if (manifest.get("schema") != expected_manifest_schema
+                    or manifest.get("snapshot_path") != str(self.snapshot_path)
                     or manifest.get("snapshot_file_sha256") != self.snapshot_file_sha):
                 raise ValueError("MANIFEST_PIN_MISMATCH")
             snapshot, raw_sha = watchdog.read_json(self.snapshot_path)
             if raw_sha != self.snapshot_file_sha:
                 raise ValueError("SNAPSHOT_PIN_MISMATCH")
             watchdog.sealed_hash(snapshot, "sha256", "SNAPSHOT_SEAL_INVALID")
-            return self.project(snapshot, raw_sha)
+            if snapshot.get("schema") != expected_snapshot_schema:
+                raise ValueError("SNAPSHOT_PROFILE_MISMATCH")
+            return self._project(snapshot, raw_sha)
         except Exception as exc:
             code = str(exc) if type(exc) is ValueError else "EVIDENCE_UNAVAILABLE"
-            return self.unavailable(code if SAFE_CODE.fullmatch(code) else "EVIDENCE_UNAVAILABLE")
+            return self.unavailable(code if SAFE_CODE.fullmatch(code) else "EVIDENCE_UNAVAILABLE",
+                                    early=self.profile == "early")
 
     @staticmethod
-    def unavailable(reason):
+    def unavailable(reason, early=False):
+        if early:
+            return {"schema": "atlas.mcp.early-observation.v1", "profile": "EARLY_OBSERVATION",
+                    "status": "UNKNOWN", "reason": "EVIDENCE_UNAVAILABLE",
+                    "refusal_reason": safe_reason(reason), "observed_at_utc": None,
+                    "observed_at_ms": None, "clock_uncertainty_ms": None,
+                    "evidence_grade": "UNAVAILABLE",
+                    "lanes": {name: {"lane": name, "status": "UNKNOWN", "reason": "EVIDENCE_UNAVAILABLE",
+                                     "refusal_reason": None, "trading_authority": "NONE"}
+                              for name in LANES},
+                    "gaps": {}, "provenance": {"snapshot_sha256": None, "source_pins": {},
+                                               "host_attested": False},
+                    "scientific_authority": "NONE", "trading_authority": "NONE"}
         return {"schema": "atlas.mcp.health.v1", "status": "UNKNOWN", "reason": "EVIDENCE_UNAVAILABLE",
                 "refusal_reason": safe_reason(reason), "observed_at_utc": None, "evidence_grade": "UNAVAILABLE",
                 "lanes": {name: make_lane(name, {"state": "UNKNOWN"}) for name in LANES},
@@ -288,6 +323,90 @@ class SnapshotReader:
                 "provenance": {"snapshot_sha256": file_sha, "source_pins": pins,
                                "registry_event_watermark": watermark, "host_attested": False},
                 "scientific_authority": "RETROSPECTIVE_NON_PIT_ONLY", "trading_authority": "NONE"}
+
+    @staticmethod
+    def project_early(snapshot, file_sha):
+        allowed = {"HEALTHY_PROGRESS": "HEALTHY", "EXPECTED_WAIT": "EXPECTED_WAIT",
+                   "STALE": "STALE", "HELD": "HELD", "FAILED": "FAILED", "UNKNOWN": "UNKNOWN"}
+        if (snapshot.get("schema") != "atlas.operator.early-observation.v1"
+                or snapshot.get("profile") != "EARLY_OBSERVATION"):
+            raise ValueError("EARLY_PROFILE_INVALID")
+        if (snapshot.get("source_paths_exposed") is not False
+                or snapshot.get("raw_market_payload_included") is not False
+                or snapshot.get("network_calls") != 0
+                or snapshot.get("source_mutations") != 0
+                or snapshot.get("trading_authority") != "NONE"):
+            raise ValueError("EARLY_READ_ONLY_CONTRACT")
+        observed = snapshot.get("observed_at_ms")
+        if type(observed) is not int or observed < 0:
+            raise ValueError("EARLY_CLOCK_INVALID")
+        raw_lanes = snapshot.get("lanes")
+        if type(raw_lanes) is not dict or set(raw_lanes) != set(LANES):
+            raise ValueError("EARLY_LANES_INVALID")
+        lanes = {}
+        for name in LANES:
+            raw = raw_lanes[name]
+            if type(raw) is not dict or raw.get("lane") != name or raw.get("status") not in allowed:
+                raise ValueError("EARLY_LANE_INVALID")
+            pin = raw.get("source_file_sha256")
+            if pin is not None and not is_sha256(pin):
+                raise ValueError("EARLY_SOURCE_PIN_INVALID")
+            report = raw.get("reported") if type(raw.get("reported")) is dict else {}
+            if name == "history":
+                counters = report.get("counters") if type(report.get("counters")) is dict else {}
+                gaps = {"unresolved_ranges": bounded_int(report.get("unresolved_gaps")) or 0,
+                        "source_obstacles": bounded_int(report.get("source_obstacles")) or 0,
+                        "registry_gaps": bounded_int(counters.get("registry_gaps")) or 0}
+                progress = {key: bounded_int(value) for key, value in counters.items()
+                            if key in {"archives_imported", "inserted_rows", "event_watermark",
+                                       "physical_rows", "source_count", "last_open_ms"}}
+            elif name == "daily":
+                progress = {key: report.get(key) for key in
+                            ("task_state", "scheduler_state", "runtime_state", "cycle_evidence",
+                             "source_freshness", "last_success_source_day_ms", "worker_receipt_sha256")}
+                gaps = {"import_registry_link_missing": True}
+            else:
+                progress = {key: report.get(key) for key in
+                            ("source_class", "status", "verified_receipts", "last_committed_ms",
+                             "last_receipt_fresh", "missing_ranges", "hold_reason")}
+                gaps = {"missing_ranges": bounded_int(report.get("missing_ranges")) or 0}
+            status = allowed[raw["status"]]
+            reason = safe_reason(raw.get("reason")) or "EARLY_EVIDENCE_UNTRUSTED"
+            age = bounded_int(raw.get("age_ms"))
+            lanes[name] = {"lane": name, "status": status, "progress_state": raw["status"],
+                "reason": reason, "refusal_reason": reason if status in {"HELD", "FAILED", "STALE"} else None,
+                "source_time_utc": utc(raw.get("observed_at_ms")),
+                "observed_at_utc": utc(raw.get("observed_at_ms")),
+                "last_validated_committed_progress": progress,
+                "freshness": {"source_state": safe_reason(raw.get("freshness")) or "UNKNOWN",
+                              "source_age_ms_at_snapshot": age,
+                              "max_snapshot_age_ms": 300_000,
+                              "expected_wait": status == "EXPECTED_WAIT"},
+                "gaps": gaps,
+                "provenance": {"source_schema": raw.get("source_schema"),
+                               "source_file_sha256": pin,
+                               "evidence_grade": safe_reason(raw.get("evidence_grade")) or "UNAVAILABLE"},
+                "scientific_authority": "NONE", "trading_authority": "NONE"}
+        statuses = {item["status"] for item in lanes.values()}
+        expected = ("FAILED" if "FAILED" in statuses else "HELD" if "HELD" in statuses else
+                    "STALE" if "STALE" in statuses else "UNKNOWN" if "UNKNOWN" in statuses else
+                    "HEALTHY" if "HEALTHY" in statuses else "EXPECTED_WAIT")
+        if snapshot.get("state") not in allowed or allowed[snapshot["state"]] != expected:
+            raise ValueError("EARLY_OVERALL_STATE_CONFLICT")
+        inputs = snapshot.get("inputs") if type(snapshot.get("inputs")) is dict else {}
+        pins = {name: item.get("file_sha256") for name, item in inputs.items()
+                if name in {"history", "registry", "daily", "live"}
+                and type(item) is dict and is_sha256(item.get("file_sha256"))}
+        return {"schema": "atlas.mcp.early-observation.v1", "profile": "EARLY_OBSERVATION",
+                "status": expected, "reason": "EARLY_OBSERVATION_PROFILE",
+                "observed_at_utc": utc(observed), "observed_at_ms": observed,
+                "clock_uncertainty_ms": snapshot.get("clock_uncertainty_ms"),
+                "evidence_grade": "EARLY_OBSERVATION_NOT_HOST_ATTESTED",
+                "lanes": lanes, "gaps": {name: lanes[name]["gaps"] for name in LANES},
+                "provenance": {"snapshot_sha256": file_sha, "source_pins": pins,
+                               "host_attested": False},
+                "scientific_authority": "NONE", "trading_authority": "NONE"}
+
 
 
 def tool_specs():
