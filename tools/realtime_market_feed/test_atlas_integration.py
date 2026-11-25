@@ -199,12 +199,17 @@ def test_daily_overlap_proposal_is_read_only_and_hash_pinned(tmp_path):
                            end_ms=end, now_ms=end+1_000, engineering_test_only=True)
     with ResearchBarStore(target) as store:
         live = store.read("BTCUSDT", "1m", START)
+        live_15m = store.project("BTCUSDT", "15m", START)
     wh, historical, registry = _daily(tmp_path / "warehouse")
+    daily_15m = wh.query("15m", START, START+900_000,
+                         cutoff_ms=START+DAY)[0]
     before = _bytes(wh.root)
     match = reconcile_daily_bar(live, historical)
+    aggregate_match = reconcile_daily_bar(live_15m, daily_15m)
     assert match["status"] == "MATCH_IDEMPOTENT"
+    assert aggregate_match["status"] == "MATCH_IDEMPOTENT"
     assert match["duplicate_insert"] is False and match["write_performed"] is False
-    proposal = build_registry_proposal(match, registry)
+    proposal = build_registry_proposal(aggregate_match, registry)
     assert proposal["status"] == "PROPOSED_ONLY"
     assert proposal["registry_mutation"] is False
     assert _bytes(wh.root) == before
