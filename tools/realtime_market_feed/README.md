@@ -56,7 +56,7 @@ before deciding whether to register an always-on scheduled task. Example:
 $env:PYTHONPATH='C:\path\to\checkout'; & 'C:\path\to\python.exe' -B -m tools.realtime_market_feed.service --root 'E:\ATLAS\realtime-market-feed' --symbols BTCUSDT --observe-seconds 600
 ```
 
-A successful process start is not a successful feed. Confirm fresh rows in
+A successful process start is not a successful feed. After the bounded run, get a structured local status snapshot with `python -B -m tools.realtime_market_feed.service --root 'E:\\ATLAS\\realtime-market-feed' --report`. Confirm fresh rows in
 `latest_trade`, `latest_quote`, and `final_bar`, no unexplained OPEN gaps,
 and an advancing `service_event` history. A provider rejection or repeated
 disconnect remains a failed smoke test. Do not enable this as a background
