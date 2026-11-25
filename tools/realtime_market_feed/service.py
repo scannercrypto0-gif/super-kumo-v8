@@ -242,7 +242,13 @@ class LiveService:
             from tools.realtime_market_feed.backfill import recover_open_gaps
             recover_open_gaps(self.store.path, symbol)
         except Exception as exc:
-            self.store.event("GAP_BACKFILL_WORKER_ERROR", type(exc).__name__)
+            db = sqlite3.connect(self.store.path, timeout=10)
+            try:
+                with db:
+                    db.execute("INSERT INTO service_event(at_ms,kind,detail) VALUES(?,?,?)",
+                               (utc_ms(),"GAP_BACKFILL_WORKER_ERROR",type(exc).__name__))
+            finally:
+                db.close()
             LOG.exception("Gap recovery worker failed")
         finally:
             with self._recovery_lock:
