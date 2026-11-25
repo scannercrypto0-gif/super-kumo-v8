@@ -497,9 +497,11 @@ def main():
     output_root = checked_root(args.approved_output_root, "APPROVED_OUTPUT_ROOT_REQUIRED")
     require(input_root != output_root and input_root not in output_root.parents
             and output_root not in input_root.parents, "APPROVED_ROOTS_MUST_BE_SEPARATE")
-    paths = {name: getattr(args, name) for name in (*LANES, "registry", "previous")}
+    paths = {name: getattr(args, name) for name in (*LANES, "registry")}
     paths = {name: require_direct_child(path, input_root, "INPUT_OUTSIDE_APPROVED_ROOT")
              if path is not None else None for name, path in paths.items()}
+    paths["previous"] = (require_direct_child(args.previous, output_root, "PREVIOUS_OUTSIDE_APPROVED_OUTPUT_ROOT")
+                         if args.previous is not None else None)
     output_path = require_direct_child(args.output, output_root, "OUTPUT_OUTSIDE_APPROVED_ROOT")
     now_ms = time.time_ns() // 1_000_000
     mono = time.monotonic_ns()
