@@ -288,6 +288,35 @@ def test_missing_provenance_and_tampered_registry_fail_closed(tmp_path):
     mutated = dict(live, c="1.5")
     with pytest.raises(ValueError, match="PROJECTED_ROW_INVALID"):
         reconcile_daily_bar(mutated, daily)
+    verified = reconcile_daily_bar(live, daily)
+    forged = dict(verified, status="CONFLICT")
+    forged_body = {k:v for k,v in forged.items() if k != "reconciliation_sha256"}
+    forged["reconciliation_sha256"] = hashlib.sha256(canonical(forged_body)).hexdigest()
+    with pytest.raises(ValueError, match="RECONCILIATION_STATUS_OR_LINEAGE_INVALID"):
+        build_registry_proposal(forged, daily_context)
+
+    def resign_snapshot(snapshot):
+        body = {k:v for k,v in snapshot.items() if k != "snapshot_sha256"}
+        snapshot["snapshot_sha256"] = hashlib.sha256(canonical(body)).hexdigest()
+        return snapshot
+
+    unrelated = json.loads(json.dumps(registry))
+    unrelated["sources"][0]["key"] = "data/spot/daily/klines/ETHUSDT/1m/ETHUSDT-1m-2024-01-01.zip"
+    unrelated_context = dict(daily_context, registry=resign_snapshot(unrelated))
+    with pytest.raises(ValueError, match="DAILY_ARCHIVE_RECEIPT_NOT_BOUND"):
+        build_registry_proposal(verified, unrelated_context)
+
+    no_receipt = json.loads(json.dumps(registry))
+    no_receipt["sources"][0]["source_receipt_sha256"] = None
+    no_receipt_context = dict(daily_context, registry=resign_snapshot(no_receipt))
+    with pytest.raises(ValueError, match="DAILY_ARCHIVE_RECEIPT_NOT_BOUND"):
+        build_registry_proposal(verified, no_receipt_context)
+
+    contradictory = json.loads(json.dumps(registry))
+    contradictory["internal_gaps"] = [[START, START+60_000]]
+    gap_context = dict(daily_context, registry=resign_snapshot(contradictory))
+    with pytest.raises(ValueError, match="DAILY_REGISTRY_GAP"):
+        build_registry_proposal(verified, gap_context)
 
 
 def test_core_scanner_and_factory_record_wait_without_running_strategy(tmp_path):
