@@ -67,7 +67,7 @@ def outcome(path, now, slot, *, failed, missing_start=None, missing_end=None):
                     orders=0,trading_authority='NONE')
 
 
-def authority(root, config_pin=None):
+def authority(root, config_pin=None, *, allow_stale_config=False):
     """Opt-in must be installed by the guarded operator, never environment flags."""
     path=Path(root)/'continuous-research.authorized.json'
     if not path.exists():return None
@@ -106,7 +106,12 @@ def authority(root, config_pin=None):
     name=a.get('config_filename')
     need(type(name) is str and Path(name).name==name and name not in ('.','..'), 'CONTINUITY_CONFIG_PATH')
     actual=hashlib.sha256(read(Path(root)/name,8*1024*1024)).hexdigest()
-    need(a.get('config_sha256')==actual and (config_pin is None or config_pin==actual),'CONTINUITY_CONFIG_PIN')
+    configured=a.get('config_sha256')
+    need(type(configured) is str and re.fullmatch('[0-9a-f]{64}',configured),'CONTINUITY_CONFIG_PIN')
+    if allow_stale_config:
+        need(config_pin is None,'CONTINUITY_CONFIG_PIN')
+    else:
+        need(configured==actual and (config_pin is None or config_pin==actual),'CONTINUITY_CONFIG_PIN')
     return a
 
 
