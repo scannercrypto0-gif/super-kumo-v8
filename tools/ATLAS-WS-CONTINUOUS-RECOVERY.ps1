@@ -32,6 +32,9 @@ function Test-FreshPingBaseline($Diagnostic,[string]$ExpectedConfigSha256,[strin
     if($Diagnostic.hold_reason -cnotin $allowedHolds){$failures+='HOLD_REASON_MISMATCH'}
     if($Diagnostic.manifest_scope.verification_complete -ne $true){$failures+='RUNTIME_MANIFEST_NOT_VERIFIED'}
     $blockers=@($Diagnostic.blockers | Where-Object {$null -ne $_ -and [string]$_ -ne ''})
+    if($RecoveryKind -ceq 'SustainedRoot' -and $blockers.Count -eq 1 -and
+       $blockers[0] -ceq 'QUOTA_NOT_READY' -and
+       $Diagnostic.prestart_evidence.safe_quota_bootstrap -eq $true){$blockers=@()}
     $failures+=@($blockers)
     # Only a scheduled supervisor briefly holding its lock is safe to wait out.
     # Quota, collector, integrity, disabled task and unknown conditions stay terminal.
