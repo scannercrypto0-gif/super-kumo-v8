@@ -1,4 +1,5 @@
 import json
+import sqlite3
 
 import pytest
 
@@ -195,7 +196,7 @@ def test_final_bar_and_lineage_receipt_commit_atomically(tmp_path):
     bar={"e":"kline","s":"BTCUSDT","k":{"i":"1m","t":0,"T":59_999,
         "o":"10","h":"11","l":"9","c":"10.5","v":"2.5","n":4,"x":True}}
     try:
-        with pytest.raises(Exception):
+        with pytest.raises(sqlite3.OperationalError):
             store.ingest(json.dumps(bar),received_ms=60_000)
         assert store.db.execute("SELECT count(*) FROM final_bar").fetchone()[0] == 0
     finally:
