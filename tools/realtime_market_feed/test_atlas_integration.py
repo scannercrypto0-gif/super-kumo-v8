@@ -17,7 +17,7 @@ sys.path.insert(0, str(WAREHOUSE_CHECKOUT))
 
 from tools.realtime_market_feed.service import Store as FeedStore
 from tools.realtime_market_feed.atlas_integration import (
-    build_registry_proposal, copy_to_research_store, project_feed_window,
+    build_registry_proposal, project_feed_window,
     reconcile_daily_bar,
 )
 from aql.research_bar_store import ResearchBarStore
@@ -50,6 +50,26 @@ def feed(path, *, start=START, count=1, stale=False, changed=None, symbol="BTCUS
     return start, start + count * 60_000
 
 
+
+def _copy_generated_fixture_to_research_store(database, research_store_path, *, symbol,
+                                               start_ms, end_ms, now_ms):
+    """Test-only fixture writer; its input is created by feed() below."""
+    source = Path(database).resolve()
+    target = Path(research_store_path).resolve()
+    source.relative_to(Path(__import__("tempfile").gettempdir()).resolve())
+    target.relative_to(Path(__import__("tempfile").gettempdir()).resolve())
+    rows = project_feed_window(source, symbol=symbol, start_ms=start_ms,
+                               end_ms=end_ms, now_ms=now_ms,
+                               allow_synthetic_fixture=True)
+    with ResearchBarStore(target) as store:
+        store.insert_batch(rows)
+        verified = [store.read(symbol, "1m", row["open_ms"]) for row in rows]
+    assert all(row is not None and row["source_class"] == "FORWARD_UNQUALIFIED"
+               for row in verified)
+    return {"status": "SYNTHETIC_FORWARD_BARS_COPIED", "rows": len(verified),
+            "evidence_class": "GENERATED_TEST_FIXTURE", "trading_authority": "NONE"}
+
+
 def _project(database, **kwargs):
     return project_feed_window(database, **kwargs, allow_synthetic_fixture=True)
 
@@ -74,12 +94,12 @@ def test_finalized_feed_to_native_research_store_is_idempotent_and_read_only(tmp
     start, end = feed(source, count=1)
     before = hashlib.sha256(source.read_bytes()).hexdigest()
     target = tmp_path / "research.sqlite"
-    result = copy_to_research_store(source, target, symbol="BTCUSDT",
+    result = _copy_generated_fixture_to_research_store(source, target, symbol="BTCUSDT",
                                     start_ms=start, end_ms=end,
-                                    now_ms=end + 1_000, engineering_test_only=True)
-    again = copy_to_research_store(source, target, symbol="BTCUSDT",
+                                    now_ms=end + 1_000)
+    again = _copy_generated_fixture_to_research_store(source, target, symbol="BTCUSDT",
                                    start_ms=start, end_ms=end,
-                                   now_ms=end + 1_000, engineering_test_only=True)
+                                   now_ms=end + 1_000)
     assert result["rows"] == again["rows"] == 1
     with ResearchBarStore(target) as store:
         row = store.read("BTCUSDT", "1m", start)
@@ -92,12 +112,12 @@ def test_integration_writer_is_disabled_without_test_only_switch(tmp_path):
     source = tmp_path / "feed.sqlite"
     start, end = feed(source)
     with pytest.raises(ValueError, match="INTEGRATION_DISABLED"):
-        copy_to_research_store(source, tmp_path / "research.sqlite",
+        _copy_generated_fixture_to_research_store(source, tmp_path / "research.sqlite",
                                symbol="BTCUSDT", start_ms=start, end_ms=end,
                                now_ms=end+1_000)
     outside = Path(__import__("tempfile").gettempdir()).parent / "forbidden.sqlite"
     with pytest.raises(ValueError, match="ISOLATED_RESEARCH_STORE_REQUIRED"):
-        copy_to_research_store(source, outside, symbol="BTCUSDT",
+        _copy_generated_fixture_to_research_store(source, outside, symbol="BTCUSDT",
                                start_ms=start, end_ms=end, now_ms=end+1_000,
                                engineering_test_only=True)
 
@@ -183,8 +203,8 @@ def test_missing_receipt_bad_utc_grid_and_incomplete_aggregation_fail_closed(tmp
     source = tmp_path / "short.sqlite"
     start, end = feed(source, count=14)
     copied = tmp_path / "short-research.sqlite"
-    copy_to_research_store(source, copied, symbol="BTCUSDT", start_ms=start,
-                           end_ms=end, now_ms=end+1_000, engineering_test_only=True)
+    _copy_generated_fixture_to_research_store(source, copied, symbol="BTCUSDT", start_ms=start,
+                           end_ms=end, now_ms=end+1_000)
     with ResearchBarStore(copied) as store:
         with pytest.raises(ValueError, match="SOURCE_GAP"):
             store.project("BTCUSDT", "15m", start)
@@ -202,8 +222,8 @@ def test_daily_overlap_proposal_is_read_only_and_hash_pinned(tmp_path):
     source = tmp_path / "feed.sqlite"
     start, end = feed(source, count=15)
     target = tmp_path / "research.sqlite"
-    copy_to_research_store(source, target, symbol="BTCUSDT", start_ms=start,
-                           end_ms=end, now_ms=end+1_000, engineering_test_only=True)
+    _copy_generated_fixture_to_research_store(source, target, symbol="BTCUSDT", start_ms=start,
+                           end_ms=end, now_ms=end+1_000)
     with ResearchBarStore(target) as store:
         live = store.read("BTCUSDT", "1m", START)
         live_15m = store.project("BTCUSDT", "15m", START)
@@ -228,8 +248,8 @@ def test_daily_ohlcv_conflict_and_missing_realtime_produce_proposals_not_repairs
     source = tmp_path / "feed.sqlite"
     start, end = feed(source, count=3)
     copied = tmp_path / "research.sqlite"
-    copy_to_research_store(source, copied, symbol="BTCUSDT", start_ms=start,
-                           end_ms=end, now_ms=end+1_000, engineering_test_only=True)
+    _copy_generated_fixture_to_research_store(source, copied, symbol="BTCUSDT", start_ms=start,
+                           end_ms=end, now_ms=end+1_000)
     with ResearchBarStore(copied) as store:
         live = store.read("BTCUSDT", "1m", START)
     wh, historical, registry, daily_context = _daily(tmp_path / "warehouse", changed=2)
@@ -273,8 +293,8 @@ def test_core_scanner_and_factory_record_wait_without_running_strategy(tmp_path)
     source = tmp_path / "feed.sqlite"
     start, end = feed(source, count=180)
     research = tmp_path / "research.sqlite"
-    copy_to_research_store(source, research, symbol="BTCUSDT", start_ms=start,
-                           end_ms=end, now_ms=end+1_000, engineering_test_only=True)
+    _copy_generated_fixture_to_research_store(source, research, symbol="BTCUSDT", start_ms=start,
+                           end_ms=end, now_ms=end+1_000)
     with ResearchBarStore(research) as store:
         for index in range(12):
             store.project("BTCUSDT", "15m", start + index * 900_000)
@@ -310,8 +330,8 @@ def test_utc_day_boundary_and_registry_provenance(tmp_path):
     source = tmp_path / "midnight.sqlite"
     start, end = feed(source, start=midnight, count=15)
     copied = tmp_path / "research.sqlite"
-    copy_to_research_store(source, copied, symbol="BTCUSDT", start_ms=start,
-                           end_ms=end, now_ms=end+1_000, engineering_test_only=True)
+    _copy_generated_fixture_to_research_store(source, copied, symbol="BTCUSDT", start_ms=start,
+                           end_ms=end, now_ms=end+1_000)
     wh, daily, registry, daily_context = _daily(tmp_path / "warehouse")
     assert registry["event_watermark"] >= 1
     assert registry["sources"][0]["source_zip_sha256"]
@@ -399,8 +419,8 @@ def test_unrelated_registry_or_daily_query_context_cannot_bind_bar(tmp_path):
     source = tmp_path / "feed.sqlite"
     start, end = feed(source)
     copied = tmp_path / "research.sqlite"
-    copy_to_research_store(source, copied, symbol="BTCUSDT", start_ms=start,
-                           end_ms=end, now_ms=end+1_000, engineering_test_only=True)
+    _copy_generated_fixture_to_research_store(source, copied, symbol="BTCUSDT", start_ms=start,
+                           end_ms=end, now_ms=end+1_000)
     with ResearchBarStore(copied) as store:
         live = store.read("BTCUSDT", "1m", start)
     _, daily, _, context = _daily(tmp_path / "warehouse")
