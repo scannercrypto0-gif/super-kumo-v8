@@ -29,11 +29,12 @@ def build_evidence():
         with ResearchBarStore(research) as store:
             for i in range(12):
                 store.project("BTCUSDT", "15m", start+i*900_000)
-            projected_1m = store.read("BTCUSDT", "1m", START)
+            projected_15m = store.read("BTCUSDT", "15m", start)
         core = forward_core_window(research, start_ms=start, bar_count=12)
         scanner = inspect_forward_15m(research, start)
         wh, daily, registry = _daily(root / "warehouse")
-        result = reconcile_daily_bar(projected_1m, daily)
+        daily_15m = wh.query("15m", START, START+900_000, cutoff_ms=START+DAY)[0]
+        result = reconcile_daily_bar(projected_15m, daily_15m)
         proposal = build_registry_proposal(result, registry)
         return {
             "schema": "aql.realtime-integration.synthetic-evidence.v1",
@@ -46,7 +47,7 @@ def build_evidence():
                         "one_minute_rows_observed":write["rows"],
                         "fifteen_minute_rows_expected":12,
                         "fifteen_minute_rows_observed":core["available_bars"],
-                        "daily_overlap":result["status"],
+                        "daily_15m_overlap":result["status"],
                         "registry_proposal_sha256":proposal["proposal_sha256"]},
             "seams": {
                 "feed_sqlite_read": "EXERCISED_READ_ONLY",
