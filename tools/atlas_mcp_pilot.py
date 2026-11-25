@@ -27,6 +27,35 @@ LANES = ("history", "daily", "live")
 SAFE_CODE = re.compile(r"[A-Z0-9_]{1,96}\Z")
 SAFE_STOP = re.compile(r"PILOT_STOP_[A-Z0-9_]{1,80}\Z")
 
+EARLY_ENUMS = {
+    "task_state": {"Ready", "Running", "Disabled", "Queued", "Unknown", "Completed"},
+    "scheduler_state": {"Ready", "Running", "Disabled", "Queued", "Unknown", "Completed"},
+    "runtime_state": {"PIN_VERIFIED", "CONFIG_PIN_MISMATCH", "UNVERIFIED", "UNKNOWN",
+                      "ERROR", "NOT_RUNNING", "READY"},
+    "cycle_evidence": {"WAIT_FOR_SOURCE", "RECENT_RESEARCH_RECEIPT", "COMPLETE", "FAILED",
+                       "UNKNOWN", "NO_CURRENT_ENTRY"},
+    "source_freshness": {"LATEST_DUE_DAY_RECEIVED", "STALE", "UNKNOWN",
+                         "WAITING_FOR_DUE_DAY", "NOT_MEASURED", "NO_CURRENT_ENTRY"},
+    "live_status": {"HELD", "HOLD", "FAILED", "WS_OPERATOR_BLOCKED",
+                    "AWAITING_EXISTING_SCHEDULE", "OBSERVING_CONTINUOUS_ACCEPTANCE",
+                    "OBSERVING", "HEALTHY", "STALE", "UNKNOWN"},
+}
+EARLY_REASON_CODES = {
+    "INPUT_NOT_SUPPLIED", "INPUT_UNTRUSTED", "INPUT_UNAVAILABLE",
+    "SOURCE_TIME_MISSING", "SOURCE_TIME_IN_FUTURE", "SOURCE_REPORT_EXPIRED",
+    "REGISTRY_REPORT_NOT_SUPPLIED", "REGISTRY_REPORT_STALE_OR_UNTRUSTED",
+    "REGISTRY_INCOMPLETE_OR_CONFLICTED", "HISTORY_SOURCE_OR_IMPORT_FAILURE",
+    "HISTORY_GAPS_OR_OBSTACLES", "HISTORY_SOURCE_WAIT", "HISTORY_WAIT_CADENCE_UNVERIFIED",
+    "COMMITTED_HISTORY_COUNTER_ADVANCED", "SECOND_OBSERVATION_OR_SOURCE_LINK_REQUIRED",
+    "DAILY_WORKER_FAILURE_REPORTED", "DAILY_SOURCE_REPORTED_STALE", "DAILY_SOURCE_WAIT",
+    "DAILY_WAIT_CADENCE_UNVERIFIED", "DAILY_IMPORT_REGISTRY_LINK_NOT_SUPPLIED",
+    "LIVE_EXPLICIT_HOLD", "LIVE_REPORT_FAILURE", "LIVE_LAST_RECEIPT_STALE",
+    "LIVE_EXISTING_SCHEDULE_WAIT", "LIVE_COMMITTED_RECEIPT_ADVANCED",
+    "SECOND_OBSERVATION_OR_SESSION_LINK_REQUIRED", "CLOCK_QUALITY_UNVERIFIED",
+    "CLOCK_OR_TIMESTAMP_UNTRUSTED", "SNAPSHOT_TTL_EXCEEDED",
+}
+
+
 
 def utc(ms):
     if type(ms) is not int or ms < 0:
@@ -51,6 +80,20 @@ def is_sha256(value):
 
 def bounded_int(value):
     return value if type(value) is int and value >= 0 else None
+
+
+def early_enum(value, key):
+    allowed = EARLY_ENUMS.get(key, set())
+    return value if type(value) is str and value in allowed else "UNRECOGNIZED"
+
+
+def early_ranges(value):
+    if type(value) is not list:
+        return []
+    return [pair for pair in value[:32]
+            if type(pair) is list and len(pair) == 2
+            and all(type(x) is int and x >= 0 for x in pair)
+            and pair[0] < pair[1]]
 
 
 def map_state(state, lane):
@@ -368,36 +411,56 @@ class SnapshotReader:
                                        "latest_published_close_reached"}
                             and type(value) in (int, bool)}
             elif name == "daily":
-                progress = {key: report.get(key) for key in
+                progress = {key: early_enum(report.get(key), key) for key in
                             ("task_state", "scheduler_state", "runtime_state", "cycle_evidence",
-                             "source_freshness", "last_success_source_day_ms", "worker_receipt_sha256")}
+                             "source_freshness")}
+                progress["last_success_source_day_ms"] = bounded_int(report.get("last_success_source_day_ms"))
+                receipt = report.get("worker_receipt_sha256")
+                progress["worker_receipt_sha256"] = receipt if is_sha256(receipt) else None
                 gaps = {"import_registry_link_missing": True}
             else:
-                progress = {key: report.get(key) for key in
-                            ("source_class", "status", "verified_receipts", "last_committed_ms",
-                             "last_receipt_fresh", "missing_ranges", "missing_open_ranges", "hold_reason")}
+                progress = {"source_class": "LIVE_CAPTURE",
+                            "status": early_enum(report.get("status"), "live_status"),
+                            "verified_receipts": bounded_int(report.get("verified_receipts")),
+                            "last_committed_ms": bounded_int(report.get("last_committed_ms")),
+                            "last_receipt_fresh": report.get("last_receipt_fresh")
+                                if type(report.get("last_receipt_fresh")) is bool else None,
+                            "missing_ranges": bounded_int(report.get("missing_ranges")) or 0,
+                            "missing_open_ranges": early_ranges(report.get("missing_open_ranges")),
+                            "hold_reason": safe_reason(report.get("hold_reason"))}
                 gaps = {"missing_ranges": bounded_int(report.get("missing_ranges")) or 0,
-                        "missing_open_ranges": report.get("missing_open_ranges", [])[:32]}
+                        "missing_open_ranges": early_ranges(report.get("missing_open_ranges"))}
             status = allowed[raw["status"]]
-            reason = safe_reason(raw.get("reason")) or "EARLY_EVIDENCE_UNTRUSTED"
+            raw_reason = raw.get("reason")
+            reason = raw_reason if type(raw_reason) is str and raw_reason in EARLY_REASON_CODES else "EARLY_EVIDENCE_UNTRUSTED"
             age = bounded_int(raw.get("age_ms"))
             lanes[name] = {"lane": name, "status": status, "progress_state": raw["status"],
                 "reason": reason, "refusal_reason": reason if status in {"HELD", "FAILED", "STALE"} else None,
                 "source_time_utc": utc(raw.get("observed_at_ms")),
                 "observed_at_utc": utc(raw.get("observed_at_ms")),
                 "last_validated_committed_progress": progress,
-                "freshness": {"source_state": safe_reason(raw.get("freshness")) or "UNKNOWN",
+                "freshness": {"source_state": raw.get("freshness") if raw.get("freshness") in {"FRESH", "STALE", "UNKNOWN"} else "UNKNOWN",
                               "source_age_ms_at_snapshot": age,
                               "max_snapshot_age_ms": 300_000,
                               "expected_wait": status == "EXPECTED_WAIT"},
-                "gaps": gaps, "scope": safe_reason(raw.get("scope")) or "REPORT_ONLY",
-                "provenance": {"source_schema": raw.get("source_schema"),
+                "gaps": gaps, "scope": {"history": "REPORT_ONLY_NO_PHYSICAL_REVALIDATION",
+                    "daily": "WORKER_REPORT_IMPORT_REGISTRY_LINK_UNVERIFIED",
+                    "live": "WORK1_HANDOFF_REPORT_ONLY"}[name],
+                "provenance": {"source_schema": raw.get("source_schema")
+                    if (name == "history" and raw.get("source_schema") in {
+                        "aql.warehouse.full-history-checkpoint.v1",
+                        "aql.warehouse.full-history-continuation.v1"})
+                    or (name == "daily" and raw.get("source_schema") == "aql.recurring-runtime.health.v1")
+                    or (name == "live" and raw.get("source_schema") == "atlas.ws.continuous-report.v1")
+                    else "UNRECOGNIZED_SCHEMA",
                                "source_file_sha256": pin,
                                "source_identity": raw.get("source_identity")
                                   if name == "live" and type(raw.get("source_identity")) is dict
                                   and is_sha256(raw["source_identity"].get("config_sha256"))
                                   and is_sha256(raw["source_identity"].get("policy_sha256")) else None,
-                               "evidence_grade": safe_reason(raw.get("evidence_grade")) or "UNAVAILABLE"},
+                               "evidence_grade": {"history": "OWNER_SUPPLIED_SEALED_REPORT_NOT_RECONCILED",
+                    "daily": "OWNER_SUPPLIED_DAILY_WORKER_REPORT_IMPORT_UNVERIFIED",
+                    "live": "OWNER_SUPPLIED_LIVE_REPORT_NOT_HOST_ATTESTED"}[name]},
                 "scientific_authority": "NONE", "trading_authority": "NONE"}
         statuses = {item["status"] for item in lanes.values()}
         expected = ("FAILED" if "FAILED" in statuses else "HELD" if "HELD" in statuses else
