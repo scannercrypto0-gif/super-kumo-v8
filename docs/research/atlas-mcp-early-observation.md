@@ -35,7 +35,7 @@ The strict six-input full pilot remains unchanged. Its manifest schema and snaps
 
 ## Fixture verification
 
-CI runs the early-profile unit suite and the existing strict MCP suite on Ubuntu and Windows. The fixture stdio test performs initialize, list, health call, resource read and normal EOF exit. It checks missing inputs, partial lanes, stale/future times, wall-clock uncertainty, held precedence, worker-without-import linkage, source/session mismatch, two-observation progress, malformed/duplicate JSON keys, file-size refusal, create-only output, manifest pinning and redaction/read-only contracts.
+CI runs the early-profile unit suite and the existing strict MCP suite on Ubuntu and Windows. The fixture stdio test performs initialize, list, health call, resource read and normal EOF exit. It checks missing inputs, partial lanes, stale/future times, wall-clock uncertainty, HELD/FAILED precedence, worker-without-import linkage, source/session mismatch, two-observation progress, malformed/duplicate JSON keys, symlink/hardlink/path traversal refusal, replacement during read, request-time TTL, file-size refusal, bounded fixture resources, create-only output, manifest pinning and redaction/read-only contracts.
 
 These are `SYNTHETIC_TESTED` results. They are not owner-host evidence. The known live 24-hour trial remains `UNKNOWN` until Work 1 supplies its exact genuine report. No host pilot ran in this qualification because no approved host-capable path and complete report handoff were available; product protections were not bypassed.
 
