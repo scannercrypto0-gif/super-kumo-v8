@@ -238,7 +238,7 @@ def test_daily_overlap_proposal_is_read_only_and_hash_pinned(tmp_path):
     assert match["status"] == "MATCH_IDEMPOTENT"
     assert aggregate_match["status"] == "MATCH_IDEMPOTENT"
     assert match["duplicate_insert"] is False and match["write_performed"] is False
-    proposal = build_registry_proposal(aggregate_match, daily_context_15m)
+    proposal = build_registry_proposal(aggregate_match, daily_context_15m, warehouse_root=wh.root)
     assert proposal["status"] == "PROPOSED_ONLY"
     assert proposal["evidence_class"] == "GENERATED_SYNTHETIC_FIXTURE"
     assert proposal["registry_mutation"] is False
@@ -265,8 +265,8 @@ def test_daily_ohlcv_conflict_and_missing_realtime_produce_proposals_not_repairs
     missing = reconcile_daily_bar(None, historical)
     assert missing["status"] == "MISSING_REALTIME"
     assert missing["recovery"] == "AUTHORIZED_BOUNDED_RECOVERY_REQUIRED"
-    assert build_registry_proposal(conflict, daily_context_conflict)["warehouse_mutation"] is False
-    assert build_registry_proposal(missing, daily_context)["status"] == "PROPOSED_ONLY"
+    assert build_registry_proposal(conflict, daily_context_conflict, warehouse_root=wh.root)["warehouse_mutation"] is False
+    assert build_registry_proposal(missing, daily_context, warehouse_root=wh.root)["status"] == "PROPOSED_ONLY"
 
 
 def test_missing_provenance_and_tampered_registry_fail_closed(tmp_path):
@@ -281,10 +281,10 @@ def test_missing_provenance_and_tampered_registry_fail_closed(tmp_path):
         reconcile_daily_bar(dict(live, constituent_sha256=[]), daily)
     bad = dict(registry, snapshot_sha256="f"*64)
     with pytest.raises(ValueError, match="RECONCILIATION_REQUIRED|RECONCILIATION_SEAL_INVALID"):
-        build_registry_proposal({"status":"MATCH_IDEMPOTENT"}, daily_context)
-    with pytest.raises(ValueError, match="REGISTRY_SNAPSHOT_INVALID"):
+        build_registry_proposal({"status":"MATCH_IDEMPOTENT"}, daily_context, warehouse_root=wh.root)
+    with pytest.raises(ValueError, match="DAILY_NATIVE_READBACK_MISMATCH"):
         bad_context = dict(daily_context, registry=bad)
-        build_registry_proposal(reconcile_daily_bar(live, daily), bad_context)
+        build_registry_proposal(reconcile_daily_bar(live, daily), bad_context, warehouse_root=wh.root)
     mutated = dict(live, c="1.5")
     with pytest.raises(ValueError, match="PROJECTED_ROW_INVALID"):
         reconcile_daily_bar(mutated, daily)
@@ -293,7 +293,7 @@ def test_missing_provenance_and_tampered_registry_fail_closed(tmp_path):
     forged_body = {k:v for k,v in forged.items() if k != "reconciliation_sha256"}
     forged["reconciliation_sha256"] = hashlib.sha256(canonical(forged_body)).hexdigest()
     with pytest.raises(ValueError, match="RECONCILIATION_STATUS_OR_LINEAGE_INVALID"):
-        build_registry_proposal(forged, daily_context)
+        build_registry_proposal(forged, daily_context, warehouse_root=wh.root)
 
     def resign_snapshot(snapshot):
         body = {k:v for k,v in snapshot.items() if k != "snapshot_sha256"}
@@ -303,20 +303,20 @@ def test_missing_provenance_and_tampered_registry_fail_closed(tmp_path):
     unrelated = json.loads(json.dumps(registry))
     unrelated["sources"][0]["key"] = "data/spot/daily/klines/ETHUSDT/1m/ETHUSDT-1m-2024-01-01.zip"
     unrelated_context = dict(daily_context, registry=resign_snapshot(unrelated))
-    with pytest.raises(ValueError, match="DAILY_ARCHIVE_RECEIPT_NOT_BOUND"):
-        build_registry_proposal(verified, unrelated_context)
+    with pytest.raises(ValueError, match="DAILY_NATIVE_READBACK_MISMATCH"):
+        build_registry_proposal(verified, unrelated_context, warehouse_root=wh.root)
 
     no_receipt = json.loads(json.dumps(registry))
     no_receipt["sources"][0]["source_receipt_sha256"] = None
     no_receipt_context = dict(daily_context, registry=resign_snapshot(no_receipt))
-    with pytest.raises(ValueError, match="DAILY_ARCHIVE_RECEIPT_NOT_BOUND"):
-        build_registry_proposal(verified, no_receipt_context)
+    with pytest.raises(ValueError, match="DAILY_NATIVE_READBACK_MISMATCH"):
+        build_registry_proposal(verified, no_receipt_context, warehouse_root=wh.root)
 
     contradictory = json.loads(json.dumps(registry))
     contradictory["internal_gaps"] = [[START, START+60_000]]
     gap_context = dict(daily_context, registry=resign_snapshot(contradictory))
-    with pytest.raises(ValueError, match="DAILY_REGISTRY_GAP"):
-        build_registry_proposal(verified, gap_context)
+    with pytest.raises(ValueError, match="DAILY_NATIVE_READBACK_MISMATCH"):
+        build_registry_proposal(verified, gap_context, warehouse_root=wh.root)
 
 
 def test_core_scanner_and_factory_record_wait_without_running_strategy(tmp_path):
@@ -369,7 +369,7 @@ def test_utc_day_boundary_and_registry_provenance(tmp_path):
     with ResearchBarStore(copied) as store:
         realtime = store.read("BTCUSDT", "1m", START)
     assert reconcile_daily_bar(realtime, daily)["status"] == "MATCH_IDEMPOTENT"
-    proposal = build_registry_proposal(reconcile_daily_bar(realtime, daily), daily_context)
+    proposal = build_registry_proposal(reconcile_daily_bar(realtime, daily), daily_context, warehouse_root=wh.root)
     assert proposal["status"] == "PROPOSED_ONLY"
 
 
@@ -453,15 +453,55 @@ def test_unrelated_registry_or_daily_query_context_cannot_bind_bar(tmp_path):
                            end_ms=end, now_ms=end+1_000)
     with ResearchBarStore(copied) as store:
         live = store.read("BTCUSDT", "1m", start)
-    _, daily, _, context = _daily(tmp_path / "warehouse")
+    wh, daily, _, context = _daily(tmp_path / "warehouse")
     reconciliation = reconcile_daily_bar(live, daily)
     wrong = dict(context, requested_window=[start+60_000, start+120_000])
     with pytest.raises(ValueError, match="DAILY_QUERY_ROW_NOT_BOUND|DAILY_QUERY_WINDOW_MISMATCH"):
-        build_registry_proposal(reconciliation, wrong)
+        build_registry_proposal(reconciliation, wrong, warehouse_root=wh.root)
     realtime_only = reconcile_daily_bar(live, None)
     with pytest.raises(ValueError, match="NOT_VERIFIABLE_DAILY_ROW_ABSENT"):
-        build_registry_proposal(realtime_only, context)
+        build_registry_proposal(realtime_only, context, warehouse_root=wh.root)
 
+
+
+def test_same_key_daily_row_and_receipt_substitution_fail_native_readback(tmp_path):
+    source = tmp_path / "feed.sqlite"
+    start, end = feed(source)
+    copied = tmp_path / "research.sqlite"
+    _copy_generated_fixture_to_research_store(source, copied, symbol="BTCUSDT",
+        start_ms=start, end_ms=end, now_ms=end+1_000)
+    with ResearchBarStore(copied) as store:
+        live = store.read("BTCUSDT", "1m", start)
+
+    wh, daily, registry, context = _daily(tmp_path / "warehouse")
+    _, changed_daily, _, _ = _daily(tmp_path / "other-warehouse", changed=0)
+    assert changed_daily["symbol"] == daily["symbol"]
+    assert changed_daily["interval"] == daily["interval"]
+    assert changed_daily["open_ms"] == daily["open_ms"]
+    assert changed_daily["close_exclusive_ms"] == daily["close_exclusive_ms"]
+    assert changed_daily["sha256"] != daily["sha256"]
+
+    # A freshly sealed same-key OHLCV row cannot be attributed to this warehouse.
+    changed_reconciliation = reconcile_daily_bar(live, changed_daily)
+    forged_rows = dict(context, bars=[changed_daily])
+    with pytest.raises(ValueError, match="DAILY_NATIVE_READBACK_MISMATCH"):
+        build_registry_proposal(changed_reconciliation, forged_rows,
+                                warehouse_root=wh.root)
+
+    # A shape-valid substituted ZIP/receipt pin, even after the outer Registry
+    # snapshot is re-sealed, cannot substitute for native receipt verification.
+    from aql.warehouse.storage import canonical
+    forged_registry = json.loads(json.dumps(registry))
+    forged_registry["sources"][0]["source_zip_sha256"] = "a" * 64
+    forged_registry["sources"][0]["source_receipt_sha256"] = "b" * 64
+    registry_body = {k: v for k, v in forged_registry.items()
+                     if k != "snapshot_sha256"}
+    forged_registry["snapshot_sha256"] = hashlib.sha256(
+        canonical(registry_body)).hexdigest()
+    forged_receipt_context = dict(context, registry=forged_registry)
+    with pytest.raises(ValueError, match="DAILY_NATIVE_READBACK_MISMATCH"):
+        build_registry_proposal(reconcile_daily_bar(live, daily),
+                                forged_receipt_context, warehouse_root=wh.root)
 
 def test_missing_schema_locked_database_and_reader_rollback(tmp_path):
     missing = tmp_path / "missing.sqlite"
