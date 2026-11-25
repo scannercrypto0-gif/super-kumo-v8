@@ -461,3 +461,36 @@ def test_unrelated_registry_or_daily_query_context_cannot_bind_bar(tmp_path):
     realtime_only = reconcile_daily_bar(live, None)
     with pytest.raises(ValueError, match="NOT_VERIFIABLE_DAILY_ROW_ABSENT"):
         build_registry_proposal(realtime_only, context)
+
+
+def test_missing_schema_locked_database_and_reader_rollback(tmp_path):
+    missing = tmp_path / "missing.sqlite"
+    with pytest.raises(ValueError, match="FEED_DATABASE_MISSING"):
+        project_feed_window(missing, symbol="BTCUSDT", start_ms=START,
+                            end_ms=START+60_000, now_ms=START+61_000,
+                            allow_synthetic_fixture=True)
+
+    incomplete = tmp_path / "missing-table.sqlite"
+    db = sqlite3.connect(incomplete)
+    db.execute("CREATE TABLE engineering_fixture(schema TEXT, fixture_id TEXT)")
+    db.execute("INSERT INTO engineering_fixture VALUES(?,?)",
+               ("aql.realtime-feed.generated-fixture.v1", "generated-in-test-helper"))
+    db.commit()
+    db.close()
+    with pytest.raises(ValueError, match="FEED_SCHEMA_INCOMPATIBLE"):
+        _project(incomplete, symbol="BTCUSDT", start_ms=START,
+                 end_ms=START+60_000, now_ms=START+61_000)
+
+    source = tmp_path / "locked.sqlite"
+    start, end = feed(source)
+    locker = sqlite3.connect(source, timeout=1)
+    locker.execute("PRAGMA journal_mode=DELETE")
+    locker.execute("BEGIN EXCLUSIVE")
+    with pytest.raises(ValueError, match="FEED_DATABASE_INVALID"):
+        _project(source, symbol="BTCUSDT", start_ms=start, end_ms=end,
+                 now_ms=end+1_000)
+    locker.rollback()
+    locker.close()
+    # Failed read rolled back/closed cleanly; a fresh coherent read succeeds.
+    assert len(_project(source, symbol="BTCUSDT", start_ms=start, end_ms=end,
+                        now_ms=end+1_000)) == 1
