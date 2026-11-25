@@ -475,7 +475,7 @@ class SnapshotReader:
         return {"schema": "atlas.mcp.early-observation.v1", "profile": "EARLY_OBSERVATION",
                 "status": expected, "reason": "EARLY_OBSERVATION_PROFILE",
                 "observed_at_utc": utc(observed), "observed_at_ms": observed,
-                "clock_uncertainty_ms": snapshot.get("clock_uncertainty_ms"),
+                "clock_uncertainty_ms": (bounded_int(snapshot.get("clock_uncertainty_ms")) if snapshot.get("clock_uncertainty_ms") is None or bounded_int(snapshot.get("clock_uncertainty_ms")) is not None else None),
                 "evidence_grade": "EARLY_OBSERVATION_NOT_HOST_ATTESTED",
                 "lanes": lanes, "gaps": {name: lanes[name]["gaps"] for name in LANES},
                 "provenance": {"snapshot_sha256": file_sha, "source_pins": pins,
