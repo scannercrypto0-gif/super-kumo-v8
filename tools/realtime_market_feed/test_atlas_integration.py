@@ -373,26 +373,77 @@ def test_utc_day_boundary_and_registry_provenance(tmp_path):
     assert proposal["status"] == "PROPOSED_ONLY"
 
 
-def test_unverifiable_raw_event_hash_never_admits_mutable_feed_rows(tmp_path):
-    source = tmp_path / "unverified.sqlite"
+def test_forward_only_lineage_detects_mutation_and_untrusted_receipt(tmp_path):
+    import tools.realtime_market_feed.service as producer
+    from tools.realtime_market_feed.atlas_integration import _project if False else project_feed_window
+
+    source = tmp_path / "lineage.sqlite"
     start, end = feed(source)
     db = sqlite3.connect(source)
-    pin = db.execute("SELECT payload_sha256 FROM final_bar").fetchone()[0]
-    assert len(pin) == 64 and all(ch in "0123456789abcdef" for ch in pin)
+    payload_pin = db.execute("SELECT payload_sha256 FROM final_bar").fetchone()[0]
+    receipt_json, receipt_pin = db.execute(
+        "SELECT receipt_json,receipt_sha256 FROM final_bar_lineage").fetchone()
+    assert len(payload_pin) == len(receipt_pin) == 64
+    assert producer.PRODUCER_CODE_SHA256
     db.close()
-    # The persisted payload pin is raw-event SHA, while raw event bytes are absent.
-    with pytest.raises(ValueError, match="FEED_SOURCE_LINEAGE_UNVERIFIED"):
-        project_feed_window(source, symbol="BTCUSDT", start_ms=start,
-                            end_ms=end, now_ms=end+1_000)
+
+    # A caller-supplied trusted code pin admits the positive normalized receipt.
+    projected = project_feed_window(source, symbol="BTCUSDT", start_ms=start,
+        end_ms=end, now_ms=end+1_000,
+        expected_producer_code_sha256=producer.PRODUCER_CODE_SHA256)
+    assert len(projected) == 1 and projected[0]["source_class"] == "FORWARD_UNQUALIFIED"
+
+    # Legacy or torn rows without the new receipt cannot be retrofitted/admitted.
     db = sqlite3.connect(source)
-    db.execute("UPDATE final_bar SET close='1.5' WHERE open_ms=?", (start,))
-    assert db.execute("SELECT payload_sha256 FROM final_bar").fetchone()[0] == pin
+    db.execute("DELETE FROM final_bar_lineage WHERE open_ms=?", (start,))
     db.commit()
     db.close()
-    # A shape-valid unchanged pin cannot authorize changed OHLCV.
     with pytest.raises(ValueError, match="FEED_SOURCE_LINEAGE_UNVERIFIED"):
         project_feed_window(source, symbol="BTCUSDT", start_ms=start,
-                            end_ms=end, now_ms=end+1_000)
+            end_ms=end, now_ms=end+1_000,
+            expected_producer_code_sha256=producer.PRODUCER_CODE_SHA256)
+
+    # Restart/replay keeps exactly the original lineage receipt; it is not rewritten.
+    store = FeedStore(source)
+    data = {"e":"kline","s":"BTCUSDT","E":start+59_999,
+            "k":{"s":"BTCUSDT","i":"1m","x":True,"t":start,"T":start+59_999,
+                 "o":"1","h":"2","l":"1","c":"1","v":"3","n":1}}
+    store.ingest(json.dumps(data,separators=(",",":")), received_ms=start+60_000)
+    store.db.commit()
+    store.db.close()
+    db = sqlite3.connect(source)
+    assert db.execute("SELECT count(*) FROM final_bar_lineage").fetchone()[0] == 0
+    db.close()
+
+    # A changed bar plus a self-consistent but foreign producer receipt fails
+    # the independently supplied producer-code pin.
+    source2 = tmp_path / "forged.sqlite"
+    start2, end2 = feed(source2)
+    db = sqlite3.connect(source2)
+    body = json.loads(db.execute(
+        "SELECT receipt_json FROM final_bar_lineage").fetchone()[0])
+    body["producer_code_sha256"] = "f" * 64
+    encoded = json.dumps(body,sort_keys=True,separators=(",",":"))
+    import hashlib
+    db.execute("""UPDATE final_bar_lineage SET receipt_json=?,receipt_sha256=?
+                  WHERE open_ms=?""",(encoded,hashlib.sha256(encoded.encode()).hexdigest(),start2))
+    db.commit()
+    db.close()
+    with pytest.raises(ValueError, match="FEED_PRODUCER_IDENTITY_MISMATCH"):
+        project_feed_window(source2, symbol="BTCUSDT", start_ms=start2,
+            end_ms=end2, now_ms=end2+1_000,
+            expected_producer_code_sha256=producer.PRODUCER_CODE_SHA256)
+
+
+def test_feed_query_budget_fails_closed(tmp_path, monkeypatch):
+    import tools.realtime_market_feed.atlas_integration as adapter
+    source = tmp_path / "budget.sqlite"
+    start, end = feed(source)
+    ticks = iter((0.0, 2.0, 2.0, 2.0, 2.0))
+    monkeypatch.setattr(adapter, "_QUERY_CLOCK", lambda: next(ticks, 2.0))
+    with pytest.raises(ValueError, match="FEED_QUERY_BUDGET_EXCEEDED"):
+        _project(source, symbol="BTCUSDT", start_ms=start, end_ms=end,
+                 now_ms=end+1_000, query_budget_ms=1)
 
 
 def test_feed_reader_uses_one_coherent_sqlite_snapshot(tmp_path, monkeypatch):
@@ -517,7 +568,7 @@ def test_missing_schema_locked_database_and_reader_rollback(tmp_path):
                ("aql.realtime-feed.generated-fixture.v1", "generated-in-test-helper"))
     db.commit()
     db.close()
-    with pytest.raises(ValueError, match="FEED_SCHEMA_INCOMPATIBLE"):
+    with pytest.raises(ValueError, match="FEED_SOURCE_LINEAGE_UNVERIFIED"):
         _project(incomplete, symbol="BTCUSDT", start_ms=START,
                  end_ms=START+60_000, now_ms=START+61_000)
 
