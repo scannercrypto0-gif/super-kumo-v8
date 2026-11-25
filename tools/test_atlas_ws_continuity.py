@@ -141,4 +141,4 @@ def test_sustained_root_resume_ticket_is_exact_and_exclusive():
     assert not c.resume_ticket_pending(*args[:2]+({**ticket,'sustained_root_correction':False},)+args[3:])
     assert not c.resume_ticket_pending(*args[:2]+({**ticket,'disk_reserve_correction':True},)+args[3:])
     assert not c.resume_ticket_pending(*(('PILOT_STOP_ConnectionResetError',)+args[1:]))
-    assert not c.resume_ticket_pending(args[0],True,ticket,*args[3:])
+    assert not c.resume_ticket_pending(args[0],False,ticket,*args[3:-1],True)
