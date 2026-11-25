@@ -163,6 +163,9 @@ class LiveService:
         self.last_attempt = 0.0
         self.attempts = 0
         self.stop = False
+        self._recovery_lock = threading.Lock()
+        self._recovering_symbols = set()
+        self._recovery_last_attempt = {}
 
     def run(self) -> None:
         delay = 2.0
@@ -223,12 +226,13 @@ class LiveService:
             LOG.exception("Rejected feed message")
 
     def _queue_gap_recovery(self, symbol: str) -> None:
-        if not hasattr(self, "_recovery_lock"):
-            self._recovery_lock = threading.Lock()
-            self._recovering_symbols = set()
+        now = time.monotonic()
         with self._recovery_lock:
             if symbol in self._recovering_symbols:
                 return
+            if now - self._recovery_last_attempt.get(symbol, 0.0) < 60:
+                return
+            self._recovery_last_attempt[symbol] = now
             self._recovering_symbols.add(symbol)
         worker = threading.Thread(target=self._recover_gaps, args=(symbol,), daemon=True)
         worker.start()
