@@ -10,7 +10,7 @@ import sys
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[2]
 WAREHOUSE_CHECKOUT = ROOT / ".integration" / "warehouse"
 sys.path.insert(0, str(WAREHOUSE_CHECKOUT / "src"))
 sys.path.insert(0, str(WAREHOUSE_CHECKOUT))
@@ -88,7 +88,7 @@ def test_integration_writer_is_disabled_without_test_only_switch(tmp_path):
         copy_to_research_store(source, tmp_path / "research.sqlite",
                                symbol="BTCUSDT", start_ms=start, end_ms=end,
                                now_ms=end+1_000)
-    outside = Path(__file__).resolve().parents[4] / "forbidden.sqlite"
+    outside = Path(__import__("tempfile").gettempdir()).parent / "forbidden.sqlite"
     with pytest.raises(ValueError, match="ISOLATED_RESEARCH_STORE_REQUIRED"):
         copy_to_research_store(source, outside, symbol="BTCUSDT",
                                start_ms=start, end_ms=end, now_ms=end+1_000,
@@ -204,17 +204,18 @@ def test_daily_overlap_proposal_is_read_only_and_hash_pinned(tmp_path):
 
 def test_daily_ohlcv_conflict_and_missing_realtime_produce_proposals_not_repairs(tmp_path):
     source = tmp_path / "feed.sqlite"
-    start, end = feed(source, count=15, changed=0)
+    start, end = feed(source, count=3)
     copied = tmp_path / "research.sqlite"
     copy_to_research_store(source, copied, symbol="BTCUSDT", start_ms=start,
                            end_ms=end, now_ms=end+1_000, engineering_test_only=True)
     with ResearchBarStore(copied) as store:
         live = store.read("BTCUSDT", "1m", START)
-    wh, historical, registry = _daily(tmp_path / "warehouse", changed=0)
-    # Daily fixture row 0 matches feed; row 2 is deliberately different.
+    wh, historical, registry = _daily(tmp_path / "warehouse", changed=2)
+    # Same UTC key, but source OHLCV differs; originals stay untouched.
     daily_conflict = wh.query("1m", START+120_000, START+180_000,
                               cutoff_ms=START+DAY)[0]
-    live_row = dict(live, open_ms=START+120_000)
+    with ResearchBarStore(copied) as store:
+        live_row = store.read("BTCUSDT", "1m", START+120_000)
     conflict = reconcile_daily_bar(live_row, daily_conflict)
     assert conflict["status"] == "CONFLICT"
     missing = reconcile_daily_bar(None, historical)
