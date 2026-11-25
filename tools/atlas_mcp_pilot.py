@@ -57,6 +57,28 @@ EARLY_REASON_CODES = {
 
 
 
+def approved_root(path):
+    given = Path(path)
+    if ".." in given.parts:
+        raise ValueError("APPROVED_OUTPUT_ROOT_INVALID")
+    target = given.absolute()
+    for item in (target, *target.parents):
+        if item.exists() or item.is_symlink():
+            st = item.lstat()
+            if item.is_symlink() or getattr(st, "st_file_attributes", 0) & 1024:
+                raise ValueError("APPROVED_OUTPUT_ROOT_INVALID")
+    if not target.is_dir():
+        raise ValueError("APPROVED_OUTPUT_ROOT_INVALID")
+    return target.resolve(strict=True)
+
+
+def direct_child(path, root, code):
+    given = Path(path)
+    if ".." in given.parts or given.absolute().parent.resolve(strict=True) != root:
+        raise ValueError(code)
+    return given.absolute()
+
+
 def utc(ms):
     if type(ms) is not int or ms < 0:
         return None
@@ -183,32 +205,41 @@ def make_lane(name, lane, *, observed_ms=None, registry_last_open_ms=None, regis
 
 
 class SnapshotReader:
-    def __init__(self, manifest_path, expected_manifest_sha):
-        self.profile = "strict"
-        self.view = self.unavailable("EVIDENCE_UNAVAILABLE")
+    def __init__(self, manifest_path, expected_manifest_sha, *, profile="strict",
+                 approved_output_root=None):
+        self.profile = profile if profile in {"strict", "early"} else "strict"
+        self.view = self.unavailable("EVIDENCE_UNAVAILABLE", early=self.profile == "early")
         self.manifest_path = Path(manifest_path)
         self.expected_manifest_sha = expected_manifest_sha
         self.snapshot_path = None
         self.snapshot_file_sha = None
+        output_root = None
         try:
+            if self.profile == "early":
+                if approved_output_root is None:
+                    raise ValueError("APPROVED_OUTPUT_ROOT_REQUIRED")
+                output_root = approved_root(approved_output_root)
+                self.manifest_path = direct_child(self.manifest_path, output_root,
+                                                  "MANIFEST_OUTSIDE_APPROVED_ROOT")
             manifest, raw_manifest_sha = watchdog.read_json(self.manifest_path)
             if raw_manifest_sha != expected_manifest_sha:
                 raise ValueError("MANIFEST_PIN_MISMATCH")
             watchdog.sealed_hash(manifest, "manifest_sha256", "MANIFEST_SEAL_INVALID")
             manifest_schema = manifest.get("schema")
-            if manifest_schema == "atlas.mcp.source-manifest.v1":
-                self.profile = "strict"
+            if self.profile == "strict" and manifest_schema == "atlas.mcp.source-manifest.v1":
                 expected_snapshot_schema = "atlas.operator.health-snapshot.v1"
-            elif manifest_schema == "atlas.mcp.early-source-manifest.v1":
-                self.profile = "early"
+            elif self.profile == "early" and manifest_schema == "atlas.mcp.early-source-manifest.v1":
                 expected_snapshot_schema = "atlas.operator.early-observation.v1"
             else:
-                raise ValueError("MANIFEST_SCHEMA_INVALID")
+                raise ValueError("MANIFEST_PROFILE_MISMATCH")
             snapshot_path = manifest.get("snapshot_path")
             pinned_sha = manifest.get("snapshot_file_sha256")
             if type(snapshot_path) is not str or not Path(snapshot_path).is_absolute() or not is_sha256(pinned_sha):
                 raise ValueError("MANIFEST_SOURCE_INVALID")
             self.snapshot_path = Path(snapshot_path)
+            if self.profile == "early":
+                self.snapshot_path = direct_child(self.snapshot_path, output_root,
+                                                  "SNAPSHOT_OUTSIDE_APPROVED_ROOT")
             self.snapshot_file_sha = pinned_sha
             snapshot, snapshot_file_sha = watchdog.read_json(self.snapshot_path)
             if snapshot_file_sha != pinned_sha:
@@ -660,10 +691,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", required=True, type=Path, help="Local sealed source manifest; never an MCP argument.")
     parser.add_argument("--manifest-sha256", required=True, help="Out-of-band SHA-256 pin for manifest bytes.")
+    parser.add_argument("--profile", choices=("strict", "early"), default="strict")
+    parser.add_argument("--approved-output-root", type=Path,
+                        help="Required for early profile; manifest and snapshot must be direct children.")
     args = parser.parse_args()
     if not is_sha256(args.manifest_sha256):
         parser.error("--manifest-sha256 must be lowercase SHA-256")
-    server = MCPServer(SnapshotReader(args.manifest, args.manifest_sha256))
+    if args.profile == "early" and args.approved_output_root is None:
+        parser.error("--approved-output-root is required for --profile early")
+    reader = SnapshotReader(args.manifest, args.manifest_sha256, profile=args.profile,
+                            approved_output_root=args.approved_output_root)
+    server = MCPServer(reader)
     for raw in sys.stdin.buffer:
         if len(raw) > MAX_LINE_BYTES:
             response = server.error(None, -32700, "Request exceeds size bound")
