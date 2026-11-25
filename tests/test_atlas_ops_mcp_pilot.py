@@ -160,6 +160,48 @@ class McpPilotTests(unittest.TestCase):
         self.assertEqual(missing_link["status"], "UNKNOWN")
         self.assertIsNone(missing_link["last_validated_committed_progress"]["source_rows"])
 
+    def test_isolated_stdio_calls_both_tools_and_all_four_resources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest, pin = write_fixture(root)
+            requests = [
+                {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                 "params": {"protocolVersion": pilot.LEGACY, "capabilities": {},
+                            "clientInfo": {"name": "isolated-test", "version": "1"}}},
+                {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                 "params": {"name": "atlas.runtime.health", "arguments": {}}},
+                *[{"jsonrpc": "2.0", "id": 3 + index, "method": "tools/call",
+                   "params": {"name": "atlas.lane.latest", "arguments": {"lane": lane}}}
+                  for index, lane in enumerate(("history", "daily", "live"))],
+                *[{"jsonrpc": "2.0", "id": 6 + index, "method": "resources/read",
+                   "params": {"uri": uri}}
+                  for index, uri in enumerate(("atlas://runtime/health", "atlas://lane/history",
+                                               "atlas://lane/daily", "atlas://lane/live"))],
+            ]
+            command = [sys.executable, "-B", str(ROOT / "tools" / "atlas_mcp_pilot.py"),
+                       "--manifest", str(manifest), "--manifest-sha256", pin]
+            result = subprocess.run(command, input="".join(json.dumps(row) + "\\n" for row in requests),
+                                    capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            responses = [json.loads(line) for line in result.stdout.splitlines()]
+        self.assertEqual(len(responses), 8)
+        health = responses[1]["result"]["structuredContent"]
+        self.assertEqual(health["schema"], "atlas.mcp.health.v1")
+        self.assertEqual(health["status"], "HELD")
+        self.assertEqual(health["trading_authority"], "NONE")
+        tool_lanes = [row["result"]["structuredContent"] for row in responses[2:5]]
+        resource_views = [json.loads(row["result"]["contents"][0]["text"]) for row in responses[5:]]
+        self.assertEqual([row["lane"] for row in tool_lanes], ["history", "daily", "live"])
+        self.assertEqual([row["status"] for row in tool_lanes], ["STALE", "UNKNOWN", "HELD"])
+        self.assertEqual(resource_views[0]["status"], "HELD")
+        self.assertEqual([row["lane"] for row in resource_views[1:]], ["history", "daily", "live"])
+        self.assertEqual([row["status"] for row in resource_views[1:]],
+                         ["STALE", "UNKNOWN", "HELD"])
+        for view in (health, *tool_lanes, *resource_views):
+            self.assertEqual(view["trading_authority"], "NONE")
+            self.assertNotIn("C:\\\\private", json.dumps(view))
+            self.assertNotIn("raw_candles", json.dumps(view))
+
     def test_modern_and_legacy_protocol_read_only_surface(self):
         server = pilot.MCPServer(type("Reader", (), {"view": pilot.SnapshotReader.unavailable("TEST")}))
         modern_meta = {pilot.META_VERSION: pilot.MODERN, pilot.META_CAPABILITIES: {}}
