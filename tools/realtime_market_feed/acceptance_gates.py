@@ -51,19 +51,23 @@ def evaluate_24h_report(report, *, expected_code_sha256, expected_symbols,
         failures.append("DURABLE_READBACK_NOT_PROVEN")
     if report.get("fresh_trade_quote_final_bar") is not True:
         failures.append("LATEST_MARKET_STATE_NOT_FRESH")
+    if report.get("short_gaps_recovered") is not True:
+        failures.append("SHORT_GAP_RECOVERY_NOT_PROVEN")
+    if report.get("unexplained_message_rejections") != 0:
+        failures.append("MESSAGE_REJECTIONS_UNEXPLAINED")
     if report.get("open_gaps") != []:
         failures.append("OPEN_GAPS_PRESENT_OR_UNREPORTED")
     events = report.get("events")
     if not isinstance(events, list):
         failures.append("EVENT_EVIDENCE_MISSING")
         events = []
-    rotations = [i for i, event in enumerate(events)
-                 if isinstance(event, dict) and event.get("kind") == "PLANNED_ROTATION"]
-    if not rotations or not any(
-        isinstance(event, dict) and event.get("kind") == "CONNECTED"
-        and any(j < i for j in rotations)
-        for i, event in enumerate(events)
-    ):
+    rotations = [event.get("at_ms") for event in events
+                 if isinstance(event, dict) and event.get("kind") == "PLANNED_ROTATION"
+                 and type(event.get("at_ms")) is int]
+    reconnects = [event.get("at_ms") for event in events
+                  if isinstance(event, dict) and event.get("kind") == "CONNECTED"
+                  and type(event.get("at_ms")) is int]
+    if not rotations or not any(t > r for r in rotations for t in reconnects):
         failures.append("PLANNED_ROTATION_RECONNECT_NOT_PROVEN")
     if report.get("replay_after_restart_verified") is not True:
         failures.append("RESTART_REPLAY_NOT_PROVEN")
