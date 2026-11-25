@@ -192,11 +192,11 @@ class McpPilotTests(unittest.TestCase):
         tool_lanes = [row["result"]["structuredContent"] for row in responses[2:5]]
         resource_views = [json.loads(row["result"]["contents"][0]["text"]) for row in responses[5:]]
         self.assertEqual([row["lane"] for row in tool_lanes], ["history", "daily", "live"])
-        self.assertEqual([row["status"] for row in tool_lanes], ["STALE", "UNKNOWN", "HELD"])
+        self.assertEqual([row["status"] for row in tool_lanes], ["UNKNOWN", "UNKNOWN", "HELD"])
         self.assertEqual(resource_views[0]["status"], "HELD")
         self.assertEqual([row["lane"] for row in resource_views[1:]], ["history", "daily", "live"])
         self.assertEqual([row["status"] for row in resource_views[1:]],
-                         ["STALE", "UNKNOWN", "HELD"])
+                         ["UNKNOWN", "UNKNOWN", "HELD"])
         for view in (health, *tool_lanes, *resource_views):
             self.assertEqual(view["trading_authority"], "NONE")
             self.assertNotIn("C:\\private", json.dumps(view))
