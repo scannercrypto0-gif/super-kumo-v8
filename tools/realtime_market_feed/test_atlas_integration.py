@@ -582,3 +582,29 @@ def test_missing_schema_locked_database_and_reader_rollback(tmp_path):
     # Failed read rolled back/closed cleanly; a fresh coherent read succeeds.
     assert len(_project(source, symbol="BTCUSDT", start_ms=start, end_ms=end,
                         now_ms=end+1_000)) == 1
+
+
+def test_feed_row_and_digest_substitution_fail_closed(tmp_path):
+    import tools.realtime_market_feed.service as producer
+
+    source=tmp_path/"row-tamper.sqlite"
+    start,end=feed(source)
+    db=sqlite3.connect(source)
+    # Shape-valid digest substitution does not override the producer receipt.
+    db.execute("UPDATE final_bar SET payload_sha256=? WHERE open_ms=?",
+               ("f"*64,start))
+    db.commit()
+    db.close()
+    with pytest.raises(ValueError,match="FEED_LINEAGE_ROW_MISMATCH"):
+        project_feed_window(source,symbol="BTCUSDT",start_ms=start,end_ms=end,
+            now_ms=end+1_000,expected_producer_code_sha256=producer.PRODUCER_CODE_SHA256)
+
+    source=tmp_path/"ohlcv-tamper.sqlite"
+    start,end=feed(source)
+    db=sqlite3.connect(source)
+    db.execute("UPDATE final_bar SET close='1.5' WHERE open_ms=?",(start,))
+    db.commit()
+    db.close()
+    with pytest.raises(ValueError,match="FEED_LINEAGE_ROW_MISMATCH"):
+        project_feed_window(source,symbol="BTCUSDT",start_ms=start,end_ms=end,
+            now_ms=end+1_000,expected_producer_code_sha256=producer.PRODUCER_CODE_SHA256)
