@@ -308,3 +308,93 @@ def test_utc_day_boundary_and_registry_provenance(tmp_path):
     with ResearchBarStore(copied) as store:
         realtime = store.read("BTCUSDT", "1m", START)
     assert reconcile_daily_bar(realtime, daily)["status"] == "MATCH_IDEMPOTENT"
+
+
+def test_unverifiable_raw_event_hash_never_admits_mutable_feed_rows(tmp_path):
+    source = tmp_path / "unverified.sqlite"
+    start, end = feed(source)
+    db = sqlite3.connect(source)
+    pin = db.execute("SELECT payload_sha256 FROM final_bar").fetchone()[0]
+    assert len(pin) == 64 and all(ch in "0123456789abcdef" for ch in pin)
+    db.close()
+    # The persisted payload pin is raw-event SHA, while raw event bytes are absent.
+    with pytest.raises(ValueError, match="FEED_SOURCE_LINEAGE_UNVERIFIED"):
+        project_feed_window(source, symbol="BTCUSDT", start_ms=start,
+                            end_ms=end, now_ms=end+1_000)
+    db = sqlite3.connect(source)
+    db.execute("UPDATE final_bar SET close='1.5' WHERE open_ms=?", (start,))
+    assert db.execute("SELECT payload_sha256 FROM final_bar").fetchone()[0] == pin
+    db.commit()
+    db.close()
+    # A shape-valid unchanged pin cannot authorize changed OHLCV.
+    with pytest.raises(ValueError, match="FEED_SOURCE_LINEAGE_UNVERIFIED"):
+        project_feed_window(source, symbol="BTCUSDT", start_ms=start,
+                            end_ms=end, now_ms=end+1_000)
+
+
+def test_feed_reader_uses_one_coherent_sqlite_snapshot(tmp_path, monkeypatch):
+    import threading
+    import tools.realtime_market_feed.atlas_integration as adapter
+
+    source = tmp_path / "concurrent.sqlite"
+    start, end = feed(source)
+    snapshot_ready = threading.Event()
+    writer_committed = threading.Event()
+    received, failures = [], []
+
+    def pause_between_snapshot_reads():
+        snapshot_ready.set()
+        if not writer_committed.wait(timeout=5):
+            raise AssertionError("WRITER_DID_NOT_COMMIT")
+
+    monkeypatch.setattr(adapter, "_SNAPSHOT_TEST_HOOK",
+                        pause_between_snapshot_reads)
+
+    def read_snapshot():
+        try:
+            received.extend(_project(source, symbol="BTCUSDT", start_ms=start,
+                                     end_ms=end, now_ms=end+1_000))
+        except Exception as exc:  # captured for assertion in the owner thread
+            failures.append(exc)
+
+    reader = threading.Thread(target=read_snapshot)
+    reader.start()
+    assert snapshot_ready.wait(timeout=5)
+    writer = sqlite3.connect(source, timeout=5)
+    writer.execute("PRAGMA journal_mode=WAL")
+    writer.execute("BEGIN IMMEDIATE")
+    writer.execute("""INSERT INTO open_gap(symbol,interval,start_ms,end_ms,reason,detected_ms)
+                      VALUES(?,?,?,?,?,?)""",
+                   ("BTCUSDT", "1m", start, end, "concurrent-fixture-gap", end))
+    writer.execute("INSERT INTO service_event(at_ms,kind,detail) VALUES(?,?,?)",
+                   (end, "FINAL_BAR_CONFLICT", "BTCUSDT:" + str(start)))
+    writer.commit()
+    writer.close()
+    writer_committed.set()
+    reader.join(timeout=5)
+    monkeypatch.setattr(adapter, "_SNAPSHOT_TEST_HOOK", None)
+    assert not reader.is_alive()
+    assert not failures
+    assert len(received) == 1
+    # The next read observes the committed gap; the in-flight read saw pre-commit.
+    with pytest.raises(ValueError, match="OPEN_HISTORY_GAP"):
+        _project(source, symbol="BTCUSDT", start_ms=start,
+                 end_ms=end, now_ms=end+1_000)
+
+
+def test_unrelated_registry_or_daily_query_context_cannot_bind_bar(tmp_path):
+    source = tmp_path / "feed.sqlite"
+    start, end = feed(source)
+    copied = tmp_path / "research.sqlite"
+    copy_to_research_store(source, copied, symbol="BTCUSDT", start_ms=start,
+                           end_ms=end, now_ms=end+1_000, engineering_test_only=True)
+    with ResearchBarStore(copied) as store:
+        live = store.read("BTCUSDT", "1m", start)
+    _, daily, _, context = _daily(tmp_path / "warehouse")
+    reconciliation = reconcile_daily_bar(live, daily)
+    wrong = dict(context, requested_window=[start+60_000, start+120_000])
+    with pytest.raises(ValueError, match="DAILY_QUERY_ROW_NOT_BOUND|DAILY_QUERY_WINDOW_MISMATCH"):
+        build_registry_proposal(reconciliation, wrong)
+    realtime_only = reconcile_daily_bar(live, None)
+    with pytest.raises(ValueError, match="NOT_VERIFIABLE_DAILY_ROW_ABSENT"):
+        build_registry_proposal(realtime_only, context)
