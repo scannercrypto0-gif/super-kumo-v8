@@ -24,4 +24,4 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: python -m pip install -r tools/realtime_market_feed/requirements.txt pytest
-      - run: python -m pytest tools/realtime_market_feed/test_service.py -q
+      - run: python -m pytest tools/realtime_market_feed/test_service.py tools/realtime_market_feed/test_backfill.py -q
