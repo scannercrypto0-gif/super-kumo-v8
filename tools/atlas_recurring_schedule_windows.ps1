@@ -87,6 +87,33 @@ function Read-TickHealth {
                last_failure=$lastFailure; freshness_limit_ms=if ($cadenceMs -gt 0) {$cadenceMs + 30000}}
 }
 
+
+function Read-DailySourceEvidence {
+    param($Settings, $Success)
+    if (!$Settings.daily_policy -or !$Success -or
+        $null -eq $Success.source_day_ms -or @($Success.receipts).Count -ne 1) {
+        return $null
+    }
+    $previous = $env:PYTHONPATH
+    $env:PYTHONPATH = "$($Settings.tree)/src;$($Settings.tree)"
+    Push-Location -LiteralPath $Settings.tree
+    try {
+        $helper = Join-Path $PSScriptRoot 'atlas_daily_health_evidence.py'
+        $output = & $Settings.python -B $helper --state $Settings.state --policy $Settings.daily_policy --pin $Settings.pin --source-day-ms ([string]$Success.source_day_ms) --receipt-sha256 ([string]@($Success.receipts)[0])
+        if ($LASTEXITCODE -ne 0) { return $null }
+        $view = [string]::Join([Environment]::NewLine, $output) | ConvertFrom-Json
+        if ($view.status -eq 'VERIFIED') { return $view }
+        return $null
+    }
+    catch {
+        return $null
+    }
+    finally {
+        Pop-Location
+        $env:PYTHONPATH = $previous
+    }
+}
+
 if ($Mode -in 'prepare','install') {
     if ($TaskName -notmatch '^ATLAS-Research-[A-Za-z0-9-]+$' -or !$Python -or !$State) {
         throw 'TASK_NAME_PYTHON_AND_STATE_REQUIRED'
@@ -158,6 +185,10 @@ if ($Mode -in 'prepare','install') {
     }
     $first = (Get-Date).AddSeconds(35)
     $duration = New-TimeSpan -Minutes ($IntervalMinutes * ($Ticks - 1)) -Seconds 15
+    $dailyFirstCheckMs = $null
+    if ($DailyPolicy) {
+        $dailyFirstCheckMs = $opening.AddDays(1).AddHours(6).ToUnixTimeMilliseconds()
+    }
     $settings = [ordered]@{
         python = $Python; tree = $tree; state = $State; task = $TaskName
         log = Join-Path $stage 'ticks.jsonl'
@@ -166,7 +197,7 @@ if ($Mode -in 'prepare','install') {
         pin = if ($DailyPolicy) {$DailyPolicySha256} else {$AuthorizedPlanSha256}
         authorized_plan = $AuthorizedPlan
         daily_policy = $DailyPolicy
-        daily_first_check_ms = if ($DailyPolicy) {$opening.AddDays(1).AddHours(6).ToUnixTimeMilliseconds()}
+        daily_first_check_ms = $dailyFirstCheckMs
         prepared_only = ($Mode -eq 'prepare')
         runtime_pin_version = 2
         runtime = @($runtime | ForEach-Object { @{path=$_;sha256=(Get-FileHash -LiteralPath $_).Hash} })
@@ -234,6 +265,16 @@ switch ($Mode) {
         $evidence = Read-TickHealth $settings $nowMs
         $runtimeState = 'PIN_VERIFIED'
         try { Test-Runtime $settings } catch { $runtimeState = 'RUNTIME_PIN_MISMATCH' }
+        if ($settings.daily_policy -and $runtimeState -eq 'PIN_VERIFIED' -and $evidence.last_success) {
+            $evidence.last_success | Add-Member -NotePropertyName daily_source_evidence_status -NotePropertyValue 'UNVERIFIED' -Force
+            $dailySource = Read-DailySourceEvidence $settings $evidence.last_success
+            if ($dailySource) {
+                $evidence.last_success | Add-Member -NotePropertyName daily_source_evidence_status -NotePropertyValue 'VERIFIED' -Force
+                $evidence.last_success | Add-Member -NotePropertyName daily_worker_receipt_sha256 -NotePropertyValue $dailySource.receipt_sha256 -Force
+                $evidence.last_success | Add-Member -NotePropertyName source_zip_sha256 -NotePropertyValue $dailySource.source_zip_sha256 -Force
+                $evidence.last_success | Add-Member -NotePropertyName checksum_sha256 -NotePropertyValue $dailySource.checksum_sha256 -Force
+            }
+        }
         $schedulerState = if ($settings.prepared_only) { 'NOT_REGISTERED' }
                           elseif (!$task) { 'REMOVED' }
                           elseif (!$settings.daily_policy -and $nowMs -gt $settings.deadline_ms) { 'EXPIRED' }

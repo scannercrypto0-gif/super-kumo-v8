@@ -1,0 +1,73 @@
+name: ATLAS operational watchdog and MCP pilot contract
+on:
+  push:
+    branches: [codex/atlas-ops-watchdog-mcp-001]
+    paths:
+      - '.github/workflows/atlas-ops-watchdog.yml'
+      - 'tools/atlas_ops_watchdog.py'
+      - 'tools/atlas_daily_health_evidence.py'
+      - 'tools/atlas_recurring_schedule_windows.ps1'
+      - 'tools/atlas_mcp_pilot.py'
+      - 'tools/atlas_mcp_manifest.py'
+      - 'tests/test_atlas_ops_watchdog.py'
+      - 'tests/test_atlas_daily_health_evidence.py'
+      - 'tests/test_atlas_ops_mcp_pilot.py'
+      - 'tests/test_atlas_ops_mcp_freshness.py'
+      - 'tools/atlas_early_observation.py'
+      - 'tests/test_atlas_early_observation.py'
+      - 'docs/research/atlas-mcp-early-observation.md'
+      - 'docs/research/atlas-operational-watchdog-mcp-001.md'
+      - 'docs/research/atlas-mcp-pilot-readonly.md'
+  pull_request:
+    branches: [integration/package-e-g1-g12-pinned-20261105]
+    paths:
+      - '.github/workflows/atlas-ops-watchdog.yml'
+      - 'tools/atlas_ops_watchdog.py'
+      - 'tools/atlas_daily_health_evidence.py'
+      - 'tools/atlas_recurring_schedule_windows.ps1'
+      - 'tools/atlas_mcp_pilot.py'
+      - 'tools/atlas_mcp_manifest.py'
+      - 'tests/test_atlas_ops_watchdog.py'
+      - 'tests/test_atlas_daily_health_evidence.py'
+      - 'tests/test_atlas_ops_mcp_pilot.py'
+      - 'tests/test_atlas_ops_mcp_freshness.py'
+      - 'docs/research/atlas-operational-watchdog-mcp-001.md'
+      - 'docs/research/atlas-mcp-pilot-readonly.md'
+permissions:
+  contents: read
+jobs:
+  bounded-read-only:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Parse the Windows scheduler script
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'tools/atlas_recurring_schedule_windows.ps1'), [ref]$tokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | Format-List Message,Extent
+            throw 'POWERSHELL_PARSE_FAILED'
+          }
+      - name: Run focused Daily lineage and watchdog tests
+        shell: bash
+        run: |
+          python -B -m unittest discover -s tests -p 'test_atlas_daily_health_evidence.py' -v
+          python -B -m unittest discover -s tests -p 'test_atlas_ops_watchdog.py' -v
+      - name: Run focused read-only MCP contract
+        shell: bash
+        run: |
+          python -B -m unittest discover -s tests -p 'test_atlas_ops_mcp*.py' -v
+          python -B -m unittest discover -s tests -p 'test_atlas_early_observation.py' -v
