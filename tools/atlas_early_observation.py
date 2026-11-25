@@ -253,9 +253,7 @@ def _daily(item, now):
         state, reason, age = _age_state(observed, now)
         last = doc.get("last_success") if type(doc.get("last_success")) is dict else {}
         failure = doc.get("last_failure")
-        failure_reason = (safe_reason(failure.get("reason"))
-                          if type(failure) is dict else
-                          safe_reason(failure) if type(failure) is str else None)
+        failure_reason = "DAILY_FAILURE_REASON_REPORTED" if failure is not None else None
         receipt = last.get("daily_worker_receipt_sha256")
         if receipt is not None:
             require(watchdog.HEX64.fullmatch(receipt) is not None, "DAILY_RECEIPT_PIN_INVALID")
