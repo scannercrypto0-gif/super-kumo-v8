@@ -26,6 +26,39 @@ from tools.atlas_ws_receive_diagnostics import receive_fault_context, classify_t
 
 MARKER = "atlas-live-research-v1"
 
+def dedicated_research_root(raw, marker, *, sustained):
+    """Create live segment state under its authorized runtime root.
+
+    The generic public-observation helper intentionally rejects E: as a
+    separate-volume safeguard. The sustained operator service has a different
+    custody model: it is pinned beneath the configured runtime's segments/
+    directory, and only its existing continuous authorization permits it.
+    """
+    if not sustained:
+        return dedicated_root(raw, marker)
+    path = Path(raw).absolute()
+    service_root = path.parent.parent
+    need(path.parent.name == "segments"
+         and (service_root / "config.json").is_file()
+         and (service_root / "continuous-research.authorized.json").is_file(),
+         "SUSTAINED_STATE_ROOT_SCOPE")
+    def linked(item):
+        return item.is_symlink() or getattr(item, "is_junction", lambda: False)()
+    if any(linked(item) for item in (path, *path.parents)):
+        raise ValueError("State root cannot traverse a symlink or junction")
+    path.mkdir(parents=True, exist_ok=True)
+    owner = path / marker
+    if not owner.exists():
+        if any(path.iterdir()):
+            raise ValueError("Initial state root must be empty")
+        with owner.open("x", encoding="ascii") as stream:
+            stream.write(marker)
+    if any(linked(item) for item in path.iterdir()) or owner.read_text(encoding="ascii") != marker:
+        raise ValueError("Invalid dedicated state marker")
+    return path
+
+
+
 
 class HostClock:
     @staticmethod
@@ -142,7 +175,7 @@ def run(root, plan, pin, fixture, *, verifier, clock, transport, wait=time.sleep
          type(uncertainty) is int and 0 <= uncertainty <= 250 and
          all(qualification.get(k) for k in ("source_rights_ref", "region_ref", "custody_ref")),
          "HOST_QUALIFICATION_REQUIRED")
-    root = dedicated_root(root, MARKER)
+    root = dedicated_research_root(root, MARKER, sustained=sustained)
     scope = dict(plan_pin=pin, endpoint=ENDPOINT, state_path=str(root.resolve()),
                  connections=plan["max_connections"], rest_requests=0,
                  deadline_ms=plan["slot"] + plan["wall_ms"])
