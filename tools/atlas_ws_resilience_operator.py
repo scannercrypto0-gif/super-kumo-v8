@@ -223,6 +223,15 @@ def inspect(snapshot, repo, expected_commit, now):
         code = str(exc) if isinstance(exc,ValueError) and re.fullmatch('[A-Z][A-Z0-9_]{1,119}',str(exc)) else 'QUOTA_EVIDENCE_INVALID'
         quota = dict(policy_verified=False, ready=False, reason=code, scoped_connections=2,
                      shared_ip_headroom='UNVERIFIED_EXISTING_PILOT_ONLY')
+    slot_state = root/'segments'/str(hold['slot_ms'])
+    prestart_evidence = dict(
+        state_directory_exists=slot_state.exists(),
+        health_log_exists=(slot_state/'health.jsonl').exists(),
+        segment_execution_active=(root/'segment-execution.active.json').exists(),
+        safe_quota_bootstrap=(hold['reason']=='LIVE_SERVICE_SEGMENT_FAILED'
+            and not slot_state.exists()
+            and not (slot_state/'health.jsonl').exists()
+            and not (root/'segment-execution.active.json').exists()))
     blockers = sorted({r['reason'] for r in rejected})
     if snapshot.get('task_state') != 'Ready' or snapshot.get('task_enabled') is not True:
         blockers.append('TASK_NOT_QUIESCENT_READY')
@@ -243,9 +252,11 @@ def inspect(snapshot, repo, expected_commit, now):
                 task_state=snapshot.get('task_state'), task_enabled=snapshot.get('task_enabled'),
                 collector_processes=snapshot.get('collector_processes'),
                 supervisor_lock_available=snapshot.get('supervisor_lock_available'), hold_reason=hold['reason'],
-                hold_slot_ms=hold['slot_ms'], blockers=blockers, manifest_scope=manifest_scope, clock_probe='NOT_PERFORMED',
+                hold_slot_ms=hold['slot_ms'], blockers=blockers, manifest_scope=manifest_scope,
+                prestart_evidence=prestart_evidence, clock_probe='NOT_PERFORMED',
                 source_class='LIVE_CAPTURE', retention='SANITIZED_RECEIPTS_ONLY',
-                root_cause='ROOT_CAUSE_NOT_PROVEN', network_calls=0, writes=0,
+                root_cause='E_DRIVE_REJECTED_BEFORE_SEGMENT_INITIALIZATION' if prestart_evidence['safe_quota_bootstrap'] else 'ROOT_CAUSE_NOT_PROVEN',
+                network_calls=0, writes=0,
                 orders=0, trading_authority='NONE', real_pit_oos='BLOCKED')
 
 
@@ -318,7 +329,10 @@ def authorize(path, diagnostic, now, *, action='DEPLOY_ONE_RECOVERY'):
         need(correction and not disk_correction and auth.get('continuous_research') is True and
              auth.get('expected_previous_config_sha256')==diagnostic['identity']['config_sha256'],
              'FRESH_PING_CORRECTION_AUTHORITY_REQUIRED')
-    if diagnostic['blockers']:
+    safe_bootstrap = (root_correction and
+        diagnostic.get('prestart_evidence',{}).get('safe_quota_bootstrap') is True and
+        diagnostic['blockers']==['QUOTA_NOT_READY'])
+    if diagnostic['blockers'] and not safe_bootstrap:
         raise HostPreflightBlocked(diagnostic)
     return auth, digest(raw)
 
