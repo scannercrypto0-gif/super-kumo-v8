@@ -124,7 +124,7 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
         _need(type(receipt) is str and HEX.fullmatch(receipt) is not None,
               "FEED_RECEIPT_INVALID")
         values = {key: row[col] for key, col in
-                  (("o", "open"), ("h", "high"), ("l", "low),
+                  (("o", "open"), ("h", "high"), ("l", "low"),
                    ("c", "close"), ("v", "volume"))}
         o, h, l, c, v = (_decimal(values[k]) for k in ("o", "h", "l", "c", "v"))
         _need(l <= min(o, c) <= max(o, c) <= h, "OHLC_INVALID")
