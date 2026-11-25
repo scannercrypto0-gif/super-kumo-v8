@@ -28,6 +28,7 @@ MAX_REFRESH_CPU_MS = 1_000
 MIN_REFRESH_INTERVAL_MS = 300_000
 MAX_PREVIOUS_AGE_MS = 1_800_000
 MAX_SNAPSHOT_AGE_MS = 300_000
+MAX_EXPECTED_WAIT_MS = 86_400_000
 MAX_REPORTED_RANGES = 32
 
 
@@ -40,6 +41,25 @@ def safe_reason(value):
     if type(value) is str and re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", value):
         return value
     return "REFUSAL_REDACTED"
+
+
+def safe_enum(value, allowed):
+    return value if type(value) is str and value in allowed else "UNRECOGNIZED"
+
+
+DAILY_TASK_STATES = {"Ready", "Running", "Disabled", "Queued", "Unknown", "Completed"}
+DAILY_RUNTIME_STATES = {"PIN_VERIFIED", "CONFIG_PIN_MISMATCH", "UNVERIFIED", "UNKNOWN",
+                        "ERROR", "NOT_RUNNING", "READY"}
+DAILY_CYCLE_STATES = {"WAIT_FOR_SOURCE", "RECENT_RESEARCH_RECEIPT", "COMPLETE", "FAILED",
+                      "UNKNOWN", "NO_CURRENT_ENTRY"}
+DAILY_FRESHNESS_STATES = {"LATEST_DUE_DAY_RECEIVED", "STALE", "UNKNOWN",
+                          "WAITING_FOR_DUE_DAY", "NOT_MEASURED", "NO_CURRENT_ENTRY"}
+HISTORY_REPORT_STATES = {"CONTINUING", "COMPLETE", "COMPLETE_WITH_GAPS",
+                         "FULL_HISTORY_BLOCKED_EXACT_SOURCE", "WAIT_FOR_SOURCE",
+                         "SOURCE_WAIT", "UNKNOWN", "FAILED", "RUNNING", "READY"}
+LIVE_REPORT_STATES = {"HELD", "HOLD", "FAILED", "WS_OPERATOR_BLOCKED",
+                      "AWAITING_EXISTING_SCHEDULE", "OBSERVING_CONTINUOUS_ACCEPTANCE",
+                      "OBSERVING", "HEALTHY", "STALE", "UNKNOWN"}
 
 
 def _identity(st):
@@ -183,7 +203,7 @@ def _history(item, registry_item, previous, now, clock_ok):
             elif view.get("status") in {"WAIT_FOR_SOURCE", "SOURCE_WAIT"}:
                 next_check = doc.get("next_check_ms")
                 state, reason = (("EXPECTED_WAIT", "HISTORY_SOURCE_WAIT")
-                                 if type(next_check) is int and next_check >= now
+                                 if type(next_check) is int and now <= next_check <= now + MAX_EXPECTED_WAIT_MS
                                  else ("UNKNOWN", "HISTORY_WAIT_CADENCE_UNVERIFIED"))
             else:
                 old = _prior(previous, "history")
@@ -202,7 +222,7 @@ def _history(item, registry_item, previous, now, clock_ok):
                                  "source_receipt_sha256": row["source_receipt_sha256"],
                                  "rows": row["rows"]}
                                 for row in registry.get("sources", [])[-4:]]
-        report = {"status": view.get("status"), "counters": cursor,
+        report = {"status": safe_enum(view.get("status"), HISTORY_REPORT_STATES), "counters": cursor,
                   "unresolved_gaps": view.get("unresolved_gaps", 0),
                   "unresolved_gap_ranges": history_ranges,
                   "source_obstacles": view.get("obstacles", 0),
@@ -246,7 +266,7 @@ def _daily(item, now):
         if state is None and doc.get("cycle_evidence") == "WAIT_FOR_SOURCE":
             next_check = doc.get("next_check_ms")
             state, reason = (("EXPECTED_WAIT", "DAILY_SOURCE_WAIT")
-                             if type(next_check) is int and next_check >= now
+                             if type(next_check) is int and now <= next_check <= now + MAX_EXPECTED_WAIT_MS
                              else ("UNKNOWN", "DAILY_WAIT_CADENCE_UNVERIFIED"))
         if state is None:
             state, reason = "UNKNOWN", "DAILY_IMPORT_REGISTRY_LINK_NOT_SUPPLIED"
@@ -255,12 +275,13 @@ def _daily(item, now):
                 "source_file_sha256": item["pin"], "freshness": "FRESH" if age is not None and age <= MAX_SNAPSHOT_AGE_MS else state,
                 "age_ms": age, "progress_cursor": {},
                 "source_identity": None,
-                "reported": {"task_state": doc.get("task_state"),
-                    "scheduler_state": doc.get("scheduler_state"),
-                    "runtime_state": doc.get("runtime_state"),
-                    "cycle_evidence": doc.get("cycle_evidence"),
-                    "source_freshness": doc.get("source_freshness"),
-                    "last_success_source_day_ms": last.get("source_day_ms"),
+                "reported": {"task_state": safe_enum(doc.get("task_state"), DAILY_TASK_STATES),
+                    "scheduler_state": safe_enum(doc.get("scheduler_state"), DAILY_TASK_STATES),
+                    "runtime_state": safe_enum(doc.get("runtime_state"), DAILY_RUNTIME_STATES),
+                    "cycle_evidence": safe_enum(doc.get("cycle_evidence"), DAILY_CYCLE_STATES),
+                    "source_freshness": safe_enum(doc.get("source_freshness"), DAILY_FRESHNESS_STATES),
+                    "last_success_source_day_ms": (last.get("source_day_ms")
+                        if type(last.get("source_day_ms")) is int and last["source_day_ms"] >= 0 else None),
                     "worker_receipt_sha256": receipt,
                     "last_failure_reported": failure is not None,
                     "last_failure_reason": failure_reason},
@@ -313,7 +334,7 @@ def _live(item, previous, now, clock_ok):
                 "source_file_sha256": item["pin"], "freshness": "FRESH" if age is not None and age <= MAX_SNAPSHOT_AGE_MS else state,
                 "age_ms": age, "progress_cursor": cursor,
                 "source_identity": identity,
-                "reported": {"source_class": doc.get("source_class"), "status": doc.get("status"),
+                "reported": {"source_class": "LIVE_CAPTURE", "status": safe_enum(doc.get("status"), LIVE_REPORT_STATES),
                     "verified_receipts": view.get("verified_receipts"),
                     "last_committed_ms": view.get("last_committed_ms"),
                     "last_receipt_fresh": view.get("last_receipt_fresh"),
