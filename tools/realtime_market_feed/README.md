@@ -62,6 +62,21 @@ and an advancing `service_event` history. A provider rejection or repeated
 disconnect remains a failed smoke test. Do not enable this as a background
 service until the repository's source-rights and owner-host gates are cleared.
 
+## Consumer handoff
+
+Downstream Python code can call `read_snapshot(database, symbols, now_ms=...)`
+from `tools.realtime_market_feed.reader`. The read-only contract returns exact
+decimal strings, exchange/receive timestamps, latest finalized candle, open gap
+ranges, and per-symbol freshness blockers. It reports `LIVE_FRESH` only when
+trade, quote, and finalized candle are present and within configured age limits,
+with no recent open gap; otherwise it reports `HELD`. This is a data-quality
+gate, not a trading signal. Consumers must still apply their required history
+warmup and keep the daily source as historical authority.
+
+The current slice does not connect this reader to the existing scanner runtime
+or daily loader. Those paths have different code/config pins and need an
+explicit mapping before records are shared.
+
 ## SQLite tables
 
 - `latest_trade`: last accepted trade and its exchange/receive timestamps.
