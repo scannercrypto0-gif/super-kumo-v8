@@ -101,6 +101,7 @@ def profile_synthetic_windows(database, *, symbol, start_ms, counts,
             database, symbol=symbol, start_ms=start_ms, end_ms=end_ms,
             now_ms=end_ms + 120_001, max_age_ms=86_400_000,
             expected_producer_code_sha256=expected_producer_code_sha256,
+            allow_synthetic_fixture=True,
             query_budget_ms=QUERY_BUDGET_MS, metrics=metrics)
         elapsed_ms = round((time.perf_counter()-started)*1000, 3)
         _current, peak = tracemalloc.get_traced_memory()
