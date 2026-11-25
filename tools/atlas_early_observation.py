@@ -430,6 +430,27 @@ def build(paths, *, now_ms, monotonic_ns, boot_id, clock_uncertainty_ms,
     return {**body, "sha256": watchdog.digest(watchdog.canonical(body))}
 
 
+def checked_root(path, code):
+    given = Path(path)
+    require(".." not in given.parts, code)
+    target = given.absolute()
+    for item in (target, *target.parents):
+        if item.exists() or item.is_symlink():
+            st = item.lstat()
+            require(not stat.S_ISLNK(st.st_mode)
+                    and not (getattr(st, "st_file_attributes", 0) & 1024), code)
+    require(target.is_dir(), code)
+    return target.resolve(strict=True)
+
+
+def require_direct_child(path, root, code):
+    given = Path(path)
+    require(".." not in given.parts, code)
+    target = given.absolute()
+    require(target.parent.resolve(strict=True) == root, code)
+    return target
+
+
 def publish(path, snapshot):
     given = Path(path)
     require(".." not in given.parts, "OUTPUT_PATH_TRAVERSAL")
@@ -464,16 +485,27 @@ def main():
         parser.add_argument("--" + lane, type=Path, help="One explicit sanitized report file; never a directory.")
     parser.add_argument("--registry", type=Path, help="One existing sealed Registry snapshot; no revalidation scan.")
     parser.add_argument("--previous", type=Path, help="One prior early snapshot for bounded two-observation comparison.")
-    parser.add_argument("--output", required=True, type=Path, help="New local output path; create-only.")
+    parser.add_argument("--approved-input-root", required=True, type=Path,
+                        help="Existing isolated directory containing only approved sanitized reports.")
+    parser.add_argument("--approved-output-root", required=True, type=Path,
+                        help="Existing separate directory approved for create-only pilot snapshots.")
+    parser.add_argument("--output", required=True, type=Path, help="New file directly inside approved output root.")
     parser.add_argument("--clock-uncertainty-ms", type=int)
     args = parser.parse_args()
+    input_root = checked_root(args.approved_input_root, "APPROVED_INPUT_ROOT_REQUIRED")
+    output_root = checked_root(args.approved_output_root, "APPROVED_OUTPUT_ROOT_REQUIRED")
+    require(input_root != output_root and input_root not in output_root.parents
+            and output_root not in input_root.parents, "APPROVED_ROOTS_MUST_BE_SEPARATE")
     paths = {name: getattr(args, name) for name in (*LANES, "registry", "previous")}
+    paths = {name: require_direct_child(path, input_root, "INPUT_OUTSIDE_APPROVED_ROOT")
+             if path is not None else None for name, path in paths.items()}
+    output_path = require_direct_child(args.output, output_root, "OUTPUT_OUTSIDE_APPROVED_ROOT")
     now_ms = time.time_ns() // 1_000_000
     mono = time.monotonic_ns()
     result = build(paths, now_ms=now_ms, monotonic_ns=mono,
                    boot_id=watchdog.host_boot_id(),
                    clock_uncertainty_ms=args.clock_uncertainty_ms)
-    pin = publish(args.output, result)
+    pin = publish(output_path, result)
     print(json.dumps({"result": "EARLY_OBSERVATION_SNAPSHOT_CREATED",
                       "profile": PROFILE, "snapshot_sha256": result["sha256"],
                       "file_sha256": pin, "status": result["state"],
