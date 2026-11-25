@@ -25,6 +25,7 @@ def _accepted_report():
         },
         "orders":0,"trading_authority":"NONE","integrity_check":"ok",
         "durable_readback_verified":True,"fresh_trade_quote_final_bar":True,
+        "short_gaps_recovered":True,"unexplained_message_rejections":0,
         "open_gaps":[],"events":[
             {"kind":"PLANNED_ROTATION","at_ms":80000000},
             {"kind":"CONNECTED","at_ms":80000100},
