@@ -214,7 +214,7 @@ def build_registry_proposal(reconciliation, registry_snapshot):
     """Return a content-addressed proposal; Registry C remains read-only."""
     from aql.warehouse.storage import canonical, seal
     _need(type(registry_snapshot) is dict
-          and registry_snapshot.get("schema") == "aql.research.warehouse.registry-snapshot.v1",
+          and registry_snapshot.get("schema") == "aql.warehouse.registry-snapshot.v1",
           "REGISTRY_SNAPSHOT_REQUIRED")
     body = {k: v for k, v in registry_snapshot.items() if k != "snapshot_sha256"}
     _need(registry_snapshot.get("snapshot_sha256") == seal(canonical(body))
