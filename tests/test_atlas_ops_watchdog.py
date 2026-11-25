@@ -131,7 +131,7 @@ class WatchdogTests(unittest.TestCase):
         values = list(evidence())
         values[2]["last_success"].pop("daily_source_evidence_status")
         first = build(values)
-        second = build(values, now=2_060_000, mono=60_000_000_010, prev=first)
+        second = build(values, now=200_060_000, mono=60_000_000_010, prev=first)
         self.assertFalse(second["lanes"]["daily"]["source_receipt_link_verified"])
         self.assertEqual(second["lanes"]["daily"]["state"], "UNKNOWN")
 
@@ -178,7 +178,7 @@ class WatchdogTests(unittest.TestCase):
         values = evidence()
         values[4].pop("checksum_sha256")
         first = build(values)
-        second = build(values, now=2_060_000, mono=60_000_000_010, prev=first)
+        second = build(values, now=200_060_000, mono=60_000_000_010, prev=first)
         self.assertEqual(second["lanes"]["daily"]["state"], "UNKNOWN")
         self.assertEqual(second["lanes"]["daily"]["reason"], "DAILY_SOURCE_LINKAGE_UNPROVEN")
 
@@ -187,7 +187,7 @@ class WatchdogTests(unittest.TestCase):
         values = evidence()
         values[5]["hold_reason"] = "PILOT_STOP_ConnectionResetError"
         first = build(values)
-        second = build(values, now=2_060_000, mono=60_000_000_010, prev=first)
+        second = build(values, now=200_060_000, mono=60_000_000_010, prev=first)
         self.assertEqual(second["lanes"]["live"]["state"], "HOLD")
 
 
