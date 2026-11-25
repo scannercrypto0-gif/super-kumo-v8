@@ -143,9 +143,12 @@ class Store:
                   (symbol,opened,closed,str(k["o"]),str(k["h"]),str(k["l"]),str(k["c"]),
                    str(k["v"]),int(k["n"]),received_ms,digest))
                 existing = self.db.execute(
-                    "SELECT payload_sha256 FROM final_bar WHERE symbol=? AND interval='1m' AND open_ms=?",
+                    """SELECT close_ms,open,high,low,close,volume,trades
+                       FROM final_bar WHERE symbol=? AND interval='1m' AND open_ms=?""",
                     (symbol,opened)).fetchone()
-                if existing and existing[0] != digest:
+                candidate = (closed,str(k["o"]),str(k["h"]),str(k["l"]),str(k["c"]),
+                             str(k["v"]),int(k["n"]))
+                if existing and tuple(existing) != candidate:
                     self.db.execute("INSERT INTO service_event(at_ms,kind,detail) VALUES(?,?,?)",
                                     (received_ms,"FINAL_BAR_CONFLICT",symbol+":"+str(opened)))
             return "final_bar"
@@ -208,10 +211,38 @@ class LiveService:
 
     def _on_message(self, raw: str) -> None:
         try:
-            self.store.ingest(raw)
+            outcome = self.store.ingest(raw)
+            if outcome == "final_bar":
+                envelope = json.loads(raw)
+                data = envelope.get("data", envelope)
+                symbol = str(data.get("s", "")).upper()
+                if symbol:
+                    self._queue_gap_recovery(symbol)
         except Exception as exc:
             self.store.event("MESSAGE_REJECTED", type(exc).__name__)
             LOG.exception("Rejected feed message")
+
+    def _queue_gap_recovery(self, symbol: str) -> None:
+        if not hasattr(self, "_recovery_lock"):
+            self._recovery_lock = threading.Lock()
+            self._recovering_symbols = set()
+        with self._recovery_lock:
+            if symbol in self._recovering_symbols:
+                return
+            self._recovering_symbols.add(symbol)
+        worker = threading.Thread(target=self._recover_gaps, args=(symbol,), daemon=True)
+        worker.start()
+
+    def _recover_gaps(self, symbol: str) -> None:
+        try:
+            from tools.realtime_market_feed.backfill import recover_open_gaps
+            recover_open_gaps(self.store.path, symbol)
+        except Exception as exc:
+            self.store.event("GAP_BACKFILL_WORKER_ERROR", type(exc).__name__)
+            LOG.exception("Gap recovery worker failed")
+        finally:
+            with self._recovery_lock:
+                self._recovering_symbols.discard(symbol)
 
 
 def build_report(path: str | Path) -> dict:
