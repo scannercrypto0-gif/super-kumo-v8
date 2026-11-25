@@ -69,7 +69,14 @@ def read_bounded(path):
 def _load(path):
     if path is None:
         return {"doc": None, "pin": None, "bytes": 0, "reason": "INPUT_NOT_SUPPLIED"}
-    doc, pin, size = read_bounded(path)
+    try:
+        doc, pin, size = read_bounded(path)
+    except ValueError as exc:
+        if str(exc) in {"INPUT_BUDGET_EXCEEDED", "INPUT_REPLACED"}:
+            raise
+        return {"doc": None, "pin": None, "bytes": 0, "reason": "INPUT_UNTRUSTED"}
+    except OSError:
+        return {"doc": None, "pin": None, "bytes": 0, "reason": "INPUT_UNAVAILABLE"}
     return {"doc": doc, "pin": pin, "bytes": size, "reason": None}
 
 
