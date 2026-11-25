@@ -11,16 +11,23 @@ claims. It cannot place orders.
 - Latest trade and quote are committed to SQLite; finalized candles are
   idempotently stored with exact decimal strings.
 - Missing finalized 1-minute candle ranges remain explicit OPEN gaps.
-- Connection, disconnect, socket error, malformed event and final-bar conflict
-  events are stored locally.
+- A bounded, public REST recovery worker fetches and validates missing finalized
+  candles after a gap is detected. It closes a gap only after every expected
+  minute is durably present and matches; errors and conflicts leave it OPEN.
+- Backfill is limited to 1,440 candles per gap and retried no more than once per
+  minute per symbol. Larger gaps remain open for a separate historical repair.
+- Connection, disconnect, socket error, malformed event, backfill, and final-bar
+  conflict events are stored locally.
 - Reconnect attempts have exponential backoff and a minimum 15-second interval.
   The socket rotates before 24 hours. The observation mode is time bounded.
 - On Windows, the database root must be on E:.
 
 The system consuming SQLite must consider quotes/trades stale using their
-`received_ms` and must treat every OPEN gap as missing data. The daily
-historical loader should reconcile those ranges; this first vertical slice
-records gaps but does not yet call or mutate the daily-loader interface.
+`received_ms` and must treat every OPEN gap as missing data. This service can
+recover short 1-minute candle gaps from the public Spot REST market-data API;
+it does not recover every individual trade or reconstruct a complete quote
+history. The daily historical loader remains the authority for larger historical
+ranges, and no daily-loader interface is called by this service.
 
 ## Deliberate limits
 
@@ -41,16 +48,20 @@ From repository root:
 python -m pip install -r tools/realtime_market_feed/requirements.txt
 python -m pip install pytest
 $env:PYTHONPATH='.'
-python -m pytest tools/realtime_market_feed/test_service.py -q
+python -m pytest tools/realtime_market_feed/test_service.py tools/realtime_market_feed/test_backfill.py -q
 ```
 
 The tests inject synthetic frames and never open a socket.
 
-## Owner-host smoke test on E:
+## Owner-host acceptance run on E:
 
-Use the approved Python environment and start with only BTCUSDT. First make a
-bounded 10-minute observation; inspect the SQLite database and service events
-before deciding whether to register an always-on scheduled task. Example:
+First run the bounded 10-minute smoke check with BTCUSDT. After it passes, use
+a bounded 24-hour run to cover planned socket rotation. This remains a foreground
+observation; it does not install or register a persistent task. Inspect the
+report and SQLite events afterward. The acceptance run must show fresh trade,
+quote, and final-bar rows, at least one rotation/reconnect cycle, no unresolved
+short gaps, and no unexplained message rejections. A separate injected outage
+test must prove reconnect and REST gap closure before integration.
 
 ```powershell
 $env:PYTHONPATH='C:\path\to\checkout'; & 'C:\path\to\python.exe' -B -m tools.realtime_market_feed.service --root 'E:\ATLAS\realtime-market-feed' --symbols BTCUSDT --observe-seconds 600
