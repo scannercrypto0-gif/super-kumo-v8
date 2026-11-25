@@ -213,7 +213,7 @@ class LiveService:
 
 
 def build_report(path: str | Path) -> dict:
-    db = sqlite3.connect(f"file:{Path(path).resolve().as_posix()}?mode=ro", uri=True)
+    db = sqlite3.connect(Path(path).resolve().as_uri()+"?mode=ro", uri=True)
     db.row_factory = sqlite3.Row
     try:
         trade = db.execute("SELECT * FROM latest_trade ORDER BY symbol").fetchall()
