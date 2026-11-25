@@ -330,10 +330,10 @@ class EarlyObservationTests(unittest.TestCase):
             early.publish(snap_path, snapshot)
             with self.assertRaisesRegex(ValueError, "OUTPUT_CREATE_ONLY_PATH_REQUIRED"):
                 early.publish(snap_path, snapshot)
-            manifest = root / "manifest.json"
+            manifest = output_root / "manifest.json"
             made = subprocess.run([sys.executable, "-B", str(ROOT / "tools" / "atlas_mcp_manifest.py"),
-                                   "--profile", "early", "--snapshot", str(snap_path),
-                                   "--output", str(manifest)], capture_output=True, text=True, timeout=10)
+                                   "--profile", "early", "--approved-output-root", str(output_root),
+                                   "--snapshot", str(snap_path), "--output", str(manifest)], capture_output=True, text=True, timeout=10)
             self.assertEqual(made.returncode, 0, made.stderr)
             pin = made.stdout.strip()
             requests = [
@@ -360,6 +360,7 @@ class EarlyObservationTests(unittest.TestCase):
                  "params": {"uri": "file:///private/credential.txt"}},
             ]
             proc = subprocess.run([sys.executable, "-B", str(ROOT / "tools" / "atlas_mcp_pilot.py"),
+                                   "--profile", "early", "--approved-output-root", str(output_root),
                                    "--manifest", str(manifest), "--manifest-sha256", pin],
                                   input="".join(json.dumps(x) + "\n" for x in requests),
                                   capture_output=True, text=True, timeout=10)
