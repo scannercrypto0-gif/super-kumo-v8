@@ -105,3 +105,16 @@ explicit mapping before records are shared.
 - `final_bar`: final 1-minute OHLCV only.
 - `open_gap`: half-open missing minute ranges, initially OPEN.
 - `service_event`: local connection, integrity and rejection timeline.
+- `final_bar_lineage`: versioned normalized producer receipts for newly inserted
+  finalized candles only.
+- `service_run`: requested observation duration, code hash, symbols, and actual
+  start/stop times for a later code-pinned 24-hour evaluation.
+
+
+A bounded run records its requested duration and exact producer code hash in
+`service_run`; `--report` exposes the latest run envelope. This envelope is
+necessary but not sufficient for 24-hour acceptance. Acceptance still requires
+independent durable-readback/replay evidence, freshness and gap checks, planned
+rotation followed by a successful reconnect, zero unexplained rejects, cleared
+provider terms and shared-IP quota, and exact code/config/symbol pins. No result
+is inferred from a process start or synthetic CI evidence.
