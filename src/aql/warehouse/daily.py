@@ -1,11 +1,16 @@
-"""Import existing daily task's retained ZIP+CHECKSUM outputs, without network."""
+"""Import retained Daily outputs without network or scheduler changes."""
 import argparse
 import json
 from pathlib import Path
+import re
 import time
 
-from .engine import HistoricalWarehouse
-from .storage import need, safe
+from .engine import HistoricalWarehouse, parse_archive
+from .source import archive_window
+from .storage import need, safe, seal
+
+MAX_ZIP = 64 * 1024 * 1024
+HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 
 
 def import_retained(warehouse, directory, *, observed_ms, archive_limit=10000):
@@ -15,7 +20,7 @@ def import_retained(warehouse, directory, *, observed_ms, archive_limit=10000):
     with warehouse.writer():
         for path in sorted(directory.glob('BTCUSDT-1m-????-??-??.zip'))[:archive_limit]:
             safe(path)
-            need(path.stat().st_size <= 64*1024*1024, 'DAILY_INPUT_BOUND')
+            need(path.stat().st_size <= MAX_ZIP, 'DAILY_INPUT_BOUND')
             checksum = safe(path.with_name(path.name + '.CHECKSUM'))
             need(checksum.is_file() and checksum.stat().st_size <= 512, 'DAILY_CHECKSUM_REQUIRED')
             key = 'data/spot/daily/klines/BTCUSDT/1m/' + path.name
@@ -29,13 +34,71 @@ def import_retained(warehouse, directory, *, observed_ms, archive_limit=10000):
         return report
 
 
+def import_one_retained(warehouse, archive, *, source_day_ms, expected_zip_sha256,
+                        expected_checksum_sha256, observed_ms):
+    """Admit exactly one pinned retained archive after UTC-day and byte preflight."""
+    need(type(source_day_ms) is int and source_day_ms > 0 and source_day_ms % 86_400_000 == 0,
+         'DAILY_SOURCE_DAY_INVALID')
+    need(type(observed_ms) is int and observed_ms >= source_day_ms + 86_400_000,
+         'DAILY_SOURCE_NOT_FINAL')
+    need(type(expected_zip_sha256) is str and HEX64.fullmatch(expected_zip_sha256),
+         'DAILY_ZIP_PIN_INVALID')
+    need(type(expected_checksum_sha256) is str and HEX64.fullmatch(expected_checksum_sha256),
+         'DAILY_CHECKSUM_PIN_INVALID')
+    path = safe(archive)
+    need(path.is_file() and path.stat().st_nlink == 1 and not path.is_relative_to(warehouse.root),
+         'DAILY_INPUT_FILE_SCOPE')
+    day = time.strftime('%Y-%m-%d', time.gmtime(source_day_ms / 1000))
+    expected_name = f'BTCUSDT-1m-{day}.zip'
+    need(path.name == expected_name, 'DAILY_ARCHIVE_DAY_MISMATCH')
+    checksum_path = safe(path.with_name(path.name + '.CHECKSUM'))
+    need(checksum_path.is_file() and checksum_path.stat().st_nlink == 1,
+         'DAILY_CHECKSUM_FILE_SCOPE')
+    need(0 < path.stat().st_size <= MAX_ZIP and 0 < checksum_path.stat().st_size <= 512,
+         'DAILY_INPUT_BOUND')
+    raw, checksum = path.read_bytes(), checksum_path.read_bytes()
+    need(seal(raw) == expected_zip_sha256 and seal(checksum) == expected_checksum_sha256,
+         'DAILY_INPUT_PIN_MISMATCH')
+    key = 'data/spot/daily/klines/BTCUSDT/1m/' + expected_name
+    start, end = archive_window(key)
+    need(start == source_day_ms and end == source_day_ms + 86_400_000,
+         'DAILY_ARCHIVE_DAY_MISMATCH')
+    # Parse the exact captured bytes before opening the writer or mutating storage.
+    parse_archive(raw, checksum, key, observed_ms)
+    with warehouse.writer():
+        imported = warehouse.import_archive(raw, checksum, key, observed_ms=observed_ms)
+        report = warehouse.report()
+        report.update(status='DAILY_RETAINED_IMPORT_FINISHED', this_run=[imported],
+                      source_network_calls=0, scheduler_changes=0)
+        receipt_path = warehouse.document('receipts', report)
+        report['warehouse_receipt_sha256'] = receipt_path.stem
+        return report
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--root', type=Path, default=Path('E:/ATLAS/DataWarehouse'))
-    p.add_argument('--input-directory', type=Path, required=True)
+    group = p.add_mutually_exclusive_group(required=True)
+    group.add_argument('--input-directory', type=Path)
+    group.add_argument('--archive', type=Path)
+    p.add_argument('--source-day-ms', type=int)
+    p.add_argument('--expected-zip-sha256')
+    p.add_argument('--expected-checksum-sha256')
     a = p.parse_args()
-    print(json.dumps(import_retained(HistoricalWarehouse(a.root), a.input_directory,
-                                    observed_ms=time.time_ns()//1000000), sort_keys=True))
+    warehouse = HistoricalWarehouse(a.root)
+    if a.archive is not None:
+        need(a.source_day_ms is not None and a.expected_zip_sha256 is not None
+             and a.expected_checksum_sha256 is not None, 'DAILY_SINGLE_ARCHIVE_PINS_REQUIRED')
+        result = import_one_retained(warehouse, a.archive, source_day_ms=a.source_day_ms,
+            expected_zip_sha256=a.expected_zip_sha256,
+            expected_checksum_sha256=a.expected_checksum_sha256,
+            observed_ms=time.time_ns() // 1_000_000)
+    else:
+        need(a.source_day_ms is None and a.expected_zip_sha256 is None
+             and a.expected_checksum_sha256 is None, 'DAILY_BULK_MODE_PIN_ARGS_DENIED')
+        result = import_retained(warehouse, a.input_directory,
+                                 observed_ms=time.time_ns() // 1_000_000)
+    print(json.dumps(result, sort_keys=True))
 
 
 if __name__ == '__main__':
