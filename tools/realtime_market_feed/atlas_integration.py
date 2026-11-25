@@ -175,30 +175,6 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
             for bar in normalized]
 
 
-def copy_to_research_store(database, research_store_path, *, symbol, start_ms,
-                           end_ms, now_ms, engineering_test_only=False):
-    """Write generated test fixtures only; refuses non-temp sources and targets."""
-    _need(engineering_test_only is True, "INTEGRATION_DISABLED")
-    source = Path(database).resolve()
-    target = Path(research_store_path).resolve()
-    _need(_in_temp(source) and _in_temp(target) and target != source,
-          "ISOLATED_RESEARCH_STORE_REQUIRED")
-    rows = project_feed_window(source, symbol=symbol, start_ms=start_ms,
-                               end_ms=end_ms, now_ms=now_ms,
-                               allow_synthetic_fixture=True)
-    from aql.research_bar_store import ResearchBarStore
-    with ResearchBarStore(target) as store:
-        store.insert_batch(rows)
-        verified = [store.read(symbol, "1m", row["open_ms"]) for row in rows]
-    _need(all(item is not None and item["source_class"] == "FORWARD_UNQUALIFIED"
-              for item in verified), "RESEARCH_READBACK_FAILED")
-    return {"status": "SYNTHETIC_FORWARD_BARS_COPIED",
-            "rows": len(verified), "first_open_ms": start_ms,
-            "last_open_ms": end_ms - MINUTE_MS,
-            "evidence_class": "GENERATED_TEST_FIXTURE",
-            "trading_authority": "NONE"}
-
-
 def _verified_projection(row, *, source_class):
     if type(row) is not dict:
         return False
