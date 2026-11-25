@@ -8,10 +8,10 @@ from pathlib import Path
 import tempfile
 
 from tools.realtime_market_feed.test_atlas_integration import (
-    _daily, feed, START, DAY,
+    _daily, feed, START, DAY, _copy_generated_fixture_to_research_store,
 )
 from tools.realtime_market_feed.atlas_integration import (
-    build_registry_proposal, copy_to_research_store, reconcile_daily_bar,
+    build_registry_proposal, reconcile_daily_bar,
 )
 from aql.research_bar_store import ResearchBarStore
 from aql.research_forward_core_read import forward_core_window
@@ -37,8 +37,8 @@ def build_evidence():
         source = root / "feed.sqlite"
         start, end = feed(source, count=180)
         research = root / "research.sqlite"
-        write = copy_to_research_store(source, research, symbol="BTCUSDT",
-            start_ms=start, end_ms=end, now_ms=end+1_000, engineering_test_only=True)
+        write = _copy_generated_fixture_to_research_store(source, research, symbol="BTCUSDT",
+            start_ms=start, end_ms=end, now_ms=end+1_000)
         with ResearchBarStore(research) as store:
             for i in range(12):
                 store.project("BTCUSDT", "15m", start+i*900_000)
