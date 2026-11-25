@@ -50,7 +50,7 @@ def build_evidence():
                                      cutoff_ms=START+DAY, include_registry=True)
         daily_15m = daily_context_15m["bars"][0]
         result = reconcile_daily_bar(projected_15m, daily_15m)
-        proposal = build_registry_proposal(result, daily_context_15m)
+        proposal = build_registry_proposal(result, daily_context_15m, warehouse_root=wh.root)
         provenance = _git_provenance()
         return {
             "schema": "aql.realtime-integration.synthetic-evidence.v1",
