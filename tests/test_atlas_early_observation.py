@@ -161,6 +161,16 @@ class EarlyObservationTests(unittest.TestCase):
         self.assertEqual(future["lanes"]["daily"]["status"], "UNKNOWN")
         self.assertEqual(future["lanes"]["daily"]["reason"], "SOURCE_TIME_IN_FUTURE")
 
+    def test_reported_daily_failure_is_failed_and_sanitized(self):
+        report = daily()
+        report["last_failure"] = {"reason": "DAILY_IMPORT_FAILED"}
+        with tempfile.TemporaryDirectory() as folder:
+            paths = paths_for(Path(folder), day=report)
+            result = self.build(paths)
+        lane = result["lanes"]["daily"]
+        self.assertEqual(lane["status"], "FAILED")
+        self.assertEqual(lane["reported"]["last_failure_reason"], "DAILY_IMPORT_FAILED")
+
     def test_held_live_precedence_survives_other_unknown_lanes(self):
         with tempfile.TemporaryDirectory() as folder:
             paths = paths_for(Path(folder), ws=live(hold=True))
