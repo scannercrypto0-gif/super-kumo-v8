@@ -53,6 +53,14 @@ class DailyHealthEvidenceTests(unittest.TestCase):
         self.assertEqual(result["checksum_sha256"], "b" * 64)
         self.assertEqual(result["receipt_sha256"], "3" * 64)
 
+    def test_nonempty_regular_authorization_marker_is_accepted(self):
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"COMPUTERNAME": "TESTHOST"}):
+            args = self.evidence_tree(Path(folder))
+            marker = args[0] / "atlas-authorized-periodic-v1"
+            marker.write_text("x" * 28, encoding="ascii")
+            result = verify_daily_success(args[0], args[1], args[2], args[3], args[4])
+        self.assertEqual(result["status"], "VERIFIED")
+
     def test_mutated_job_fails_claim_link(self):
         with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"COMPUTERNAME": "TESTHOST"}):
             args = self.evidence_tree(Path(folder))
