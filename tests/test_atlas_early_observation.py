@@ -161,6 +161,56 @@ class EarlyObservationTests(unittest.TestCase):
         self.assertEqual(future["lanes"]["daily"]["status"], "UNKNOWN")
         self.assertEqual(future["lanes"]["daily"]["reason"], "SOURCE_TIME_IN_FUTURE")
 
+    def test_untrusted_report_fields_are_allowlisted_before_snapshot(self):
+        secret = r"C:\\private\\credentials\\access_token.txt"
+        daily_report = daily()
+        daily_report["task_state"] = secret
+        daily_report["scheduler_state"] = {"token": "secret"}
+        daily_report["runtime_state"] = "sk_live_untrusted"
+        daily_report["cycle_evidence"] = {"payload": secret}
+        daily_report["source_freshness"] = [secret]
+        daily_report["last_success"]["source_day_ms"] = {"secret": secret}
+        history_report = history()
+        history_report["status"] = secret
+        live_report = live()
+        live_report["status"] = secret
+        with tempfile.TemporaryDirectory() as folder:
+            paths = paths_for(Path(folder), hist=history_report, reg=registry(),
+                              day=daily_report, ws=live_report)
+            snapshot = self.build(paths)
+        encoded = json.dumps(snapshot, sort_keys=True)
+        self.assertNotIn(secret, encoded)
+        self.assertNotIn("sk_live_untrusted", encoded)
+        self.assertEqual(snapshot["lanes"]["daily"]["reported"]["task_state"], "UNRECOGNIZED")
+        self.assertIsNone(snapshot["lanes"]["daily"]["reported"]["last_success_source_day_ms"])
+        self.assertEqual(snapshot["lanes"]["history"]["reported"]["status"], "UNRECOGNIZED")
+        self.assertEqual(snapshot["lanes"]["live"]["reported"]["status"], "UNRECOGNIZED")
+
+    def test_wait_beyond_one_day_stays_unknown(self):
+        report = daily(wait=True)
+        report["next_check_ms"] = NOW + early.MAX_EXPECTED_WAIT_MS + 1
+        with tempfile.TemporaryDirectory() as folder:
+            result = self.build(paths_for(Path(folder), day=report))
+        self.assertEqual(result["lanes"]["daily"]["status"], "UNKNOWN")
+        self.assertEqual(result["lanes"]["daily"]["reason"], "DAILY_WAIT_CADENCE_UNVERIFIED")
+
+    def test_cli_refuses_inputs_outside_approved_root(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            input_root = root / "input"
+            output_root = root / "output"
+            input_root.mkdir()
+            output_root.mkdir()
+            outside = write_doc(root, "outside-report", daily())
+            result = subprocess.run([
+                sys.executable, "-B", str(ROOT / "tools" / "atlas_early_observation.py"),
+                "--approved-input-root", str(input_root),
+                "--approved-output-root", str(output_root),
+                "--daily", str(outside), "--output", str(output_root / "snapshot.json"),
+            ], capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("INPUT_OUTSIDE_APPROVED_ROOT", result.stderr)
+
     def test_reported_daily_failure_is_failed_and_sanitized(self):
         report = daily()
         report["last_failure"] = {"reason": "DAILY_IMPORT_FAILED"}
@@ -225,8 +275,12 @@ class EarlyObservationTests(unittest.TestCase):
     def test_create_only_output_and_profile_manifest_stdio(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
+            input_root = root / "approved-input"
+            output_root = root / "approved-output"
+            input_root.mkdir()
+            output_root.mkdir()
             snapshot = self.build({}, now=time.time_ns() // 1_000_000)
-            snap_path = root / "early.json"
+            snap_path = output_root / "early.json"
             early.publish(snap_path, snapshot)
             with self.assertRaisesRegex(ValueError, "OUTPUT_CREATE_ONLY_PATH_REQUIRED"):
                 early.publish(snap_path, snapshot)
