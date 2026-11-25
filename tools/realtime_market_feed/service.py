@@ -14,6 +14,7 @@ import random
 import sqlite3
 import time
 import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
@@ -99,6 +100,10 @@ class Store:
           symbol TEXT NOT NULL, interval TEXT NOT NULL, open_ms INTEGER NOT NULL,
           receipt_json TEXT NOT NULL, receipt_sha256 TEXT NOT NULL,
           PRIMARY KEY(symbol, interval, open_ms));
+        CREATE TABLE IF NOT EXISTS service_run(
+          run_id TEXT PRIMARY KEY, producer_code_sha256 TEXT NOT NULL,
+          symbols_json TEXT NOT NULL, requested_observe_seconds INTEGER NOT NULL,
+          started_ms INTEGER NOT NULL, stopped_ms INTEGER);
         """)
         self.db.commit()
 
@@ -106,6 +111,21 @@ class Store:
         with self.db:
             self.db.execute("INSERT INTO service_event(at_ms,kind,detail) VALUES(?,?,?)",
                             (utc_ms(), kind, detail[:300]))
+
+    def begin_run(self, symbols: list[str], observe_seconds: int) -> str:
+        run_id = uuid.uuid4().hex
+        with self.db:
+            self.db.execute("""INSERT INTO service_run
+              (run_id,producer_code_sha256,symbols_json,requested_observe_seconds,started_ms)
+              VALUES(?,?,?,?,?)""",
+              (run_id,PRODUCER_CODE_SHA256,json.dumps(sorted(symbols),separators=(",",":")),
+               observe_seconds,utc_ms()))
+        return run_id
+
+    def end_run(self, run_id: str) -> None:
+        with self.db:
+            self.db.execute("UPDATE service_run SET stopped_ms=? WHERE run_id=? AND stopped_ms IS NULL",
+                            (utc_ms(),run_id))
 
     def ingest(self, raw: str, received_ms: int | None = None) -> str:
         received_ms = received_ms or utc_ms()
@@ -318,10 +338,24 @@ def build_report(path: str | Path) -> dict:
                              FROM open_gap WHERE status='OPEN' ORDER BY symbol,start_ms""").fetchall()
         events = db.execute("""SELECT at_ms,kind,detail FROM service_event
                                ORDER BY id DESC LIMIT 20""").fetchall()
+        has_run_table = db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='service_run'").fetchone()
+        run = None
+        if has_run_table:
+            row = db.execute("""SELECT run_id,producer_code_sha256,symbols_json,
+                requested_observe_seconds,started_ms,stopped_ms FROM service_run
+                ORDER BY started_ms DESC LIMIT 1""").fetchone()
+            if row:
+                run = {"schema":"aql.realtime-market-feed.observation-run.v1",
+                       "run_id":row["run_id"],"producer_code_sha256":row["producer_code_sha256"],
+                       "symbols":json.loads(row["symbols_json"]),
+                       "requested_observe_seconds":row["requested_observe_seconds"],
+                       "started_ms":row["started_ms"],"stopped_ms":row["stopped_ms"]}
         return {"schema":"atlas.realtime-market-feed.report.v1","as_of_ms":utc_ms(),
                 "trades":[dict(row) for row in trade],"quotes":[dict(row) for row in quotes],
                 "latest_final_bars":[dict(row) for row in bars],
                 "open_gaps":[dict(row) for row in gaps],"recent_events":[dict(row) for row in events],
+                "observation":run,
                 "readiness":"OBSERVED_ONLY" if trade and quotes and bars and not gaps else "NOT_READY",
                 "orders":0,"trading_authority":"NONE"}
     finally:
@@ -348,11 +382,13 @@ def main() -> None:
         print(json.dumps(build_report(db_path),sort_keys=True))
         return
     store = Store(db_path)
+    run_id = store.begin_run(symbols, args.observe_seconds)
     store.event("SERVICE_START", f"symbols={len(symbols)}")
     try:
         LiveService(symbols, store, args.observe_seconds).run()
     finally:
         store.event("SERVICE_STOP")
+        store.end_run(run_id)
         store.db.close()
 
 
