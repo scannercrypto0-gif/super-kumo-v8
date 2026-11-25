@@ -13,7 +13,7 @@ WATCHDOG_CHECKOUT = ROOT / ".integration" / "watchdog"
 sys.path.insert(0, str(WATCHDOG_CHECKOUT / "tools"))
 
 from tools.realtime_market_feed.acceptance_gates import (
-    profile_synthetic_windows, verify_sanitized_live_projection,
+    evaluate_24h_report, profile_synthetic_windows, verify_sanitized_live_projection,
 )
 from tools.realtime_market_feed.service import (
     PRODUCER_CODE_SHA256, PRODUCER_ID, LINEAGE_SCHEMA,
@@ -96,6 +96,10 @@ def build_evidence():
         }
         sanitized_live = live_view(live_report)
         live_projection = verify_sanitized_live_projection(live_report,sanitized_live)
+        owner_24h = evaluate_24h_report(
+            None, expected_code_sha256=PRODUCER_CODE_SHA256,
+            expected_symbols=["btcusdt"],
+        )
         provenance = _git_provenance()
         return {
             "schema": "aql.realtime-integration.synthetic-evidence.v1",
@@ -139,7 +143,8 @@ def build_evidence():
                 "orders": "NO_ORDER_API_USED",
                 "trading_authority": "NONE",
             },
-            "owner_24h_test": "24H_RESULT_PENDING; NO_OWNER_REPORT_READ",
+            "owner_24h_test": owner_24h,
+            "owner_evidence_class":"NO_OWNER_REPORT_READ_OR_MODIFIED",
             "original_e2e": "NOT_RUN; LIVE_ACTIVATION_BLOCKED",
         }
 
