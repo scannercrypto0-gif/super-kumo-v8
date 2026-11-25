@@ -167,7 +167,7 @@ def test_missing_receipt_bad_utc_grid_and_incomplete_aggregation_fail_closed(tmp
     db.close()
     with pytest.raises(ValueError, match="FEED_RECEIPT_INVALID"):
         project_feed_window(source, symbol="BTCUSDT", start_ms=start,
-                            end_ms=start+60_000, now_ms=end+1_000)
+                            end_ms=start+60_000, now_ms=start+61_000)
 
     with pytest.raises(ValueError, match="UTC_WINDOW_INVALID"):
         project_feed_window(source, symbol="BTCUSDT", start_ms=start+1,
