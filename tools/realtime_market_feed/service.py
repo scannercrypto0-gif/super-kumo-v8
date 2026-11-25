@@ -230,7 +230,8 @@ class LiveService:
         with self._recovery_lock:
             if symbol in self._recovering_symbols:
                 return
-            if now - self._recovery_last_attempt.get(symbol, 0.0) < 60:
+            last_attempt = self._recovery_last_attempt.get(symbol)
+            if last_attempt is not None and now - last_attempt < 60:
                 return
             self._recovery_last_attempt[symbol] = now
             self._recovering_symbols.add(symbol)
