@@ -29,6 +29,7 @@ HEX = re.compile(r"^[0-9a-f]{64}$")
 MINUTE_MS = 60_000
 DAY_MS = 86_400_000
 MAX_WINDOW_BARS = 10_080
+_QUERY_CLOCK = time.monotonic
 _FIXTURE_SCHEMA = "aql.realtime-feed.generated-fixture.v1"
 _SNAPSHOT_TEST_HOOK = None
 
@@ -72,7 +73,7 @@ def _feed_db(path, *, allow_synthetic_fixture=False,
         db.execute("PRAGMA busy_timeout=2000")
         if query_deadline is not None:
             db.set_progress_handler(
-                lambda: 1 if time.monotonic() >= query_deadline else 0, 500)
+                lambda: 1 if _QUERY_CLOCK() >= query_deadline else 0, 500)
         # Every integrity check/read uses this one immutable SQLite snapshot.
         db.execute("BEGIN")
         check = db.execute("PRAGMA quick_check").fetchone()[0]
@@ -96,7 +97,7 @@ def _feed_db(path, *, allow_synthetic_fixture=False,
     except sqlite3.Error as exc:
         if db is not None:
             db.close()
-        if query_deadline is not None and time.monotonic() >= query_deadline:
+        if query_deadline is not None and _QUERY_CLOCK() >= query_deadline:
             raise ValueError("FEED_QUERY_BUDGET_EXCEEDED") from None
         message = str(exc).lower()
         if "locked" in message or "busy" in message:
@@ -110,6 +111,8 @@ def _feed_db(path, *, allow_synthetic_fixture=False,
 
 def _verify_lineage(row, *, expected_producer_code_sha256):
     try:
+        if row["lineage_json"] is None or row["lineage_sha256"] is None:
+            raise ValueError("FEED_SOURCE_LINEAGE_UNVERIFIED")
         def unique(pairs):
             result = {}
             for key, value in pairs:
@@ -207,11 +210,11 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
           "FEED_SOURCE_LINEAGE_UNVERIFIED")
 
     from aql.research_timeframes import project_finalized_1m
-    deadline = time.monotonic() + query_budget_ms / 1000
+    deadline = _QUERY_CLOCK() + query_budget_ms / 1000
     db = _feed_db(database, allow_synthetic_fixture=allow_synthetic_fixture,
                   expected_producer_code_sha256=expected_producer_code_sha256,
                   query_deadline=deadline)
-    read_started = time.monotonic()
+    read_started = _QUERY_CLOCK()
     try:
         gaps = db.execute(
             """SELECT start_ms,end_ms,reason FROM open_gap
@@ -240,10 +243,10 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
                WHERE f.symbol=? AND f.interval='1m' AND f.open_ms>=? AND f.open_ms<?
                ORDER BY f.open_ms""",
             (symbol, start_ms, end_ms)).fetchall()
-        _need(time.monotonic() <= deadline, "FEED_QUERY_BUDGET_EXCEEDED")
-        snapshot_ms = round((time.monotonic() - read_started) * 1000, 3)
+        _need(_QUERY_CLOCK() <= deadline, "FEED_QUERY_BUDGET_EXCEEDED")
+        snapshot_ms = round((_QUERY_CLOCK() - read_started) * 1000, 3)
     except sqlite3.Error as exc:
-        if time.monotonic() >= deadline:
+        if _QUERY_CLOCK() >= deadline:
             raise ValueError("FEED_QUERY_BUDGET_EXCEEDED") from None
         message = str(exc).lower()
         if "locked" in message or "busy" in message:
@@ -259,7 +262,7 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
     normalized = []
     decoded_source_bytes = 0
     for i, row in enumerate(rows):
-        _need(time.monotonic() <= deadline, "FEED_QUERY_BUDGET_EXCEEDED")
+        _need(_QUERY_CLOCK() <= deadline, "FEED_QUERY_BUDGET_EXCEEDED")
         opened = start_ms + i * MINUTE_MS
         _need(row["symbol"] == symbol and row["interval"] == "1m"
               and type(row["open_ms"]) is int and row["open_ms"] == opened
