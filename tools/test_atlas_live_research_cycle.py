@@ -12,7 +12,8 @@ from aql.observation.contracts import digest
 from tools.atlas_research_lease import Lease
 from tools.atlas_single_receipt import persist_frame
 from tools.atlas_live_research_cycle import (
-    ingest, operational_guard, read_service_receipt, saved_operations_progress, saved_pilot_summary,
+    MARKER, dedicated_research_root, ingest, operational_guard, read_service_receipt,
+    saved_operations_progress, saved_pilot_summary,
 )
 from tools.atlas_live_research_cycle import FIXTURE, STEP, make_plan, run, report, recover, DurableJournal, OperationalStore, ProspectiveObserver
 
@@ -74,6 +75,25 @@ authority = SimpleNamespace(
 def wait(seconds):
     clock.current += round(seconds * 1000)
 class LiveResearchTests(unittest.TestCase):
+
+    def test_sustained_segment_root_is_scoped_to_authorized_runtime(self):
+        runtime = Path(tempfile.mkdtemp()) / "runtime"
+        (runtime / "segments").mkdir(parents=True)
+        (runtime / "config.json").write_text("{}")
+        (runtime / "continuous-research.authorized.json").write_text("{}")
+        state = runtime / "segments" / "1795587300000"
+        prepared = dedicated_research_root(state, MARKER, sustained=True)
+        self.assertEqual(prepared, state.absolute())
+        self.assertEqual((state / MARKER).read_text(encoding="ascii"), MARKER)
+
+        unscoped = runtime.parent / "other" / "segments" / "1795587300000"
+        with self.assertRaisesRegex(ValueError, "SUSTAINED_STATE_ROOT_SCOPE"):
+            dedicated_research_root(unscoped, MARKER, sustained=True)
+
+        non_sustained = runtime / "segments" / "1795588200000"
+        with self.assertRaises(ValueError):
+            dedicated_research_root(non_sustained, MARKER, sustained=False)
+
     def test_sustained_receipts_survive_new_segment_without_filling_gap(self):
         class SegmentWire(Wire):
             def __init__(self, root, opening):
