@@ -148,11 +148,15 @@ class SnapshotReader:
         self.snapshot_path = None
         self.snapshot_file_sha = None
 
-    def _project(self, snapshot, file_sha):
-        return (self.project_early(snapshot, file_sha) if self.profile == "early"
-                else self.project(snapshot, file_sha))
+    def __init__(self, manifest_path, expected_manifest_sha):
+        self.profile = "strict"
+        self.view = self.unavailable("EVIDENCE_UNAVAILABLE")
+        self.manifest_path = Path(manifest_path)
+        self.expected_manifest_sha = expected_manifest_sha
+        self.snapshot_path = None
+        self.snapshot_file_sha = None
         try:
-            manifest, raw_manifest_sha = watchdog.read_json(manifest_path)
+            manifest, raw_manifest_sha = watchdog.read_json(self.manifest_path)
             if raw_manifest_sha != expected_manifest_sha:
                 raise ValueError("MANIFEST_PIN_MISMATCH")
             watchdog.sealed_hash(manifest, "manifest_sha256", "MANIFEST_SEAL_INVALID")
@@ -182,6 +186,10 @@ class SnapshotReader:
             code = str(exc) if type(exc) is ValueError else "EVIDENCE_UNAVAILABLE"
             self.view = self.unavailable(code if SAFE_CODE.fullmatch(code) else "EVIDENCE_UNAVAILABLE",
                                           early=self.profile == "early")
+
+    def _project(self, snapshot, file_sha):
+        return (self.project_early(snapshot, file_sha) if self.profile == "early"
+                else self.project(snapshot, file_sha))
 
     def read_pinned(self):
         try:
