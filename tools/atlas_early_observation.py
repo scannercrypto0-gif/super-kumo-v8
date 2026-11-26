@@ -289,30 +289,38 @@ def _daily(item, registry_item, now):
                 and type(receipts) is list and len(receipts) == 1 and receipts[0] == worker_receipt)
             if not evidence_ok:
                 state, reason = "UNKNOWN", "DAILY_SOURCE_EVIDENCE_UNVERIFIED"
-            elif registry_item["doc"] is None:
-                state, reason = "UNKNOWN", "DAILY_REGISTRY_REPORT_NOT_SUPPLIED"
             else:
-                registry_doc = registry_item["doc"]
-                registry_view = watchdog.registry_view(registry_doc)
-                registry_state, _, _ = _age_state(registry_doc.get("as_of_ms"), now)
-                if registry_state is not None:
-                    state, reason = registry_state, "DAILY_REGISTRY_REPORT_STALE_OR_UNTRUSTED"
+                source_age_for_gate = observed - source_day if type(observed) is int and type(source_day) is int and 0 <= source_day <= observed else None
+                freshness_limit = doc.get("freshness_limit_ms")
+                if (source_age_for_gate is None or type(freshness_limit) is not int
+                        or not 0 < freshness_limit <= MAX_EXPECTED_WAIT_MS):
+                    state, reason = "UNKNOWN", "DAILY_SOURCE_FRESHNESS_LIMIT_UNVERIFIED"
+                elif source_age_for_gate > freshness_limit:
+                    state, reason = "STALE", "DAILY_SOURCE_DATA_STALE"
+                elif registry_item["doc"] is None:
+                    state, reason = "UNKNOWN", "DAILY_REGISTRY_REPORT_NOT_SUPPLIED"
                 else:
-                    match = next((row for row in registry_doc["sources"]
-                                  if row["source_zip_sha256"] == source_zip), None)
-                    if match is None:
-                        state, reason = "UNKNOWN", "DAILY_REGISTRY_APPEND_NOT_VERIFIED"
+                    registry_doc = registry_item["doc"]
+                    registry_view = watchdog.registry_view(registry_doc)
+                    registry_state, _, _ = _age_state(registry_doc.get("as_of_ms"), now)
+                    if registry_state is not None:
+                        state, reason = registry_state, "DAILY_REGISTRY_REPORT_STALE_OR_UNTRUSTED"
                     else:
-                        registry_link = {
-                            "source_day_ms": source_day,
-                            "worker_receipt_sha256": worker_receipt,
-                            "source_zip_sha256": source_zip,
-                            "checksum_sha256": checksum,
-                            "registry_source_receipt_sha256": match["source_receipt_sha256"],
-                            "registry_snapshot_sha256": registry_view["snapshot_sha256"],
-                            "registry_event_watermark": registry_view["counters"]["event_watermark"],
-                        }
-                        state, reason = "HEALTHY_PROGRESS", "DAILY_SOURCE_RECEIPT_LINKED_TO_REGISTRY"
+                        match = next((row for row in registry_doc["sources"]
+                                      if row["source_zip_sha256"] == source_zip), None)
+                        if match is None:
+                            state, reason = "UNKNOWN", "DAILY_REGISTRY_APPEND_NOT_VERIFIED"
+                        else:
+                            registry_link = {
+                                "source_day_ms": source_day,
+                                "worker_receipt_sha256": worker_receipt,
+                                "source_zip_sha256": source_zip,
+                                "checksum_sha256": checksum,
+                                "registry_source_receipt_sha256": match["source_receipt_sha256"],
+                                "registry_snapshot_sha256": registry_view["snapshot_sha256"],
+                                "registry_event_watermark": registry_view["counters"]["event_watermark"],
+                            }
+                            state, reason = "HEALTHY_PROGRESS", "DAILY_SOURCE_RECEIPT_LINKED_TO_REGISTRY"
         source_day = last.get("source_day_ms")
         source_age = observed - source_day if type(observed) is int and type(source_day) is int and 0 <= source_day <= observed else None
         return {"lane": "daily", "status": state, "reason": reason,
