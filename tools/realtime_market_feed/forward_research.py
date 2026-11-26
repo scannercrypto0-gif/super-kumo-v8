@@ -107,8 +107,9 @@ def _load_kernel(baseline_root, dependency_root):
         (definition_path, deps / "factory", "factory/research_wp0/strategy_definition.py"),
         (projection_path, deps / "factory", "factory/research_wp0/aql_factory_historical_rule_projection.py"),
     ):
-        _need(relative in manifest and _sha_bytes(path.read_bytes()) == manifest[relative],
-              "ANALYZER_TRANSITIVE_FILE_PIN_MISMATCH")
+        _need(relative in manifest, "ANALYZER_TRANSITIVE_FILE_MISSING:" + relative)
+        _need(_sha_bytes(path.read_bytes()) == manifest[relative],
+              "ANALYZER_TRANSITIVE_FILE_PIN_MISMATCH:" + relative)
     definition = StrategyDefinition.from_dict(
         plan["strategy"]["definition"], registry=IndicatorRegistryV2())
     _need(definition.digest == STRATEGY_DIGEST, "ANALYZER_STRATEGY_PIN_MISMATCH")
