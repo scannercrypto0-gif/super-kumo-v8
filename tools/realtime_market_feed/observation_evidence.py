@@ -31,6 +31,31 @@ def _sha(value):
     return hashlib.sha256(value).hexdigest()
 
 
+def _fault_events(events):
+    explicit={"SOCKET_ERROR","SOCKET_EXCEPTION","MESSAGE_REJECTED",
+              "GAP_BACKFILL_FAILED","GAP_BACKFILL_WORKER_ERROR"}
+    faults=[]
+    for index,event in enumerate(events):
+        if event["kind"] in explicit:
+            faults.append(event)
+            continue
+        if event["kind"]!="DISCONNECTED":
+            continue
+        since_connection=[e for e in events[:index]
+            if e["kind"] in {"CONNECTED","SOCKET_ERROR","SOCKET_EXCEPTION"}]
+        if since_connection and since_connection[-1]["kind"] in {"SOCKET_ERROR","SOCKET_EXCEPTION"}:
+            continue
+        planned=False
+        for later in events[index+1:]:
+            if later["kind"]=="CONNECTED":
+                break
+            if later["kind"]=="PLANNED_ROTATION":
+                planned=True
+        if not planned:
+            faults.append(event)
+    return faults
+
+
 def _file_set_sha(path: Path):
     digest = hashlib.sha256()
     files = [path]
@@ -133,12 +158,9 @@ def build_observation_evidence(database, run_id):
         # Events retain row ids; this digest covers the complete ordered event set.
         event_digest = _sha(_canonical(events))
         before = _file_set_sha(path)
-        fault_kinds = {"SOCKET_ERROR","SOCKET_EXCEPTION","MESSAGE_REJECTED",
-                       "GAP_BACKFILL_FAILED","GAP_BACKFILL_WORKER_ERROR"}
+        fault_events=_fault_events(events)
         recoveries = []
-        for event in events:
-            if event["kind"] not in fault_kinds:
-                continue
+        for event in fault_events:
             recovery_kind = ("GAP_BACKFILL_COMPLETED" if event["kind"].startswith("GAP_")
                              else "FINAL_BAR_RECEIVED" if event["kind"]=="MESSAGE_REJECTED"
                              else "CONNECTED")
@@ -148,7 +170,7 @@ def build_observation_evidence(database, run_id):
             if recovery:
                 recoveries.append({"fault_event_id":event["id"],
                                    "recovery_event_id":recovery["id"]})
-        fault_count = sum(1 for event in events if event["kind"] in fault_kinds)
+        fault_count = len(fault_events)
         natural_fault = ("NOT_OBSERVED" if fault_count == 0 else
                          "OBSERVED_AND_RECOVERED" if len(recoveries) == fault_count else
                          "OBSERVED_NOT_RECOVERED")
