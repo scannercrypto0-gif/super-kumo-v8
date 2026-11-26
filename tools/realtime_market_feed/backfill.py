@@ -29,13 +29,15 @@ def _fetch_json(url: str):
     return json.loads(raw)
 
 
-def _event(database: Path, kind: str, detail: str) -> None:
+def _event(database: Path, kind: str, detail: str, run_id=None) -> None:
     db = sqlite3.connect(database, timeout=10)
     try:
         db.execute("PRAGMA busy_timeout=10000")
         with db:
-            db.execute("INSERT INTO service_event(at_ms,kind,detail) VALUES(?,?,?)",
-                       (time.time_ns() // 1_000_000, kind, detail[:300]))
+            db.execute("""INSERT INTO service_event
+                (run_id,at_ms,monotonic_ms,kind,detail) VALUES(?,?,?,?,?)""",
+                (run_id,time.time_ns()//1_000_000,time.monotonic_ns()//1_000_000,
+                 kind,detail[:300]))
     finally:
         db.close()
 
@@ -141,7 +143,8 @@ def _valid_existing_receipt(db, symbol, opened):
         return False
 
 
-def recover_gap(database: str | Path, symbol: str, start_ms: int, end_ms: int, *, fetch_json=_fetch_json):
+def recover_gap(database: str | Path, symbol: str, start_ms: int, end_ms: int, *,
+                fetch_json=_fetch_json, run_id=None):
     """Recover one half-open gap with a distinct, forward-only REST receipt."""
     path = Path(database).resolve()
     symbol = symbol.upper()
@@ -151,10 +154,10 @@ def recover_gap(database: str | Path, symbol: str, start_ms: int, end_ms: int, *
         raise ValueError("BACKFILL_GAP_GRID")
     expected_count = (end_ms - start_ms) // STEP_MS
     if expected_count > MAX_RECOVERY_BARS:
-        _event(path, "GAP_BACKFILL_LIMIT", f"{symbol}:{start_ms}:{end_ms}:bars={expected_count}")
+        _event(path, "GAP_BACKFILL_LIMIT", f"{symbol}:{start_ms}:{end_ms}:bars={expected_count}", run_id)
         return {"status": "OPEN_LIMIT_EXCEEDED", "bars": 0}
 
-    _event(path, "GAP_BACKFILL_STARTED", f"{symbol}:{start_ms}:{end_ms}")
+    _event(path, "GAP_BACKFILL_STARTED", f"{symbol}:{start_ms}:{end_ms}", run_id)
     try:
         server = fetch_json(BASE + "/api/v3/time")
         server_ms = server.get("serverTime") if isinstance(server, dict) else None
@@ -239,18 +242,20 @@ def recover_gap(database: str | Path, symbol: str, start_ms: int, end_ms: int, *
                     (symbol, start_ms, end_ms)).rowcount
                 if changed != 1:
                     raise ValueError("BACKFILL_GAP_CLOSE_RACE")
-                db.execute("INSERT INTO service_event(at_ms,kind,detail) VALUES(?,?,?)",
-                           (received_ms,"GAP_BACKFILL_COMPLETED",
+                db.execute("""INSERT INTO service_event
+                           (run_id,at_ms,monotonic_ms,kind,detail) VALUES(?,?,?,?,?)""",
+                           (run_id,received_ms,time.monotonic_ns()//1_000_000,
+                            "GAP_BACKFILL_COMPLETED",
                             f"{symbol}:{start_ms}:{end_ms}:bars={expected_count}:source=REST"))
         finally:
             db.close()
         return {"status": "CLOSED", "bars": expected_count}
     except (HTTPError, URLError, TimeoutError, OSError, ValueError, RuntimeError, sqlite3.Error) as exc:
         reason = type(exc).__name__ + ":" + str(exc)
-        _event(path, "GAP_BACKFILL_FAILED", f"{symbol}:{start_ms}:{end_ms}:{reason}")
+        _event(path, "GAP_BACKFILL_FAILED", f"{symbol}:{start_ms}:{end_ms}:{reason}", run_id)
         return {"status": "OPEN_FAILED", "bars": 0, "reason": reason[:180]}
 
-def recover_open_gaps(database: str | Path, symbol: str):
+def recover_open_gaps(database: str | Path, symbol: str, *, run_id=None):
     path = Path(database).resolve()
     symbol = symbol.upper()
     db = sqlite3.connect(path, timeout=10)
@@ -260,4 +265,4 @@ def recover_open_gaps(database: str | Path, symbol: str):
                AND status='OPEN' ORDER BY start_ms LIMIT 3""", (symbol,)).fetchall()
     finally:
         db.close()
-    return [recover_gap(path, symbol, int(start), int(end)) for start, end in gaps]
+    return [recover_gap(path, symbol, int(start), int(end), run_id=run_id) for start, end in gaps]
