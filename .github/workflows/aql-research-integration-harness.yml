@@ -1,0 +1,57 @@
+name: Work offline research integration gate
+on:
+  pull_request:
+    paths:
+      - 'tools/research_integration_harness/**'
+      - '.github/workflows/aql-research-integration-harness.yml'
+permissions:
+  contents: read
+jobs:
+  current-seam-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      # Public pinned code provisioning only. Runtime audit hook denies network/children.
+      - uses: actions/checkout@v4
+        with:
+          ref: 'c1104955ae92153221cbe93f26b62cc50bdeb28a'
+          path: '.harness-pins/core'
+      - uses: actions/checkout@v4
+        with:
+          ref: '6177da84ce67b3dc81ef759521c6b52ffa2132b3'
+          path: '.harness-pins/factory'
+      - uses: actions/checkout@v4
+        with:
+          ref: 'b9c9ff8602e79c534402f44bce83c56ec2fa6bb9'
+          path: '.harness-pins/scanner'
+      - uses: actions/checkout@v4
+        with:
+          ref: 'f2006c0e431690ccea8b0532095bf4f2a2dc88ba'
+          path: '.harness-pins/discoverer'
+      - name: One consolidated current-seam boundary gate (TEST_ONLY)
+        run: |
+          python -m tools.research_integration_harness.gate_v2 \
+            --checkout core=.harness-pins/core \
+            --checkout factory=.harness-pins/factory \
+            --checkout scanner=.harness-pins/scanner \
+            --checkout discoverer=.harness-pins/discoverer \
+            --output gate-evidence
+      - name: Preserve public TEST_ONLY evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: work-current-seams-TEST-ONLY-${{ github.event.pull_request.head.sha }}-py${{ matrix.python }}
+          path: |
+            gate-evidence/
+            tools/research_integration_harness/fixtures_v2/
+          retention-days: 7
+          if-no-files-found: error
