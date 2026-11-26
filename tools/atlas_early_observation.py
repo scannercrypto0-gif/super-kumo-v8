@@ -242,7 +242,7 @@ def _history(item, registry_item, previous, now, clock_ok):
                         doc.get("schema"), doc.get("finished_ms"))
 
 
-def _daily(item, now):
+def _daily(item, registry_item, now):
     doc = item["doc"]
     if doc is None:
         return _unknown("daily", item["reason"], item)
@@ -257,7 +257,8 @@ def _daily(item, now):
         receipt = last.get("daily_worker_receipt_sha256")
         if receipt is not None:
             require(watchdog.HEX64.fullmatch(receipt) is not None, "DAILY_RECEIPT_PIN_INVALID")
-        if state is None and doc.get("last_failure") is not None:
+        registry_link = None
+        if state is None and failure is not None:
             state, reason = "FAILED", "DAILY_WORKER_FAILURE_REPORTED"
         if state is None and doc.get("source_freshness") == "STALE":
             state, reason = "STALE", "DAILY_SOURCE_REPORTED_STALE"
@@ -267,27 +268,70 @@ def _daily(item, now):
                              if type(next_check) is int and now <= next_check <= now + MAX_EXPECTED_WAIT_MS
                              else ("UNKNOWN", "DAILY_WAIT_CADENCE_UNVERIFIED"))
         if state is None:
-            state, reason = "UNKNOWN", "DAILY_IMPORT_REGISTRY_LINK_NOT_SUPPLIED"
+            worker_receipt = last.get("daily_worker_receipt_sha256")
+            source_zip = last.get("source_zip_sha256")
+            checksum = last.get("checksum_sha256")
+            source_day = last.get("source_day_ms")
+            receipts = last.get("receipts")
+            evidence_ok = (
+                last.get("daily_source_evidence_status") == "VERIFIED"
+                and type(worker_receipt) is str and watchdog.HEX64.fullmatch(worker_receipt)
+                and type(source_zip) is str and watchdog.HEX64.fullmatch(source_zip)
+                and type(checksum) is str and watchdog.HEX64.fullmatch(checksum)
+                and type(source_day) is int and source_day >= 0 and source_day % 86_400_000 == 0
+                and type(receipts) is list and len(receipts) == 1 and receipts[0] == worker_receipt)
+            if not evidence_ok:
+                state, reason = "UNKNOWN", "DAILY_SOURCE_EVIDENCE_UNVERIFIED"
+            elif registry_item["doc"] is None:
+                state, reason = "UNKNOWN", "DAILY_REGISTRY_REPORT_NOT_SUPPLIED"
+            else:
+                registry_doc = registry_item["doc"]
+                registry_view = watchdog.registry_view(registry_doc)
+                registry_state, _, _ = _age_state(registry_doc.get("as_of_ms"), now)
+                if registry_state is not None:
+                    state, reason = registry_state, "DAILY_REGISTRY_REPORT_STALE_OR_UNTRUSTED"
+                else:
+                    match = next((row for row in registry_doc["sources"]
+                                  if row["source_zip_sha256"] == source_zip), None)
+                    if match is None:
+                        state, reason = "UNKNOWN", "DAILY_REGISTRY_APPEND_NOT_VERIFIED"
+                    else:
+                        registry_link = {
+                            "source_day_ms": source_day,
+                            "worker_receipt_sha256": worker_receipt,
+                            "source_zip_sha256": source_zip,
+                            "checksum_sha256": checksum,
+                            "registry_source_receipt_sha256": match["source_receipt_sha256"],
+                            "registry_snapshot_sha256": registry_view["snapshot_sha256"],
+                            "registry_event_watermark": registry_view["counters"]["event_watermark"],
+                        }
+                        state, reason = "HEALTHY_PROGRESS", "DAILY_SOURCE_RECEIPT_LINKED_TO_REGISTRY"
+        source_day = last.get("source_day_ms")
+        source_age = observed - source_day if type(observed) is int and type(source_day) is int and 0 <= source_day <= observed else None
         return {"lane": "daily", "status": state, "reason": reason,
                 "observed_at_ms": observed, "source_schema": doc["schema"],
                 "source_file_sha256": item["pin"], "freshness": "FRESH" if age is not None and age <= MAX_SNAPSHOT_AGE_MS else state,
-                "age_ms": age, "progress_cursor": {},
-                "source_identity": None,
+                "age_ms": age, "progress_cursor": {
+                    "source_day_ms": registry_link["source_day_ms"] if registry_link else None,
+                    "registry_event_watermark": registry_link["registry_event_watermark"] if registry_link else None,
+                    "worker_receipt_sha256": registry_link["worker_receipt_sha256"] if registry_link else None},
+                "source_identity": registry_link,
                 "reported": {"task_state": safe_enum(doc.get("task_state"), DAILY_TASK_STATES),
                     "scheduler_state": safe_enum(doc.get("scheduler_state"), DAILY_TASK_STATES),
                     "runtime_state": safe_enum(doc.get("runtime_state"), DAILY_RUNTIME_STATES),
                     "cycle_evidence": safe_enum(doc.get("cycle_evidence"), DAILY_CYCLE_STATES),
                     "source_freshness": safe_enum(doc.get("source_freshness"), DAILY_FRESHNESS_STATES),
-                    "last_success_source_day_ms": (last.get("source_day_ms")
-                        if type(last.get("source_day_ms")) is int and last["source_day_ms"] >= 0 else None),
+                    "last_success_source_day_ms": (source_day
+                        if type(source_day) is int and source_day >= 0 else None),
+                    "source_age_ms": source_age,
                     "worker_receipt_sha256": receipt,
+                    "registry_link": registry_link,
                     "last_failure_reported": failure is not None,
                     "last_failure_reason": failure_reason},
-                "scope": "WORKER_REPORT_IMPORT_REGISTRY_LINK_UNVERIFIED",
-                "evidence_grade": "OWNER_SUPPLIED_DAILY_WORKER_REPORT_IMPORT_UNVERIFIED"}
+                "scope": "DAILY_WORKER_SOURCE_RECEIPT_REGISTRY_LINK_VERIFIED" if registry_link else "DAILY_IMPORT_REGISTRY_LINK_UNVERIFIED",
+                "evidence_grade": "OWNER_SUPPLIED_DAILY_REPORT_REGISTRY_LINK_VERIFIED" if registry_link else "OWNER_SUPPLIED_DAILY_WORKER_REPORT_IMPORT_UNVERIFIED"}
     except Exception:
         return _unknown("daily", "DAILY_EVIDENCE_UNTRUSTED", item, doc.get("schema"), observed)
-
 
 def _live(item, previous, now, clock_ok):
     doc = item["doc"]
@@ -400,7 +444,7 @@ def build(paths, *, now_ms, monotonic_ns, boot_id, clock_uncertainty_ms,
     clock_ok = type(clock_uncertainty_ms) is int and 0 <= clock_uncertainty_ms <= 5_000
     lanes = {
         "history": _history(loaded["history"], loaded["registry"], previous, now_ms, clock_ok),
-        "daily": _daily(loaded["daily"], now_ms),
+        "daily": _daily(loaded["daily"], loaded["registry"], now_ms),
         "live": _live(loaded["live"], previous, now_ms, clock_ok),
     }
     # An untrusted wall clock cannot establish fresh progress or schedule waits.
