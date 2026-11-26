@@ -134,7 +134,7 @@ def test_live_service_dispatches_final_bar_to_gap_recovery_worker(tmp_path, monk
 
     called=threading.Event()
     observed=[]
-    def recover(path,symbol):
+    def recover(path,symbol,run_id=None):
         observed.append((path,symbol))
         called.set()
     monkeypatch.setattr(backfill,"recover_open_gaps",recover)
