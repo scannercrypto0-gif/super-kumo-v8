@@ -214,15 +214,21 @@ def evaluate_24h_report(report, *, expected_code_sha256, expected_symbols,
             failures.append("FAULT_RECOVERY_PAIRING_INCOMPLETE")
         else:
             by_id={e.get("id"):e for e in events if isinstance(e,dict)}
+            fault_ids=[]; recovery_ids=[]
             for pair in pairs:
                 if not isinstance(pair,dict) or set(pair)!={"fault_event_id","recovery_event_id"}:
                     failures.append("FAULT_RECOVERY_PAIR_INVALID");break
+                fault_ids.append(pair["fault_event_id"]);recovery_ids.append(pair["recovery_event_id"])
                 f=by_id.get(pair["fault_event_id"]);r=by_id.get(pair["recovery_event_id"])
                 expected=("GAP_BACKFILL_COMPLETED" if f and f.get("kind","").startswith("GAP_")
                     else "FINAL_BAR_RECEIVED" if f and f.get("kind")=="MESSAGE_REJECTED"
                     else "CONNECTED")
                 if not f or not r or f not in faults or r.get("kind")!=expected or r["id"]<=f["id"] or r["at_ms"]<f["at_ms"]:
                     failures.append("FAULT_RECOVERY_CAUSALITY_INVALID");break
+            expected_fault_ids=[f["id"] for f in faults]
+            if (len(set(fault_ids))!=len(fault_ids) or len(set(recovery_ids))!=len(recovery_ids)
+                or set(fault_ids)!=set(expected_fault_ids)):
+                failures.append("FAULT_RECOVERY_PAIR_COVERAGE_INVALID")
     else:
         failures.append("NATURAL_FAULT_STATE_INVALID")
 
