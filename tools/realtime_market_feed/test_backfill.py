@@ -211,6 +211,7 @@ def test_rest_retry_is_idempotent_and_consumer_rejects_unpinned_missing_or_tampe
 
 
 def test_rest_receipt_source_claim_and_bar_content_tampering_are_rejected(tmp_path):
+    import hashlib
     import time
     from tools.realtime_market_feed.backfill import REST_PRODUCER_CODE_SHA256
     from tools.realtime_market_feed.service import PRODUCER_CODE_SHA256
@@ -228,7 +229,6 @@ def test_rest_receipt_source_claim_and_bar_content_tampering_are_rejected(tmp_pa
         original_receipt_sha=hashlib.sha256(body_text.encode()).hexdigest()
         body["source_class"]="WEBSOCKET"
         canonical=json.dumps(body,sort_keys=True,separators=(",",":"),ensure_ascii=True)
-        import hashlib
         store.db.execute("""UPDATE final_bar_lineage SET receipt_json=?,receipt_sha256=?
             WHERE open_ms=60000""",(canonical,hashlib.sha256(canonical.encode()).hexdigest()))
         store.db.commit()
