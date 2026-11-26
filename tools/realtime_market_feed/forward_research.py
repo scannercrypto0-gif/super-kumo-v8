@@ -182,6 +182,9 @@ def analyze_forward_window(feed_database, research_database, *, symbol, start_ms
                            dependency_root, warehouse_root,
                            allow_synthetic_fixture=False):
     """Evaluate only the latest finalized 15m decision in a complete bounded window."""
+    # Load the pinned Warehouse package before importing its adapter; the adapter
+    # imports the native `aql` package and must resolve from this exact checkout.
+    ResearchBarStore, project_finalized_1m, minute_ms = _warehouse_api(warehouse_root)
     from tools.realtime_market_feed.atlas_integration import project_feed_window
 
     _need(type(symbol) is str and symbol.isalnum() and symbol == symbol.upper(),
@@ -227,7 +230,6 @@ def analyze_forward_window(feed_database, research_database, *, symbol, start_ms
           "ANALYZER_RESEARCH_STORE_MUST_BE_DISPOSABLE")
     _need(Path(feed_database).resolve() != Path(research_database).resolve(),
           "ANALYZER_SOURCE_RESEARCH_STORE_COLLISION")
-    ResearchBarStore, project_finalized_1m, minute_ms = _warehouse_api(warehouse_root)
     kernel = _load_kernel(baseline_root, dependency_root)
 
     # These writes are restricted to a disposable store. The source feed is read-only.
