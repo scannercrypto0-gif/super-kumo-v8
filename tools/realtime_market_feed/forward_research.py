@@ -330,7 +330,7 @@ def analyze_forward_window(feed_database, research_database, *, symbol, start_ms
         },
         "strategy": {
             "strategy_id": kernel["definition"].spec["strategy_id"],
-            "strategy_version": kernel["definition"].strategy_version,
+            "strategy_version": kernel["definition"].spec["strategy_version"],
             "strategy_definition_sha256": kernel["definition"].digest,
             "evaluation_boundary": "tools.scanner_strategy_f.research_e2e_diagnostic._eval_strategy",
             "availability_claim": "DECISION_AT_CUTOFF_NOT_RETROACTIVE_PIT",
