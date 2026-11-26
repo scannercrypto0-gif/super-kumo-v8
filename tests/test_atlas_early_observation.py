@@ -14,7 +14,7 @@ import atlas_early_observation as early
 import atlas_ops_watchdog as watchdog
 
 
-NOW = 20_000_000
+NOW = 172_800_000
 BOOT = "synthetic-test-boot"
 
 
