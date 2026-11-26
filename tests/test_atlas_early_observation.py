@@ -83,6 +83,22 @@ def daily(now=NOW, *, wait=False):
     }
 
 
+
+def daily_linked(now=NOW, *, source_zip="2" * 64, source_day=None):
+    report = daily(now)
+    day = now - 86_400_000 if source_day is None else source_day
+    worker_receipt = "4" * 64
+    report["last_success"].update({
+        "source_day_ms": day,
+        "daily_source_evidence_status": "VERIFIED",
+        "daily_worker_receipt_sha256": worker_receipt,
+        "receipts": [worker_receipt],
+        "source_zip_sha256": source_zip,
+        "checksum_sha256": "8" * 64,
+    })
+    return report
+
+
 def live(now=NOW, *, hold=False, committed=None, receipts=2, receipt="5" * 64,
          config="6" * 64):
     return {
@@ -140,6 +156,34 @@ class EarlyObservationTests(unittest.TestCase):
             result = self.build(paths)
         self.assertEqual(result["lanes"]["daily"]["status"], "UNKNOWN")
         self.assertEqual(result["lanes"]["daily"]["reason"], "DAILY_IMPORT_REGISTRY_LINK_NOT_SUPPLIED")
+
+    def test_daily_success_requires_verified_source_and_registry_link(self):
+        with tempfile.TemporaryDirectory() as folder:
+            paths = paths_for(Path(folder), day=daily_linked(), reg=registry())
+            result = self.build(paths)
+        lane = result["lanes"]["daily"]
+        self.assertEqual(lane["status"], "HEALTHY_PROGRESS")
+        self.assertEqual(lane["reason"], "DAILY_SOURCE_RECEIPT_LINKED_TO_REGISTRY")
+        self.assertEqual(lane["reported"]["registry_link"]["registry_source_receipt_sha256"], "3" * 64)
+        self.assertEqual(lane["reported"]["registry_link"]["source_zip_sha256"], "2" * 64)
+        self.assertEqual(lane["reported"]["source_age_ms"], 86_400_000)
+
+    def test_daily_verified_source_without_matching_registry_stays_unknown(self):
+        with tempfile.TemporaryDirectory() as folder:
+            paths = paths_for(Path(folder), day=daily_linked(source_zip="9" * 64), reg=registry())
+            result = self.build(paths)
+        lane = result["lanes"]["daily"]
+        self.assertEqual(lane["status"], "UNKNOWN")
+        self.assertEqual(lane["reason"], "DAILY_REGISTRY_APPEND_NOT_VERIFIED")
+
+    def test_daily_verified_source_with_stale_registry_stays_stale(self):
+        stale_registry = registry(now=NOW - early.MAX_SNAPSHOT_AGE_MS - 1)
+        with tempfile.TemporaryDirectory() as folder:
+            paths = paths_for(Path(folder), day=daily_linked(), reg=stale_registry)
+            result = self.build(paths)
+        lane = result["lanes"]["daily"]
+        self.assertEqual(lane["status"], "STALE")
+        self.assertEqual(lane["reason"], "DAILY_REGISTRY_REPORT_STALE_OR_UNTRUSTED")
 
     def test_expected_wait_requires_valid_next_check_and_clock(self):
         with tempfile.TemporaryDirectory() as folder:
