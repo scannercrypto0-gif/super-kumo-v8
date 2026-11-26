@@ -177,6 +177,7 @@ class EarlyObservationTests(unittest.TestCase):
         self.assertEqual(lane["reported"]["registry_link"]["registry_source_receipt_sha256"], "3" * 64)
         self.assertEqual(lane["reported"]["registry_link"]["source_zip_sha256"], "2" * 64)
         self.assertEqual(lane["reported"]["source_age_ms"], 86_400_000)
+        self.assertEqual(lane["reported"]["source_data_freshness"], "FRESH")
 
     def test_fresh_report_cannot_hide_stale_daily_source_day(self):
         report = daily_linked(source_day=NOW - 2 * 86_400_000)
@@ -187,6 +188,7 @@ class EarlyObservationTests(unittest.TestCase):
         self.assertEqual(lane["status"], "STALE")
         self.assertEqual(lane["reason"], "DAILY_SOURCE_DATA_STALE")
         self.assertEqual(lane["reported"]["source_age_ms"], 2 * 86_400_000)
+        self.assertEqual(lane["reported"]["source_data_freshness"], "STALE")
 
     def test_daily_verified_source_without_matching_registry_stays_unknown(self):
         with tempfile.TemporaryDirectory() as folder:
