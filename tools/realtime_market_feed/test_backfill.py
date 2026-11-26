@@ -225,6 +225,7 @@ def test_rest_receipt_source_claim_and_bar_content_tampering_are_rejected(tmp_pa
         body_text, = store.db.execute(
             "SELECT receipt_json FROM final_bar_lineage WHERE open_ms=60000").fetchone()
         body=json.loads(body_text)
+        original_receipt_sha=hashlib.sha256(body_text.encode()).hexdigest()
         body["source_class"]="WEBSOCKET"
         canonical=json.dumps(body,sort_keys=True,separators=(",",":"),ensure_ascii=True)
         import hashlib
@@ -236,6 +237,10 @@ def test_rest_receipt_source_claim_and_bar_content_tampering_are_rejected(tmp_pa
                 end_ms=180_000,now_ms=now,max_age_ms=86_400_000,
                 expected_producer_code_sha256=PRODUCER_CODE_SHA256,
                 expected_rest_producer_code_sha256=REST_PRODUCER_CODE_SHA256)
+        # Restore the untouched valid REST lineage before testing bar tampering,
+        # so this assertion proves row/receipt binding rather than the source-claim failure.
+        store.db.execute("""UPDATE final_bar_lineage SET receipt_json=?,receipt_sha256=?
+            WHERE open_ms=60000""",(body_text,original_receipt_sha))
         store.db.execute("UPDATE final_bar SET close='99' WHERE open_ms=60000")
         store.db.commit()
         with pytest.raises(ValueError,match="FEED_LINEAGE_ROW_MISMATCH"):
