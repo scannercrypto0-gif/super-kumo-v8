@@ -110,8 +110,9 @@ def _load_kernel(baseline_root, dependency_root):
         _need(relative in manifest, "ANALYZER_TRANSITIVE_FILE_MISSING:" + relative)
         _need(_sha_bytes(path.read_bytes()) == manifest[relative],
               "ANALYZER_TRANSITIVE_FILE_PIN_MISMATCH:" + relative)
+    # The accepted reference stores a sealed {definition, digest} envelope.
     definition = StrategyDefinition.from_dict(
-        plan["strategy"]["definition"], registry=IndicatorRegistryV2())
+        plan["strategy"], registry=IndicatorRegistryV2())
     _need(definition.digest == STRATEGY_DIGEST, "ANALYZER_STRATEGY_PIN_MISMATCH")
     return {
         "plan": plan, "definition": definition, "evaluate": _eval_strategy,
