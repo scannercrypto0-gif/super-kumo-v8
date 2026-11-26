@@ -147,6 +147,14 @@ class Store:
                observe_seconds,started,config_sha,source_id,mono))
         self.active_run_id = run_id
         self.event("RUN_STARTED", "observation-v2")
+        previous = self.db.execute("""SELECT run_id FROM service_run WHERE run_id<>?
+            ORDER BY started_ms DESC LIMIT 1""",(run_id,)).fetchone()
+        if previous:
+            integrity = self.db.execute("PRAGMA quick_check").fetchone()[0]
+            bars = self.db.execute("SELECT COUNT(*) FROM final_bar").fetchone()[0]
+            if integrity == "ok" and bars > 0:
+                self.event("RESTART_REPLAY_VERIFIED",
+                    f"prior_run={previous[0]}:database_reopened:bars={bars}")
         return run_id
 
     def end_run(self, run_id: str) -> None:
