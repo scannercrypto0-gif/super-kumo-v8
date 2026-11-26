@@ -196,7 +196,7 @@ def evaluate_24h_report(report, *, expected_code_sha256, expected_symbols,
 
     verification=report.get("verification")
     verify_keys={"schema","verifier_id","verifier_code_sha256","method",
-        "database_sha256","integrity_check","run_id","event_count","events_sha256",
+        "database_sha256","integrity_check","run_id","verified_at_ms","event_count","events_sha256",
         "evidence_sha256","complete_event_set"}
     if not isinstance(verification,dict) or set(verification)!=verify_keys:
         failures.append("INDEPENDENT_VERIFICATION_MISSING_OR_UNKNOWN")
@@ -210,6 +210,8 @@ def evaluate_24h_report(report, *, expected_code_sha256, expected_symbols,
             or verification.get("verifier_code_sha256")!=expected_verifier_code_sha256
             or verification.get("integrity_check")!="ok"
             or verification.get("run_id")!=run.get("run_id")
+            or type(verification.get("verified_at_ms")) is not int
+            or type(stopped) is not int or verification.get("verified_at_ms")<stopped
             or verification.get("event_count")!=len(events)
             or verification.get("events_sha256")!=report.get("events_sha256")
             or verification.get("complete_event_set") is not True
