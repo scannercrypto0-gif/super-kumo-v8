@@ -1,0 +1,41 @@
+name: Factory R3 nontrading event and monitor projection
+on:
+  pull_request:
+    paths:
+      - 'research_wp_r0/aql_r3_factory_event_outcome_consumer.py'
+      - 'tests/test_aql_r3_factory_event_outcome_consumer.py'
+      - '.github/workflows/aql-r3-factory-event-outcome.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r3-factory-focused:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run only 12 Factory R3 focused tests
+        run: python -m unittest -v tests.test_aql_r3_factory_event_outcome_consumer
+      - name: Reproduce bounded no-real-G2 output twice
+        run: |
+          printf '[]\n' > /tmp/aql-r3-schedule.json
+          python -m research_wp_r0.aql_r3_factory_event_outcome_consumer --schedule /tmp/aql-r3-schedule.json --asof-ms 900000 --out /tmp/r3-a.json
+          python -m research_wp_r0.aql_r3_factory_event_outcome_consumer --schedule /tmp/aql-r3-schedule.json --asof-ms 900000 --out /tmp/r3-b.json
+          cmp /tmp/r3-a.json /tmp/r3-b.json
+          python - <<'PY'
+          import json
+          r=json.load(open('/tmp/r3-a.json'))
+          assert r['original_g2_event_status']=='BLOCKED_ON_REAL_G2_EVENT'
+          assert r['scheduled_opportunities']==0 and r['horizon_rows']==0
+          assert r['f3_monitor_status']=='NOT_CONNECTED'
+          assert r['g0_merge_paper_shadow_live_authorized'] is False
+          PY
+          sha256sum /tmp/r3-a.json
+          cp /tmp/r3-a.json factory-r3-evaluation.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: factory-r3-blocked-on-real-g2-event
+          path: factory-r3-evaluation.json
+          if-no-files-found: error

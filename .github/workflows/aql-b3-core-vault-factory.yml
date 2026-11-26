@@ -1,0 +1,94 @@
+name: AQL B3 Core Vault Factory actual local software seam
+on:
+  push:
+    branches:
+      - aql/w1-factory-research-consumer-20261031
+    paths:
+      - research_wp_r0/aql_b3_core_vault_factory.py
+      - tests/test_aql_b3_core_vault_factory.py
+      - .github/workflows/aql-b3-core-vault-factory.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  b3-core-vault-factory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Retrieve existing pinned Core/B1 artifact bytes and verify digests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p b3-pinned b3-report
+          api="https://api.github.com/repos/scannercrypto0-gif/super-kumo-v8"
+          curl --fail --location --retry 2 -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${api}/actions/artifacts/13084853700/zip" -o b3-pinned/core.zip
+          curl --fail --location --retry 2 -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${api}/actions/artifacts/13084775420/zip" -o b3-pinned/b1-original-2024.zip
+          python - <<'PY'
+          import zipfile,hashlib,pathlib
+          d=pathlib.Path('b3-pinned')
+          with zipfile.ZipFile(d/'core.zip') as z:
+              raw=z.read('core-b2-integrity-input.json')
+          assert hashlib.sha256(raw).hexdigest() == '42005d09e3674420ddd8a761d40540c8e6509e8e79943d1f6a9821f692823b09'
+          (d/'core-b2-integrity-input.json').write_bytes(raw)
+          assert hashlib.sha256((d/'b1-original-2024.zip').read_bytes()).hexdigest() == '265b7ade1be307bd2efafbd0a8438e6846c869df6205af717133d490e38aeb59'
+          print('CORE_B2_AND_ACCEPTED_B1_PINNED_BYTES_OK')
+          PY
+      - name: Read-only exact-head overlay Core F1 validator and real Vault implementation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/scannercrypto0-gif/super-kumo-v8/contents"
+          mkdir -p tools/raw_vault_offline
+          curl --fail --location --retry 2 -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github.raw+json" \
+            "${api}/research_wp_r0/aql_f1_decision_capture_v1.py?ref=83d44ef23392b9ca9628d18d0f6fc909cd98e4ff" \
+            -o research_wp_r0/aql_f1_decision_capture_v1.py
+          for file in __init__.py schema.py vault.py; do
+            curl --fail --location --retry 2 -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github.raw+json" \
+              "${api}/tools/raw_vault_offline/${file}?ref=2ddfb2f4a6e145c6579820beb03e4d678594de21" \
+              -o "tools/raw_vault_offline/${file}"
+          done
+          python -m py_compile research_wp_r0/aql_f1_decision_capture_v1.py \
+            tools/raw_vault_offline/schema.py tools/raw_vault_offline/vault.py
+          echo "PINNED_CORE_SHA=83d44ef23392b9ca9628d18d0f6fc909cd98e4ff"
+          echo "PINNED_VAULT_SHA=2ddfb2f4a6e145c6579820beb03e4d678594de21"
+      - name: Run only B3 new changed-path tests
+        env:
+          AQL_B3_CORE_JSON: b3-pinned/core-b2-integrity-input.json
+          AQL_B3_B1_ARTIFACT: b3-pinned/b1-original-2024.zip
+        run: python -m unittest tests.test_aql_b3_core_vault_factory -v
+      - name: Run actual Core-F1 to RawVault to Factory and identical-input replay
+        run: |
+          set -euo pipefail
+          python -m research_wp_r0.aql_b3_core_vault_factory \
+            --core b3-pinned/core-b2-integrity-input.json \
+            --b1-artifact b3-pinned/b1-original-2024.zip \
+            --vault-root b3-local-vault \
+            --out b3-report/system-integrity.json
+          python -m research_wp_r0.aql_b3_core_vault_factory \
+            --core b3-pinned/core-b2-integrity-input.json \
+            --b1-artifact b3-pinned/b1-original-2024.zip \
+            --vault-root b3-local-vault \
+            --out b3-report/second-run.json
+          cmp b3-report/system-integrity.json b3-report/second-run.json
+          sha256sum b3-report/system-integrity.json | tee b3-report/sha256.txt
+          rm b3-report/second-run.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: factory-b3-actual-core-vault-factory-system-integrity
+          path: b3-report/
+          if-no-files-found: warn

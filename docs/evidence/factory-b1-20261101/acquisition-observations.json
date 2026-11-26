@@ -1,0 +1,578 @@
+[
+  {
+    "month": 1,
+    "observed_at_utc": "2026-11-01T12:48:47.926231+00:00",
+    "archive": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-01.zip",
+      "http_status": 200,
+      "bytes": 164409,
+      "sha256": "20c617e34b350f61d4bba493154ddec76b9f2ecd449a94410a60ba75efd488ce",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "164409",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:48:54 GMT",
+        "server": "envoy",
+        "last-modified": "Mon, 05 Feb 2024 12:06:55 GMT",
+        "etag": "\"85a734496c923af75ec14ba18b0f0b26\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 dbac8ed364d26ad4c74af8601c0952c4.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "Hop4sruWjzzl_d9pKRqZ7Lmkio_ePCR5gkmK3YsqmbME9tbw9nmGsQ==",
+        "x-envoy-upstream-service-time": "452",
+        "connection": "close"
+      }
+    },
+    "checksum": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-01.zip.CHECKSUM",
+      "http_status": 200,
+      "bytes": 89,
+      "sha256": "3622cdae7850378c3c7925b92b2097a916697ef34f53283697b6895356e2b106",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "89",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:03 GMT",
+        "server": "envoy",
+        "last-modified": "Mon, 05 Feb 2024 12:06:55 GMT",
+        "etag": "\"3b0bba798df929096aff1dc6d5fb4194\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 dbac8ed364d26ad4c74af8601c0952c4.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "BnPN-WNZExz8BuRkLskGEMpIp9AaUwyGocURFHdc5aPvVoft2iLpGg==",
+        "x-envoy-upstream-service-time": "456",
+        "connection": "close"
+      }
+    }
+  },
+  {
+    "month": 2,
+    "observed_at_utc": "2026-11-01T12:48:47.926748+00:00",
+    "archive": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-02.zip",
+      "http_status": 200,
+      "bytes": 153686,
+      "sha256": "55066890cd3a76c97c05e94213311b17a4146d697f6abe8762b3edae8495b20e",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "153686",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:48:54 GMT",
+        "server": "envoy",
+        "last-modified": "Tue, 12 Mar 2024 10:29:52 GMT",
+        "etag": "\"07c9da9e240a67da42d8816e3175733a\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 a67f6f4f796b41186ad30732ca90389a.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "cnKHueA_D3EBYsurT2tjqDoes_-LvcpWN7cA8kdpA39tciaseTTRHA==",
+        "x-envoy-upstream-service-time": "515",
+        "connection": "close"
+      }
+    },
+    "checksum": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-02.zip.CHECKSUM",
+      "http_status": 200,
+      "bytes": 89,
+      "sha256": "57d0671d08ef213d12bdc145624665ed8b62cdc6b71190f57557cefa76ff4eec",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "89",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:03 GMT",
+        "server": "envoy",
+        "last-modified": "Tue, 12 Mar 2024 10:29:53 GMT",
+        "etag": "\"ac82c655e3c4bfa4e727db1514fe953f\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 a67f6f4f796b41186ad30732ca90389a.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "FpscbuFDj6VKUBOnrjLx0GB8e5YZIVZ-vh0e8RqxA7SXxvbr5N5bcw==",
+        "x-envoy-upstream-service-time": "457",
+        "connection": "close"
+      }
+    }
+  },
+  {
+    "month": 3,
+    "observed_at_utc": "2026-11-01T12:48:47.927365+00:00",
+    "archive": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-03.zip",
+      "http_status": 200,
+      "bytes": 167084,
+      "sha256": "d42824b930c63b31c0217e39d9ef22671a79b695330a63dda68df8ef04dc81c1",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "167084",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:48:54 GMT",
+        "server": "envoy",
+        "last-modified": "Thu, 11 Apr 2024 13:40:01 GMT",
+        "etag": "\"0f6169e38d0c31651d2aced4f2697c1c\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 dbac8ed364d26ad4c74af8601c0952c4.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "yXmMIt5oBNUvzpOgj1GoLfffB0ajh1OC4feHHz-b8OmmI8z7uRG5gw==",
+        "x-envoy-upstream-service-time": "446",
+        "connection": "close"
+      }
+    },
+    "checksum": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-03.zip.CHECKSUM",
+      "http_status": 200,
+      "bytes": 89,
+      "sha256": "0023b0dac11277f92c06152c67a995794379e199ee1e6341d46a0fe5581671d6",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "89",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:03 GMT",
+        "server": "envoy",
+        "last-modified": "Thu, 11 Apr 2024 13:40:01 GMT",
+        "etag": "\"d9d08e69a3dd613d10cc0d4d94fd9513\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 a67f6f4f796b41186ad30732ca90389a.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "TInIg9QDeSGe_x3-rK4YsUPIgV7fEAmn1IUYky96etb7fudA-rc8Jw==",
+        "x-envoy-upstream-service-time": "460",
+        "connection": "close"
+      }
+    }
+  },
+  {
+    "month": 4,
+    "observed_at_utc": "2026-11-01T12:48:47.927819+00:00",
+    "archive": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-04.zip",
+      "http_status": 200,
+      "bytes": 160707,
+      "sha256": "c9d04ed29b5103131db2f9b7c7dfe1d42f10cc889a01e9cbf0dd23b00f701cab",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "160707",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:48:54 GMT",
+        "server": "envoy",
+        "last-modified": "Sat, 11 May 2024 14:46:42 GMT",
+        "etag": "\"0b4ef960f5b87f8c7d0691fc6b50dea2\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 a67f6f4f796b41186ad30732ca90389a.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "8OWjdE0J2RrmrMd4fyefedxmTSy6vivVG18lyBG8FkVzP62mkNq-ww==",
+        "x-envoy-upstream-service-time": "510",
+        "connection": "close"
+      }
+    },
+    "checksum": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-04.zip.CHECKSUM",
+      "http_status": 200,
+      "bytes": 89,
+      "sha256": "7b95c062b16abfbac700a6b526a370716456bd122ff45070fcf897a34bde1205",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "89",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:03 GMT",
+        "server": "envoy",
+        "last-modified": "Sat, 11 May 2024 14:46:42 GMT",
+        "etag": "\"07c4bdd4569d5523ce465f188800b4e1\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 dbac8ed364d26ad4c74af8601c0952c4.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "q_KLOI9UkJ8L7k34_scBLUr3zbUD2oI-RSyY04AYzBJNLbKdqFpGNw==",
+        "x-envoy-upstream-service-time": "453",
+        "connection": "close"
+      }
+    }
+  },
+  {
+    "month": 5,
+    "observed_at_utc": "2026-11-01T12:49:03.375499+00:00",
+    "archive": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-05.zip",
+      "http_status": 200,
+      "bytes": 163851,
+      "sha256": "b093a42ba168fbdb34365067a3e0fa714a8856840a9abd12188378b6e54eddb2",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "163851",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:11 GMT",
+        "server": "envoy",
+        "last-modified": "Thu, 06 Jun 2024 02:54:15 GMT",
+        "etag": "\"468156bfe6cfa97f32abdbeeb1cc744e\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 dbac8ed364d26ad4c74af8601c0952c4.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "lSVAsKDDMweBCnzHEDtrg8LcER2pPk_wHE5j6LZyM1iDRoKVVXfBFA==",
+        "x-envoy-upstream-service-time": "454",
+        "connection": "close"
+      }
+    },
+    "checksum": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-05.zip.CHECKSUM",
+      "http_status": 200,
+      "bytes": 89,
+      "sha256": "066198596972e2241b4877bc9000db94b387a7599fa9a3852e02d9354ad145d2",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "89",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:19 GMT",
+        "server": "envoy",
+        "last-modified": "Thu, 06 Jun 2024 02:54:15 GMT",
+        "etag": "\"51f5b934488ee2bb06f5dce7e8dfe12f\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 a67f6f4f796b41186ad30732ca90389a.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "NTiaezMe2pk92qFlWISL9e1ldZZ3mfYSm8SvOrUCOQg8wuZ8WqP0tQ==",
+        "x-envoy-upstream-service-time": "455",
+        "connection": "close"
+      }
+    }
+  },
+  {
+    "month": 6,
+    "observed_at_utc": "2026-11-01T12:49:03.378788+00:00",
+    "archive": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-06.zip",
+      "http_status": 200,
+      "bytes": 156179,
+      "sha256": "41e0e7ecf5087b343daa183d2cf9a0f5e33e1f279a1d529e39845223999be0f1",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "156179",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:11 GMT",
+        "server": "envoy",
+        "last-modified": "Tue, 09 Jul 2024 03:58:16 GMT",
+        "etag": "\"20ad6b48c81c1d5f30970c3d0f97f5c5\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 a67f6f4f796b41186ad30732ca90389a.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "yl2dfToNrH3WhWdlLFFVu5taCkTnZyNLNLy64jAGtG2zLnXU7yAPeQ==",
+        "x-envoy-upstream-service-time": "455",
+        "connection": "close"
+      }
+    },
+    "checksum": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-06.zip.CHECKSUM",
+      "http_status": 200,
+      "bytes": 89,
+      "sha256": "55a254a70dac349ed69471cfc6ea401eb7b860902e915f2a00ab144c8ca7589f",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "89",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:19 GMT",
+        "server": "envoy",
+        "last-modified": "Tue, 09 Jul 2024 03:58:16 GMT",
+        "etag": "\"318c567c269983453cc3a38bf6e65a9a\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 dbac8ed364d26ad4c74af8601c0952c4.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "UtAU7afArHpuDqRQrP10TU4P-_GYlwRTWDtKa5p_EMvJtvDKp4D5Ig==",
+        "x-envoy-upstream-service-time": "449",
+        "connection": "close"
+      }
+    }
+  },
+  {
+    "month": 7,
+    "observed_at_utc": "2026-11-01T12:49:03.379230+00:00",
+    "archive": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-07.zip",
+      "http_status": 200,
+      "bytes": 163056,
+      "sha256": "cd60b795c1cf5b33e6899b474152a89e0f07953a6dabb9514a3269274ad390d4",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "163056",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:11 GMT",
+        "server": "envoy",
+        "last-modified": "Thu, 08 Aug 2024 09:34:05 GMT",
+        "etag": "\"d7124e99ac5e848d987e4b3748dee8d6\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 a67f6f4f796b41186ad30732ca90389a.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "mU9j9FZvRX1JghXhtqUWKlUV1Ua36oembllUxVyNwgv2Hds1J57bVg==",
+        "x-envoy-upstream-service-time": "184",
+        "connection": "close"
+      }
+    },
+    "checksum": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-07.zip.CHECKSUM",
+      "http_status": 200,
+      "bytes": 89,
+      "sha256": "1bdf80ec4bab741af1356061990e488be56dd6d99c48d456e622be70b28be80d",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "89",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:19 GMT",
+        "server": "envoy",
+        "last-modified": "Thu, 08 Aug 2024 09:34:05 GMT",
+        "etag": "\"55fe767f652dbf99b27a7f67888c163c\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 dbac8ed364d26ad4c74af8601c0952c4.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "iyLo48fnzN8EqpdqWF9O-_mSdsoSfNz1AlkzTPLmk0w_4TKopJw35g==",
+        "x-envoy-upstream-service-time": "445",
+        "connection": "close"
+      }
+    }
+  },
+  {
+    "month": 8,
+    "observed_at_utc": "2026-11-01T12:49:03.381035+00:00",
+    "archive": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-08.zip",
+      "http_status": 200,
+      "bytes": 164040,
+      "sha256": "44e084e916a4c661b2177741d71438916388c0d34554f63cb147973aac13b094",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "164040",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:11 GMT",
+        "server": "envoy",
+        "last-modified": "Tue, 10 Sep 2024 11:16:20 GMT",
+        "etag": "\"040eb402fde55718898f9ec7e118c764\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 dbac8ed364d26ad4c74af8601c0952c4.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "9OquTo_o0wjcfuAvODcbyJ3pUMlI82WOoh8TNiKRvg6BEa-NPyR1bQ==",
+        "x-envoy-upstream-service-time": "453",
+        "connection": "close"
+      }
+    },
+    "checksum": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-08.zip.CHECKSUM",
+      "http_status": 200,
+      "bytes": 89,
+      "sha256": "3fe8d6caf60fa6e7b7bc22e482fc04710aaedbd281dc725fba8a36e913e33118",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "89",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:19 GMT",
+        "server": "envoy",
+        "last-modified": "Tue, 10 Sep 2024 11:16:20 GMT",
+        "etag": "\"cb6f17b5dd2040e0f8e98a8e36e3a026\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 a67f6f4f796b41186ad30732ca90389a.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "5Mx72zlXkCNM29sLvkO1X_zRW7Uh3POO1SD4cyHAT-l_aeWDrWz_hw==",
+        "x-envoy-upstream-service-time": "450",
+        "connection": "close"
+      }
+    }
+  },
+  {
+    "month": 9,
+    "observed_at_utc": "2026-11-01T12:49:19.555916+00:00",
+    "archive": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-09.zip",
+      "http_status": 200,
+      "bytes": 156476,
+      "sha256": "2135a835c5b7be91f6015d182b393b115a40aea8a83193a096f23d2c8447b9c0",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "156476",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:28 GMT",
+        "server": "envoy",
+        "last-modified": "Tue, 15 Oct 2024 12:35:03 GMT",
+        "etag": "\"d02c8ff53e176f8080f6ddea4ec7d1ab\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 a67f6f4f796b41186ad30732ca90389a.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "FuxwN01aM4EFQka8u8jubUc9-nR6w16O9MlvEMMI2olGFqedfQcL_w==",
+        "x-envoy-upstream-service-time": "459",
+        "connection": "close"
+      }
+    },
+    "checksum": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-09.zip.CHECKSUM",
+      "http_status": 200,
+      "bytes": 89,
+      "sha256": "b8bffa5604a08e8e0d897ca9ae665fd60ee035a97ba6b141ce06216021513ad5",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "89",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:36 GMT",
+        "server": "envoy",
+        "last-modified": "Tue, 15 Oct 2024 12:35:03 GMT",
+        "etag": "\"5837f5c10b9a3a47f8bcc37dc02c1c82\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 dbac8ed364d26ad4c74af8601c0952c4.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "PpfKJfAgQvIWYLW4cT2IhmKpshwapCHtzH9b7b5yVuD6ejw9PRwkPQ==",
+        "x-envoy-upstream-service-time": "462",
+        "connection": "close"
+      }
+    }
+  },
+  {
+    "month": 10,
+    "observed_at_utc": "2026-11-01T12:49:19.594940+00:00",
+    "archive": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-10.zip",
+      "http_status": 200,
+      "bytes": 162356,
+      "sha256": "2e5b200be53e7196f1c73b06f3fb33caee04d2efd191b08d45049dd2a287d326",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "162356",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:28 GMT",
+        "server": "envoy",
+        "last-modified": "Wed, 06 Nov 2024 10:31:47 GMT",
+        "etag": "\"707266d051dcdcdffe0b48d4fb3233e2\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 dbac8ed364d26ad4c74af8601c0952c4.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "tX2tDeg1qRXaxlBxgWDGfkrMHVukGAXxzkXsqRqTuExY71eBmLkwCw==",
+        "x-envoy-upstream-service-time": "463",
+        "connection": "close"
+      }
+    },
+    "checksum": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-10.zip.CHECKSUM",
+      "http_status": 200,
+      "bytes": 89,
+      "sha256": "99e83b19849ac104107b52c51e3bf7d8ac4a62af7aed7c9a9a99701fdd72207d",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "89",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:36 GMT",
+        "server": "envoy",
+        "last-modified": "Wed, 06 Nov 2024 10:31:48 GMT",
+        "etag": "\"9e35d02cf1edf4a1ca92e84e46d77957\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 a67f6f4f796b41186ad30732ca90389a.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "n9vJl4JdTWhhEQLkurAQeOcDCmHxIrRp18_bzewXijpx5AJjCNxNNQ==",
+        "x-envoy-upstream-service-time": "457",
+        "connection": "close"
+      }
+    }
+  },
+  {
+    "month": 11,
+    "observed_at_utc": "2026-11-01T12:49:19.598755+00:00",
+    "archive": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-11.zip",
+      "http_status": 200,
+      "bytes": 161547,
+      "sha256": "4589ca348cb6547a59dab9cafd3ca474631f3817bfe13e692607f1074cbe2818",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "161547",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:28 GMT",
+        "server": "envoy",
+        "last-modified": "Mon, 02 Dec 2024 18:21:12 GMT",
+        "etag": "\"0c3681c71af688f49224b91f05d09815\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 a67f6f4f796b41186ad30732ca90389a.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "N8JalSQD541eLObgNyy3otlctJPfAdpLAVx3gt-Uv3lBWESm5XBMig==",
+        "x-envoy-upstream-service-time": "458",
+        "connection": "close"
+      }
+    },
+    "checksum": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-11.zip.CHECKSUM",
+      "http_status": 200,
+      "bytes": 89,
+      "sha256": "a4f36ed25d9e4a9121cbd92a4d2c6b2a56b5833175d246f82c21ff454fb27b30",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "89",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:36 GMT",
+        "server": "envoy",
+        "last-modified": "Mon, 02 Dec 2024 18:21:12 GMT",
+        "etag": "\"ee83a8777abb4246e9e2d7cdf2b687f8\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 a67f6f4f796b41186ad30732ca90389a.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "VEPDxQeWSKKO7tj6O3EI_XaFpUkQAFpxQHJ04HHBCA81y6I5FhpKMw==",
+        "x-envoy-upstream-service-time": "450",
+        "connection": "close"
+      }
+    }
+  },
+  {
+    "month": 12,
+    "observed_at_utc": "2026-11-01T12:49:19.605601+00:00",
+    "archive": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-12.zip",
+      "http_status": 200,
+      "bytes": 167250,
+      "sha256": "f7df52b68d68c03936b886f6fa056027959e307310d27c05175fd74382e5ec9d",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "167250",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:28 GMT",
+        "server": "envoy",
+        "last-modified": "Wed, 08 Jan 2025 00:50:27 GMT",
+        "etag": "\"18c032fd3f3efc7976b95dd6fba8247a\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 dbac8ed364d26ad4c74af8601c0952c4.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "9yEXPUk5kUyL0XtiHrOVkMG9AcTSmLV0gEPvi1XOaCDFn1Wo2M54kg==",
+        "x-envoy-upstream-service-time": "452",
+        "connection": "close"
+      }
+    },
+    "checksum": {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-2024-12.zip.CHECKSUM",
+      "http_status": 200,
+      "bytes": 89,
+      "sha256": "762602ace545073a965c8d41b87827ed1d299229da0c64d789af1594e27872e5",
+      "headers": {
+        "content-type": "application/zip",
+        "content-length": "89",
+        "accept-ranges": "bytes",
+        "date": "Sun, 01 Nov 2026 12:49:36 GMT",
+        "server": "envoy",
+        "last-modified": "Wed, 08 Jan 2025 00:50:27 GMT",
+        "etag": "\"517af575253604b5312ea871054c6706\"",
+        "x-amz-server-side-encryption": "AES256",
+        "x-cache": "Miss from cloudfront",
+        "via": "1.1 dbac8ed364d26ad4c74af8601c0952c4.cloudfront.net (CloudFront)",
+        "x-amz-cf-pop": "DFW59-P7",
+        "x-amz-cf-id": "PWLIRsdUnZcZa14bXAKIyg6CjWaNJFjirJ6Z6MYlZ16dDe2REDcH-Q==",
+        "x-envoy-upstream-service-time": "443",
+        "connection": "close"
+      }
+    }
+  }
+]

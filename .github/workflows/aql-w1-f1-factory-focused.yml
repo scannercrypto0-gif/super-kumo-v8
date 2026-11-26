@@ -1,0 +1,44 @@
+name: AQL Factory B1 Original Market Research
+on:
+  push:
+    branches: [aql/w1-factory-research-consumer-20261031]
+    paths:
+      - research_wp_r0/aql_b1_market_research.py
+      - tests/test_aql_b1_market_research.py
+      - 'docs/evidence/factory-b1-20261101/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  b1-original-market-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Exact source and actual vendor-byte replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "FACTORY_HEAD_SHA=$(git rev-parse HEAD)"
+          echo "FACTORY_TREE_SHA=$(git rev-parse HEAD^{tree})"
+          python -m research_wp_r0.aql_b1_market_research --lock docs/evidence/factory-b1-20261101/originals-lock.json --data-dir b1-originals --out b1-replay --download
+          cmp b1-replay/report.json docs/evidence/factory-b1-20261101/market-report.json
+          sha256sum b1-originals/* b1-replay/*
+      - name: Only eight new B1 actual-input tests
+        env:
+          AQL_B1_DATA_DIR: b1-originals
+        run: python -m unittest -v tests.test_aql_b1_market_research
+      - name: Retain actual originals and replay bytes (90 days, not an external custody authority)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: factory-b1-original-market-replay
+          path: |
+            b1-originals/
+            b1-replay/
+          if-no-files-found: error
+          retention-days: 90
