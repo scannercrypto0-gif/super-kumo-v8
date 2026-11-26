@@ -70,6 +70,7 @@ def daily(now=NOW, *, wait=False):
         "schema": "aql.recurring-runtime.health.v1",
         "source_cadence": "DAILY_UTC",
         "trading_authority": "NONE",
+        "current_entry": "NO_CURRENT_ENTRY",
         "observed_at_ms": now,
         "task_state": "Ready",
         "scheduler_state": "Ready",
@@ -78,7 +79,7 @@ def daily(now=NOW, *, wait=False):
         "source_freshness": "LATEST_DUE_DAY_RECEIVED",
         "next_check_ms": now + 60_000 if wait else None,
         "last_failure": None,
-        "last_success": {"status": "COMPLETE", "source_day_ms": now - 86_400_000,
+        "last_success": {"status": "COMPLETE", "exit_code": 0, "source_day_ms": now - 86_400_000,
                          "daily_worker_receipt_sha256": "4" * 64},
     }
 
@@ -156,6 +157,14 @@ class EarlyObservationTests(unittest.TestCase):
             result = self.build(paths)
         self.assertEqual(result["lanes"]["daily"]["status"], "UNKNOWN")
         self.assertEqual(result["lanes"]["daily"]["reason"], "DAILY_IMPORT_REGISTRY_LINK_NOT_SUPPLIED")
+
+    def test_disabled_daily_task_cannot_be_healthy(self):
+        report = daily_linked()
+        report["task_state"] = "Disabled"
+        with tempfile.TemporaryDirectory() as folder:
+            result = self.build(paths_for(Path(folder), day=report, reg=registry()))
+        self.assertEqual(result["lanes"]["daily"]["status"], "FAILED")
+        self.assertEqual(result["lanes"]["daily"]["reason"], "DAILY_SCHEDULER_DISABLED")
 
     def test_daily_success_requires_verified_source_and_registry_link(self):
         with tempfile.TemporaryDirectory() as folder:
