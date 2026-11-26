@@ -151,12 +151,12 @@ class EarlyObservationTests(unittest.TestCase):
         self.assertEqual(result["trading_authority"], "NONE")
         self.assertFalse(result["source_paths_exposed"])
 
-    def test_worker_success_without_import_registry_link_stays_unknown(self):
+    def test_worker_success_without_verified_source_evidence_stays_unknown(self):
         with tempfile.TemporaryDirectory() as folder:
             paths = paths_for(Path(folder), day=daily(wait=False))
             result = self.build(paths)
         self.assertEqual(result["lanes"]["daily"]["status"], "UNKNOWN")
-        self.assertEqual(result["lanes"]["daily"]["reason"], "DAILY_IMPORT_REGISTRY_LINK_NOT_SUPPLIED")
+        self.assertEqual(result["lanes"]["daily"]["reason"], "DAILY_SOURCE_EVIDENCE_UNVERIFIED")
 
     def test_disabled_daily_task_cannot_be_healthy(self):
         report = daily_linked()
