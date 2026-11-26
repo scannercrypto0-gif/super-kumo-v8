@@ -1,7 +1,7 @@
 name: ATLAS operational watchdog and MCP pilot contract
 on:
   push:
-    branches: [codex/atlas-ops-watchdog-mcp-001]
+    branches: [codex/atlas-ops-watchdog-mcp-001, codex/aql-mcp-report-015-consumer]
     paths:
       - '.github/workflows/atlas-ops-watchdog.yml'
       - 'tools/atlas_ops_watchdog.py'
