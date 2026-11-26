@@ -24,7 +24,7 @@ def _canonical_sha(value):
 def evaluate_24h_report(report, *, expected_code_sha256, expected_symbols,
                         expected_config_sha256=None, provider_terms_cleared=False,
                         quota_headroom_verified=False,
-                        expected_verifier_code_sha256=None):
+                        expected_verifier_code_sha256=None, database_path=None):
     """Evaluate only complete run-scoped v2 evidence; legacy --report is insufficient."""
     if not isinstance(report, dict):
         return {"status":"24H_RESULT_PENDING","failures":["OWNER_REPORT_MISSING"],
@@ -77,7 +77,7 @@ def evaluate_24h_report(report, *, expected_code_sha256, expected_symbols,
     event_keys={"id","run_id","at_ms","monotonic_ms","kind","detail"}
     allowed_kinds={"RUN_STARTED","SERVICE_START","SERVICE_STOP","CONNECTING","CONNECTED",
         "SOCKET_ERROR","SOCKET_EXCEPTION","DISCONNECTED","PLANNED_ROTATION","RECONNECT_WAIT",
-        "MESSAGE_REJECTED","FINAL_BAR_CONFLICT","GAP_BACKFILL_LIMIT","GAP_BACKFILL_STARTED",
+        "MESSAGE_REJECTED","FINAL_BAR_CONFLICT","RESTART_REPLAY_VERIFIED","GAP_BACKFILL_LIMIT","GAP_BACKFILL_STARTED",
         "GAP_BACKFILL_COMPLETED","GAP_BACKFILL_FAILED","GAP_BACKFILL_WORKER_ERROR"}
     seen_ids=set()
     prior_id=-1
@@ -223,6 +223,16 @@ def evaluate_24h_report(report, *, expected_code_sha256, expected_symbols,
         failures.append("PROVIDER_TERMS_NOT_CLEARED")
     if not quota_headroom_verified:
         failures.append("SHARED_IP_QUOTA_NOT_VERIFIED")
+    if database_path is None:
+        failures.append("INDEPENDENT_SOURCE_REOPEN_REQUIRED")
+    else:
+        try:
+            from tools.realtime_market_feed.observation_evidence import build_observation_evidence
+            independent=build_observation_evidence(database_path,run.get("run_id"))
+            if _canonical_sha(independent)!=_canonical_sha(report):
+                failures.append("SOURCE_REPORT_RECOMPUTE_MISMATCH")
+        except (OSError,ValueError,TypeError,KeyError):
+            failures.append("INDEPENDENT_SOURCE_REOPEN_FAILED")
     return {"status":"24H_ACCEPTANCE_PASS" if not failures else "24H_ACCEPTANCE_BLOCKED",
         "failures":sorted(set(failures)),"natural_fault":natural_fault if natural_fault in
         ("OBSERVED_AND_RECOVERED","OBSERVED_NOT_RECOVERED","NOT_OBSERVED") else "UNKNOWN",
