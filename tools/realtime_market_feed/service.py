@@ -94,8 +94,8 @@ class Store:
           detected_ms INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'OPEN',
           UNIQUE(symbol, interval, start_ms, end_ms));
         CREATE TABLE IF NOT EXISTS service_event(
-          id INTEGER PRIMARY KEY, at_ms INTEGER NOT NULL, kind TEXT NOT NULL,
-          detail TEXT NOT NULL);
+          id INTEGER PRIMARY KEY, run_id TEXT, at_ms INTEGER NOT NULL,
+          monotonic_ms INTEGER, kind TEXT NOT NULL, detail TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS final_bar_lineage(
           symbol TEXT NOT NULL, interval TEXT NOT NULL, open_ms INTEGER NOT NULL,
           receipt_json TEXT NOT NULL, receipt_sha256 TEXT NOT NULL,
@@ -103,29 +103,60 @@ class Store:
         CREATE TABLE IF NOT EXISTS service_run(
           run_id TEXT PRIMARY KEY, producer_code_sha256 TEXT NOT NULL,
           symbols_json TEXT NOT NULL, requested_observe_seconds INTEGER NOT NULL,
-          started_ms INTEGER NOT NULL, stopped_ms INTEGER);
+          started_ms INTEGER NOT NULL, stopped_ms INTEGER,
+          config_sha256 TEXT, source_id TEXT,
+          started_monotonic_ms INTEGER, stopped_monotonic_ms INTEGER);
         """)
+        # In-place additive migration keeps prior observations readable while new
+        # events are always tied to a run and a monotonic clock witness.
+        event_columns = {r[1] for r in self.db.execute("PRAGMA table_info(service_event)")}
+        if "run_id" not in event_columns:
+            self.db.execute("ALTER TABLE service_event ADD COLUMN run_id TEXT")
+        if "monotonic_ms" not in event_columns:
+            self.db.execute("ALTER TABLE service_event ADD COLUMN monotonic_ms INTEGER")
+        run_columns = {r[1] for r in self.db.execute("PRAGMA table_info(service_run)")}
+        for name, kind in (("config_sha256","TEXT"),("source_id","TEXT"),
+                           ("started_monotonic_ms","INTEGER"),("stopped_monotonic_ms","INTEGER")):
+            if name not in run_columns:
+                self.db.execute(f"ALTER TABLE service_run ADD COLUMN {name} {kind}")
         self.db.commit()
+        self.active_run_id = None
 
     def event(self, kind: str, detail: str = "") -> None:
         with self.db:
-            self.db.execute("INSERT INTO service_event(at_ms,kind,detail) VALUES(?,?,?)",
-                            (utc_ms(), kind, detail[:300]))
+            self.db.execute("""INSERT INTO service_event
+                (run_id,at_ms,monotonic_ms,kind,detail) VALUES(?,?,?,?,?)""",
+                (self.active_run_id,utc_ms(),time.monotonic_ns()//1_000_000,kind,detail[:300]))
 
     def begin_run(self, symbols: list[str], observe_seconds: int) -> str:
         run_id = uuid.uuid4().hex
+        started = utc_ms()
+        mono = time.monotonic_ns()//1_000_000
+        source_id = "BINANCE_SPOT_PUBLIC_WEBSOCKET"
+        config = {"schema":"atlas.realtime-market-feed.run-config.v1",
+                  "source_id":source_id,"symbols":sorted(symbols),
+                  "requested_observe_seconds":observe_seconds,
+                  "interval":"1m","protocol":"atlas.realtime-market-feed.observation.v2"}
+        config_sha = _sha256(_canonical(config))
         with self.db:
             self.db.execute("""INSERT INTO service_run
-              (run_id,producer_code_sha256,symbols_json,requested_observe_seconds,started_ms)
-              VALUES(?,?,?,?,?)""",
+              (run_id,producer_code_sha256,symbols_json,requested_observe_seconds,
+               started_ms,config_sha256,source_id,started_monotonic_ms)
+              VALUES(?,?,?,?,?,?,?,?)""",
               (run_id,PRODUCER_CODE_SHA256,json.dumps(sorted(symbols),separators=(",",":")),
-               observe_seconds,utc_ms()))
+               observe_seconds,started,config_sha,source_id,mono))
+        self.active_run_id = run_id
+        self.event("RUN_STARTED", "observation-v2")
         return run_id
 
     def end_run(self, run_id: str) -> None:
+        stopped = utc_ms()
+        mono = time.monotonic_ns()//1_000_000
         with self.db:
-            self.db.execute("UPDATE service_run SET stopped_ms=? WHERE run_id=? AND stopped_ms IS NULL",
-                            (utc_ms(),run_id))
+            self.db.execute("""UPDATE service_run SET stopped_ms=?,stopped_monotonic_ms=?
+                WHERE run_id=? AND stopped_ms IS NULL""",(stopped,mono,run_id))
+        if self.active_run_id == run_id:
+            self.active_run_id = None
 
     def ingest(self, raw: str, received_ms: int | None = None) -> str:
         received_ms = received_ms or utc_ms()
@@ -211,8 +242,10 @@ class Store:
                 candidate = (closed,ohlcv["o"],ohlcv["h"],ohlcv["l"],ohlcv["c"],
                              ohlcv["v"],normalized["trades"])
                 if existing and tuple(existing) != candidate:
-                    self.db.execute("INSERT INTO service_event(at_ms,kind,detail) VALUES(?,?,?)",
-                                    (received_ms,"FINAL_BAR_CONFLICT",symbol+":"+str(opened)))
+                    self.db.execute("""INSERT INTO service_event
+                        (run_id,at_ms,monotonic_ms,kind,detail) VALUES(?,?,?,?,?)""",
+                        (self.active_run_id,received_ms,time.monotonic_ns()//1_000_000,
+                         "FINAL_BAR_CONFLICT",symbol+":"+str(opened)))
                 elif cur.rowcount == 1:
                     # Forward-only: legacy rows are never retrofitted on replay.
                     self.db.execute("""INSERT INTO final_bar_lineage
@@ -309,13 +342,15 @@ class LiveService:
     def _recover_gaps(self, symbol: str) -> None:
         try:
             from tools.realtime_market_feed.backfill import recover_open_gaps
-            recover_open_gaps(self.store.path, symbol)
+            recover_open_gaps(self.store.path, symbol, run_id=self.store.active_run_id)
         except Exception as exc:
             db = sqlite3.connect(self.store.path, timeout=10)
             try:
                 with db:
-                    db.execute("INSERT INTO service_event(at_ms,kind,detail) VALUES(?,?,?)",
-                               (utc_ms(),"GAP_BACKFILL_WORKER_ERROR",type(exc).__name__))
+                    db.execute("""INSERT INTO service_event
+                        (run_id,at_ms,monotonic_ms,kind,detail) VALUES(?,?,?,?,?)""",
+                        (self.store.active_run_id,utc_ms(),time.monotonic_ns()//1_000_000,
+                         "GAP_BACKFILL_WORKER_ERROR",type(exc).__name__))
             finally:
                 db.close()
             LOG.exception("Gap recovery worker failed")
