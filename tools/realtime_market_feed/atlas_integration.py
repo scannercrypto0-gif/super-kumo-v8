@@ -227,7 +227,8 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
                         allow_synthetic_fixture=False,
                         expected_producer_code_sha256=None,
                         expected_rest_producer_code_sha256=None,
-                        query_budget_ms=5_000, metrics=None):
+                        query_budget_ms=5_000, metrics=None,
+                        include_lineage_evidence=False):
     """Read one coherent finalized 1m window and verify its pinned producer receipts.
 
     Legacy rows without a forward-only normalized producer receipt remain blocked.
@@ -246,6 +247,7 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
           "FRESHNESS_BOUND")
     _need(type(query_budget_ms) is int and 1 <= query_budget_ms <= 60_000,
           "QUERY_BUDGET_INVALID")
+    _need(type(include_lineage_evidence) is bool, "LINEAGE_EVIDENCE_FLAG_INVALID")
     if allow_synthetic_fixture and expected_producer_code_sha256 is None:
         from tools.realtime_market_feed.service import PRODUCER_CODE_SHA256
         expected_producer_code_sha256 = PRODUCER_CODE_SHA256
@@ -304,6 +306,7 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
     _need(rows, "SYMBOL_OR_WINDOW_MISSING")
     _need(len(rows) == count, "WINDOW_INCOMPLETE")
     normalized = []
+    lineage_evidence = []
     decoded_source_bytes = 0
     for i, row in enumerate(rows):
         _need(_QUERY_CLOCK() <= deadline, "FEED_QUERY_BUDGET_EXCEEDED")
@@ -329,6 +332,17 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
         normalized.append(dict(symbol=symbol, interval="1m", open_ms=opened,
                                final=True, **values, source_sha256=receipt_sha,
                                available_at_ms=body["available_at_ms"]))
+        lineage_evidence.append({
+            "open_ms": opened,
+            "receipt_sha256": receipt_sha,
+            "schema": body["schema"],
+            "source_class": body.get("source_class", "BINANCE_SPOT_PUBLIC_WEBSOCKET"),
+            "producer_id": body["producer_id"],
+            "producer_code_sha256": body["producer_code_sha256"],
+            "available_at_ms": body["available_at_ms"],
+            "finality": body["finality"],
+            "replay_identity_sha256": body["replay_identity_sha256"],
+        })
         decoded_source_bytes += len(row["lineage_json"].encode("utf-8")) + sum(
             len(str(row[key]).encode("utf-8")) for key in
             ("symbol","interval","open_ms","close_ms","open","high","low","close",
@@ -336,8 +350,11 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
     if metrics is not None:
         metrics.update({"selected_bars":len(rows), "decoded_source_bytes":decoded_source_bytes,
                         "read_snapshot_ms":snapshot_ms, "query_budget_ms":query_budget_ms})
-    return [project_finalized_1m([bar], "1m", source_class="FORWARD_UNQUALIFIED")
-            for bar in normalized]
+    projected = [project_finalized_1m([bar], "1m", source_class="FORWARD_UNQUALIFIED")
+                 for bar in normalized]
+    if include_lineage_evidence:
+        return {"bars": projected, "lineage": lineage_evidence}
+    return projected
 
 
 def _verified_projection(row, *, source_class):
