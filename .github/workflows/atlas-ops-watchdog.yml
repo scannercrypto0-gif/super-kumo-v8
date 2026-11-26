@@ -31,6 +31,9 @@ on:
       - 'tests/test_atlas_daily_health_evidence.py'
       - 'tests/test_atlas_ops_mcp_pilot.py'
       - 'tests/test_atlas_ops_mcp_freshness.py'
+      - 'tools/atlas_early_observation.py'
+      - 'tests/test_atlas_early_observation.py'
+      - 'docs/research/atlas-mcp-early-observation.md'
       - 'docs/research/atlas-operational-watchdog-mcp-001.md'
       - 'docs/research/atlas-mcp-pilot-readonly.md'
 permissions:
