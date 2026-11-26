@@ -32,6 +32,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: scannercrypto0-gif/super-kumo-v8
+          ref: eb49308d61ffdfc24ed5032df2cb541f37c48bfe
+          path: .integration/research-baseline
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
           ref: ae60b3e367241fec14753ac78e08147603b7af84
           path: .integration/warehouse
           persist-credentials: false
@@ -45,8 +51,10 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: python -m pip install -r tools/realtime_market_feed/requirements.txt pytest
+      - name: Stage exact audited Analyzer dependencies
+        run: python .integration/research-baseline/tools/first_research_cycle/stage_dependencies.py --output .integration/research-kernel --fetch
       - name: Run feed and integration fixture suites
-        run: python -m pytest --timeout=60 tools/realtime_market_feed/test_service.py tools/realtime_market_feed/test_backfill.py tools/realtime_market_feed/test_atlas_integration.py tools/realtime_market_feed/test_acceptance_gates.py -q
+        run: python -m pytest --timeout=60 tools/realtime_market_feed/test_service.py tools/realtime_market_feed/test_backfill.py tools/realtime_market_feed/test_atlas_integration.py tools/realtime_market_feed/test_acceptance_gates.py tools/realtime_market_feed/test_forward_research.py -q
       - name: Build machine-readable isolated evidence
         run: python -B -m tools.realtime_market_feed.integration_acceptance --output integration-evidence.json
       - uses: actions/upload-artifact@v4
