@@ -152,15 +152,18 @@ def _decimal_to_float(text):
     return converted
 
 
-def _validated_config(config, expected_config_sha256, symbol, start_ms, bar_count):
+def _validated_config(config, expected_config_sha256, symbol, start_ms, bar_count,
+                      adapter_code_sha256):
     required = {"schema", "symbol", "window_start_ms", "bar_count",
-                "strategy_definition_sha256", "max_age_ms", "max_signal_lag_ms"}
+                "strategy_definition_sha256", "adapter_code_sha256",
+                "max_age_ms", "max_signal_lag_ms"}
     _need(type(config) is dict and set(config) == required,
           "ANALYZER_CONFIG_FIELDS_INVALID")
     _need(config["schema"] == "atlas.realtime-market-feed.forward-analysis-config.v1"
           and config["symbol"] == symbol and config["window_start_ms"] == start_ms
           and config["bar_count"] == bar_count
-          and config["strategy_definition_sha256"] == STRATEGY_DIGEST,
+          and config["strategy_definition_sha256"] == STRATEGY_DIGEST
+          and config["adapter_code_sha256"] == adapter_code_sha256,
           "ANALYZER_CONFIG_IDENTITY_MISMATCH")
     _need(type(config["max_age_ms"]) is int and 1 <= config["max_age_ms"] <= 86_400_000
           and type(config["max_signal_lag_ms"]) is int
@@ -188,7 +191,9 @@ def analyze_forward_window(feed_database, research_database, *, symbol, start_ms
           "ANALYZER_WINDOW_INVALID")
     _need(type(decision_cutoff_ms) is int and decision_cutoff_ms >= 0,
           "ANALYZER_DECISION_CLOCK_INVALID")
-    _validated_config(config, expected_config_sha256, symbol, start_ms, bar_count)
+    adapter_code_sha256 = _sha_bytes(Path(__file__).read_bytes())
+    _validated_config(config, expected_config_sha256, symbol, start_ms, bar_count,
+                      adapter_code_sha256)
     clock_keys = {"schema", "method", "observed_at_ms", "uncertainty_ms"}
     _need(type(clock_evidence) is dict and set(clock_evidence) == clock_keys
           and clock_evidence.get("schema") == "atlas.realtime-market-feed.validated-clock.v1"
@@ -286,6 +291,15 @@ def analyze_forward_window(feed_database, research_database, *, symbol, start_ms
             "ws_producer_code_sha256": expected_ws_producer_code_sha256,
             "rest_producer_code_sha256": expected_rest_producer_code_sha256,
             "availability_max_ms": max(item["available_at_ms"] for item in lineage),
+            "source_snapshot_sha256": _sha([
+                {key: item[key] for key in ("open_ms", "receipt_sha256", "schema",
+                                             "source_class", "producer_id",
+                                             "producer_code_sha256", "available_at_ms",
+                                             "finality", "replay_identity_sha256")}
+                for item in lineage]),
+            "recovered_constituent_count_window": sum(
+                item["source_class"] == "BINANCE_SPOT_PUBLIC_REST_MARKET_DATA"
+                for item in lineage),
             "recovered_constituent_count_latest_bar": len(recovered),
         },
         "window": {
@@ -300,6 +314,11 @@ def analyze_forward_window(feed_database, research_database, *, symbol, start_ms
             "state": state,
             "recovered_latest_bar": bool(recovered),
             "warmup_unknown_count": sum(1 for _, item_state in evaluated if item_state == "UNKNOWN"),
+            "signal_scope": "LATEST_CLOSED_SLOT_ONLY",
+            "evaluated_slot_count": len(evaluated),
+            "state_by_slot": [
+                {"close_ms": close_ms, "state": slot_state}
+                for close_ms, slot_state in evaluated],
         },
         "strategy": {
             "strategy_id": kernel["definition"].strategy_id,
@@ -312,7 +331,7 @@ def analyze_forward_window(feed_database, research_database, *, symbol, start_ms
             **kernel["kernel_identity"],
             "warehouse_commit": WAREHOUSE_COMMIT,
             "config_sha256": expected_config_sha256,
-            "adapter_code_sha256": _sha_bytes(Path(__file__).read_bytes()),
+            "adapter_code_sha256": adapter_code_sha256,
         },
         "evidence": {
             "lineage_receipts_verified": len(lineage),
@@ -326,7 +345,7 @@ def analyze_forward_window(feed_database, research_database, *, symbol, start_ms
     }
     receipt = {**evidence_body, "receipt_sha256": _sha(evidence_body)}
     factory = verify_factory_forward_receipt(
-        receipt, expected_adapter_code_sha256=receipt["pins"]["adapter_code_sha256"],
+        receipt, expected_adapter_code_sha256=adapter_code_sha256,
         expected_strategy_definition_sha256=kernel["definition"].digest,
         expected_config_sha256=expected_config_sha256,
     )
