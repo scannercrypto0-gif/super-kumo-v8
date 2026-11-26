@@ -82,13 +82,67 @@ def _parse_row(row, symbol: str, expected_open: int, server_ms: int, received_ms
         "open": opened_price, "high": high, "low": low, "close": close,
         "volume": volume, "trades": trades,
     }
-    digest = hashlib.sha256(json.dumps(material, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    digest = hashlib.sha256(json.dumps(row, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode()).hexdigest()
     return (symbol, "1m", opened, closed, opened_price, high, low, close, volume, trades,
             received_ms, digest)
 
 
+def _canonical(value) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=True, allow_nan=False).encode("utf-8")
+
+
+def _sha256(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
+
+REST_LINEAGE_SCHEMA = "atlas.realtime-market-feed.rest-backfill-attestation.v1"
+REST_PRODUCER_ID = "atlas.realtime_market_feed.backfill.recover_gap"
+REST_SOURCE_CLASS = "BINANCE_SPOT_PUBLIC_REST_MARKET_DATA"
+REST_PRODUCER_CODE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+
+
+def _rest_receipt(item, request, request_sha256, batch_sha256):
+    symbol, interval, opened, closed, op, high, low, close, volume, trades, received, response_sha = item
+    normalized = {
+        "provider": "BINANCE", "market": "SPOT", "source_class": REST_SOURCE_CLASS,
+        "symbol": symbol, "interval": interval, "open_ms": opened, "close_ms": closed,
+        "available_at_ms": received, "finality": "FINAL",
+        "ohlcv": {"o": op, "h": high, "l": low, "c": close, "v": volume},
+        "trades": trades, "response_row_sha256": response_sha,
+    }
+    replay = {k: normalized[k] for k in
+              ("provider", "market", "source_class", "symbol", "interval",
+               "open_ms", "close_ms", "response_row_sha256")}
+    body = {
+        "schema": REST_LINEAGE_SCHEMA, "producer_id": REST_PRODUCER_ID,
+        "producer_code_sha256": REST_PRODUCER_CODE_SHA256,
+        **normalized, "request": request, "request_sha256": request_sha256,
+        "response_batch_sha256": batch_sha256,
+        "replay_identity_sha256": _sha256(_canonical(replay)),
+        "normalized_row_sha256": _sha256(_canonical(normalized)),
+    }
+    encoded = _canonical(body)
+    return encoded.decode("utf-8"), _sha256(encoded)
+
+
+def _valid_existing_receipt(db, symbol, opened):
+    row = db.execute(
+        """SELECT receipt_json,receipt_sha256 FROM final_bar_lineage
+           WHERE symbol=? AND interval='1m' AND open_ms=?""",
+        (symbol, opened)).fetchone()
+    if not row:
+        return False
+    try:
+        body = json.loads(row[0])
+        canonical = _canonical(body)
+        return row[0] == canonical.decode("utf-8") and row[1] == _sha256(canonical)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return False
+
+
 def recover_gap(database: str | Path, symbol: str, start_ms: int, end_ms: int, *, fetch_json=_fetch_json):
-    """Recover one half-open gap, closing it only after every expected minute verifies."""
+    """Recover one half-open gap with a distinct, forward-only REST receipt."""
     path = Path(database).resolve()
     symbol = symbol.upper()
     if not symbol.isalnum() or start_ms < 0 or end_ms <= start_ms:
@@ -110,20 +164,25 @@ def recover_gap(database: str | Path, symbol: str, start_ms: int, end_ms: int, *
         if end_ms > server_ms:
             raise ValueError("BACKFILL_RANGE_NOT_CLOSED")
 
-        rows = []
+        rows, sources = [], {}
         cursor = start_ms
         while cursor < end_ms:
             count = min(MAX_PAGE, (end_ms - cursor) // STEP_MS)
-            query = urlencode({"symbol": symbol, "interval": "1m", "startTime": cursor,
-                               "endTime": end_ms - 1, "limit": count})
-            batch = fetch_json(BASE + "/api/v3/klines?" + query)
+            request = {"endpoint": "/api/v3/klines", "symbol": symbol,
+                       "interval": "1m", "startTime": cursor,
+                       "endTime": end_ms - 1, "limit": count}
+            query = urlencode({k: v for k, v in request.items() if k != "endpoint"})
+            batch = fetch_json(BASE + request["endpoint"] + "?" + query)
             if not isinstance(batch, list) or not batch:
                 raise ValueError("BACKFILL_KLINES_EMPTY")
             if len(batch) > count:
                 raise ValueError("BACKFILL_KLINES_OVERFLOW")
-            for row in batch:
-                expected = cursor
-                rows.append(_parse_row(row, symbol, expected, server_ms, received_ms))
+            request_sha = _sha256(_canonical(request))
+            batch_sha = _sha256(_canonical(batch))
+            for source_row in batch:
+                item = _parse_row(source_row, symbol, cursor, server_ms, received_ms)
+                rows.append(item)
+                sources[item[2]] = (request, request_sha, batch_sha)
                 cursor += STEP_MS
             if cursor < end_ms and len(batch) != count:
                 raise ValueError("BACKFILL_KLINES_INCOMPLETE")
@@ -147,8 +206,21 @@ def recover_gap(database: str | Path, symbol: str, start_ms: int, end_ms: int, *
                     expected = (item[3], item[4], item[5], item[6], item[7], item[8], item[9])
                     if existing and tuple(existing) != expected:
                         raise ValueError("BACKFILL_EXISTING_BAR_CONFLICT")
-                    if not existing:
+                    if existing:
+                        # Never retrofit a receipt to a legacy row. A prior WS or
+                        # REST row can participate only if its existing seal is intact.
+                        if not _valid_existing_receipt(db, symbol, item[2]):
+                            raise ValueError("BACKFILL_EXISTING_RECEIPT_UNVERIFIED")
+                    else:
                         db.execute("INSERT INTO final_bar VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", item)
+                        request, request_sha, batch_sha = sources[item[2]]
+                        receipt_json, receipt_sha = _rest_receipt(
+                            item, request, request_sha, batch_sha)
+                        db.execute(
+                            """INSERT INTO final_bar_lineage
+                               (symbol,interval,open_ms,receipt_json,receipt_sha256)
+                               VALUES(?,'1m',?,?,?)""",
+                            (symbol, item[2], receipt_json, receipt_sha))
                 stored = db.execute(
                     """SELECT open_ms,close_ms,open,high,low,close,volume,trades FROM final_bar
                        WHERE symbol=? AND interval='1m' AND open_ms>=? AND open_ms<? ORDER BY open_ms""",
@@ -159,6 +231,8 @@ def recover_gap(database: str | Path, symbol: str, start_ms: int, end_ms: int, *
                     expected = (item[2],item[3],item[4],item[5],item[6],item[7],item[8],item[9])
                     if tuple(stored[index]) != expected:
                         raise ValueError("BACKFILL_COMMIT_CONTENT_MISMATCH")
+                    if not _valid_existing_receipt(db, symbol, item[2]):
+                        raise ValueError("BACKFILL_RECEIPT_COMMIT_MISMATCH")
                 changed = db.execute(
                     """UPDATE open_gap SET status='CLOSED' WHERE symbol=? AND interval='1m'
                        AND start_ms=? AND end_ms=? AND status='OPEN'""",
@@ -175,7 +249,6 @@ def recover_gap(database: str | Path, symbol: str, start_ms: int, end_ms: int, *
         reason = type(exc).__name__ + ":" + str(exc)
         _event(path, "GAP_BACKFILL_FAILED", f"{symbol}:{start_ms}:{end_ms}:{reason}")
         return {"status": "OPEN_FAILED", "bars": 0, "reason": reason[:180]}
-
 
 def recover_open_gaps(database: str | Path, symbol: str):
     path = Path(database).resolve()
