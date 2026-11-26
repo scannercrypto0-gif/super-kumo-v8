@@ -151,10 +151,35 @@ class Store:
             ORDER BY started_ms DESC LIMIT 1""",(run_id,)).fetchone()
         if previous:
             integrity = self.db.execute("PRAGMA quick_check").fetchone()[0]
+            verified = 0
+            for symbol in symbols:
+                row = self.db.execute("""SELECT f.symbol,f.interval,f.open_ms,f.close_ms,
+                    f.open,f.high,f.low,f.close,f.volume,f.trades,f.received_ms,
+                    f.payload_sha256,l.receipt_json,l.receipt_sha256
+                    FROM final_bar f JOIN final_bar_lineage l
+                    ON l.symbol=f.symbol AND l.interval=f.interval AND l.open_ms=f.open_ms
+                    WHERE f.symbol=? ORDER BY f.open_ms DESC LIMIT 1""",(symbol.upper(),)).fetchone()
+                if not row:
+                    break
+                try:
+                    body=json.loads(row[12])
+                    source_digest=body.get("event_payload_sha256",body.get("response_row_sha256"))
+                    canonical=_canonical(body)
+                    valid=(row[12]==canonical.decode("utf-8") and _sha256(canonical)==row[13]
+                        and body.get("provider")=="BINANCE" and body.get("market")=="SPOT"
+                        and body.get("symbol")==row[0] and body.get("interval")==row[1]
+                        and body.get("open_ms")==row[2] and body.get("close_ms")==row[3]
+                        and body.get("available_at_ms")==row[10] and body.get("finality")=="FINAL"
+                        and body.get("ohlcv")=={"o":row[4],"h":row[5],"l":row[6],"c":row[7],"v":row[8]}
+                        and body.get("trades")==row[9] and source_digest==row[11])
+                    if valid:
+                        verified+=1
+                except (TypeError,ValueError,json.JSONDecodeError):
+                    break
             bars = self.db.execute("SELECT COUNT(*) FROM final_bar").fetchone()[0]
-            if integrity == "ok" and bars > 0:
+            if integrity == "ok" and bars > 0 and verified == len(symbols):
                 self.event("RESTART_REPLAY_VERIFIED",
-                    f"prior_run={previous[0]}:database_reopened:bars={bars}")
+                    f"prior_run={previous[0]}:database_reopened:verified_symbol_rows={verified}")
         return run_id
 
     def end_run(self, run_id: str) -> None:
@@ -260,6 +285,11 @@ class Store:
                       (symbol,interval,open_ms,receipt_json,receipt_sha256)
                       VALUES(?,'1m',?,?,?)""",
                       (symbol,opened,receipt_json,receipt_sha))
+                if not existing or tuple(existing) == candidate:
+                    self.db.execute("""INSERT INTO service_event
+                        (run_id,at_ms,monotonic_ms,kind,detail) VALUES(?,?,?,?,?)""",
+                        (self.active_run_id,received_ms,time.monotonic_ns()//1_000_000,
+                         "FINAL_BAR_RECEIVED",symbol+":"+str(opened)))
             return "final_bar"
         return "ignored"
 
