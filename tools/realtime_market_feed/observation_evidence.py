@@ -118,10 +118,19 @@ def build_observation_evidence(database, run_id):
         # Events retain row ids; this digest covers the complete ordered event set.
         event_digest = _sha(_canonical(events))
         before = _file_set_sha(path)
+        start_event = next((event for event in events if event["kind"]=="RUN_STARTED"),None)
+        stop_event = next((event for event in reversed(events) if event["kind"]=="SERVICE_STOP"),None)
+        def skew(wall_delta, mono_delta):
+            return None if wall_delta is None or mono_delta is None else abs(wall_delta-mono_delta)
+        start_skew = None if (not start_event or run["started_monotonic_ms"] is None
+                              or type(start_event["monotonic_ms"]) is not int) else skew(
+            start_event["at_ms"]-started,start_event["monotonic_ms"]-run["started_monotonic_ms"])
+        stop_skew = None if (not stop_event or run["stopped_monotonic_ms"] is None
+                             or type(stop_event["monotonic_ms"]) is not int) else skew(
+            stopped-stop_event["at_ms"],run["stopped_monotonic_ms"]-stop_event["monotonic_ms"])
         clock = {
             "method":"WALL_MONOTONIC_BRACKET_V1",
-            "start_skew_ms":None if run["started_monotonic_ms"] is None else 0,
-            "stop_skew_ms":None if run["stopped_monotonic_ms"] is None else 0,
+            "start_skew_ms":start_skew,"stop_skew_ms":stop_skew,
             "monotonic_elapsed_ms":None if run["started_monotonic_ms"] is None or
                 run["stopped_monotonic_ms"] is None else run["stopped_monotonic_ms"]-run["started_monotonic_ms"],
             "max_allowed_skew_ms":MAX_CLOCK_SKEW_MS,
