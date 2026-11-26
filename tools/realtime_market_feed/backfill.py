@@ -163,7 +163,6 @@ def recover_gap(database: str | Path, symbol: str, start_ms: int, end_ms: int, *
         server_ms = server.get("serverTime") if isinstance(server, dict) else None
         if type(server_ms) is not int:
             raise ValueError("BACKFILL_SERVER_TIME")
-        received_ms = time.time_ns() // 1_000_000
         if end_ms > server_ms:
             raise ValueError("BACKFILL_RANGE_NOT_CLOSED")
 
@@ -171,11 +170,12 @@ def recover_gap(database: str | Path, symbol: str, start_ms: int, end_ms: int, *
         cursor = start_ms
         while cursor < end_ms:
             count = min(MAX_PAGE, (end_ms - cursor) // STEP_MS)
-            request = {"endpoint": "/api/v3/klines", "symbol": symbol,
+            request = {"base_url": BASE, "endpoint": "/api/v3/klines", "symbol": symbol,
                        "interval": "1m", "startTime": cursor,
                        "endTime": end_ms - 1, "limit": count}
             query = urlencode({k: v for k, v in request.items() if k != "endpoint"})
             batch = fetch_json(BASE + request["endpoint"] + "?" + query)
+            batch_received_ms = time.time_ns() // 1_000_000
             if not isinstance(batch, list) or not batch:
                 raise ValueError("BACKFILL_KLINES_EMPTY")
             if len(batch) > count:
@@ -183,7 +183,7 @@ def recover_gap(database: str | Path, symbol: str, start_ms: int, end_ms: int, *
             request_sha = _sha256(_canonical(request))
             batch_sha = _sha256(_canonical(batch))
             for source_row in batch:
-                item = _parse_row(source_row, symbol, cursor, server_ms, received_ms)
+                item = _parse_row(source_row, symbol, cursor, server_ms, batch_received_ms)
                 rows.append(item)
                 sources[item[2]] = (request, request_sha, batch_sha)
                 cursor += STEP_MS
@@ -244,7 +244,7 @@ def recover_gap(database: str | Path, symbol: str, start_ms: int, end_ms: int, *
                     raise ValueError("BACKFILL_GAP_CLOSE_RACE")
                 db.execute("""INSERT INTO service_event
                            (run_id,at_ms,monotonic_ms,kind,detail) VALUES(?,?,?,?,?)""",
-                           (run_id,received_ms,time.monotonic_ns()//1_000_000,
+                           (run_id,time.time_ns()//1_000_000,time.monotonic_ns()//1_000_000,
                             "GAP_BACKFILL_COMPLETED",
                             f"{symbol}:{start_ms}:{end_ms}:bars={expected_count}:source=REST"))
         finally:
