@@ -159,7 +159,8 @@ def _verify_lineage(row, *, expected_producer_code_sha256,
                   "FEED_PRODUCER_IDENTITY_MISMATCH")
             request = body["request"]
             _need(type(request) is dict and set(request) ==
-                  {"endpoint","symbol","interval","startTime","endTime","limit"}
+                  {"base_url","endpoint","symbol","interval","startTime","endTime","limit"}
+                  and request["base_url"] == "https://data-api.binance.vision"
                   and request["endpoint"] == "/api/v3/klines"
                   and request["symbol"] == row["symbol"]
                   and request["interval"] == "1m"
