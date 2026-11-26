@@ -77,7 +77,7 @@ def evaluate_24h_report(report, *, expected_code_sha256, expected_symbols,
     event_keys={"id","run_id","at_ms","monotonic_ms","kind","detail"}
     allowed_kinds={"RUN_STARTED","SERVICE_START","SERVICE_STOP","CONNECTING","CONNECTED",
         "SOCKET_ERROR","SOCKET_EXCEPTION","DISCONNECTED","PLANNED_ROTATION","RECONNECT_WAIT",
-        "MESSAGE_REJECTED","FINAL_BAR_CONFLICT","RESTART_REPLAY_VERIFIED","GAP_BACKFILL_LIMIT","GAP_BACKFILL_STARTED",
+        "MESSAGE_REJECTED","FINAL_BAR_RECEIVED","FINAL_BAR_CONFLICT","RESTART_REPLAY_VERIFIED","GAP_BACKFILL_LIMIT","GAP_BACKFILL_STARTED",
         "GAP_BACKFILL_COMPLETED","GAP_BACKFILL_FAILED","GAP_BACKFILL_WORKER_ERROR"}
     seen_ids=set()
     prior_id=-1
@@ -188,7 +188,9 @@ def evaluate_24h_report(report, *, expected_code_sha256, expected_symbols,
                 if not isinstance(pair,dict) or set(pair)!={"fault_event_id","recovery_event_id"}:
                     failures.append("FAULT_RECOVERY_PAIR_INVALID");break
                 f=by_id.get(pair["fault_event_id"]);r=by_id.get(pair["recovery_event_id"])
-                expected="GAP_BACKFILL_COMPLETED" if f and f.get("kind","").startswith("GAP_") else "CONNECTED"
+                expected=("GAP_BACKFILL_COMPLETED" if f and f.get("kind","").startswith("GAP_")
+                    else "FINAL_BAR_RECEIVED" if f and f.get("kind")=="MESSAGE_REJECTED"
+                    else "CONNECTED")
                 if not f or not r or f not in faults or r.get("kind")!=expected or r["id"]<=f["id"] or r["at_ms"]<f["at_ms"]:
                     failures.append("FAULT_RECOVERY_CAUSALITY_INVALID");break
     else:
