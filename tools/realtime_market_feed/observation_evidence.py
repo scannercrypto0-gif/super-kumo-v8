@@ -108,13 +108,24 @@ def build_observation_evidence(database, run_id):
                 "trade_fresh":bool(trade and type(stopped) is int and 0 <= stopped-trade[0] <= FRESHNESS_MS),
                 "quote_fresh":bool(quote and type(stopped) is int and 0 <= stopped-quote[0] <= FRESHNESS_MS),
             }
-        replay = db.execute("""SELECT COUNT(*) FROM final_bar_lineage l JOIN final_bar f
-            ON f.symbol=l.symbol AND f.interval=l.interval AND f.open_ms=l.open_ms
+        lineage_rows = db.execute("""SELECT f.symbol,f.open_ms,l.receipt_json,l.receipt_sha256
+            FROM final_bar f LEFT JOIN final_bar_lineage l
+              ON f.symbol=l.symbol AND f.interval=l.interval AND f.open_ms=l.open_ms
             WHERE f.symbol IN (%s) AND f.interval='1m' AND f.open_ms>=? AND f.open_ms<?
               AND f.received_ms>=? AND f.received_ms<=?""" %
             ",".join("?" for _ in symbols),
-            tuple(symbols)+(lo*MINUTE_MS,hi*MINUTE_MS,started,stopped)).fetchone()[0] if symbols else 0
-        complete_bars_have_receipts = replay == observed
+            tuple(symbols)+(lo*MINUTE_MS,hi*MINUTE_MS,started,stopped)).fetchall() if symbols else []
+        valid_receipts = 0
+        for receipt in lineage_rows:
+            try:
+                body=json.loads(receipt["receipt_json"])
+                canonical=_canonical(body)
+                if (receipt["receipt_json"]==canonical.decode("utf-8")
+                    and receipt["receipt_sha256"]==_sha(canonical)):
+                    valid_receipts+=1
+            except (TypeError,ValueError,json.JSONDecodeError):
+                pass
+        complete_bars_have_receipts = valid_receipts == observed
         # Events retain row ids; this digest covers the complete ordered event set.
         event_digest = _sha(_canonical(events))
         before = _file_set_sha(path)
@@ -160,7 +171,7 @@ def build_observation_evidence(database, run_id):
             "all_observed_bars_have_lineage":complete_bars_have_receipts,
             "market_state":market,
             "short_gaps_recovered":not open_gaps and not missing,
-            "restart_replay_verified":False,
+            "restart_replay_verified":any(event["kind"]=="RESTART_REPLAY_VERIFIED" for event in events),
             "fault_recovery_pairs":recoveries,
         }
         body = {
