@@ -21,6 +21,33 @@ def _canonical_sha(value):
         ensure_ascii=True,allow_nan=False).encode()).hexdigest()
 
 
+def _fault_events(events):
+    explicit={"SOCKET_ERROR","SOCKET_EXCEPTION","MESSAGE_REJECTED",
+              "GAP_BACKFILL_FAILED","GAP_BACKFILL_WORKER_ERROR"}
+    faults=[]
+    for index,event in enumerate(events):
+        if not isinstance(event,dict):
+            continue
+        if event.get("kind") in explicit:
+            faults.append(event)
+            continue
+        if event.get("kind")!="DISCONNECTED":
+            continue
+        since=[e for e in events[:index] if isinstance(e,dict) and
+               e.get("kind") in {"CONNECTED","SOCKET_ERROR","SOCKET_EXCEPTION"}]
+        if since and since[-1].get("kind") in {"SOCKET_ERROR","SOCKET_EXCEPTION"}:
+            continue
+        planned=False
+        for later in events[index+1:]:
+            if later.get("kind")=="CONNECTED":
+                break
+            if later.get("kind")=="PLANNED_ROTATION":
+                planned=True
+        if not planned:
+            faults.append(event)
+    return faults
+
+
 def evaluate_24h_report(report, *, expected_code_sha256, expected_symbols,
                         expected_config_sha256=None, provider_terms_cleared=False,
                         quota_headroom_verified=False,
@@ -82,6 +109,7 @@ def evaluate_24h_report(report, *, expected_code_sha256, expected_symbols,
     seen_ids=set()
     prior_id=-1
     prior_mono=-1
+    prior_at=-1
     for event in events:
         if not isinstance(event,dict) or set(event)!=event_keys:
             failures.append("EVENT_SCHEMA_OR_UNKNOWN_FIELD")
@@ -99,6 +127,10 @@ def evaluate_24h_report(report, *, expected_code_sha256, expected_symbols,
         elif (type(started) is int and type(stopped) is int and
               not (started<=event["at_ms"]<=stopped)):
             failures.append("EVENT_OUTSIDE_RUN_WINDOW")
+        if type(event.get("at_ms")) is int:
+            if event["at_ms"]<prior_at:
+                failures.append("EVENT_WALL_ORDER_INVALID")
+            prior_at=event["at_ms"]
         if type(event["monotonic_ms"]) is int:
             if event["monotonic_ms"]<prior_mono:
                 failures.append("EVENT_MONOTONIC_ORDER_INVALID")
@@ -169,9 +201,7 @@ def evaluate_24h_report(report, *, expected_code_sha256, expected_symbols,
     if coverage.get("restart_replay_verified") is not True:
         failures.append("RESTART_REPLAY_NOT_PROVEN")
 
-    fault_kinds={"SOCKET_ERROR","SOCKET_EXCEPTION","MESSAGE_REJECTED",
-                 "GAP_BACKFILL_FAILED","GAP_BACKFILL_WORKER_ERROR"}
-    faults=[e for e in events if isinstance(e,dict) and e.get("kind") in fault_kinds]
+    faults=_fault_events(events)
     natural_fault=report.get("natural_fault")
     pairs=coverage.get("fault_recovery_pairs")
     if natural_fault=="OBSERVED_NOT_RECOVERED":
