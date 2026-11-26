@@ -24,6 +24,38 @@ class RetrospectiveKlineReceipt:
     availability: str = "RETROSPECTIVE_NOT_CONFIRMED"
 
 
+def read_binance_spot_archive_bytes(raw, *, expected_sha256):
+    """Shared offline ZIP envelope check; no finality, PIT or trading authority.
+
+    Returns the exact CSV bytes, compressed-byte digest and member name.
+    Legacy path intake and input-quality inspection share this bounded decoder.
+    """
+    if (type(expected_sha256) is not str or len(expected_sha256) != 64 or
+        any(ch not in "0123456789abcdef" for ch in expected_sha256)):
+        raise ValueError("Independent SHA256 required")
+    if type(raw) is not bytes or len(raw) > 110_000_000:
+        raise ValueError("Archive exceeds bounded input size")
+    sha = hashlib.sha256(raw).hexdigest()
+    if sha != expected_sha256:
+        raise ValueError("Archive checksum mismatch")
+    try:
+        with ZipFile(io.BytesIO(raw)) as z:
+            members = [m for m in z.infolist() if not m.is_dir()]
+            if len(members) != 1 or not members[0].filename.endswith(".csv"):
+                raise ValueError("Exactly one CSV required")
+            member = members[0]
+            if not member.filename.startswith("BTCUSDT-1m-"):
+                raise ValueError("Archive member market identity mismatch")
+            if member.file_size > 100_000_000:
+                raise ValueError("Archive exceeds bounded CSV size")
+            if member.compress_size == 0 or member.file_size > 100 * member.compress_size:
+                raise ValueError("Excessive archive expansion ratio")
+            csv_bytes = z.read(member)
+    except BadZipFile as exc:
+        raise ValueError("Invalid ZIP") from exc
+    return csv_bytes, sha, member.filename
+
+
 def inspect_binance_spot_zip(path, *, expected_sha256, symbol="BTCUSDT",
                              interval_ms=60000):
     """Verify independently recorded ZIP hash and return canonical OHLCV rows.
@@ -46,23 +78,7 @@ def inspect_binance_spot_zip(path, *, expected_sha256, symbol="BTCUSDT",
     if archive_path.stat().st_size > 110_000_000:
         raise ValueError("Archive exceeds bounded input size")
     raw = archive_path.read_bytes()
-    sha = hashlib.sha256(raw).hexdigest()
-    if sha != expected_sha256:
-        raise ValueError("Archive checksum mismatch")
-    try:
-        with ZipFile(io.BytesIO(raw)) as z:
-            members = [m for m in z.infolist() if not m.is_dir()]
-            if len(members) != 1 or not members[0].filename.endswith(".csv"):
-                raise ValueError("Exactly one CSV required")
-            if not members[0].filename.startswith("BTCUSDT-1m-"):
-                raise ValueError("Archive member market identity mismatch")
-            if members[0].file_size > 100_000_000:
-                raise ValueError("Archive exceeds bounded CSV size")
-            if members[0].compress_size == 0 or members[0].file_size > 100 * members[0].compress_size:
-                raise ValueError("Excessive archive expansion ratio")
-            csv_bytes = z.read(members[0])
-    except BadZipFile as exc:
-        raise ValueError("Invalid ZIP") from exc
+    csv_bytes, sha, _ = read_binance_spot_archive_bytes(raw, expected_sha256=expected_sha256)
     rows = []
     previous = None
     gaps = 0
