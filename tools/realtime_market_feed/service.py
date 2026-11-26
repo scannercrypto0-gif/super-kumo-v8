@@ -274,6 +274,8 @@ class Store:
                     (symbol,opened)).fetchone()
                 candidate = (closed,ohlcv["o"],ohlcv["h"],ohlcv["l"],ohlcv["c"],
                              ohlcv["v"],normalized["trades"])
+                lineage_verified = False
+                lineage_verified = False
                 if existing and tuple(existing) != candidate:
                     self.db.execute("""INSERT INTO service_event
                         (run_id,at_ms,monotonic_ms,kind,detail) VALUES(?,?,?,?,?)""",
@@ -285,7 +287,27 @@ class Store:
                       (symbol,interval,open_ms,receipt_json,receipt_sha256)
                       VALUES(?,'1m',?,?,?)""",
                       (symbol,opened,receipt_json,receipt_sha))
-                if not existing or tuple(existing) == candidate:
+                    lineage_verified = True
+                elif existing:
+                    existing_state=self.db.execute("""SELECT received_ms,payload_sha256 FROM final_bar
+                        WHERE symbol=? AND interval='1m' AND open_ms=?""",(symbol,opened)).fetchone()
+                    prior = self.db.execute("""SELECT receipt_json,receipt_sha256
+                        FROM final_bar_lineage WHERE symbol=? AND interval='1m' AND open_ms=?""",
+                        (symbol,opened)).fetchone()
+                    if prior and existing_state:
+                        existing_received,existing_payload=existing_state
+                        try:
+                            body=json.loads(prior[0])
+                            lineage_verified=(prior[0]==_canonical(body).decode("utf-8")
+                                and prior[1]==_sha256(_canonical(body))
+                                and body.get("symbol")==symbol and body.get("interval")=="1m"
+                                and body.get("open_ms")==opened and body.get("close_ms")==closed
+                                and body.get("available_at_ms")==existing_received
+                                and body.get("ohlcv")=={"o":existing[1],"h":existing[2],"l":existing[3],"c":existing[4],"v":existing[5]} and body.get("trades")==existing[6]
+                                and body.get("event_payload_sha256",body.get("response_row_sha256"))==existing_payload)
+                        except (TypeError,ValueError,json.JSONDecodeError):
+                            lineage_verified=False
+                if lineage_verified:
                     self.db.execute("""INSERT INTO service_event
                         (run_id,at_ms,monotonic_ms,kind,detail) VALUES(?,?,?,?,?)""",
                         (self.active_run_id,received_ms,time.monotonic_ns()//1_000_000,
