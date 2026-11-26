@@ -233,6 +233,10 @@ def evaluate_24h_report(report, *, expected_code_sha256, expected_symbols,
         try:
             from tools.realtime_market_feed.observation_evidence import build_observation_evidence
             independent=build_observation_evidence(database_path,run.get("run_id"))
+            # Verification time is informational and intentionally changes on each reopen;
+            # all source-derived fields and the independently recomputed seal must match.
+            if isinstance(report.get("verification"),dict) and isinstance(independent.get("verification"),dict):
+                independent["verification"]["verified_at_ms"]=report["verification"].get("verified_at_ms")
             if _canonical_sha(independent)!=_canonical_sha(report):
                 failures.append("SOURCE_REPORT_RECOMPUTE_MISMATCH")
         except (OSError,ValueError,TypeError,KeyError):
