@@ -293,7 +293,7 @@ def _daily(item, registry_item, now):
                 source_age_for_gate = observed - source_day if type(observed) is int and type(source_day) is int and 0 <= source_day <= observed else None
                 freshness_limit = doc.get("freshness_limit_ms")
                 if (source_age_for_gate is None or type(freshness_limit) is not int
-                        or not 0 < freshness_limit <= MAX_EXPECTED_WAIT_MS):
+                        or not 0 < freshness_limit <= 7 * 86_400_000):
                     state, reason = "UNKNOWN", "DAILY_SOURCE_FRESHNESS_LIMIT_UNVERIFIED"
                 elif source_age_for_gate > freshness_limit:
                     state, reason = "STALE", "DAILY_SOURCE_DATA_STALE"
