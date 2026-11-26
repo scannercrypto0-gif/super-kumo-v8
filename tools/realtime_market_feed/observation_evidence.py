@@ -118,6 +118,23 @@ def build_observation_evidence(database, run_id):
         # Events retain row ids; this digest covers the complete ordered event set.
         event_digest = _sha(_canonical(events))
         before = _file_set_sha(path)
+        fault_kinds = {"SOCKET_ERROR","SOCKET_EXCEPTION","MESSAGE_REJECTED",
+                       "GAP_BACKFILL_FAILED","GAP_BACKFILL_WORKER_ERROR"}
+        recoveries = []
+        for event in events:
+            if event["kind"] not in fault_kinds:
+                continue
+            recovery_kind = "GAP_BACKFILL_COMPLETED" if event["kind"].startswith("GAP_") else "CONNECTED"
+            recovery = next((candidate for candidate in events
+                if candidate["id"] > event["id"] and candidate["kind"] == recovery_kind
+                and candidate["at_ms"] >= event["at_ms"]),None)
+            if recovery:
+                recoveries.append({"fault_event_id":event["id"],
+                                   "recovery_event_id":recovery["id"]})
+        fault_count = sum(1 for event in events if event["kind"] in fault_kinds)
+        natural_fault = ("NOT_OBSERVED" if fault_count == 0 else
+                         "OBSERVED_AND_RECOVERED" if len(recoveries) == fault_count else
+                         "OBSERVED_NOT_RECOVERED")
         start_event = next((event for event in events if event["kind"]=="RUN_STARTED"),None)
         stop_event = next((event for event in reversed(events) if event["kind"]=="SERVICE_STOP"),None)
         def skew(wall_delta, mono_delta):
@@ -144,9 +161,11 @@ def build_observation_evidence(database, run_id):
             "market_state":market,
             "short_gaps_recovered":not open_gaps and not missing,
             "restart_replay_verified":False,
+            "fault_recovery_pairs":recoveries,
         }
         body = {
             "schema":EVIDENCE_SCHEMA,
+            "natural_fault":natural_fault,
             "run":{
                 "schema":"aql.realtime-market-feed.observation-run.v2",
                 "run_id":run["run_id"],"producer_code_sha256":run["producer_code_sha256"],
