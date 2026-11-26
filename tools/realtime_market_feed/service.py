@@ -275,7 +275,6 @@ class Store:
                 candidate = (closed,ohlcv["o"],ohlcv["h"],ohlcv["l"],ohlcv["c"],
                              ohlcv["v"],normalized["trades"])
                 lineage_verified = False
-                lineage_verified = False
                 if existing and tuple(existing) != candidate:
                     self.db.execute("""INSERT INTO service_event
                         (run_id,at_ms,monotonic_ms,kind,detail) VALUES(?,?,?,?,?)""",
