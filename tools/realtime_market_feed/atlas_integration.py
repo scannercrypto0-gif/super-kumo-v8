@@ -108,7 +108,8 @@ def _feed_db(path, *, allow_synthetic_fixture=False,
         raise
 
 
-def _verify_lineage(row, *, expected_producer_code_sha256):
+def _verify_lineage(row, *, expected_producer_code_sha256,
+                    expected_rest_producer_code_sha256=None):
     try:
         if row["lineage_json"] is None or row["lineage_sha256"] is None:
             raise ValueError("FEED_SOURCE_LINEAGE_UNVERIFIED")
@@ -120,18 +121,68 @@ def _verify_lineage(row, *, expected_producer_code_sha256):
                 result[key] = value
             return result
         body = json.loads(row["lineage_json"], object_pairs_hook=unique)
-        required = {
-            "schema", "producer_id", "producer_code_sha256", "provider", "market",
-            "symbol", "interval", "open_ms", "close_ms", "available_at_ms",
-            "finality", "ohlcv", "trades", "event_payload_sha256",
-            "replay_identity_sha256", "normalized_row_sha256",
-        }
-        _need(type(body) is dict and set(body) == required,
-              "FEED_LINEAGE_SCHEMA_INVALID")
-        _need(body["schema"] == "atlas.realtime-market-feed.normalized-bar-attestation.v1"
-              and body["producer_id"] == "atlas.realtime_market_feed.service.Store.ingest"
-              and body["producer_code_sha256"] == expected_producer_code_sha256,
-              "FEED_PRODUCER_IDENTITY_MISMATCH")
+        ws_schema = "atlas.realtime-market-feed.normalized-bar-attestation.v1"
+        rest_schema = "atlas.realtime-market-feed.rest-backfill-attestation.v1"
+        if type(body) is not dict:
+            raise ValueError("FEED_LINEAGE_SCHEMA_INVALID")
+        if body.get("schema") == ws_schema:
+            required = {
+                "schema", "producer_id", "producer_code_sha256", "provider", "market",
+                "symbol", "interval", "open_ms", "close_ms", "available_at_ms",
+                "finality", "ohlcv", "trades", "event_payload_sha256",
+                "replay_identity_sha256", "normalized_row_sha256",
+            }
+            _need(set(body) == required, "FEED_LINEAGE_SCHEMA_INVALID")
+            _need(body["producer_id"] == "atlas.realtime_market_feed.service.Store.ingest"
+                  and body["producer_code_sha256"] == expected_producer_code_sha256,
+                  "FEED_PRODUCER_IDENTITY_MISMATCH")
+            source_digest_key = "event_payload_sha256"
+            normalized_keys = ("provider","market","symbol","interval","open_ms",
+                               "close_ms","available_at_ms","finality","ohlcv",
+                               "trades","event_payload_sha256")
+            replay_keys = ("provider","market","symbol","interval","open_ms",
+                           "close_ms","event_payload_sha256")
+            source_digest = body["event_payload_sha256"]
+        elif body.get("schema") == rest_schema:
+            required = {
+                "schema", "producer_id", "producer_code_sha256", "source_class",
+                "provider", "market", "symbol", "interval", "open_ms", "close_ms",
+                "available_at_ms", "finality", "ohlcv", "trades", "response_row_sha256",
+                "request", "request_sha256", "response_batch_sha256",
+                "replay_identity_sha256", "normalized_row_sha256",
+            }
+            _need(set(body) == required, "FEED_LINEAGE_SCHEMA_INVALID")
+            _need(expected_rest_producer_code_sha256 is not None
+                  and body["producer_id"] == "atlas.realtime_market_feed.backfill.recover_gap"
+                  and body["producer_code_sha256"] == expected_rest_producer_code_sha256
+                  and body["source_class"] == "BINANCE_SPOT_PUBLIC_REST_MARKET_DATA",
+                  "FEED_PRODUCER_IDENTITY_MISMATCH")
+            request = body["request"]
+            _need(type(request) is dict and set(request) ==
+                  {"endpoint","symbol","interval","startTime","endTime","limit"}
+                  and request["endpoint"] == "/api/v3/klines"
+                  and request["symbol"] == row["symbol"]
+                  and request["interval"] == "1m"
+                  and type(request["startTime"]) is int
+                  and type(request["endTime"]) is int
+                  and type(request["limit"]) is int and 0 < request["limit"] <= 1000
+                  and request["startTime"] <= row["open_ms"]
+                  and request["endTime"] >= row["open_ms"]
+                  and hashlib.sha256(json.dumps(request,sort_keys=True,separators=(",",":"),
+                       ensure_ascii=True,allow_nan=False).encode()).hexdigest() == body["request_sha256"],
+                  "FEED_REST_REQUEST_INVALID")
+            _need(type(body["response_batch_sha256"]) is str
+                  and HEX.fullmatch(body["response_batch_sha256"]) is not None,
+                  "FEED_REST_BATCH_DIGEST_INVALID")
+            source_digest_key = "response_row_sha256"
+            normalized_keys = ("provider","market","source_class","symbol","interval",
+                               "open_ms","close_ms","available_at_ms","finality","ohlcv",
+                               "trades","response_row_sha256")
+            replay_keys = ("provider","market","source_class","symbol","interval",
+                           "open_ms","close_ms","response_row_sha256")
+            source_digest = body["response_row_sha256"]
+        else:
+            raise ValueError("FEED_LINEAGE_SCHEMA_INVALID")
         _need(body["provider"] == "BINANCE" and body["market"] == "SPOT"
               and body["symbol"] == row["symbol"] and body["interval"] == row["interval"]
               and body["interval"] == "1m" and body["open_ms"] == row["open_ms"]
@@ -139,29 +190,19 @@ def _verify_lineage(row, *, expected_producer_code_sha256):
               and body["available_at_ms"] == row["received_ms"]
               and body["finality"] == "FINAL",
               "FEED_LINEAGE_IDENTITY_MISMATCH")
-        _need(type(body["event_payload_sha256"]) is str
-              and HEX.fullmatch(body["event_payload_sha256"]) is not None,
+        _need(type(source_digest) is str and HEX.fullmatch(source_digest) is not None,
               "FEED_RECEIPT_INVALID")
         ohlcv = {"o": row["open"], "h": row["high"], "l": row["low"],
                  "c": row["close"], "v": row["volume"]}
         _need(body["ohlcv"] == ohlcv and body["trades"] == row["trades"]
-              and body["event_payload_sha256"] == row["payload_sha256"],
+              and source_digest == row["payload_sha256"],
               "FEED_LINEAGE_ROW_MISMATCH")
-        normalized = {
-            "provider":body["provider"], "market":body["market"],
-            "symbol":body["symbol"], "interval":body["interval"],
-            "open_ms":body["open_ms"], "close_ms":body["close_ms"],
-            "available_at_ms":body["available_at_ms"], "finality":body["finality"],
-            "ohlcv":body["ohlcv"], "trades":body["trades"],
-            "event_payload_sha256":body["event_payload_sha256"],
-        }
+        normalized = {key: body[key] for key in normalized_keys}
         _need(body["normalized_row_sha256"] == hashlib.sha256(
                   json.dumps(normalized,sort_keys=True,separators=(",",":"),
                              ensure_ascii=True,allow_nan=False).encode()).hexdigest(),
               "FEED_NORMALIZED_ROW_DIGEST_MISMATCH")
-        replay = {key: body[key] for key in
-                  ("provider","market","symbol","interval","open_ms","close_ms",
-                   "event_payload_sha256")}
+        replay = {key: body[key] for key in replay_keys}
         replay_sha = hashlib.sha256(json.dumps(replay,sort_keys=True,
             separators=(",",":"),ensure_ascii=True,allow_nan=False).encode()).hexdigest()
         _need(body["replay_identity_sha256"] == replay_sha,
@@ -182,6 +223,7 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
                         max_age_ms=120_000, max_bars=MAX_WINDOW_BARS,
                         allow_synthetic_fixture=False,
                         expected_producer_code_sha256=None,
+                        expected_rest_producer_code_sha256=None,
                         query_budget_ms=5_000, metrics=None):
     """Read one coherent finalized 1m window and verify its pinned producer receipts.
 
@@ -274,7 +316,8 @@ def project_feed_window(database, *, symbol, start_ms, end_ms, now_ms,
         if i == count - 1:
             _need(now_ms - received <= max_age_ms, "FEED_STALE")
         body, receipt_sha = _verify_lineage(
-            row, expected_producer_code_sha256=expected_producer_code_sha256)
+            row, expected_producer_code_sha256=expected_producer_code_sha256,
+            expected_rest_producer_code_sha256=expected_rest_producer_code_sha256)
         values = {key: row[col] for key, col in
                   (("o", "open"), ("h", "high"), ("l", "low"),
                    ("c", "close"), ("v", "volume"))}
