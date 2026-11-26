@@ -249,7 +249,9 @@ def _daily(item, registry_item, now):
     observed = doc.get("observed_at_ms")
     try:
         require(doc.get("schema") == "aql.recurring-runtime.health.v1"
-                and doc.get("source_cadence") == "DAILY_UTC", "DAILY_SCHEMA_INVALID")
+                and doc.get("source_cadence") == "DAILY_UTC"
+                and doc.get("trading_authority") == "NONE"
+                and doc.get("current_entry") == "NO_CURRENT_ENTRY", "DAILY_SCHEMA_INVALID")
         state, reason, age = _age_state(observed, now)
         last = doc.get("last_success") if type(doc.get("last_success")) is dict else {}
         failure = doc.get("last_failure")
@@ -258,6 +260,10 @@ def _daily(item, registry_item, now):
         if receipt is not None:
             require(watchdog.HEX64.fullmatch(receipt) is not None, "DAILY_RECEIPT_PIN_INVALID")
         registry_link = None
+        if state is None and (doc.get("task_state") == "Disabled" or doc.get("scheduler_state") == "Disabled"):
+            state, reason = "FAILED", "DAILY_SCHEDULER_DISABLED"
+        if state is None and doc.get("runtime_state") in {"CONFIG_PIN_MISMATCH", "ERROR"}:
+            state, reason = "FAILED", "DAILY_RUNTIME_PIN_OR_EXECUTION_FAILURE"
         if state is None and failure is not None:
             state, reason = "FAILED", "DAILY_WORKER_FAILURE_REPORTED"
         if state is None and doc.get("source_freshness") == "STALE":
@@ -274,7 +280,8 @@ def _daily(item, registry_item, now):
             source_day = last.get("source_day_ms")
             receipts = last.get("receipts")
             evidence_ok = (
-                last.get("daily_source_evidence_status") == "VERIFIED"
+                last.get("status") == "COMPLETE" and last.get("exit_code") == 0
+                and last.get("daily_source_evidence_status") == "VERIFIED"
                 and type(worker_receipt) is str and watchdog.HEX64.fullmatch(worker_receipt)
                 and type(source_zip) is str and watchdog.HEX64.fullmatch(source_zip)
                 and type(checksum) is str and watchdog.HEX64.fullmatch(checksum)
