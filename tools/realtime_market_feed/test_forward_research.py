@@ -27,7 +27,7 @@ import hashlib, json, os, sys
 from pathlib import Path
 root=Path(os.environ["AQL_WORKTREE"])
 sys.path.insert(0,str(root))
-warehouse=ROOT / ".integration" / "warehouse"
+warehouse=root / ".integration" / "warehouse"
 sys.path.insert(0,str(warehouse / "src"))
 from tools.realtime_market_feed import forward_research as fr
 from tools.realtime_market_feed import atlas_integration as adapter
