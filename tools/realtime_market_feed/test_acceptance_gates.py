@@ -19,7 +19,8 @@ from atlas_ops_watchdog import live_view
 
 def _accepted_report(tmp_path, *, fault=False, recover=True):
     import time
-    path=tmp_path/("accepted-fault.sqlite" if fault else "accepted-healthy.sqlite")
+    import uuid
+    path=tmp_path/(("accepted-fault-" if fault else "accepted-healthy-")+uuid.uuid4().hex+".sqlite")
     store=Store(path)
     run_id=store.begin_run(["btcusdt"],86_400)
     started=time.time_ns()//1_000_000-86_405_000
@@ -108,7 +109,7 @@ def test_24h_gate_rejects_out_of_window_and_cross_run_rotation_events(tmp_path):
 def test_24h_gate_rejects_duplicate_unknown_truncated_and_forged_evidence(tmp_path):
     report,path,config=_accepted_report(tmp_path)
     report["events"][2]["id"]=report["events"][1]["id"]
-    report["events"][2]["unexpected"]="not allowed"
+    report["events"][3]["unexpected"]="not allowed"
     report["events_complete"]=False
     result=_evaluate(report,path,config)
     assert {"EVENT_DUPLICATE_OR_REORDERED","EVENT_SCHEMA_OR_UNKNOWN_FIELD",
