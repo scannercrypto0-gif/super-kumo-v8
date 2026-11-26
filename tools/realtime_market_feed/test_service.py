@@ -201,3 +201,32 @@ def test_final_bar_and_lineage_receipt_commit_atomically(tmp_path):
         assert store.db.execute("SELECT count(*) FROM final_bar").fetchone()[0] == 0
     finally:
         store.db.close()
+
+
+def test_observation_run_events_are_bound_and_full_evidence_is_versioned(tmp_path):
+    from tools.realtime_market_feed.observation_evidence import build_observation_evidence
+
+    path=tmp_path/"run.sqlite"
+    store=Store(path)
+    run_id=store.begin_run(["btcusdt"],86_400)
+    store.event("PLANNED_ROTATION")
+    store.event("CONNECTED","symbols=1")
+    store.event("SERVICE_STOP")
+    store.end_run(run_id)
+    store.db.close()
+
+    evidence=build_observation_evidence(path,run_id)
+    assert evidence["schema"]=="atlas.realtime-market-feed.observation-evidence.v2"
+    assert evidence["events_complete"] is True
+    assert evidence["events"]
+    assert all(event["run_id"]==run_id for event in evidence["events"])
+    assert all(type(event["monotonic_ms"]) is int for event in evidence["events"])
+    assert evidence["verification"]["method"]=="READ_ONLY_SQLITE_REOPEN_AND_RECOMPUTE"
+    assert evidence["verification"]["event_count"]==len(evidence["events"])
+    assert evidence["clock_validation"]["start_skew_ms"] is not None
+    assert evidence["clock_validation"]["stop_skew_ms"] is not None
+    assert evidence["coverage"]["expected_closed_bars"]==0
+
+    ordinary=build_report(path)
+    assert ordinary["schema"]=="atlas.realtime-market-feed.report.v1"
+    assert "events_complete" not in ordinary
