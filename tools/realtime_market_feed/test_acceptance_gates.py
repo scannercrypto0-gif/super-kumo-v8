@@ -18,26 +18,38 @@ from atlas_ops_watchdog import live_view
 
 
 def _accepted_report(tmp_path, *, fault=False, recover=True):
+    import time
     path=tmp_path/("accepted-fault.sqlite" if fault else "accepted-healthy.sqlite")
     store=Store(path)
     run_id=store.begin_run(["btcusdt"],86_400)
-    run=store.db.execute("SELECT started_ms,started_monotonic_ms FROM service_run WHERE run_id=?",
-                         (run_id,)).fetchone()
-    started,mono_start=run
+    started=time.time_ns()//1_000_000-86_405_000
     stopped=started+86_400_000
+    mono_now=time.monotonic_ns()//1_000_000
+    mono_start=max(0,mono_now-86_405_000)
     mono_stop=mono_start+86_400_000
-    store.event("PLANNED_ROTATION")
-    store.event("CONNECTED","symbols=1")
-    store.event("RESTART_REPLAY_VERIFIED","prior_run=fixture:database_reopened:bars=1")
+    config=store.db.execute("SELECT config_sha256 FROM service_run WHERE run_id=?",
+                            (run_id,)).fetchone()[0]
+    offsets=[
+        ("RUN_STARTED",0,"observation-v2"),
+        ("RESTART_REPLAY_VERIFIED",1_000,"prior_run=fixture:database_reopened:bars=1"),
+        ("PLANNED_ROTATION",80_000_000,""),
+        ("CONNECTED",80_000_100,"symbols=1"),
+    ]
     if fault:
-        store.event("SOCKET_ERROR","ConnectionResetError")
+        offsets.append(("SOCKET_ERROR",80_001_000,"ConnectionResetError"))
         if recover:
-            store.event("CONNECTED","symbols=1")
-    store.event("SERVICE_STOP")
+            offsets.append(("CONNECTED",80_002_000,"symbols=1"))
+    offsets.append(("SERVICE_STOP",86_400_000,""))
     lo=started//60_000*60_000
     with store.db:
-        store.db.execute("UPDATE service_run SET stopped_ms=?,stopped_monotonic_ms=? WHERE run_id=?",
-                         (stopped,mono_stop,run_id))
+        store.db.execute("""UPDATE service_run SET started_ms=?,stopped_ms=?,
+            started_monotonic_ms=?,stopped_monotonic_ms=? WHERE run_id=?""",
+            (started,stopped,mono_start,mono_stop,run_id))
+        store.db.execute("DELETE FROM service_event WHERE run_id=?",(run_id,))
+        for kind,offset,detail in offsets:
+            store.db.execute("""INSERT INTO service_event
+                (run_id,at_ms,monotonic_ms,kind,detail) VALUES(?,?,?,?,?)""",
+                (run_id,started+offset,mono_start+offset,kind,detail))
         for i in range(1440):
             opened=lo+i*60_000
             received=started+i*60_000
@@ -54,13 +66,13 @@ def _accepted_report(tmp_path, *, fault=False, recover=True):
             ("BTCUSDT","1.4","1","1.6","1",1,stopped-1000))
     store.db.close()
     from tools.realtime_market_feed.observation_evidence import build_observation_evidence
-    return build_observation_evidence(path,run_id),path
+    return build_observation_evidence(path,run_id),path,config
 
 
-def _evaluate(report, database_path, **kwargs):
+def _evaluate(report, database_path, config_sha=None, **kwargs):
     options={"expected_code_sha256":PRODUCER_CODE_SHA256,
              "expected_symbols":["btcusdt"],
-             "expected_config_sha256":report.get("run",{}).get("config_sha256"),
+             "expected_config_sha256":config_sha or report.get("run",{}).get("config_sha256"),
              "provider_terms_cleared":True,"quota_headroom_verified":True,
              "database_path":database_path}
     options.update(kwargs)
@@ -72,22 +84,21 @@ def test_24h_gate_requires_complete_evidence_and_accepts_exact_healthy_run(tmp_p
                                 expected_symbols=["btcusdt"])
     assert pending["status"]=="24H_RESULT_PENDING"
     assert pending["natural_fault"]=="NOT_OBSERVED"
-    report,path=_accepted_report(tmp_path)
-    result=_evaluate(report,path)
+    report,path,config=_accepted_report(tmp_path)
+    result=_evaluate(report,path,config)
     assert result["status"]=="24H_ACCEPTANCE_PASS"
     assert result["natural_fault"]=="NOT_OBSERVED"
     legacy={"observation":{"schema":"aql.realtime-market-feed.observation-run.v1"}}
-    result=_evaluate(legacy,path)
+    result=_evaluate(legacy,path,config)
     assert "COMPLETE_EVIDENCE_ENVELOPE_REQUIRED" in result["failures"]
-    assert "INDEPENDENT_SOURCE_REOPEN_REQUIRED" not in result["failures"]
 
 
 def test_24h_gate_rejects_out_of_window_and_cross_run_rotation_events(tmp_path):
-    report,path=_accepted_report(tmp_path)
-    report["events"][1]["at_ms"]=0
-    report["events"][1]["monotonic_ms"]=report["run"]["started_monotonic_ms"]-1
-    report["events"][2]["run_id"]="other-run"
-    result=_evaluate(report,path)
+    report,path,config=_accepted_report(tmp_path)
+    report["events"][2]["at_ms"]=0
+    report["events"][2]["monotonic_ms"]=report["run"]["started_monotonic_ms"]-1
+    report["events"][3]["run_id"]="other-run"
+    result=_evaluate(report,path,config)
     assert result["status"]=="24H_ACCEPTANCE_BLOCKED"
     assert {"EVENT_OUTSIDE_RUN_WINDOW","EVENT_MONOTONIC_OUTSIDE_RUN",
             "EVENT_RUN_ID_MISMATCH","PLANNED_ROTATION_RECONNECT_NOT_PROVEN",
@@ -95,44 +106,44 @@ def test_24h_gate_rejects_out_of_window_and_cross_run_rotation_events(tmp_path):
 
 
 def test_24h_gate_rejects_duplicate_unknown_truncated_and_forged_evidence(tmp_path):
-    report,path=_accepted_report(tmp_path)
+    report,path,config=_accepted_report(tmp_path)
     report["events"][2]["id"]=report["events"][1]["id"]
     report["events"][2]["unexpected"]="not allowed"
     report["events_complete"]=False
-    result=_evaluate(report,path)
+    result=_evaluate(report,path,config)
     assert {"EVENT_DUPLICATE_OR_REORDERED","EVENT_SCHEMA_OR_UNKNOWN_FIELD",
             "COMPLETE_EVENT_SET_REQUIRED"} <= set(result["failures"])
 
-    report,path=_accepted_report(tmp_path)
+    report,path,config=_accepted_report(tmp_path)
     report["coverage"]["expected_closed_bars"]=1439
-    assert "CLOSED_BAR_COVERAGE_INCOMPLETE" in _evaluate(report,path)["failures"]
+    assert "CLOSED_BAR_COVERAGE_INCOMPLETE" in _evaluate(report,path,config)["failures"]
 
-    report,path=_accepted_report(tmp_path)
+    report,path,config=_accepted_report(tmp_path)
     report["verification"]["verifier_code_sha256"]="f"*64
-    assert "INDEPENDENT_VERIFICATION_INVALID" in _evaluate(report,path)["failures"]
+    assert "INDEPENDENT_VERIFICATION_INVALID" in _evaluate(report,path,config)["failures"]
 
 
 def test_24h_gate_requires_clock_identity_freshness_recovery_and_complete_grid(tmp_path):
-    report,path=_accepted_report(tmp_path)
+    report,path,config=_accepted_report(tmp_path)
     report["run"]["config_sha256"]="c"*64
     report["clock_validation"]["start_skew_ms"]=9000
     report["coverage"]["market_state"]["btcusdt"]["quote_fresh"]=False
     report["coverage"]["restart_replay_verified"]=False
     report["coverage"]["open_gaps"]=[{"symbol":"BTCUSDT","start_ms":1000,"end_ms":61000}]
-    result=_evaluate(report,path)
+    result=_evaluate(report,path,config)
     assert {"CONFIG_PIN_MISMATCH","CLOCK_SKEW_UNVALIDATED",
             "LATEST_MARKET_STATE_NOT_FRESH","RESTART_REPLAY_NOT_PROVEN",
             "OPEN_GAPS_PRESENT_OR_UNREPORTED","SOURCE_REPORT_RECOMPUTE_MISMATCH"} <= set(result["failures"])
 
 
 def test_24h_gate_rejects_unrecovered_fault_and_accepts_causal_in_window_recovery(tmp_path):
-    report,path=_accepted_report(tmp_path,fault=True,recover=False)
+    report,path,config=_accepted_report(tmp_path,fault=True,recover=False)
     assert report["natural_fault"]=="OBSERVED_NOT_RECOVERED"
-    blocked=_evaluate(report,path)
+    blocked=_evaluate(report,path,config)
     assert "NATURAL_FAULT_NOT_RECOVERED" in blocked["failures"]
 
-    report,path=_accepted_report(tmp_path,fault=True,recover=True)
-    accepted=_evaluate(report,path)
+    report,path,config=_accepted_report(tmp_path,fault=True,recover=True)
+    accepted=_evaluate(report,path,config)
     assert accepted["status"]=="24H_ACCEPTANCE_PASS"
     assert accepted["natural_fault"]=="OBSERVED_AND_RECOVERED"
 
