@@ -189,6 +189,8 @@ def _verify_lineage(row, *, expected_producer_code_sha256,
               and body["interval"] == "1m" and body["open_ms"] == row["open_ms"]
               and body["close_ms"] == row["close_ms"]
               and body["available_at_ms"] == row["received_ms"]
+              and type(body["available_at_ms"]) is int
+              and body["available_at_ms"] > body["close_ms"]
               and body["finality"] == "FINAL",
               "FEED_LINEAGE_IDENTITY_MISMATCH")
         _need(type(source_digest) is str and HEX.fullmatch(source_digest) is not None,
