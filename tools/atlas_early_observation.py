@@ -339,6 +339,11 @@ def _daily(item, registry_item, now):
                     "last_success_source_day_ms": (source_day
                         if type(source_day) is int and source_day >= 0 else None),
                     "source_age_ms": source_age,
+                    "source_data_freshness": (
+                        "UNKNOWN" if source_age is None or type(doc.get("freshness_limit_ms")) is not int
+                        else "STALE" if source_age > doc["freshness_limit_ms"] else "FRESH"),
+                    "source_freshness_limit_ms": (
+                        doc.get("freshness_limit_ms") if type(doc.get("freshness_limit_ms")) is int else None),
                     "worker_receipt_sha256": receipt,
                     "registry_link": registry_link,
                     "last_failure_reported": failure is not None,
