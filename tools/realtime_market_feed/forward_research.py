@@ -104,8 +104,8 @@ def _load_kernel(baseline_root, dependency_root):
     manifest = {item["path"]: item["sha256"] for item in plan["dependency_files"]}
     for path, root, relative in (
         (evaluator_path, deps / "scanner", "scanner/tools/scanner_strategy_f/research_e2e_diagnostic.py"),
-        (definition_path, deps / "factory", "factory/research_wp0/strategy_definition.py"),
-        (projection_path, deps / "factory", "factory/research_wp0/aql_factory_historical_rule_projection.py"),
+        (definition_path, deps / "factory", "factory/research_wp_r0/strategy_definition.py"),
+        (projection_path, deps / "factory", "factory/research_wp_r0/aql_factory_historical_rule_projection.py"),
     ):
         _need(relative in manifest, "ANALYZER_TRANSITIVE_FILE_MISSING:" + relative)
         _need(_sha_bytes(path.read_bytes()) == manifest[relative],
@@ -121,8 +121,8 @@ def _load_kernel(baseline_root, dependency_root):
             "dependency_heads": dict(plan["dependency_heads"]),
             "dependency_manifest_sha256": _sha(plan["dependency_files"]),
             "scanner_evaluator_sha256": manifest["scanner/tools/scanner_strategy_f/research_e2e_diagnostic.py"],
-            "factory_strategy_definition_sha256": manifest["factory/research_wp0/strategy_definition.py"],
-            "factory_rule_kernel_sha256": manifest["factory/research_wp0/aql_factory_historical_rule_projection.py"],
+            "factory_strategy_definition_sha256": manifest["factory/research_wp_r0/strategy_definition.py"],
+            "factory_rule_kernel_sha256": manifest["factory/research_wp_r0/aql_factory_historical_rule_projection.py"],
             "strategy_definition_sha256": definition.digest,
         },
     }
