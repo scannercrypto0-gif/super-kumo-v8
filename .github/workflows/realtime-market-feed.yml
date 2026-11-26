@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: scannercrypto0-gif/super-kumo-v8
-          ref: 9d9e873fbaba8742280846285bd0b5db154ec455
+          ref: 8c7f37287cc6b0f4514a5604b56c6a24b26b5b63
           path: .integration/watchdog
           persist-credentials: false
       - uses: actions/setup-python@v5
