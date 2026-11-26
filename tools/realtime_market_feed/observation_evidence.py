@@ -200,7 +200,8 @@ def build_observation_evidence(database, run_id):
             "verifier_id":VERIFIER_ID,"verifier_code_sha256":VERIFIER_CODE_SHA256,
             "method":"READ_ONLY_SQLITE_REOPEN_AND_RECOMPUTE",
             "database_sha256":before,"integrity_check":integrity,
-            "run_id":run_id,"event_count":len(events),"events_sha256":event_digest,
+            "run_id":run_id,"verified_at_ms":time.time_ns()//1_000_000,
+            "event_count":len(events),"events_sha256":event_digest,
             "evidence_sha256":report_sha,"complete_event_set":True,
         }
         # Ensure the input files did not change while this independent snapshot
