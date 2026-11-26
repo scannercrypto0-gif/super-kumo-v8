@@ -90,9 +90,9 @@ def _load_kernel(baseline_root, dependency_root):
     import tools
     if str(scanner_tools) not in [str(Path(p).resolve()) for p in tools.__path__]:
         tools.__path__.insert(0, str(scanner_tools))
-    from research_wp0.strategy_definition import StrategyDefinition
-    from research_wp0.indicator_library_v2 import IndicatorRegistryV2
-    from research_wp0.aql_factory_historical_rule_projection import _vectors, _expression
+    from research_wp_r0.strategy_definition import StrategyDefinition
+    from research_wp_r0.indicator_library_v2 import IndicatorRegistryV2
+    from research_wp_r0.aql_factory_historical_rule_projection import _vectors, _expression
     from tools.scanner_strategy_f.research_e2e_diagnostic import _eval_strategy
 
     evaluator_path = Path(inspect.getfile(_eval_strategy)).resolve()
