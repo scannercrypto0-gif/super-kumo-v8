@@ -139,7 +139,9 @@ def build_observation_evidence(database, run_id):
         for event in events:
             if event["kind"] not in fault_kinds:
                 continue
-            recovery_kind = "GAP_BACKFILL_COMPLETED" if event["kind"].startswith("GAP_") else "CONNECTED"
+            recovery_kind = ("GAP_BACKFILL_COMPLETED" if event["kind"].startswith("GAP_")
+                             else "FINAL_BAR_RECEIVED" if event["kind"]=="MESSAGE_REJECTED"
+                             else "CONNECTED")
             recovery = next((candidate for candidate in events
                 if candidate["id"] > event["id"] and candidate["kind"] == recovery_kind
                 and candidate["at_ms"] >= event["at_ms"]),None)
