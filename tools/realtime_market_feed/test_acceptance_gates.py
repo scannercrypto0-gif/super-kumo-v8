@@ -137,7 +137,7 @@ def test_24h_gate_requires_clock_identity_freshness_recovery_and_complete_grid()
 
 def test_24h_gate_rejects_unrecovered_fault_and_accepts_causal_in_window_recovery():
     report=_accepted_report()
-    fault={"id":4,"run_id":"run-a","at_ms":70_000_000,"monotonic_ms":70_004_000,
+    fault={"id":4,"run_id":"run-a","at_ms":80_001_000,"monotonic_ms":80_005_000,
            "kind":"SOCKET_ERROR","detail":"ConnectionResetError"}
     report["events"].insert(-1,fault)
     report["events"][-1]["id"]=5
@@ -151,8 +151,8 @@ def test_24h_gate_rejects_unrecovered_fault_and_accepts_causal_in_window_recover
     report["coverage"]["fault_recovery_pairs"]=[{"fault_event_id":4,"recovery_event_id":5}]
     # The prior CONNECTED event remains earlier than the fault, so use a later recovery.
     report["events"][-1]["id"]=6
-    report["events"].insert(-1,{"id":5,"run_id":"run-a","at_ms":70_001_000,
-        "monotonic_ms":70_005_000,"kind":"CONNECTED","detail":"symbols=1"})
+    report["events"].insert(-1,{"id":5,"run_id":"run-a","at_ms":80_002_000,
+        "monotonic_ms":80_006_000,"kind":"CONNECTED","detail":"symbols=1"})
     report["coverage"]["fault_recovery_pairs"]=[{"fault_event_id":4,"recovery_event_id":5}]
     _seal(report)
     accepted=_evaluate(report)
