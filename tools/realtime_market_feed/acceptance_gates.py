@@ -98,8 +98,9 @@ def evaluate_24h_report(report, *, expected_code_sha256, expected_symbols,
         failures.append("SAFETY_BOUNDARY_VIOLATION")
 
     events=report.get("events")
-    if (report.get("events_complete") is not True or type(events) is not list or not events):
+    if report.get("events_complete") is not True or type(events) is not list or not events:
         failures.append("COMPLETE_EVENT_SET_REQUIRED")
+    if type(events) is not list:
         events=[]
     event_keys={"id","run_id","at_ms","monotonic_ms","kind","detail"}
     allowed_kinds={"RUN_STARTED","SERVICE_START","SERVICE_STOP","CONNECTING","CONNECTED",
@@ -145,9 +146,21 @@ def evaluate_24h_report(report, *, expected_code_sha256, expected_symbols,
     kinds=[e.get("kind") for e in events if isinstance(e,dict)]
     if "RUN_STARTED" not in kinds or "SERVICE_STOP" not in kinds:
         failures.append("RUN_BOUNDARY_EVENTS_MISSING")
-    rotations=[e for e in events if isinstance(e,dict) and e.get("kind")=="PLANNED_ROTATION"]
-    reconnects=[e for e in events if isinstance(e,dict) and e.get("kind")=="CONNECTED"]
-    if not any(c["id"]>r["id"] and c["at_ms"]>=r["at_ms"] for r in rotations for c in reconnects):
+    # Only complete, well-formed events from this run and within both run clocks
+    # can establish a planned rotation/reconnect pair.
+    bounded_events=[e for e in events if isinstance(e,dict) and set(e)==event_keys
+        and e.get("run_id")==run.get("run_id")
+        and type(e.get("id")) is int and type(e.get("at_ms")) is int
+        and type(e.get("monotonic_ms")) is int
+        and type(started) is int and type(stopped) is int
+        and type(mono_start) is int and type(mono_stop) is int
+        and started<=e["at_ms"]<=stopped
+        and mono_start<=e["monotonic_ms"]<=mono_stop]
+    rotations=[e for e in bounded_events if e["kind"]=="PLANNED_ROTATION"]
+    reconnects=[e for e in bounded_events if e["kind"]=="CONNECTED"]
+    if not any(c["id"]>r["id"] and c["at_ms"]>=r["at_ms"]
+               and c["monotonic_ms"]>=r["monotonic_ms"]
+               for r in rotations for c in reconnects):
         failures.append("PLANNED_ROTATION_RECONNECT_NOT_PROVEN")
 
     clock=report.get("clock_validation")
