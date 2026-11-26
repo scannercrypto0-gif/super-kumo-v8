@@ -27,11 +27,14 @@ import hashlib, json, os, sys
 from pathlib import Path
 root=Path(os.environ["AQL_WORKTREE"])
 sys.path.insert(0,str(root))
+warehouse=ROOT / ".integration" / "warehouse"
+sys.path.insert(0,str(warehouse / "src"))
 from tools.realtime_market_feed import forward_research as fr
+from tools.realtime_market_feed import atlas_integration as adapter
 args=json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 mode=args.pop("mode",None)
 if mode in ("recovered","future"):
-    original=fr.project_feed_window
+    original=adapter.project_feed_window
     def injected(*a,**kw):
         value=original(*a,**kw)
         if mode=="recovered":
@@ -39,7 +42,7 @@ if mode in ("recovered","future"):
         else:
             value["lineage"][-1]["available_at_ms"]=args["decision_cutoff_ms"]+1
         return value
-    fr.project_feed_window=injected
+    adapter.project_feed_window=injected
 try:
     result=fr.analyze_forward_window(
         args.pop("feed_database"), args.pop("research_database"),
