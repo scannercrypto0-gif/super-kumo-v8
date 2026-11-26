@@ -1,0 +1,50 @@
+name: Backup71 encrypted automation acceptance
+on:
+  pull_request:
+    paths: ["src/aql/archive/automation.py", "src/aql/archive/encrypted.py", "scripts/*backup71*", "tests/test_backup71_automation.py", "pyproject.toml", ".github/workflows/backup71-automation.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backup:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e ".[dev,backup]"
+      - name: Exact source and optional crypto environment
+        shell: bash
+        run: |
+          git rev-parse HEAD | tee backup71-source.txt
+          git rev-parse 'HEAD^{tree}' | tee -a backup71-source.txt
+          python --version | tee -a backup71-source.txt
+          python -m pip freeze | tee -a backup71-source.txt
+      - name: Synthetic encryption, failure and recovery tests
+        run: python -B -m pytest tests/test_backup71_automation.py -v --tb=short --junitxml=backup71.xml
+      - name: No skipped acceptance cases
+        run: python -B -c "import xml.etree.ElementTree as E; s=E.parse('backup71.xml').getroot().find('testsuite'); print(s.attrib); assert int(s.get('tests'))==29; assert all(int(s.get(k,0))==0 for k in ('failures','errors','skipped'))"
+      - name: PowerShell syntax (no task registration in CI)
+        shell: pwsh
+        run: |
+          foreach ($path in @('scripts/backup71-task.ps1','scripts/register-backup71-task.ps1')) {
+            $tokens=$null; $errors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $path),[ref]$tokens,[ref]$errors)
+            if ($errors.Count) { throw 'PowerShell syntax failure' }
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backup71-${{ matrix.os }}-${{ matrix.python }}
+          path: |
+            backup71.xml
+            backup71-source.txt
