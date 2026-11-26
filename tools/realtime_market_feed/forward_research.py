@@ -82,6 +82,10 @@ def _load_kernel(baseline_root, dependency_root):
     # Reuses #296's exact import-origin and full transitive-file manifest checks.
     cycle.configure(deps, plan)
 
+    factory_root = deps / "factory"
+    _need(factory_root.is_dir(), "ANALYZER_FACTORY_DEPENDENCY_MISSING")
+    if str(factory_root) not in [str(Path(p).resolve()) for p in sys.path if p]:
+        sys.path.insert(0, str(factory_root))
     scanner_tools = deps / "scanner" / "tools"
     import tools
     if str(scanner_tools) not in [str(Path(p).resolve()) for p in tools.__path__]:
