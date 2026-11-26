@@ -64,6 +64,8 @@ def _parse_row(row, symbol: str, expected_open: int, server_ms: int, received_ms
         raise ValueError("BACKFILL_KLINE_GRID")
     if closed >= server_ms:
         raise ValueError("BACKFILL_KLINE_NOT_FINAL")
+    if type(received_ms) is not int or received_ms <= closed:
+        raise ValueError("BACKFILL_RECEIVED_BEFORE_CLOSE")
     opened_price = _decimal(row[1], positive=True)
     high = _decimal(row[2], positive=True)
     low = _decimal(row[3], positive=True)
