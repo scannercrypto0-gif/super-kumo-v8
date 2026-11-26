@@ -245,3 +245,40 @@ def test_rest_receipt_source_claim_and_bar_content_tampering_are_rejected(tmp_pa
                 expected_rest_producer_code_sha256=REST_PRODUCER_CODE_SHA256)
     finally:
         store.db.close()
+
+
+def test_rest_lineage_rejects_receipt_timestamp_at_or_before_final_close(tmp_path):
+    import hashlib
+    import time
+    from tools.realtime_market_feed.backfill import REST_PRODUCER_CODE_SHA256
+    from tools.realtime_market_feed.service import PRODUCER_CODE_SHA256
+    from tools.realtime_market_feed.atlas_integration import project_feed_window
+
+    store=_store_with_two_minute_gap(tmp_path)
+    try:
+        result=recover_gap(store.path,"BTCUSDT",60_000,180_000,
+            fetch_json=_client([_bar(60_000),_bar(120_000,"10.7")]))
+        assert result["status"]=="CLOSED"
+        receipt_text=store.db.execute(
+            "SELECT receipt_json FROM final_bar_lineage WHERE open_ms=60000").fetchone()[0]
+        body=json.loads(receipt_text)
+        body["available_at_ms"]=body["close_ms"]
+        normalized={key:body[key] for key in
+            ("provider","market","source_class","symbol","interval","open_ms","close_ms",
+             "available_at_ms","finality","ohlcv","trades","response_row_sha256")}
+        body["normalized_row_sha256"]=hashlib.sha256(json.dumps(normalized,
+            sort_keys=True,separators=(",",":"),ensure_ascii=True,
+            allow_nan=False).encode()).hexdigest()
+        canonical=json.dumps(body,sort_keys=True,separators=(",",":"),
+                             ensure_ascii=True,allow_nan=False)
+        store.db.execute("UPDATE final_bar SET received_ms=close_ms WHERE open_ms=60000")
+        store.db.execute("""UPDATE final_bar_lineage SET receipt_json=?,receipt_sha256=?
+            WHERE open_ms=60000""",(canonical,hashlib.sha256(canonical.encode()).hexdigest()))
+        store.db.commit()
+        with pytest.raises(ValueError,match="FEED_LINEAGE_IDENTITY_MISMATCH"):
+            project_feed_window(store.path,symbol="BTCUSDT",start_ms=60_000,
+                end_ms=180_000,now_ms=time.time_ns()//1_000_000+1,
+                max_age_ms=86_400_000,expected_producer_code_sha256=PRODUCER_CODE_SHA256,
+                expected_rest_producer_code_sha256=REST_PRODUCER_CODE_SHA256)
+    finally:
+        store.db.close()
