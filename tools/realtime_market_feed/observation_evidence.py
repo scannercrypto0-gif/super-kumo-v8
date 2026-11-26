@@ -76,11 +76,12 @@ def build_observation_evidence(database, run_id):
         missing = []
         observed = expected = 0
         for symbol in symbols:
+            db_symbol=symbol.upper()
             expected_opens = list(range(lo*MINUTE_MS,hi*MINUTE_MS,MINUTE_MS))
             rows = db.execute("""SELECT open_ms,received_ms FROM final_bar
                 WHERE symbol=? AND interval='1m' AND open_ms>=? AND open_ms<?
                   AND received_ms>=? AND received_ms<=? ORDER BY open_ms""",
-                (symbol,lo*MINUTE_MS,hi*MINUTE_MS,started,stopped)).fetchall()
+                (db_symbol,lo*MINUTE_MS,hi*MINUTE_MS,started,stopped)).fetchall()
             by_open = {}
             for row in rows:
                 by_open.setdefault(row["open_ms"],[]).append(row)
@@ -92,16 +93,19 @@ def build_observation_evidence(database, run_id):
             per_symbol[symbol] = {"expected":len(expected_opens),
                                   "observed":len(expected_opens)-len(absent),
                                   "missing":[[x,x+MINUTE_MS] for x in absent]}
+        db_symbols=[symbol.upper() for symbol in symbols]
         open_gaps = [dict(row) for row in db.execute("""SELECT symbol,interval,start_ms,end_ms,reason
-            FROM open_gap WHERE status='OPEN' AND interval='1m'
-              AND start_ms<? AND end_ms>? ORDER BY symbol,start_ms""",
-            (hi*MINUTE_MS,lo*MINUTE_MS)).fetchall()]
+            FROM open_gap WHERE status='OPEN' AND interval='1m' AND symbol IN (%s)
+              AND start_ms<? AND end_ms>? ORDER BY symbol,start_ms""" %
+            ",".join("?" for _ in db_symbols),
+            tuple(db_symbols)+(hi*MINUTE_MS,lo*MINUTE_MS)).fetchall()] if db_symbols else []
         conflicts = sum(1 for e in events if e["kind"]=="FINAL_BAR_CONFLICT")
         duplicate_count = max(0,expected-observed)
         market = {}
         for symbol in symbols:
-            trade = db.execute("SELECT received_ms FROM latest_trade WHERE symbol=?",(symbol,)).fetchone()
-            quote = db.execute("SELECT received_ms FROM latest_quote WHERE symbol=?",(symbol,)).fetchone()
+            db_symbol=symbol.upper()
+            trade = db.execute("SELECT received_ms FROM latest_trade WHERE symbol=?",(db_symbol,)).fetchone()
+            quote = db.execute("SELECT received_ms FROM latest_quote WHERE symbol=?",(db_symbol,)).fetchone()
             market[symbol] = {
                 "trade_received_ms":trade[0] if trade else None,
                 "quote_received_ms":quote[0] if quote else None,
@@ -114,7 +118,7 @@ def build_observation_evidence(database, run_id):
             WHERE f.symbol IN (%s) AND f.interval='1m' AND f.open_ms>=? AND f.open_ms<?
               AND f.received_ms>=? AND f.received_ms<=?""" %
             ",".join("?" for _ in symbols),
-            tuple(symbols)+(lo*MINUTE_MS,hi*MINUTE_MS,started,stopped)).fetchall() if symbols else []
+            tuple(db_symbols)+(lo*MINUTE_MS,hi*MINUTE_MS,started,stopped)).fetchall() if symbols else []
         valid_receipts = 0
         for receipt in lineage_rows:
             try:
