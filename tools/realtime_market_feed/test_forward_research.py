@@ -33,6 +33,7 @@ from tools.realtime_market_feed import forward_research as fr
 from tools.realtime_market_feed import atlas_integration as adapter
 args=json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 mode=args.pop("mode",None)
+future_cutoff=args.get("decision_cutoff_ms")
 if mode in ("recovered","future"):
     original=adapter.project_feed_window
     def injected(*a,**kw):
@@ -40,7 +41,7 @@ if mode in ("recovered","future"):
         if mode=="recovered":
             value["lineage"][-1]["source_class"]="BINANCE_SPOT_PUBLIC_REST_MARKET_DATA"
         else:
-            value["lineage"][-1]["available_at_ms"]=args["decision_cutoff_ms"]+1
+            value["lineage"][-1]["available_at_ms"]=future_cutoff+1
         return value
     adapter.project_feed_window=injected
 try:
@@ -216,8 +217,8 @@ def test_missing_slot_open_gap_and_tampered_receipt_fail_closed(tmp_path):
                    (start + 5 * 60_000,))
     missing = _call(tmp_path, source, start, end)
     assert not missing["ok"]
-    assert missing["error"] in {"FEED_LINEAGE_MISSING", "FEED_WINDOW_INCOMPLETE",
-                                "FEED_LINEAGE_ROW_MISSING"}
+    assert missing["error"] in {"FEED_SOURCE_LINEAGE_UNVERIFIED", "FEED_LINEAGE_MISSING",
+                                "FEED_WINDOW_INCOMPLETE", "FEED_LINEAGE_ROW_MISSING"}
 
     source2 = tmp_path / "feed-gap.sqlite"
     start2, end2 = _feed(source2)
