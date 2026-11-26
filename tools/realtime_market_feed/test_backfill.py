@@ -1,4 +1,6 @@
 import json
+
+import pytest
 from urllib.parse import parse_qs, urlparse
 
 from tools.realtime_market_feed.backfill import recover_gap
