@@ -76,6 +76,11 @@ def import_one_retained(warehouse, archive, *, source_day_ms, expected_zip_sha25
     if report_root is not None:
         from .producer_report import publish_bounded
         registry = report.get('registry') or {}
+        matched = [row for row in registry.get('sources', [])
+                   if row.get('source_zip_sha256') == expected_zip_sha256
+                   and row.get('key') == key]
+        source_receipt_sha = (matched[0].get('source_receipt_sha256')
+                              if len(matched) == 1 else None)
         publish_bounded(report_root, protected_root=warehouse.root,
             code_sha256=seal(Path(__file__).read_bytes()),
             config_sha256=seal(json.dumps(dict(day=source_day_ms,
@@ -85,12 +90,15 @@ def import_one_retained(warehouse, archive, *, source_day_ms, expected_zip_sha25
             sequence=source_day_ms, observed_ms=observed_ms,
             published_ms=time.time_ns() // 1_000_000,
             status='SOURCE_IMPORT_COMMITTED', reason='REGISTRY_LINK_PRESENT'
-                if registry.get('snapshot_sha256') else 'REGISTRY_LINK_UNKNOWN',
+                if source_receipt_sha and registry.get('snapshot_sha256')
+                else 'REGISTRY_LINK_UNKNOWN',
             counters=dict(source_rows=imported.get('source_rows', 0),
                           inserted_rows=imported.get('inserted_rows', 0),
                           duplicate_rows=imported.get('duplicate_rows', 0),
                           conflicts=imported.get('conflicts', 0)),
             source_sha256=imported.get('source_sha256'),
+            checksum_sha256=expected_checksum_sha256,
+            source_receipt_sha256=source_receipt_sha,
             receipt_sha256=receipt_path.stem,
             registry_sha256=registry.get('snapshot_sha256'),
             registry_watermark=registry.get('event_watermark'),
