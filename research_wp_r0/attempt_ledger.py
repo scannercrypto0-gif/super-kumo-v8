@@ -321,4 +321,3 @@ def prepare_durable_candidate(ledger, *args, **kwargs):
     ledger.record_attempt({**prepared.__dict__, "state": "INPUTS",
                            "inputs": inputs.payload.decode(), "inputs_digest": inputs.digest})
     return prepared, inputs
-
