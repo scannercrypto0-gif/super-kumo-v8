@@ -117,3 +117,28 @@ def test_daily_wrong_checksum_cannot_create_report_or_import(tmp_path):
                             expected_checksum_sha256=seal(checksum),
                             observed_ms=START + DAY, report_root=out)
     assert list(out.iterdir()) == []
+
+
+def test_report_link_failure_rolls_back_only_pending_temp(tmp_path, monkeypatch):
+    from aql.warehouse import producer_report
+    args = _args(tmp_path)
+    def fail_link(*unused):
+        raise OSError("SYNTHETIC_LINK_FAILURE")
+    monkeypatch.setattr(producer_report.os, "link", fail_link)
+    with pytest.raises(OSError, match="SYNTHETIC_LINK_FAILURE"):
+        publish_bounded(**args)
+    assert list(args["report_root"].iterdir()) == []
+    # The protected root has never been opened by publisher code.
+    assert list(args["protected_root"].iterdir()) == []
+
+
+def test_report_directory_symlink_and_hardlink_conflicts_denied(tmp_path):
+    args = _args(tmp_path)
+    symlink = tmp_path / "linked"
+    try:
+        symlink.symlink_to(args["report_root"], target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("Symlinks unavailable on this test runner")
+    with pytest.raises(ValueError, match="REPARSE_DENIED"):
+        publish_bounded(**{**args, "report_root": symlink})
+    assert list(args["report_root"].iterdir()) == []
