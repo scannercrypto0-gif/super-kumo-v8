@@ -3,7 +3,7 @@ import json
 import pytest
 from urllib.parse import parse_qs, urlparse
 
-from tools.realtime_market_feed.backfill import recover_gap
+from tools.realtime_market_feed.backfill import MAX_RECOVERY_BARS, recover_gap
 from tools.realtime_market_feed.service import Store
 
 
@@ -86,6 +86,31 @@ def test_unfinalized_rest_rows_are_rejected(tmp_path):
         assert result["status"] == "OPEN_FAILED"
         assert "BACKFILL_RANGE_NOT_CLOSED" in result["reason"]
         assert store.db.execute("SELECT status FROM open_gap").fetchone()[0] == "OPEN"
+    finally:
+        store.db.close()
+
+
+@pytest.mark.parametrize("count",[MAX_RECOVERY_BARS-1,MAX_RECOVERY_BARS,MAX_RECOVERY_BARS+1])
+def test_recovery_limit_boundaries_are_explicit_and_fail_closed(tmp_path,count):
+    store=Store(tmp_path/f"limit-{count}.sqlite")
+    calls=[]
+    end=count*60_000
+    def fetch(url):
+        calls.append(url)
+        return {"serverTime":end} if url.endswith("/api/v3/time") else []
+    try:
+        result=recover_gap(store.path,"BTCUSDT",0,end,fetch_json=fetch)
+        limit_events=store.db.execute(
+            "SELECT count(*) FROM service_event WHERE kind='GAP_BACKFILL_LIMIT'").fetchone()[0]
+        if count>MAX_RECOVERY_BARS:
+            assert result=={"status":"OPEN_LIMIT_EXCEEDED","bars":0}
+            assert calls==[]
+            assert limit_events==1
+        else:
+            assert result["status"]=="OPEN_FAILED"
+            assert len(calls)==2
+            assert limit_events==0
+        assert store.db.execute("SELECT count(*) FROM final_bar").fetchone()[0]==0
     finally:
         store.db.close()
 

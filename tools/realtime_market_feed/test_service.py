@@ -5,6 +5,7 @@ import pytest
 
 from tools.realtime_market_feed.reader import read_snapshot
 from tools.realtime_market_feed.service import Store, build_report, make_url, normalize_symbols
+from tools.realtime_market_feed.service import APP_MESSAGE_TIMEOUT_SECONDS, FINAL_BAR_PROGRESS_TIMEOUT_SECONDS
 
 
 def test_symbol_normalization_and_bound():
@@ -127,6 +128,77 @@ def test_consumer_snapshot_holds_stale_data_and_open_history_gap(tmp_path):
     assert "BTCUSDT:OPEN_HISTORY_GAP" in result["blockers"]
 
 
+def test_consumer_snapshot_holds_known_final_bar_conflict(tmp_path):
+    path=tmp_path/"conflict.sqlite"
+    store=Store(path)
+    trade={"e":"trade","s":"BTCUSDT","t":1,"p":"100","q":"1","T":119000,"m":False}
+    quote={"s":"BTCUSDT","u":2,"b":"99.9","B":"2","a":"100.1","A":"3"}
+    bar={"e":"kline","s":"BTCUSDT","k":{"i":"1m","t":120000,"T":179999,
+        "o":"100","h":"101","l":"99","c":"100.5","v":"10","n":4,"x":True}}
+    store.ingest(json.dumps(trade),199500)
+    store.ingest(json.dumps(quote),199500)
+    store.ingest(json.dumps(bar),199500)
+    store.event("FINAL_BAR_CONFLICT","BTCUSDT:120000")
+    store.db.close()
+    result=read_snapshot(path,"BTCUSDT",now_ms=200000)
+    assert result["status"]=="HELD"
+    assert "BTCUSDT:FINAL_BAR_CONFLICT" in result["blockers"]
+
+
+def test_receive_watchdog_checks_message_silence_and_final_bar_progress(tmp_path):
+    from tools.realtime_market_feed.service import LiveService
+    store=Store(tmp_path/"watchdog.sqlite")
+    service=LiveService(["btcusdt"],store)
+    try:
+        service._reset_receive_progress(100.0)
+        assert service._receive_stall_reason(100.0+APP_MESSAGE_TIMEOUT_SECONDS-0.01) is None
+        assert service._receive_stall_reason(100.0+APP_MESSAGE_TIMEOUT_SECONDS)=="APPLICATION_MESSAGE_SILENCE"
+        with service._progress_lock:
+            service._last_application_message=100.0+FINAL_BAR_PROGRESS_TIMEOUT_SECONDS-1
+        assert service._receive_stall_reason(100.0+FINAL_BAR_PROGRESS_TIMEOUT_SECONDS)=="FINAL_BAR_PROGRESS_TIMEOUT:BTCUSDT"
+    finally:
+        store.db.close()
+
+
+def test_receive_watchdog_closes_silent_socket_and_records_reason(tmp_path,monkeypatch):
+    import threading
+    import tools.realtime_market_feed.service as service_module
+    from tools.realtime_market_feed.service import LiveService
+    store=Store(tmp_path/"silent.sqlite")
+    service=LiveService(["btcusdt"],store)
+    attempts=[]
+
+    class SilentSocket:
+        def __init__(self,url,on_open,on_message,on_error,on_close):
+            self.on_open=on_open;self.on_close=on_close
+            self.closed=threading.Event()
+        def close(self):
+            if not self.closed.is_set():
+                self.closed.set()
+                service.stop=True
+                self.on_close(self,1006,"watchdog")
+        def run_forever(self,**kwargs):
+            assert kwargs["ping_interval"]==service_module.PING_INTERVAL_SECONDS
+            assert kwargs["ping_timeout"]==service_module.PING_TIMEOUT_SECONDS
+            self.on_open(self)
+            assert self.closed.wait(1),"silent socket was not closed by watchdog"
+            attempts.append(1)
+
+    monkeypatch.setattr(service_module.websocket,"WebSocketApp",SilentSocket)
+    monkeypatch.setattr(service_module,"APP_MESSAGE_TIMEOUT_SECONDS",0.02)
+    monkeypatch.setattr(service_module,"WATCHDOG_POLL_INTERVAL_SECONDS",0.005)
+    monkeypatch.setattr(service_module,"MIN_RECONNECT_INTERVAL_SECONDS",0)
+    monkeypatch.setattr(service_module,"MAX_SOCKET_AGE_SECONDS",60)
+    monkeypatch.setattr(service_module.time,"sleep",lambda _seconds:None)
+    try:
+        service.run()
+        kinds=[row[0] for row in store.db.execute("SELECT kind FROM service_event ORDER BY id")]
+        assert len(attempts)==1
+        assert "RECEIVE_WATCHDOG_CLOSED" in kinds
+    finally:
+        store.db.close()
+
+
 def test_live_service_dispatches_final_bar_to_gap_recovery_worker(tmp_path, monkeypatch):
     import threading
     from tools.realtime_market_feed import backfill
@@ -165,6 +237,8 @@ def test_live_service_reconnects_after_transport_close(tmp_path, monkeypatch):
         def close(self):
             self.on_close(self,1000,"timer")
         def run_forever(self,**kwargs):
+            assert kwargs["ping_interval"] == service_module.PING_INTERVAL_SECONDS
+            assert kwargs["ping_timeout"] == service_module.PING_TIMEOUT_SECONDS
             self.on_open(self)
             self.on_close(self,1006,"injected-drop")
             attempts.append(1)

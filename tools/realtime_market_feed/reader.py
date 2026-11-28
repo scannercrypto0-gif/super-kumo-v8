@@ -30,6 +30,21 @@ def read_snapshot(
     db.row_factory = sqlite3.Row
     items, blockers = [], []
     try:
+        # Keep every symbol and integrity decision on one SQLite snapshot.
+        db.execute("BEGIN")
+        conflict_events = db.execute(
+            "SELECT at_ms,detail FROM service_event "
+            "WHERE kind='FINAL_BAR_CONFLICT' AND at_ms>=? ORDER BY id",
+            (cutoff,),
+        ).fetchall()
+        conflicts_by_symbol = {}
+        for event in conflict_events:
+            detail = str(event["detail"])
+            symbol, separator, opened = detail.partition(":")
+            if not separator or not symbol or not opened.isdecimal():
+                blockers.append("UNSCOPED_FINAL_BAR_CONFLICT")
+                continue
+            conflicts_by_symbol.setdefault(symbol.upper(), []).append(int(opened))
         for symbol in requested:
             trade = db.execute("SELECT * FROM latest_trade WHERE symbol=?", (symbol.upper(),)).fetchone()
             quote = db.execute("SELECT * FROM latest_quote WHERE symbol=?", (symbol.upper(),)).fetchone()
@@ -52,6 +67,9 @@ def read_snapshot(
                         missing.append(label + "_STALE")
             if gaps:
                 missing.append("OPEN_HISTORY_GAP")
+            conflict_opens = conflicts_by_symbol.get(symbol.upper(), [])
+            if any(opened >= cutoff and opened <= now_ms for opened in conflict_opens):
+                missing.append("FINAL_BAR_CONFLICT")
             item = {
                 "symbol": symbol.upper(),
                 "trade": dict(trade) if trade else None,
@@ -63,6 +81,10 @@ def read_snapshot(
             }
             items.append(item)
             blockers.extend(f"{symbol.upper()}:{reason}" for reason in missing)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
     return {

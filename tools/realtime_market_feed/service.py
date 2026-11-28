@@ -27,6 +27,11 @@ MAX_SYMBOLS = 64
 MAX_BACKOFF_SECONDS = 60
 MIN_RECONNECT_INTERVAL_SECONDS = 15
 MAX_SOCKET_AGE_SECONDS = 23 * 60 * 60 + 50 * 60
+APP_MESSAGE_TIMEOUT_SECONDS = 45
+FINAL_BAR_PROGRESS_TIMEOUT_SECONDS = 150
+WATCHDOG_POLL_INTERVAL_SECONDS = 1
+PING_INTERVAL_SECONDS = 20
+PING_TIMEOUT_SECONDS = 10
 
 # A code-pinned normalized producer attestation. It binds each newly inserted
 # finalized bar to its event digest and exact normalized row. It is not a
@@ -326,6 +331,42 @@ class LiveService:
         self._recovery_lock = threading.Lock()
         self._recovering_symbols = set()
         self._recovery_last_attempt = {}
+        self._progress_lock = threading.Lock()
+        self._last_application_message = self.started
+        self._last_final_bar = {symbol.upper(): self.started for symbol in symbols}
+
+    def _reset_receive_progress(self, opened: float) -> None:
+        with self._progress_lock:
+            self._last_application_message = opened
+            self._last_final_bar = {symbol.upper(): opened for symbol in self.symbols}
+
+    def _note_application_message(self) -> None:
+        with self._progress_lock:
+            self._last_application_message = time.monotonic()
+
+    def _note_final_bar(self, symbol: str) -> None:
+        with self._progress_lock:
+            if symbol in self._last_final_bar:
+                self._last_final_bar[symbol] = time.monotonic()
+
+    def _receive_stall_reason(self, now: float | None = None) -> str | None:
+        now = time.monotonic() if now is None else now
+        with self._progress_lock:
+            if now - self._last_application_message >= APP_MESSAGE_TIMEOUT_SECONDS:
+                return "APPLICATION_MESSAGE_SILENCE"
+            stale = sorted(symbol for symbol, last in self._last_final_bar.items()
+                           if now - last >= FINAL_BAR_PROGRESS_TIMEOUT_SECONDS)
+        if stale:
+            return "FINAL_BAR_PROGRESS_TIMEOUT:" + ",".join(stale[:8])
+        return None
+
+    def _watch_receive_progress(self, app, stop_event, result) -> None:
+        while not stop_event.wait(WATCHDOG_POLL_INTERVAL_SECONDS):
+            reason = self._receive_stall_reason()
+            if reason is not None:
+                result["reason"] = reason
+                app.close()
+                return
 
     def run(self) -> None:
         delay = 2.0
@@ -340,11 +381,19 @@ class LiveService:
             self.attempts += 1
             opened = time.monotonic()
             self.store.event("CONNECTING", f"attempt={self.attempts}")
+            close_events = []
+            close_events_lock = threading.Lock()
+            def record_close(_app, code, message):
+                # app.close() may invoke this callback on the watchdog thread;
+                # defer SQLite journaling until run_forever returns to owner.
+                with close_events_lock:
+                    close_events.append((code, str(message or "")[:40]))
             app = websocket.WebSocketApp(make_url(self.symbols),
-                on_open=lambda _app: self.store.event("CONNECTED", f"symbols={len(self.symbols)}"),
+                on_open=lambda _app: (self._reset_receive_progress(time.monotonic()),
+                    self.store.event("CONNECTED", f"symbols={len(self.symbols)}")),
                 on_message=lambda _app,msg: self._on_message(msg),
                 on_error=lambda _app,err: self.store.event("SOCKET_ERROR", type(err).__name__),
-                on_close=lambda _app,code,msg: self.store.event("DISCONNECTED", str(code or "")[:40]))
+                on_close=record_close)
             elapsed = time.monotonic()-self.started
             lifetime = MAX_SOCKET_AGE_SECONDS
             if self.stop_after_seconds:
@@ -352,14 +401,28 @@ class LiveService:
             timer = threading.Timer(lifetime, app.close)
             timer.daemon = True
             timer.start()
+            watchdog_stop = threading.Event()
+            watchdog_result = {}
+            watchdog = threading.Thread(target=self._watch_receive_progress,
+                args=(app,watchdog_stop,watchdog_result),daemon=True)
+            watchdog.start()
             try:
-                app.run_forever(ping_interval=0, ping_timeout=None,
+                app.run_forever(ping_interval=PING_INTERVAL_SECONDS,
+                    ping_timeout=PING_TIMEOUT_SECONDS,
                     sslopt={"cert_reqs": 2, "check_hostname": True},
                     reconnect=0, skip_utf8_validation=False)
             except Exception as exc:
                 self.store.event("SOCKET_EXCEPTION", type(exc).__name__)
             finally:
+                watchdog_stop.set()
+                watchdog.join(timeout=max(1.0, WATCHDOG_POLL_INTERVAL_SECONDS + 0.5))
                 timer.cancel()
+            with close_events_lock:
+                pending_close_events = list(close_events)
+            for code, message in pending_close_events:
+                self.store.event("DISCONNECTED", str(code or "")[:40] + (":" + message if message else ""))
+            if watchdog_result.get("reason"):
+                self.store.event("RECEIVE_WATCHDOG_CLOSED", watchdog_result["reason"])
             lived = time.monotonic()-opened
             if lived >= MAX_SOCKET_AGE_SECONDS-1:
                 self.store.event("PLANNED_ROTATION")
@@ -373,6 +436,7 @@ class LiveService:
             delay = min(MAX_BACKOFF_SECONDS, delay*2)
 
     def _on_message(self, raw: str) -> None:
+        self._note_application_message()
         try:
             outcome = self.store.ingest(raw)
             if outcome == "final_bar":
@@ -380,6 +444,7 @@ class LiveService:
                 data = envelope.get("data", envelope)
                 symbol = str(data.get("s", "")).upper()
                 if symbol:
+                    self._note_final_bar(symbol)
                     self._queue_gap_recovery(symbol)
         except Exception as exc:
             self.store.event("MESSAGE_REJECTED", type(exc).__name__)
