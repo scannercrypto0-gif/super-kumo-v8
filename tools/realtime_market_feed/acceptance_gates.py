@@ -356,3 +356,18 @@ def verify_sanitized_live_projection(report, live_view):
         raise ValueError("LIVE_PROJECTION_LEAK")
     return {"status":"SANITIZED_PROJECTION_PASS","fields":sorted(live_view),
             "source_schema":report.get("schema")}
+
+
+def evaluate_settlement_coverage(database, plan_path, endpoint_path, final_path, *,
+                                 expected_plan_sha256, expected_endpoint_sha256,
+                                 expected_verifier_code_sha256):
+    """Opt-in delivery gate, never an override of evaluate_24h_report.
+
+    Requires the pre-T plan and separately sealed endpoint; independent reopen
+    proves the eligible rows against actual receipt times. Returns coverage only.
+    """
+    from tools.realtime_market_feed.settlement import verify
+    return verify(database, plan_path, endpoint_path, final_path,
+        expected_plan_sha256=expected_plan_sha256,
+        expected_endpoint_sha256=expected_endpoint_sha256,
+        expected_verifier_code_sha256=expected_verifier_code_sha256)

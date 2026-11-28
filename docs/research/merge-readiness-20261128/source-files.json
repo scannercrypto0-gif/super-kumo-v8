@@ -37,12 +37,10 @@
     },
     {
       "path": ".github/workflows/realtime-market-feed.yml",
-      "sha256": "ea89eb7c9559f3317a68992b427f68f7c94906c6b9b4026ae015df7ce09a96da",
-      "git_blob": "e1cfd2b9f7cc150d8623abf13345fd39bfee722b",
-      "exact_source_prs": [
-        333
-      ],
-      "scope": "REUSED_EXACT_BYTES"
+      "sha256": "7d8a436ba0e603a53c862535f3fdda1c2723321fb545ad4f101b20a585d8fa39",
+      "git_blob": "41f19cd903896ad49962f51bc82c52899dacc3ab",
+      "exact_source_prs": [],
+      "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
     {
       "path": ".github/workflows/research-finalized-timeframes.yml",
@@ -217,6 +215,13 @@
       "path": "docs/research/merge-readiness-20261128/core-six-source-map.json",
       "sha256": "b400056a39236f7c1ccc414bf03e605bf25c4084ab082c460ce3ae42a3bf9323",
       "git_blob": "f850e6be01d6737f48c76cf91ba631c1c688a7d5",
+      "exact_source_prs": [],
+      "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
+    },
+    {
+      "path": "docs/research/merge-readiness-20261128/settlement-policy-06.md",
+      "sha256": "43e93864f2640f2bb001e436baa6058c5a832d00207b6b5602103b9b9793d0d6",
+      "git_blob": "100f35175bb9a148383e10a184f2fc1fab7c1903",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
@@ -1125,8 +1130,8 @@
     },
     {
       "path": "tools/merge_readiness/run_acceptance.py",
-      "sha256": "7ed62c615c062b2b08d4329762a619b124ddf56dc6a97be9999983f70a1e8ce6",
-      "git_blob": "5a99174c490982c28b8e3aaa1e1c080f7f952557",
+      "sha256": "7e7a5675fbd2ca7788adce87b2fbeb47ef3a17e03c3f86e30208516c23d1473c",
+      "git_blob": "eb0d430c4af949c1aed3e95e4549aaf167b7955d",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
@@ -1141,8 +1146,8 @@
     },
     {
       "path": "tools/realtime_market_feed/acceptance_gates.py",
-      "sha256": "56bccf071aa59a3148f9e193f904830c41a58191ca5b5486f264dcb41e5e6698",
-      "git_blob": "0df2917dd758daa757dae849c2df69bdfe497866",
+      "sha256": "24276fdb193fc1c3cdd9f9fee505e77ffdc1c4de0a22f26d90c4319fadaccf26",
+      "git_blob": "f4340dd6399f48053a5b556ed8d0ef77f88e70d2",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
@@ -1229,6 +1234,13 @@
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
     {
+      "path": "tools/realtime_market_feed/settlement.py",
+      "sha256": "dede1f53c26dd4a1c12b517211adfaa5f0b62c37ee956cd70df4e70d5fffbf1d",
+      "git_blob": "13eaec469741305285eee302f5f9a32206b6f7aa",
+      "exact_source_prs": [],
+      "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
+    },
+    {
       "path": "tools/realtime_market_feed/test_acceptance_gates.py",
       "sha256": "763172a14a5af100bb33db67bb931b0d1181418d48d9238492717ac88fd34637",
       "git_blob": "68bd28b15170bc563e8da54bbd2ff7c2b0fc1cc0",
@@ -1296,6 +1308,13 @@
       "path": "tools/realtime_market_feed/test_service.py",
       "sha256": "720058cb6174d24e0d1b948f513926d80bd5fcdf1c89939d9b88df6924039fcb",
       "git_blob": "f03a51d4c11e395459aabc9a3ca2803274301f67",
+      "exact_source_prs": [],
+      "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
+    },
+    {
+      "path": "tools/realtime_market_feed/test_settlement.py",
+      "sha256": "19247fe3727fa297b4dd12ea81a99d844c97cfd878a10a0751c8c9ed0dcf7abd",
+      "git_blob": "f908c219f48daf506a7b6f25d1a8ebb01dde04c6",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     }
