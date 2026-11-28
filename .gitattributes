@@ -1,2 +1,21 @@
 /tools/scanner_strategy_f/research_e2e_diagnostic.py text eol=lf
 /research_wp_r0/aql_factory_historical_rule_projection.py text eol=lf
+
+# Exact accepted Core source/test/workflow bytes across Windows and Ubuntu.
+/.github/workflows/g1-tests.yml text eol=lf
+/research_wp_r0/attempt_ledger.py text eol=lf
+/research_wp_r0/historical_library.py text eol=lf
+/src/aql/collector/binance_collector.py text eol=lf
+/src/aql/paper_sim/engine.py text eol=lf
+/src/aql/pipeline.py text eol=lf
+/src/aql/recovery/gap_recovery.py text eol=lf
+/tests/paper_sim/test_engine.py text eol=lf
+/tests/test_cdr_d04_reconnect_budget.py text eol=lf
+/tests/test_cdr_d07_empty_recovery.py text eol=lf
+/tests/test_cdr_d12_ledger_open.py text eol=lf
+/tests/test_cdr_d18_availability.py text eol=lf
+/tests/test_g1_completion.py text eol=lf
+/tests/test_sf_content_identity.py text eol=lf
+/tests/test_sf_ind_02.py text eol=lf
+/tests/test_sf_research_int_01.py text eol=lf
+/tests/test_sf_strat_01.py text eol=lf

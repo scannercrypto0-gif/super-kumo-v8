@@ -1,0 +1,108 @@
+{
+  "schema": "aql.september.original-derived-diagnostic.v1",
+  "evidence_grade": "ORIGINAL_PUBLISHER_INPUT_ISOLATED_LINUX_IMPORT_NOT_OWNER_E_DRIVE",
+  "owner_e_drive_access": false,
+  "observed_at_ms": 1795243876428,
+  "clock_basis": "LOCAL_OS_DIAGNOSTIC_IMPORT_NOT_HISTORICAL_AVAILABILITY",
+  "original_preserved": true,
+  "lineage": {
+    "schema": "aql.warehouse.authorized-derivation.v1",
+    "policy": "AQL-2017-09-CLOSE-8160-v1",
+    "version": 1,
+    "authorizing_decision": "https://github.com/scannercrypto0-gif/super-kumo-v8/pull/330#issuecomment-7058751093",
+    "provisional_pending_final_g0": true,
+    "source_key": "data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2017-09.zip",
+    "source_class": "RETROSPECTIVE_NON_PIT",
+    "original_zip_sha256": "b4e525fa0549688dca9e09cc24093f50526db2a255d03961791da3bfd7c24d81",
+    "original_checksum_sha256": "50b17e0903e8f657910c08b76b91fddede36fb8584404ff0bebdde627373f683",
+    "original_csv_sha256": "d103edb024d391f67713e2e9377a9b2f3101ac02700b5e0637c20cea7fe7a149",
+    "derived_zip_sha256": "91f6a6d573d35118c6248021c465ec0194ef40096109d9664cd3696475c318d4",
+    "derived_csv_sha256": "6b0376305b080a61a7977ebfd18386cc1ee3bbfc2eb1263f43e83745584813e0",
+    "derived_local_checksum_sha256": "e49164ec6fbbab7508c2b51b8ed05a3698eba0644e55d093c252f138d98dffd5",
+    "checksum_kind": "LOCAL_DERIVATIVE_DIGEST_NOT_PUBLISHER_CHECKSUM",
+    "transform": {
+      "native_csv_line": 8160,
+      "field_zero_indexed": 6,
+      "old": "1504713600000",
+      "new": "1504713599999",
+      "all_other_bytes_unchanged": true
+    },
+    "source_rows": 42780,
+    "missing_open_time_ranges": [
+      [
+        1504713600000,
+        1504738800000
+      ]
+    ],
+    "missing_minutes": 420,
+    "full_history_verified": false,
+    "trading_authority": "NONE",
+    "pit_oos": "NOT_ATTESTED"
+  },
+  "imported": {
+    "status": "ARCHIVE_IMPORTED",
+    "key": "data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2017-09.zip",
+    "source_sha256": "91f6a6d573d35118c6248021c465ec0194ef40096109d9664cd3696475c318d4",
+    "source_rows": 42780,
+    "inserted_rows": 42780,
+    "duplicate_rows": 0,
+    "repaired_internal_minutes": 0,
+    "conflicts": 0,
+    "source_class": "RETROSPECTIVE_NON_PIT",
+    "trading_authority": "NONE",
+    "source_kind": "OWNER_AUTHORIZED_DERIVATIVE",
+    "derivation_manifest_sha256": "7573e99e80a5a38bdeb33ba60d9a5f6b702693b4d5ecff8e84c3558710d63cf3"
+  },
+  "replay": {
+    "status": "ARCHIVE_IMPORTED",
+    "key": "data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2017-09.zip",
+    "source_sha256": "91f6a6d573d35118c6248021c465ec0194ef40096109d9664cd3696475c318d4",
+    "source_rows": 42780,
+    "inserted_rows": 0,
+    "duplicate_rows": 42780,
+    "repaired_internal_minutes": 0,
+    "conflicts": 0,
+    "source_class": "RETROSPECTIVE_NON_PIT",
+    "trading_authority": "NONE",
+    "source_kind": "OWNER_AUTHORIZED_DERIVATIVE",
+    "derivation_manifest_sha256": "7573e99e80a5a38bdeb33ba60d9a5f6b702693b4d5ecff8e84c3558710d63cf3"
+  },
+  "warehouse": {
+    "schema": "aql.research.warehouse-report.v1",
+    "stored_first_open_ms": 1504224000000,
+    "stored_last_open_ms": 1506815940000,
+    "one_minute_rows": 42780,
+    "available_complete_projections": {
+      "1m": 42780,
+      "5m": 8556,
+      "15m": 2852,
+      "30m": 1426,
+      "1h": 713,
+      "1d": 29,
+      "1w": 2
+    },
+    "internal_gaps": [
+      [
+        1504713600000,
+        1504738800000
+      ]
+    ],
+    "archive_count": 1,
+    "archive_boundary_missing_ranges": [],
+    "overlapping_accepted_source_rows": 0,
+    "conflicting_candidates": [],
+    "quarantined_checksum_candidates": 0,
+    "resumable_partial_downloads": [],
+    "source_zip_bytes": 6326507,
+    "source_csv_bytes": 6326365,
+    "stored_bytes": 38514615,
+    "cap_bytes": 150000000000,
+    "reserve_bytes": 0,
+    "coverage": "OBSERVED_STORED_RANGE_ONLY",
+    "source_class": "RETROSPECTIVE_NON_PIT",
+    "forward_lane": "SEPARATE_UNMODIFIED",
+    "pit_oos": "NOT_ATTESTED",
+    "trading_authority": "NONE",
+    "orders_enabled": false
+  }
+}

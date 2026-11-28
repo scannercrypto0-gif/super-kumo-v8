@@ -104,6 +104,8 @@ def _on_bar(s, b):
             price = o*(1+spread_slip)
             if not _amount(s,"stop") < price < _amount(s,"target"):
                 _unknown(s,"ENTRY_PRICE_OUTSIDE_FROZEN_RISK"); return
+            if _amount(s,"entry_notional") + qty * price > D(p["max_notional"]):
+                _unknown(s,"MAX_NOTIONAL_EXECUTION_CAP"); return
             if qty:
                 _fill(s,qty=qty,price=price,maker=False,side="buy",when=start)
                 capacity -= qty

@@ -240,3 +240,27 @@ Owner provisionally approved G1-ARCH-29–44, all option C, since last actually 
 ## G0-REV-01 / C — Review remediation state
 
 Draft PR #15 documentation clarification authorized and applied on its existing branch: test fixture/trigger/expected/forbidden cases T29–T44; revision-safe notification/restart protocol; clock-aware stage latency acceptance and evidence fields. Documentary clarification only, executable tests NOT TESTED, no merge, no final G0. Last owner-actually-submitted Work handoff remains AQL-HO-20261021-002 / PR #14; PR #15 is directly authorized GitHub documentation work.
+
+## 2026-11-21 — ATLAS-WH-REGISTRY-RECOVERY-001 (Draft #330)
+
+Owner authorized implementation/tests of Option C after reviewing the prepared brief.
+Reviewed baseline #330 `30854a2b30d0b4ae62914b6a58e1c6065a501387`; main
+`0dad5acc17172754b741b0e8a97d911436c9f4c5`. Registry engineering is on this
+Draft branch, not main. See docs/research/warehouse-registry.md and exact-head
+CI/delivery evidence on https://github.com/scannercrypto0-gif/super-kumo-v8/pull/330.
+Reuses the approved September correction, August pins and original Linux proof.
+No new owner E: execution or independent delta acceptance is claimed. Completion
+remains BLOCKED on the actual owner-local September+registry receipt and scoped
+Audit acceptance; keep the 420-minute gap OPEN and all trading/PIT/G0 boundaries.
+Next: exact-head CI, one scoped #134 Audit request, then guarded existing Windows
+resume command on the authorized host. No merge/task/WS changes.
+
+### Fresh continuity correction — 2026-11-21
+
+Latest #330/7058983090 supersedes the old September-zero host state: actual
+OWNER_REPORTED_LOCAL acceptance is August 21360 + September 42780 =64140,
+originals/August pins unchanged, 420-minute gap OPEN. Do not repeat correction.
+#330/7059048243 separately authorizes full-history continuation without proving
+its execution. New guarded RebuildRegistry mode adopts already committed data
+only, with no imports/network/task probing. Remaining host blocker is the new
+registry receipt, not September correction. Independent delta Audit remains open.
