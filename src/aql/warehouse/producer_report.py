@@ -43,7 +43,8 @@ def publish_bounded(report_root, *, protected_root, lane, identity, sequence,
                     registry_sha256=None, registry_watermark=None,
                     source_day_ms=None, task_state=None,
                     code_sha256=None, config_sha256=None, continuation_sha256=None,
-                    continuation_ref=None, accepted_prefix_unchanged=False):
+                    continuation_ref=None, accepted_prefix_unchanged=False,
+                    checksum_sha256=None, source_receipt_sha256=None):
     """Atomic create-only fixed-schema report; no warehouse reads or cleanup.
 
     A deterministic (lane, identity, sequence) path makes replay idempotent;
@@ -66,7 +67,8 @@ def publish_bounded(report_root, *, protected_root, lane, identity, sequence,
     ), "PRODUCER_REPORT_COUNTERS")
     _require(all(_hex_or_none(v) for v in
         (source_sha256, receipt_sha256, registry_sha256,
-         code_sha256, config_sha256, continuation_sha256)),
+         code_sha256, config_sha256, continuation_sha256,
+         checksum_sha256, source_receipt_sha256)),
         "PRODUCER_REPORT_DIGEST")
     _require(registry_watermark is None or
              (type(registry_watermark) is int and registry_watermark >= 0),
@@ -97,6 +99,8 @@ def publish_bounded(report_root, *, protected_root, lane, identity, sequence,
                 observation_ms=observed_ms, published_ms=published_ms,
                 status=status, reason=reason, counters=counters,
                 source_sha256=source_sha256, receipt_sha256=receipt_sha256,
+                checksum_sha256=checksum_sha256,
+                source_receipt_sha256=source_receipt_sha256,
                 registry_sha256=registry_sha256,
                 registry_watermark=registry_watermark,
                 code_sha256=code_sha256, config_sha256=config_sha256,
@@ -106,7 +110,8 @@ def publish_bounded(report_root, *, protected_root, lane, identity, sequence,
                 full_history_verified=False if lane == "HISTORY" else None,
                 publisher_import_registry_verified=bool(
                     lane == "DAILY" and source_sha256 and receipt_sha256 and
-                    registry_sha256 and registry_watermark is not None),
+                    registry_sha256 and registry_watermark is not None and
+                    checksum_sha256 and source_receipt_sha256),
                 trading_authority="NONE",
                 evidence_grade="PRODUCER_REPORTED_NOT_INDEPENDENTLY_REVALIDATED")
     if lane == "HISTORY":
