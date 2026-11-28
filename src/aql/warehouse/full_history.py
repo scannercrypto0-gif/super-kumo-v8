@@ -158,6 +158,7 @@ def main():
     p.add_argument('--root',type=Path,default=Path('E:/ATLAS/DataWarehouse'))
     p.add_argument('--authorization',type=Path)
     p.add_argument('--archive-limit',type=int,default=10000)
+    p.add_argument('--bounded-report-root',type=Path,help='pre-approved separate existing MCP report directory (opt-in)')
     args=p.parse_args()
     w=HistoricalWarehouse(args.root)
     authority=existing_authority(w,args.authorization)
@@ -169,6 +170,7 @@ def main():
         report=continue_history(w,VisionHTTP(authority=authority),
             clock_ms=lambda:time.time_ns()//1000000,
             archive_limit=args.archive_limit,task_inspection=json.loads(inspection) if inspection else None,
+            report_root=args.bounded_report_root,
             progress=lambda event:print(json.dumps(event,sort_keys=True),flush=True))
     except (OSError,ValueError) as exc:
         print(json.dumps(dict(status='FULL_HISTORY_STOPPED_FAIL_CLOSED',
