@@ -40,6 +40,7 @@ def verify():
     for name in (
         "research_wp_r0/aql_factory_h_execution_comparison_v1.py",
         "research_wp_r0/aql_factory_h_scientific_lab_v1.py",
+        "research_wp_r0/aql_p2_factory_lab.py",
         "research_wp_r0/aql_factory_historical_rule_projection.py",
         "src/aql/journal/durable_journal.py",
     ):

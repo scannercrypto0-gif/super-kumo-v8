@@ -34,6 +34,7 @@
     "private_custodian_store_retention_acl_and_immutable_ack_method": null,
     "blind_holdout_release_authority_and_one_shot_procedure": null,
     "collection_method_and_limits": null,
+    "metric_effect_risk_power_multiplicity_and_regime_policy": null,
     "exact_frozen_protocol_sha256": null
   },
   "conditions": [

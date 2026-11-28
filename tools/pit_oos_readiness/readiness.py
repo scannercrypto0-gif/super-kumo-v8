@@ -13,6 +13,7 @@ from unittest.mock import patch
 from uuid import UUID
 
 from tools.pit_oos_readiness.dependencies import CORE, FACTORY, activate, verify
+from tools.pit_oos_readiness.qualification import METRIC_POLICY, assess
 
 activate()
 
@@ -119,6 +120,7 @@ def configuration():
         source=source, rights=rights, times=times, validation_start_ms=validation_start,
         features=features, candidates=packet["attempts"], trial_budget=3, evaluated_trials=1,
         opportunity_budget=50, scenario_budget=18, hypothesis_budget=54, alpha="0.05",
+        metric_policy=METRIC_POLICY,
         bonferroni_alpha=str(Decimal("0.05") / 54), p_values="NOT_ESTIMABLE",
         stop="FIXED_POPULATION_NO_OPTIONAL_STOP", holdout="SEALED_UNOPENED",
         risk_exit={k: packet[k] for k in ("initial_risk_fraction", "target_r_multiples", "allocations", "stop_order")},
@@ -327,6 +329,22 @@ def verify_journal_scope(root, expected):
         require(observed == expected, "MISSING_FINAL_CUSTODY")
 
 
+def verify_decision_prefix(packet, rows):
+    """Resolve every signal from committed receipts available by its decision time."""
+    acks = {row["open_ms"]: row["ack"] for row in rows}
+    for entry in packet["entries"] + packet["null_entries"]:
+        prefix = {slot: ack for slot, ack in acks.items()
+                  if ack["commit_return_observed_at_ms"] <= entry["signal_ms"]}
+        source_slot = entry["entry_ms"] - 2 * STEP
+        require(source_slot in prefix and entry["signal_ms"] < entry["entry_ms"],
+                "FUTURE_FEATURE")
+        for mark in entry["bars"]:
+            bar = market_bar(mark["open_ms"], mark)
+            require(bar.bar_open not in prefix, "OUTCOME_IN_DECISION_PREFIX")
+            require(acks[mark["open_ms"]]["content_sha256"] == fingerprint(content(bar)),
+                    "MODEL_SOURCE_SWAP")
+
+
 def run(root, crash=False, *, scientific=False):
     require(not scientific, "REAL_PIT_OOS_BLOCKED")
     verify()
@@ -365,13 +383,7 @@ def run(root, crash=False, *, scientific=False):
                            plan_sha=plan_sha, freeze_sha=freeze)
     immutable(root / "scanner-census.json", canonical(scanner))
     require(len(journal.replay(symbol="BTC-USD", interval="15m", limit=51)) == len(rows), "JOURNAL_CENSUS")
-    acks = {r["open_ms"]: r["ack"] for r in rows}
-    for entry in packet["entries"] + packet["null_entries"]:
-        require(acks[entry["entry_ms"] - 2 * STEP]["commit_return_observed_at_ms"] <= entry["signal_ms"]
-                < entry["entry_ms"], "FUTURE_FEATURE")
-        for mark in entry["bars"]:
-            bar = market_bar(mark["open_ms"], mark)
-            require(acks[mark["open_ms"]]["content_sha256"] == fingerprint(content(bar)), "MODEL_SOURCE_SWAP")
+    verify_decision_prefix(packet, rows)
     store = root / "factory.sqlite"
     if not store.exists():
         migrate_store_v2(store)
@@ -389,6 +401,8 @@ def run(root, crash=False, *, scientific=False):
     require(report["sha256"] == result["report_sha256"], "FACTORY_REPORT_ACK")
     validate_report(report, packet)
     immutable(root / "factory-report.json", canonical(report))
+    assessment = assess(protocol, scanner, report)
+    immutable(root / "qualification.json", canonical(assessment))
     regimes = {}
     for row in report["outcomes"]:
         regime = protocol["regime_labels"][row["entry_id"]]
@@ -403,6 +417,7 @@ def run(root, crash=False, *, scientific=False):
                 trial_census=dict(Counter(r["state"] for r in protocol["candidates"])),
                 outcome_census=dict(Counter(r["status"] for r in report["outcomes"])),
                 comparisons=18, regime_outcome_census=regimes, scientific_inference="NOT_ESTIMABLE",
+                qualification_sha256=digest(assessment),
                 owner_envelope_sha256=digest(envelope), blockers=BLOCKERS)
     receipt = {**body, "sha256": digest(body)}
     immutable(root / "decision.json", canonical(receipt))

@@ -334,3 +334,54 @@ def test_real_evaluation_stops_before_any_custody_access(tmp_path):
         with pytest.raises(ValueError, match="REAL_PIT_OOS_BLOCKED"):
             r.run(root, scientific=True)
     assert not root.exists()
+
+
+@pytest.mark.parametrize("change,reason", [
+    ("late_ack", "FUTURE_FEATURE"),
+    ("future_mark", "OUTCOME_IN_DECISION_PREFIX"),
+    ("swapped_mark", "MODEL_SOURCE_SWAP"),
+])
+def test_causal_prefix_excludes_outcomes(ordered_fixture, change, reason):
+    receipt, parents = deepcopy(ordered_fixture)
+    packet = parents["packet"]
+    entry = packet["entries"][0]
+    if change == "late_ack":
+        cutoff = entry["entry_ms"] - 2 * r.STEP
+        row = next(row for row in receipt["decisions"] if row["open_ms"] == cutoff)
+        row["ack"]["commit_return_observed_at_ms"] = entry["signal_ms"] + 1
+    elif change == "future_mark":
+        mark_slot = entry["bars"][0]["open_ms"]
+        row = next(row for row in receipt["decisions"] if row["open_ms"] == mark_slot)
+        row["ack"]["commit_return_observed_at_ms"] = entry["signal_ms"]
+    else:
+        entry["bars"][0]["close"] = "100.1"
+    with pytest.raises(ValueError, match=reason):
+        r.verify_decision_prefix(packet, receipt["decisions"])
+
+
+def test_qualification_keeps_native_denominators_and_blocks_inference(tmp_path):
+    from tools.pit_oos_readiness.qualification import classify_interval
+
+    root = tmp_path / "qualification"
+    receipt = r.run(root)
+    assessment = json.loads((root / "qualification.json").read_bytes())
+    assert receipt["qualification_sha256"] == r.digest(assessment)
+    lab = assessment["paired_lab"]
+    assert lab["scheduled_opportunities"] == 50
+    assert lab["observation_slots"] == 300
+    assert lab["disposition_counts"] == {
+        "TRIGGERED": 5, "NO_SIGNAL": 43, "REJECTED": 1, "UNKNOWN": 1}
+    assert lab["paired_strategy_effect"] == "NOT_EVALUABLE_NO_VERIFIED_ARM_OUTCOMES"
+    assert assessment["reserved_hypotheses"] == 54
+    assert sum(cell["attempts"] for cell in assessment["variants"].values()) == 72
+    assert all(cell["verdict"] == "INCONCLUSIVE" and cell["sharpe"] is None
+               and cell["confidence_interval"] is None for cell in assessment["variants"].values())
+    assert all(cell["net_return_per_attempt"] is None or cell["unknown"] == 0
+               for cell in assessment["variants"].values())
+    assert assessment["scientific_verdict"] == "REAL_PIT_OOS_BLOCKED"
+    assert classify_interval("0.02", "0.04", "0.01", qualified_sample=True) == "PASS"
+    assert classify_interval("-0.02", "0", "0.01", qualified_sample=True) == "FAIL"
+    assert classify_interval("0.01", "0.02", "0.01", qualified_sample=True) == "INCONCLUSIVE"
+    assert classify_interval("0.02", "0.04", "0.01", qualified_sample=False) == "INCONCLUSIVE"
+    with pytest.raises(ValueError, match="INVALID_CONFIDENCE_INTERVAL"):
+        classify_interval("0.04", "0.02", "0.01", qualified_sample=True)
