@@ -45,4 +45,3 @@ def test_snapshot_rechecks_temporal_gate_on_stored_rows():
 
     with pytest.raises(HistoricalDataError, match="point-in-time availability"):
         lib.snapshot("bad", bad.bar_close + 10)
-
