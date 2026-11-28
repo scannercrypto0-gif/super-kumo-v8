@@ -266,4 +266,3 @@ class PaperSimulator:
         self._commands[key]=frozen
         self._states[simulation_id]=state
         return json.loads(canonical(state))
-
