@@ -1,13 +1,13 @@
 """
-AQL Binance Collector ? G1-WP01-MVP
+AQL Binance Collector — G1-WP01-MVP
 
 WebSocket kline stream for Binance Spot public market data.
 No API keys required (public endpoint).
 
 Pipeline:
-  Binance WebSocket ? DurableJournal.commit() ? OperationalStore.upsert()
+  Binance WebSocket → DurableJournal.commit() → OperationalStore.upsert()
 
-Telemetry tracked per execution order ?A:
+Telemetry tracked per execution order §A:
   - source timestamps (Binance k.t / k.T)
   - local ingested_at (wall-clock on message receipt)
   - committed_at (after journal fsync)
@@ -171,7 +171,7 @@ class BinanceCollector:
                     self.metrics.latency_ws_to_commit_return_samples.append(observed-bar.ingested_at)
                     self.metrics.latency_ws_to_commit_return_samples[:] = self.metrics.latency_ws_to_commit_return_samples[-1000:]
 
-                # Latency: ingested_at ? committed_at
+                # Latency: ingested_at → committed_at
                 if committed_at and bar.ingested_at:
                     lat = committed_at - bar.ingested_at
                     self.metrics.latency_ws_to_commit_samples.append(lat)
@@ -229,7 +229,7 @@ class BinanceCollector:
         if self.gap_start_ms is not None:
             self.gap_end_ms = int(time.time() * 1000)
             logger.info(
-                "Reconnected. Gap window: %d ? %d (%d ms)",
+                "Reconnected. Gap window: %d → %d (%d ms)",
                 self.gap_start_ms,
                 self.gap_end_ms,
                 self.gap_end_ms - self.gap_start_ms,
@@ -310,4 +310,3 @@ class BinanceCollector:
         self._stop_event.set()
         if self._ws:
             self._ws.close()
-
