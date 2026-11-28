@@ -1,3 +1,4 @@
+
 """Private Windows one-shot preparation: standard library, zero market calls.
 
 Diagnose reads only. The gate is invoked by the companion PowerShell wrapper
@@ -40,6 +41,12 @@ def canonical(value):
 
 def digest(raw):
     return hashlib.sha256(raw).hexdigest()
+
+
+def require_config_snapshot(preflight, current, expected_sha256):
+    """Fail before staging if the config changed after diagnostics."""
+    need(current == preflight and digest(current) == expected_sha256,
+         'CONFIG_PIN_CHANGED_BEFORE_STAGE')
 
 
 def safe(path, *, exists=True):
@@ -370,7 +377,11 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
     auth_raw=read(authorization_path,65536)
     need(digest(auth_raw)==authpin,'OWNER_AUTHORIZATION_BYTES_CHANGED')
     root = Path(snapshot['root']).absolute(); cfgpath = Path(snapshot['config_path']).absolute()
-    cfg = load(cfgpath); tree = Path(cfg['tree']).absolute()
+    preflight_config = read(cfgpath)
+    need(digest(preflight_config)==diagnostic['identity']['config_sha256'],
+         'CONFIG_PIN_CHANGED_AFTER_DIAGNOSTIC')
+    cfg = json.loads(preflight_config.decode('utf-8-sig'), object_pairs_hook=pairs)
+    tree = Path(cfg['tree']).absolute()
     clock = snapshot.get('clock', {})
     need(type(clock.get('checked_ms')) is int and 0 <= now-clock['checked_ms'] <= 60000 and
          type(clock.get('uncertainty_ms')) is int and 0 <= clock['uncertainty_ms'] <= 250, 'HOST_CLOCK_QUALIFICATION')
@@ -419,6 +430,14 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
          and (continuous or not (root/'operator-recovery.active.json').exists())
          and (correction or not (root/'continuous-research.authorized.json').exists()), 'OPERATOR_STAGE_ALREADY_PRESENT')
     with collector_lease(root):
+        # Re-read under the existing lease. A competing config edit between
+        # diagnose/preflight and lease acquisition must abort before claim,
+        # backup, marker, or candidate-file staging writes.
+        original_config = read(cfgpath)
+        require_config_snapshot(preflight_config, original_config,
+                                diagnostic['identity']['config_sha256'])
+        cfg = json.loads(original_config.decode('utf-8-sig'), object_pairs_hook=pairs)
+        need(Path(cfg['tree']).absolute()==tree, 'CONFIG_TREE_CHANGED_BEFORE_STAGE')
         safe(root/'operator-authorizations', exists=False).mkdir(exist_ok=True)
         durable(root/'operator-authorizations'/f'{authpin}.claimed', auth_raw, create=True)
         backup = root/('ws-recovery-backup-'+uuid.uuid4().hex)
@@ -439,7 +458,6 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
                 files.append(dict(path=str(target), backup=name if existing else None,
                                   old_sha256=digest(read(target)) if existing else None,
                                   new_sha256=digest(read(source)), source=str(source)))
-        original_config = read(cfgpath)
         durable(backup/'config.json', original_config, create=True)
         durable(backup/'task.xml', snapshot['task_xml'].encode('utf-8'), create=True)
         durable(backup/'task-action.json', canonical(snapshot['task_action']), create=True)
@@ -570,3 +588,4 @@ if __name__=='__main__':
                               hold_preserved=True,orders=0,trading_authority='NONE',
                               **({'preflight':exc.preflight} if isinstance(exc,HostPreflightBlocked) else {}))),flush=True)
         raise SystemExit(2)
+
