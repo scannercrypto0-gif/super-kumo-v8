@@ -1,0 +1,54 @@
+name: Integrated merge candidate acceptance
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/aql/warehouse/**'
+      - 'src/aql/research_forward*'
+      - 'tools/realtime_market_feed/**'
+      - 'tools/atlas_*'
+      - 'tools/merge_readiness/**'
+      - 'tests/test_warehouse*'
+      - 'tests/test_mcp*'
+      - 'tests/test_atlas_*'
+      - '.github/workflows/integrated-merge-readiness.yml'
+permissions:
+  contents: read
+jobs:
+  combined:
+    name: Combined (${{ matrix.os }}, Python ${{ matrix.python }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.12','3.13']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e ".[dev]" websocket-client==1.9.2 pytest==9.2.0 pytest-timeout==2.4.0
+      - name: Prepare exact code-only dependencies
+        run: python tools/merge_readiness/run_acceptance.py --prepare --fetch-code --group all --output integration-acceptance.json
+      - name: Parse affected native Windows scripts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $paths=@(Get-ChildItem tools/ATLAS-WAREHOUSE-*.ps1)
+          foreach($path in $paths){
+            $errorsFound=$null
+            $null=[System.Management.Automation.Language.Parser]::ParseFile($path.FullName,[ref]$null,[ref]$errorsFound)
+            if($errorsFound.Count){throw ($errorsFound|Out-String)}
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: combined-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            integration-acceptance.json
+            integration-junit.xml
+          if-no-files-found: warn

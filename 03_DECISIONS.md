@@ -1129,3 +1129,12 @@ This records implementation choices under that scope, not production approval.
 - Retain R09 and deferred full Inbox/off-device backup requirements. PR16's MVP
   plan is superseded; its deferred obligations remain. No PR closure is executed.
 Parameters and measured evidence/limits are in docs/operations/G1_COMPLETION_20261024.md.
+
+## 2026-11-21 — Warehouse Registry Option C, scoped owner implementation approval
+
+Owner approved implementing the reviewed Option C delta on existing Draft #330.
+Use immutable source-linked events plus a deterministic rebuildable snapshot in
+the existing warehouse; no additional database/service. Reads fail closed on
+missing or inconsistent provenance. Architecture and acceptance boundaries are
+in docs/research/warehouse-registry.md. This decision does not grant merge,
+owner-host execution, task/WS changes, PIT/trading eligibility or G0 promotion.

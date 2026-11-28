@@ -1,0 +1,81 @@
+{
+  "schema": "aql.main-branch-rule-readback.v1",
+  "observed_date": "2026-11-28",
+  "ruleset": {
+    "id": 27449229,
+    "name": "ATLAS main release review",
+    "target": "branch",
+    "source_type": "Repository",
+    "source": "scannercrypto0-gif/super-kumo-v8",
+    "enforcement": "active",
+    "conditions": {
+      "ref_name": {
+        "exclude": [],
+        "include": [
+          "refs/heads/main"
+        ]
+      }
+    },
+    "rules": [
+      {
+        "type": "deletion"
+      },
+      {
+        "type": "non_fast_forward"
+      },
+      {
+        "type": "pull_request",
+        "parameters": {
+          "required_approving_review_count": 1,
+          "dismiss_stale_reviews_on_push": true,
+          "required_reviewers": [],
+          "require_code_owner_review": false,
+          "require_last_push_approval": true,
+          "required_review_thread_resolution": true,
+          "require_extra_approval_for_unattributed_changes": true,
+          "allowed_merge_methods": [
+            "merge",
+            "squash",
+            "rebase"
+          ]
+        }
+      },
+      {
+        "type": "required_status_checks",
+        "parameters": {
+          "strict_required_status_checks_policy": true,
+          "do_not_enforce_on_create": false,
+          "required_status_checks": [
+            {
+              "context": "G1 Tests (windows-latest)",
+              "integration_id": 15368
+            },
+            {
+              "context": "G1 Tests (ubuntu-latest)",
+              "integration_id": 15368
+            }
+          ]
+        }
+      }
+    ],
+    "node_id": "RRS_lACqUmVwb3NpdG9yec5VCJpmzgGi140",
+    "created_at": "2026-11-17T13:29:19.200+03:00",
+    "updated_at": "2026-11-17T13:29:19.330+03:00",
+    "bypass_actors": [],
+    "current_user_can_bypass": "never",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/scannercrypto0-gif/super-kumo-v8/rulesets/27449229"
+      },
+      "html": {
+        "href": "https://github.com/scannercrypto0-gif/super-kumo-v8/rules/27449229"
+      }
+    }
+  },
+  "classic_protection": {
+    "status": "BLOCKED_READBACK",
+    "http_status": 403,
+    "reason": "Resource not accessible by integration"
+  },
+  "not_authorization_to_merge": true
+}
