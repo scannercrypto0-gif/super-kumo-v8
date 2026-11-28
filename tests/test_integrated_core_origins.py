@@ -29,6 +29,16 @@ def _subprocess(code, *arguments):
     return json.loads(process.stdout.strip().splitlines()[-1])
 
 
+def test_collected_main_core_interfaces_resolve_exact_accepted_336_bytes():
+    # Check the actual pytest interpreter after every module has been collected,
+    # catching dependency sys.path pollution that subprocess-only probes miss.
+    import research_wp_r0.attempt_ledger as ledger
+    import research_wp_r0.historical_library as history
+    for relative, module in zip(ACCEPTED_MAIN_BYTES, (ledger, history)):
+        assert Path(module.__file__).resolve() == (ROOT / relative).resolve()
+        assert hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest() == ACCEPTED_MAIN_BYTES[relative]
+
+
 def test_main_core_interfaces_resolve_exact_accepted_336_bytes():
     result = _subprocess(r'''
 import hashlib,inspect,json,sys

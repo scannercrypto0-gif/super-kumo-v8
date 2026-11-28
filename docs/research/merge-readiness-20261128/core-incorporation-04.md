@@ -45,3 +45,6 @@ One existing Audit intake #134/7236387946 must move to the final head after succ
 D16/sharedCDR can record exactcandidate-source/import/clean-checkout/rollback evidence, but independent and deployment closure remain separate. No edit to336 or competingD04 work. D01/D02/D06/D10 decisions, D19abound/legacyHOLD,301scientificS7/holdout and activeFullHistory/fresheab5 sessions remain untouched.
 
 Originalretained/fresh research source and current-clock/asof interface, authentic producer/Registry/worker reports and two realMCPcycles remain the unchanged closure03 gates. No clock backdating, fakeSTOP, fakeACK, cross-sessionstitching, newfeed, activeDB/WALscan or hotpatch. Mainmerge/hostactivation/trading/Paper/G0 remain unauthorized.
+
+### Combined-collection correction
+The initial final-tree run at 8fd24dde failed six assertions because Realtime's integration test inserted the pinned Warehouse repository root ahead of main during collection. This selected old research modules although all 17 accepted source files were intact. Removed that unnecessary root insertion (retaining its src dependency) and added an in-process origin assertion after collection. No accepted Core algorithm/test bytes or immutable kernel pins changed. The failed run remains evidence; replacement CI must pass before compatibility acceptance.

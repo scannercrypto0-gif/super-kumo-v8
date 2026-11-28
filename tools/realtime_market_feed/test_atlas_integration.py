@@ -13,7 +13,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 WAREHOUSE_CHECKOUT = ROOT / ".integration" / "warehouse"
 sys.path.insert(0, str(WAREHOUSE_CHECKOUT / "src"))
-sys.path.insert(0, str(WAREHOUSE_CHECKOUT))
+# Main research interfaces belong to the combined candidate. Only the pinned
+# warehouse src dependency is needed; its repository root shadows accepted Core.
 
 from tools.realtime_market_feed.service import Store as FeedStore
 from tools.realtime_market_feed.atlas_integration import (
