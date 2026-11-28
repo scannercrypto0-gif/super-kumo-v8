@@ -10,6 +10,7 @@ on:
       - 'tests/test_resilient_history.py'
       - 'tests/test_warehouse_registry.py'
       - 'tests/test_daily_warehouse_watchdog_seam.py'
+      - 'tests/test_warehouse_producer_report.py'
       - 'tools/ATLAS-WAREHOUSE-*.ps1'
       - '.github/workflows/historical-warehouse.yml'
   workflow_dispatch:
@@ -32,7 +33,7 @@ jobs:
           ref: 9d9e873fbaba8742280846285bd0b5db154ec455
           path: peer-watchdog
       - run: python -m pip install -e ".[dev]"
-      - run: python -m pytest -q tests/test_warehouse.py tests/test_warehouse_september.py tests/test_september_correction.py tests/test_full_history.py tests/test_resilient_history.py tests/test_warehouse_registry.py tests/test_daily_warehouse_watchdog_seam.py
+      - run: python -m pytest -q tests/test_warehouse.py tests/test_warehouse_september.py tests/test_september_correction.py tests/test_full_history.py tests/test_resilient_history.py tests/test_warehouse_registry.py tests/test_daily_warehouse_watchdog_seam.py tests/test_warehouse_producer_report.py
       - name: Parse unified Windows entry point
         if: runner.os == 'Windows'
         shell: pwsh
