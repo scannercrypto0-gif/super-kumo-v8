@@ -13,4 +13,3 @@ def test_healthy_sessions_do_not_accumulate_toward_permanent_exit():
         attempt = BinanceCollector._attempt_after_session(attempt, True)
         attempt += 1
     assert attempt == 1
-
