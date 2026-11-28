@@ -23,7 +23,9 @@ from aql.models.bar import MarketBar
 from research_wp_r0.aql_archive_custody_bridge_v1 import canonical, decode, digest
 from research_wp_r0.aql_core_prospective_readiness_v1 import admit_sample, seal_readiness
 from research_wp_r0.aql_factory_e_research_results_store_v1 import migrate_store_v2
-from research_wp_r0.aql_factory_h_execution_comparison_v1 import run_factory_h_execution_comparison
+from research_wp_r0.aql_factory_h_execution_comparison_v1 import (
+    POLICIES, SCENARIOS, run_factory_h_execution_comparison,
+)
 from research_wp_r0.frozen_research_plan import commit_research_plan, verify_research_plan
 from tools.atlas_factory_pkg02_execution_smoke import fixture_packet, seal
 
@@ -289,9 +291,26 @@ def validate_report(report, packet):
             and report["orders_created"] == 0 and report["winner"] is None
             and report["trading_authority"] == "NONE" and report["holdout"] == "SEALED_UNOPENED"
             and report["historical_pit"] == "NOT_ATTESTED", "REPORT_AUTHORITY")
+    cohorts = {"CANDIDATE": packet["entries"], "NULL_PLACEBO": packet["null_entries"]}
+    expected_keys = {
+        (cohort, entry["entry_id"], scenario, policy)
+        for cohort, entries in cohorts.items()
+        for entry in entries
+        for scenario in SCENARIOS
+        for policy in POLICIES
+    }
     keys = {(r["cohort"], r["entry_id"], r["scenario"], r["policy"]) for r in report["outcomes"]}
-    require(len(keys) == len(report["outcomes"]) == 72 and len(report["comparisons"]) == 18,
-            "MODEL_POPULATION")
+    require(keys == expected_keys and len(keys) == len(report["outcomes"]), "MODEL_POPULATION")
+    expected_comparisons = {
+        f"{cohort}:{scenario}:{policy}": len(entries)
+        for cohort, entries in cohorts.items()
+        for scenario in SCENARIOS
+        for policy in POLICIES
+    }
+    received_comparisons = {
+        name: cell["attempted_entry_count"] for name, cell in report["comparisons"].items()
+    }
+    require(received_comparisons == expected_comparisons, "MODEL_POPULATION")
     with localcontext() as ctx:
         ctx.prec = 40
         for row in report["outcomes"]:

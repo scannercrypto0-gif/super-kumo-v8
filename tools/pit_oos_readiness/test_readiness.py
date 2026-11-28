@@ -110,6 +110,9 @@ def native_report():
     ("promotion", "REPORT_AUTHORITY"),
     ("seal_break", "REPORT_SEAL"),
     ("missing_variant", "MODEL_POPULATION"),
+    ("substituted_entry", "MODEL_POPULATION"),
+    ("substituted_comparison", "MODEL_POPULATION"),
+    ("changed_denominator", "MODEL_POPULATION"),
     ("duplicate_cost", "COST_ONCE"),
     ("unknown_profit", "UNKNOWN_PROFIT"),
     ("no_fill_profit", "NONFILL_PROFIT"),
@@ -130,6 +133,13 @@ def test_factory_negative_contract(native_report, attack, reason):
         report["winner"] = "C"
     elif attack == "missing_variant":
         report["outcomes"].pop()
+    elif attack == "substituted_entry":
+        report["outcomes"][0]["entry_id"] = packet["null_entries"][0]["entry_id"]
+    elif attack == "substituted_comparison":
+        name = next(iter(report["comparisons"]))
+        report["comparisons"]["CANDIDATE:TAKER:UNFROZEN"] = report["comparisons"].pop(name)
+    elif attack == "changed_denominator":
+        next(iter(report["comparisons"].values()))["attempted_entry_count"] += 1
     elif attack == "duplicate_cost":
         row = next(row for row in report["outcomes"] if row["status"] == "MODEL_ONLY")
         row["legs"].append(deepcopy(row["legs"][0]))
