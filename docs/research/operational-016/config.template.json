@@ -1,0 +1,15 @@
+{
+  "schema": "atlas.operational016.config.v1",
+  "input_root": "REPLACE_WITH_APPROVED_EXISTING_ISOLATED_REPORT_ROOT",
+  "output_root": "REPLACE_WITH_APPROVED_EXISTING_EMPTY_DEDICATED_OUTPUT_ROOT",
+  "protected_roots": [
+    "E:\\ATLAS\\DataWarehouse",
+    "REPLACE_WITH_CURRENT_ACTIVE_CAPTURE_AND_CODE_ROOTS"
+  ],
+  "activation_ref": null,
+  "retention_authorization_ref": null,
+  "clock_uncertainty_ms": null,
+  "paths": {},
+  "producer_selectors": {},
+  "producer_pins": {}
+}
