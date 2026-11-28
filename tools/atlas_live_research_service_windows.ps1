@@ -151,12 +151,17 @@ function Test-OperatorResume([string]$TicketPath, [string]$RootPath, [string]$Co
         $ticket.fresh_ping_correction -is [bool] -and $ticket.fresh_ping_correction
     $diskReserveHold=($held.reason -ceq 'PILOT_STOP_DISK_RESERVE_LOW') -and
         $ticket.disk_reserve_correction -is [bool] -and $ticket.disk_reserve_correction -and
-        $ticket.fresh_ping_correction -is [bool] -and !$ticket.fresh_ping_correction
+        $ticket.fresh_ping_correction -is [bool] -and !$ticket.fresh_ping_correction -and
+        $ticket.sustained_root_correction -is [bool] -and !$ticket.sustained_root_correction
+    $sustainedRootHold=($held.reason -ceq 'LIVE_SERVICE_SEGMENT_FAILED') -and
+        $ticket.sustained_root_correction -is [bool] -and $ticket.sustained_root_correction -and
+        $ticket.fresh_ping_correction -is [bool] -and !$ticket.fresh_ping_correction -and
+        $ticket.disk_reserve_correction -is [bool] -and !$ticket.disk_reserve_correction
     if ($diskReserveHold -and [IO.DriveInfo]::new([IO.Path]::GetPathRoot($RootPath)).AvailableFreeSpace -lt 128MB) {
         throw 'LIVE_SERVICE_DISK_RESERVE_NOT_RESTORED'
     }
     if (@('PILOT_STOP_TimeoutError','PILOT_STOP_ConnectionResetError') -cnotcontains $held.reason -and
-        !$freshPingHold -and !$diskReserveHold) {
+        !$freshPingHold -and !$diskReserveHold -and !$sustainedRootHold) {
         throw 'LIVE_SERVICE_OPERATOR_HOLD_NOT_ELIGIBLE'
     }
     return $ticket

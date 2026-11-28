@@ -67,7 +67,7 @@ def outcome(path, now, slot, *, failed, missing_start=None, missing_end=None):
                     orders=0,trading_authority='NONE')
 
 
-def authority(root, config_pin=None):
+def authority(root, config_pin=None, *, allow_stale_config=False):
     """Opt-in must be installed by the guarded operator, never environment flags."""
     path=Path(root)/'continuous-research.authorized.json'
     if not path.exists():return None
@@ -106,7 +106,12 @@ def authority(root, config_pin=None):
     name=a.get('config_filename')
     need(type(name) is str and Path(name).name==name and name not in ('.','..'), 'CONTINUITY_CONFIG_PATH')
     actual=hashlib.sha256(read(Path(root)/name,8*1024*1024)).hexdigest()
-    need(a.get('config_sha256')==actual and (config_pin is None or config_pin==actual),'CONTINUITY_CONFIG_PIN')
+    configured=a.get('config_sha256')
+    need(type(configured) is str and re.fullmatch('[0-9a-f]{64}',configured),'CONTINUITY_CONFIG_PIN')
+    if allow_stale_config:
+        need(config_pin is None,'CONTINUITY_CONFIG_PIN')
+    else:
+        need(configured==actual and (config_pin is None or config_pin==actual),'CONTINUITY_CONFIG_PIN')
     return a
 
 
@@ -129,19 +134,22 @@ def resume_ticket_pending(reason, has_rows, ticket, config_pin, authorization_sh
     if active_recovery or reason not in (
         'PILOT_STOP_TimeoutError','PILOT_STOP_ConnectionResetError',
         'LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED',
-        'PILOT_STOP_DISK_RESERVE_LOW'
+        'PILOT_STOP_DISK_RESERVE_LOW','LIVE_SERVICE_SEGMENT_FAILED'
     ):
         return False
     ping_correction=reason in (
         'LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED'
     )
     disk_correction=reason=='PILOT_STOP_DISK_RESERVE_LOW'
-    if ping_correction and (ticket.get('fresh_ping_correction') is not True or ticket.get('disk_reserve_correction') is True):
+    root_correction=reason=='LIVE_SERVICE_SEGMENT_FAILED'
+    if ping_correction and (ticket.get('fresh_ping_correction') is not True or ticket.get('disk_reserve_correction') is True or ticket.get('sustained_root_correction') is True):
         return False
-    if disk_correction and (ticket.get('disk_reserve_correction') is not True or ticket.get('fresh_ping_correction') is True):
+    if disk_correction and (ticket.get('disk_reserve_correction') is not True or ticket.get('fresh_ping_correction') is True or ticket.get('sustained_root_correction') is True):
         return False
-    if not ping_correction and not disk_correction and (
-        ticket.get('fresh_ping_correction') is True or ticket.get('disk_reserve_correction') is True
+    if root_correction and (ticket.get('sustained_root_correction') is not True or ticket.get('fresh_ping_correction') is True or ticket.get('disk_reserve_correction') is True):
+        return False
+    if not ping_correction and not disk_correction and not root_correction and (
+        ticket.get('fresh_ping_correction') is True or ticket.get('disk_reserve_correction') is True or ticket.get('sustained_root_correction') is True
     ):
         return False
     return (ticket.get('schema')=='atlas.ws.operator-resume.v1'

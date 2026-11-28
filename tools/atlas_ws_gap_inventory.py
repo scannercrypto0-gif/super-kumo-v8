@@ -45,7 +45,6 @@ def inventory(receipts, *, start_ms, end_ms, as_of_ms):
     cutoff. Missing slots beyond the latest authentic receipt are expected
     outage slots, not a claim that later capture has been confirmed.
     """
-    from tools.atlas_live_research_cycle import read_service_receipt
     need(all(type(x) is int and x >= 0 for x in (start_ms,end_ms,as_of_ms))
          and start_ms % STEP == end_ms % STEP == 0 and start_ms < end_ms <= as_of_ms
          and (end_ms-start_ms)//STEP <= MAX_WINDOW_SLOTS, 'GAP_WINDOW_BOUND_OR_FUTURE')
@@ -54,9 +53,13 @@ def inventory(receipts, *, start_ms, end_ms, as_of_ms):
     paths = []
     for path in root.glob('*.json'):
         need(len(paths) < MAX_RECEIPTS, 'GAP_RECEIPT_CENSUS_BOUND')
-        need(re.fullmatch(r'[0-9]+\.json',path.name) is not None,'GAP_RECEIPT_NAME')
+        need(re.fullmatch(r'[0-9]+\.json',path.name) is not None,
+             'GAP_RECEIPT_NAME_NOT_ALLOWLISTED')
         paths.append(safe_file(path,MAX_RECEIPT_BYTES))
     paths.sort(key=lambda p:int(p.stem))
+    # Validate the complete filename allowlist before importing the larger
+    # consumer stack or attempting any receipt interpretation.
+    from tools.atlas_live_research_cycle import read_service_receipt
     previous = None
     accepted = {}
     for path in paths:
@@ -252,3 +255,4 @@ def main():
 
 if __name__=='__main__':
     main()
+

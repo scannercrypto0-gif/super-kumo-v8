@@ -132,3 +132,13 @@ def test_disk_reserve_resume_ticket_pending_is_exact_and_requires_disk_scope():
     assert not c.resume_ticket_pending(args[0],args[1],{**ticket,'fresh_ping_correction':True},*args[3:])
     assert c.resume_ticket_pending(args[0],True,ticket,*args[3:])
     assert not c.resume_ticket_pending(args[0],args[1],ticket,*args[3:-1],True)
+def test_sustained_root_resume_ticket_is_exact_and_exclusive():
+    ticket=dict(schema='atlas.ws.operator-resume.v1',config_sha256='a'*64,
+        authorization_sha256='b'*64,issued_ms=NOW,expires_ms=NOW+60000,
+        sustained_root_correction=True,fresh_ping_correction=False,disk_reserve_correction=False)
+    args=('LIVE_SERVICE_SEGMENT_FAILED',False,ticket,'a'*64,'b'*64,NOW+1,False)
+    assert c.resume_ticket_pending(*args)
+    assert not c.resume_ticket_pending(*args[:2]+({**ticket,'sustained_root_correction':False},)+args[3:])
+    assert not c.resume_ticket_pending(*args[:2]+({**ticket,'disk_reserve_correction':True},)+args[3:])
+    assert not c.resume_ticket_pending(*(('PILOT_STOP_ConnectionResetError',)+args[1:]))
+    assert not c.resume_ticket_pending(args[0],False,ticket,*args[3:-1],True)

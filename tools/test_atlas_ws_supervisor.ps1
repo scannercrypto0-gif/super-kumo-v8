@@ -23,7 +23,7 @@ function New-Case([string]$Name) {
     $script:permit=@{schema='atlas.ws.operator-resume.v1';authorization_sha256=('b'*64);config_sha256=$cfgPin;
         hold_sha256=(Pin $hold);claimed_sha256=(Pin $claimed);pending_sha256=$null;
         issued_ms=($now-1000L);expires_ms=($now+600000L);max_segments=1;max_connections=2;orders=0;trading_authority='NONE';
-        fresh_ping_correction=$false;disk_reserve_correction=$false}
+        fresh_ping_correction=$false;disk_reserve_correction=$false;sustained_root_correction=$false}
 }
 function Save-Ticket {$permit | ConvertTo-Json | Set-Content -LiteralPath $ticket}
 function Refused([scriptblock]$Action,[string]$Expected) {
@@ -131,15 +131,24 @@ try {
     Refused {Test-OperatorResume $ticket $root $cfgPin $now} 'HOLD_NOT_ELIGIBLE'
     $permit.fresh_ping_correction=$false;Save-Ticket
     Assert ((Test-OperatorResume $ticket $root $cfgPin $now).disk_reserve_correction -eq $true) 'DISK_RESERVE_SCOPED_HOLD_DENIED'
+    New-Case 'sustained-root-recovery-scope'
+    @{reason='LIVE_SERVICE_SEGMENT_FAILED';slot_ms=1795259700000L}|ConvertTo-Json|Set-Content $hold
+    $permit.hold_sha256=Pin $hold
+    Save-Ticket
+    Refused {Test-OperatorResume $ticket $root $cfgPin $now} 'HOLD_NOT_ELIGIBLE'
+    $permit.sustained_root_correction=$true;Save-Ticket
+    Assert ((Test-OperatorResume $ticket $root $cfgPin $now).sustained_root_correction -eq $true) 'SUSTAINED_ROOT_SCOPED_HOLD_DENIED'
+    $permit.disk_reserve_correction=$true;Save-Ticket
+    Refused {Test-OperatorResume $ticket $root $cfgPin $now} 'HOLD_NOT_ELIGIBLE'
     $bootstrap=Join-Path $PSScriptRoot 'ATLAS-WS-CONTINUOUS-RECOVERY.ps1'
     $bootstrapAst=[System.Management.Automation.Language.Parser]::ParseFile($bootstrap,[ref]$null,[ref]$null)
     $repairCondition=$bootstrapAst.Find({param($n) $n -is [System.Management.Automation.Language.IfStatementAst] -and
         $n.Clauses[0].Item1.Extent.Text -cmatch "RepairPermitAndObserve"},$true).Clauses[0].Item1.Extent.Text
     $stageCondition=$bootstrapAst.Find({param($n) $n -is [System.Management.Automation.Language.IfStatementAst] -and
         $n.Clauses[0].Item1.Extent.Text -cmatch "ActivateAndObserve"},$true).Clauses[0].Item1.Extent.Text
-    foreach($Mode in @('Observe','RepairPermitAndObserve','ActivateAndObserve','ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve')){
+    foreach($Mode in @('Observe','RepairPermitAndObserve','ActivateAndObserve','ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve','ApplySustainedRootCorrectionAndObserve')){
         Assert ((& ([scriptblock]::Create($repairCondition))) -eq ($Mode -ceq 'RepairPermitAndObserve')) 'WRONG_REPAIR_MODE_BRANCH'
-        Assert ((& ([scriptblock]::Create($stageCondition))) -eq ($Mode -in @('ActivateAndObserve','ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve'))) 'WRONG_STAGE_MODE_BRANCH'
+        Assert ((& ([scriptblock]::Create($stageCondition))) -eq ($Mode -in @('ActivateAndObserve','ApplyPingCorrectionAndObserve','ApplyDiskReserveRecoveryAndObserve','ApplySustainedRootCorrectionAndObserve'))) 'WRONG_STAGE_MODE_BRANCH'
     }
     $bootstrapAst=[System.Management.Automation.Language.Parser]::ParseFile($bootstrap,[ref]$null,[ref]$null)
     $baselineNode=$bootstrapAst.Find({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Test-FreshPingBaseline'},$true)
@@ -152,6 +161,11 @@ try {
     $diag.hold_reason='PILOT_STOP_DISK_RESERVE_LOW'
     Assert ((Test-FreshPingBaseline $diag $expectedConfig).failures -contains 'HOLD_REASON_MISMATCH') 'PING_BASELINE_ACCEPTED_DISK_HOLD'
     Assert ((Test-FreshPingBaseline $diag $expectedConfig 'Disk').ready) 'DISK_RESERVE_EXACT_HOLD_REJECTED'
+    $diag.hold_reason='LIVE_SERVICE_SEGMENT_FAILED';$diag.blockers=@('QUOTA_NOT_READY')
+    $diag | Add-Member -NotePropertyName prestart_evidence -NotePropertyValue ([pscustomobject]@{safe_quota_bootstrap=$true}) -Force
+    Assert ((Test-FreshPingBaseline $diag $expectedConfig 'SustainedRoot').ready) 'SUSTAINED_ROOT_PRESTART_QUOTA_BOOTSTRAP_REJECTED'
+    $diag.prestart_evidence.safe_quota_bootstrap=$false
+    Assert (!(Test-FreshPingBaseline $diag $expectedConfig 'SustainedRoot').ready) 'SUSTAINED_ROOT_QUOTA_GUARD_BYPASSED'
     $diag.blockers=@('DISK_RESERVE_LOW')
     Assert (!(Test-FreshPingBaseline $diag $expectedConfig 'Disk').ready) 'DISK_RESERVE_GUARD_BYPASSED'
     $baselineParam=$bootstrapAst.ParamBlock.Parameters | Where-Object {$_.Name.VariablePath.UserPath -ceq 'ExpectedPreviousConfigSha256'}

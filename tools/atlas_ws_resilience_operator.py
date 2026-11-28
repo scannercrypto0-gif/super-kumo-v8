@@ -42,6 +42,12 @@ def digest(raw):
     return hashlib.sha256(raw).hexdigest()
 
 
+def require_config_snapshot(preflight, current, expected_sha256):
+    """Fail before staging if the config changed after diagnostics."""
+    need(current == preflight and digest(current) == expected_sha256,
+         'CONFIG_PIN_CHANGED_BEFORE_STAGE')
+
+
 def safe(path, *, exists=True):
     p = Path(path).absolute()
     need('..' not in p.parts, 'PATH_TRAVERSAL_DENIED')
@@ -195,7 +201,7 @@ def inspect(snapshot, repo, expected_commit, now):
     need(type(snapshot.get('task_xml')) is str and digest(snapshot['task_xml'].encode('utf-8')) == snapshot['task_xml_sha256'], 'TASK_XML_SNAPSHOT_MISMATCH')
     need(type(snapshot.get('task_policy_sha256')) is str and HEX.fullmatch(snapshot['task_policy_sha256']), 'TASK_POLICY_PIN')
     hold = load(root/'hold.json')
-    need(hold.get('reason') in ('PILOT_STOP_TimeoutError', 'PILOT_STOP_ConnectionResetError','LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED','PILOT_STOP_DISK_RESERVE_LOW'), 'HOLD_NOT_RESUMABLE')
+    need(hold.get('reason') in ('PILOT_STOP_TimeoutError', 'PILOT_STOP_ConnectionResetError','LIVE_SERVICE_CONTINUITY_CIRCUIT_OPEN','PILOT_STOP_PONG_FRESH_PING_PROOF_REJECTED','PILOT_STOP_DISK_RESERVE_LOW','LIVE_SERVICE_SEGMENT_FAILED'), 'HOLD_NOT_RESUMABLE')
     need(type(hold.get('slot_ms')) is int and hold['slot_ms'] % 900000 == 0, 'HOLD_SLOT_IDENTITY')
     rights = {k:cfg.get(k) for k in ('source_rights_ref','region_ref','authorization_ref')}
     need(all(type(v) is str and v.strip() for v in rights.values()), 'SOURCE_RIGHTS_REQUIRED')
@@ -223,6 +229,15 @@ def inspect(snapshot, repo, expected_commit, now):
         code = str(exc) if isinstance(exc,ValueError) and re.fullmatch('[A-Z][A-Z0-9_]{1,119}',str(exc)) else 'QUOTA_EVIDENCE_INVALID'
         quota = dict(policy_verified=False, ready=False, reason=code, scoped_connections=2,
                      shared_ip_headroom='UNVERIFIED_EXISTING_PILOT_ONLY')
+    slot_state = root/'segments'/str(hold['slot_ms'])
+    prestart_evidence = dict(
+        state_directory_exists=slot_state.exists(),
+        health_log_exists=(slot_state/'health.jsonl').exists(),
+        segment_execution_active=(root/'segment-execution.active.json').exists(),
+        safe_quota_bootstrap=(hold['reason']=='LIVE_SERVICE_SEGMENT_FAILED'
+            and not slot_state.exists()
+            and not (slot_state/'health.jsonl').exists()
+            and not (root/'segment-execution.active.json').exists()))
     blockers = sorted({r['reason'] for r in rejected})
     if snapshot.get('task_state') != 'Ready' or snapshot.get('task_enabled') is not True:
         blockers.append('TASK_NOT_QUIESCENT_READY')
@@ -243,9 +258,11 @@ def inspect(snapshot, repo, expected_commit, now):
                 task_state=snapshot.get('task_state'), task_enabled=snapshot.get('task_enabled'),
                 collector_processes=snapshot.get('collector_processes'),
                 supervisor_lock_available=snapshot.get('supervisor_lock_available'), hold_reason=hold['reason'],
-                hold_slot_ms=hold['slot_ms'], blockers=blockers, manifest_scope=manifest_scope, clock_probe='NOT_PERFORMED',
+                hold_slot_ms=hold['slot_ms'], blockers=blockers, manifest_scope=manifest_scope,
+                prestart_evidence=prestart_evidence, clock_probe='NOT_PERFORMED',
                 source_class='LIVE_CAPTURE', retention='SANITIZED_RECEIPTS_ONLY',
-                root_cause='ROOT_CAUSE_NOT_PROVEN', network_calls=0, writes=0,
+                root_cause='E_DRIVE_REJECTED_BEFORE_SEGMENT_INITIALIZATION' if prestart_evidence['safe_quota_bootstrap'] else 'ROOT_CAUSE_NOT_PROVEN',
+                network_calls=0, writes=0,
                 orders=0, trading_authority='NONE', real_pit_oos='BLOCKED')
 
 
@@ -301,6 +318,14 @@ def authorize(path, diagnostic, now, *, action='DEPLOY_ONE_RECOVERY'):
         need(auth.get('continuous_research') in (None,False),'CONTINUITY_POLICY_AUTHORIZATION')
     correction=auth.get('fresh_ping_correction') is True
     disk_correction=auth.get('disk_reserve_correction') is True
+    root_correction=auth.get('sustained_root_correction') is True
+    need(sum((correction,disk_correction,root_correction))<=1,'RECOVERY_CORRECTION_FLAGS_CONFLICT')
+    if diagnostic['hold_reason'] == 'LIVE_SERVICE_SEGMENT_FAILED' or root_correction:
+        need(root_correction and not correction and not disk_correction and
+             diagnostic['hold_reason']=='LIVE_SERVICE_SEGMENT_FAILED' and
+             auth.get('continuous_research') is True and
+             auth.get('expected_previous_config_sha256')==diagnostic['identity']['config_sha256'],
+             'SUSTAINED_ROOT_CORRECTION_AUTHORITY_REQUIRED')
     if diagnostic['hold_reason'] == 'PILOT_STOP_DISK_RESERVE_LOW' or disk_correction:
         need(disk_correction and not correction and diagnostic['hold_reason']=='PILOT_STOP_DISK_RESERVE_LOW' and
              auth.get('continuous_research') is True and
@@ -310,7 +335,10 @@ def authorize(path, diagnostic, now, *, action='DEPLOY_ONE_RECOVERY'):
         need(correction and not disk_correction and auth.get('continuous_research') is True and
              auth.get('expected_previous_config_sha256')==diagnostic['identity']['config_sha256'],
              'FRESH_PING_CORRECTION_AUTHORITY_REQUIRED')
-    if diagnostic['blockers']:
+    safe_bootstrap = (root_correction and
+        diagnostic.get('prestart_evidence',{}).get('safe_quota_bootstrap') is True and
+        diagnostic['blockers']==['QUOTA_NOT_READY'])
+    if diagnostic['blockers'] and not safe_bootstrap:
         raise HostPreflightBlocked(diagnostic)
     return auth, digest(raw)
 
@@ -348,7 +376,11 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
     auth_raw=read(authorization_path,65536)
     need(digest(auth_raw)==authpin,'OWNER_AUTHORIZATION_BYTES_CHANGED')
     root = Path(snapshot['root']).absolute(); cfgpath = Path(snapshot['config_path']).absolute()
-    cfg = load(cfgpath); tree = Path(cfg['tree']).absolute()
+    preflight_config = read(cfgpath)
+    need(digest(preflight_config)==diagnostic['identity']['config_sha256'],
+         'CONFIG_PIN_CHANGED_AFTER_DIAGNOSTIC')
+    cfg = json.loads(preflight_config.decode('utf-8-sig'), object_pairs_hook=pairs)
+    tree = Path(cfg['tree']).absolute()
     clock = snapshot.get('clock', {})
     need(type(clock.get('checked_ms')) is int and 0 <= now-clock['checked_ms'] <= 60000 and
          type(clock.get('uncertainty_ms')) is int and 0 <= clock['uncertainty_ms'] <= 250, 'HOST_CLOCK_QUALIFICATION')
@@ -356,18 +388,55 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
     continuous = auth.get('continuous_research') is True
     correction=auth.get('fresh_ping_correction') is True
     disk_correction=auth.get('disk_reserve_correction') is True
-    correction=correction or disk_correction
+    root_correction=auth.get('sustained_root_correction') is True
+    correction=correction or disk_correction or root_correction
+    activation_expected_pin=diagnostic['identity']['config_sha256']
     if correction:
         need(not (root/'operator-recovery.active.json').exists(),'FRESH_PING_ACTIVE_RECOVERY_REVIEW_REQUIRED')
         module=continuity_module()
-        need(module.authority(root,diagnostic['identity']['config_sha256']) is not None,
-             'FRESH_PING_PRIOR_CONTINUITY_AUTHORITY_REQUIRED')
-        need(not module.next_action(root,diagnostic['identity']['config_sha256'],now)['circuit_open'],
-             'FRESH_PING_EXISTING_CIRCUIT_WINDOW_NOT_EXPIRED')
+        current_pin=diagnostic['identity']['config_sha256']
+        if root_correction:
+            prior=module.authority(root,current_pin)
+            activation=load(root/'activation.json')
+            need(prior is not None and activation.get('config_sha256')==current_pin,
+                 'SUSTAINED_ROOT_PRIOR_AUTHORITY_NOT_PROVEN')
+            need(not module.next_action(root,current_pin,now)['circuit_open'],
+                 'SUSTAINED_ROOT_CONTINUITY_CIRCUIT_OPEN')
+        elif disk_correction:
+            try:
+                prior=module.authority(root,current_pin)
+            except ValueError as exc:
+                if str(exc)!='CONTINUITY_CONFIG_PIN':raise
+                # E-drive relocation changes config bytes. Permit a one-time
+                # rebind only when the prior claimed continuous grant remains
+                # valid and activation still pins that same prior config.
+                prior=module.authority(root,allow_stale_config=True)
+                activation=load(root/'activation.json')
+                need(prior is not None and prior['config_sha256']!=current_pin and
+                     activation.get('config_sha256')==prior['config_sha256'],
+                     'MIGRATED_CONTINUITY_AUTHORITY_NOT_PROVEN')
+                activation_expected_pin=prior['config_sha256']
+            need(prior is not None,'FRESH_PING_PRIOR_CONTINUITY_AUTHORITY_REQUIRED')
+            if prior['config_sha256']==current_pin:
+                need(not module.next_action(root,current_pin,now)['circuit_open'],
+                     'FRESH_PING_EXISTING_CIRCUIT_WINDOW_NOT_EXPIRED')
+        else:
+            need(module.authority(root,current_pin) is not None,
+                 'FRESH_PING_PRIOR_CONTINUITY_AUTHORITY_REQUIRED')
+            need(not module.next_action(root,current_pin,now)['circuit_open'],
+                 'FRESH_PING_EXISTING_CIRCUIT_WINDOW_NOT_EXPIRED')
     need(not marker.exists() and not (root/'operator-resume.authorized.json').exists()
          and (continuous or not (root/'operator-recovery.active.json').exists())
          and (correction or not (root/'continuous-research.authorized.json').exists()), 'OPERATOR_STAGE_ALREADY_PRESENT')
     with collector_lease(root):
+        # Re-read under the existing lease. A competing config edit between
+        # diagnose/preflight and lease acquisition must abort before claim,
+        # backup, marker, or candidate-file staging writes.
+        original_config = read(cfgpath)
+        require_config_snapshot(preflight_config, original_config,
+                                diagnostic['identity']['config_sha256'])
+        cfg = json.loads(original_config.decode('utf-8-sig'), object_pairs_hook=pairs)
+        need(Path(cfg['tree']).absolute()==tree, 'CONFIG_TREE_CHANGED_BEFORE_STAGE')
         safe(root/'operator-authorizations', exists=False).mkdir(exist_ok=True)
         durable(root/'operator-authorizations'/f'{authpin}.claimed', auth_raw, create=True)
         backup = root/('ws-recovery-backup-'+uuid.uuid4().hex)
@@ -388,7 +457,6 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
                 files.append(dict(path=str(target), backup=name if existing else None,
                                   old_sha256=digest(read(target)) if existing else None,
                                   new_sha256=digest(read(source)), source=str(source)))
-        original_config = read(cfgpath)
         durable(backup/'config.json', original_config, create=True)
         durable(backup/'task.xml', snapshot['task_xml'].encode('utf-8'), create=True)
         durable(backup/'task-action.json', canonical(snapshot['task_action']), create=True)
@@ -420,7 +488,7 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
             durable(cfgpath,canonical(cfg));newpin=digest(read(cfgpath))
             active=root/'activation.json'
             if active.exists():
-                a=load(active);need(a.get('config_sha256')==diagnostic['identity']['config_sha256'],'ACTIVATION_PIN_MISMATCH')
+                a=load(active);need(a.get('config_sha256')==activation_expected_pin,'ACTIVATION_PIN_MISMATCH')
                 a['config_sha256']=newpin;durable(active,canonical(a))
             print(json.dumps(dict(status='STAGED_AWAITING_TASK_PIN',config_sha256=newpin)),file=out,flush=True)
             answer=inp.readline().strip()
@@ -437,7 +505,8 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
                 claimed_sha256=diagnostic['identity']['claimed_sha256'],pending_sha256=diagnostic['identity']['pending_sha256'],
                 issued_ms=now2,expires_ms=min(auth['expires_ms'],now2+1800000),max_segments=1,
                 max_connections=2,orders=0,trading_authority='NONE',fresh_ping_correction=auth.get('fresh_ping_correction') is True,
-                disk_reserve_correction=auth.get('disk_reserve_correction') is True)
+                disk_reserve_correction=auth.get('disk_reserve_correction') is True,
+                sustained_root_correction=auth.get('sustained_root_correction') is True)
             if continuous:
                 PIN=continuity_pin()
                 prior=root/'operator-recovery.active.json'
@@ -461,7 +530,9 @@ def gate(snapshot, repo, commit, authorization_path, now, inp, out):
                 clock_uncertainty_ms=clock['uncertainty_ms'],
                 max_segments=1,max_connections=2,orders=0,trading_authority='NONE',
                 host_reconnection='NOT_ATTESTED',continuous_research=continuous,fresh_ping_correction=auth.get('fresh_ping_correction') is True,
-                disk_reserve_correction=auth.get('disk_reserve_correction') is True,root_cause='ROOT_CAUSE_NOT_PROVEN')
+                disk_reserve_correction=auth.get('disk_reserve_correction') is True,
+                sustained_root_correction=auth.get('sustained_root_correction') is True,
+                root_cause='E_DRIVE_REJECTED_BY_GENERIC_ROOT_GUARD' if root_correction else 'ROOT_CAUSE_NOT_PROVEN')
             durable(backup/'deployment-receipt.json',canonical(receipt),create=True)
             print(json.dumps(receipt),file=out,flush=True)
         except BaseException:
@@ -516,3 +587,4 @@ if __name__=='__main__':
                               hold_preserved=True,orders=0,trading_authority='NONE',
                               **({'preflight':exc.preflight} if isinstance(exc,HostPreflightBlocked) else {}))),flush=True)
         raise SystemExit(2)
+
