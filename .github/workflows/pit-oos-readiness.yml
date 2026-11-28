@@ -38,3 +38,19 @@ jobs:
             pit-tests.xml
             pit-evidence/
             tools/pit_oos_readiness/owner-envelope.json
+
+  native-access:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify operating-system access with three isolated identities
+        run: sudo -n -- "$(command -v python3)" -I tools/pit_oos_readiness/os_access.py os-access.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pit-native-access-ubuntu
+          path: os-access.json
+          if-no-files-found: error
