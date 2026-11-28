@@ -1,4 +1,3 @@
-
 import pytest
 
 from tools.atlas_ws_resilience_operator import digest, require_config_snapshot
