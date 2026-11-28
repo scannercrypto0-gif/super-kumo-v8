@@ -80,3 +80,64 @@ def test_repeated_fault_attempts_share_one_causal_recovery(tmp_path):
         provider_terms_cleared=True,quota_headroom_verified=True,
         expected_verifier_code_sha256=VERIFIER_CODE_SHA256,database_path=path)
     assert result["status"]=="24H_ACCEPTANCE_PASS", result["failures"]
+
+
+def _gap_events(path, failed, completed, *, kind='GAP_BACKFILL_FAILED'):
+    _database(path)
+    db=sqlite3.connect(path)
+    start,mono=db.execute('SELECT started_ms,started_monotonic_ms FROM service_run').fetchone()
+    for event_kind,detail,offset in [(kind,failed,10000),(kind,failed,11000),
+                                   ('GAP_BACKFILL_COMPLETED',completed,12000)]:
+        db.execute('INSERT INTO service_event(run_id,at_ms,monotonic_ms,kind,detail) VALUES(?,?,?,?,?)',
+            ('run-d14',start+offset,mono+offset,event_kind,detail))
+    rows=db.execute('SELECT run_id,at_ms,monotonic_ms,kind,detail FROM service_event ORDER BY at_ms,id').fetchall()
+    db.execute('DELETE FROM service_event')
+    db.executemany('INSERT INTO service_event(run_id,at_ms,monotonic_ms,kind,detail) VALUES(?,?,?,?,?)',rows)
+    db.commit();db.close()
+
+
+def test_gap_recovery_requires_same_symbol_and_range(tmp_path):
+    from tools.realtime_market_feed.observation_evidence import recovery_matches
+    for index,completed in enumerate(['ETHUSDT:0:60000:bars=1',
+            'BTCUSDT:60000:120000:bars=1','BTCUSDT:0:120000:bars=2']):
+        path=tmp_path/f'unrelated-{index}.sqlite'
+        _gap_events(path,'BTCUSDT:0:60000:TimeoutError',completed)
+        report=build_observation_evidence(path,'run-d14')
+        assert report['natural_fault']=='OBSERVED_NOT_RECOVERED'
+        fault=next(e for e in report['events'] if e['kind']=='GAP_BACKFILL_FAILED')
+        recovery=next(e for e in report['events'] if e['kind']=='GAP_BACKFILL_COMPLETED')
+        assert not recovery_matches(fault,recovery)
+        # A re-signed/mutated envelope must fail causality independently of coverage.
+        report['natural_fault']='OBSERVED_AND_RECOVERED'
+        report['coverage']['fault_recovery_pairs'].append({
+            'fault_event_ids':[e['id'] for e in report['events'] if e['kind']=='GAP_BACKFILL_FAILED'],
+            'recovery_event_id':recovery['id']})
+        result=evaluate_24h_report(report,expected_code_sha256='d'*64,
+            expected_symbols=['BTCUSDT'],expected_config_sha256='c'*64,
+            provider_terms_cleared=True,quota_headroom_verified=True,
+            expected_verifier_code_sha256=VERIFIER_CODE_SHA256)
+        assert 'FAULT_RECOVERY_CAUSALITY_INVALID' in result['failures']
+
+
+def test_matching_gap_multi_attempts_share_completion(tmp_path):
+    path=tmp_path/'same-gap.sqlite'
+    _gap_events(path,'BTCUSDT:0:60000:TimeoutError','BTCUSDT:0:60000:bars=1:source=REST')
+    report=build_observation_evidence(path,'run-d14')
+    assert report['natural_fault']=='OBSERVED_AND_RECOVERED'
+    assert any(len(p['fault_event_ids'])==2 for p in report['coverage']['fault_recovery_pairs'])
+    result=evaluate_24h_report(report,expected_code_sha256='d'*64,
+        expected_symbols=['BTCUSDT'],expected_config_sha256='c'*64,
+        provider_terms_cleared=True,quota_headroom_verified=True,
+        expected_verifier_code_sha256=VERIFIER_CODE_SHA256,database_path=path)
+    assert result['status']=='24H_ACCEPTANCE_PASS',result['failures']
+
+
+def test_unbound_worker_and_malformed_gap_faults_remain_unrecovered(tmp_path):
+    for index,(kind,detail) in enumerate([
+        ('GAP_BACKFILL_WORKER_ERROR','BTCUSDT:TimeoutError'),
+        ('GAP_BACKFILL_FAILED','BTCUSDT:unknown:60000:TimeoutError'),
+        ('GAP_BACKFILL_FAILED','BTCUSDT:1:60000:TimeoutError')]):
+        path=tmp_path/f'unbound-{index}.sqlite'
+        _gap_events(path,detail,'BTCUSDT:0:60000:bars=1',kind=kind)
+        report=build_observation_evidence(path,'run-d14')
+        assert report['natural_fault']=='OBSERVED_NOT_RECOVERED'

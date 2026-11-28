@@ -241,11 +241,8 @@ def evaluate_24h_report(report, *, expected_code_sha256, expected_symbols,
                 for fault_id in pair["fault_event_ids"]:
                     fault_ids.append(fault_id)
                     f=by_id.get(fault_id)
-                    expected=("GAP_BACKFILL_COMPLETED" if f and f.get("kind","").startswith("GAP_")
-                        else "FINAL_BAR_RECEIVED" if f and f.get("kind")=="MESSAGE_REJECTED"
-                        else "CONNECTED")
-                    if (not f or f not in faults or r.get("kind")!=expected
-                        or r["id"]<=f["id"] or r["at_ms"]<f["at_ms"]):
+                    from tools.realtime_market_feed.observation_evidence import recovery_matches
+                    if not f or f not in faults or not recovery_matches(f, r):
                         failures.append("FAULT_RECOVERY_CAUSALITY_INVALID");break
                 if failures and failures[-1]=="FAULT_RECOVERY_CAUSALITY_INVALID":
                     break

@@ -30,8 +30,8 @@
     },
     {
       "path": ".github/workflows/integrated-merge-readiness.yml",
-      "sha256": "bf43722ff8947a33794c956063cd167cbd7289f07da8113aee5bbc42751eec8a",
-      "git_blob": "1459f0e0cfd9bb0f3e1f3b14758645c70139b765",
+      "sha256": "ccaa24062ebcc9ab0c0111d9d577eccfd4b25caeb92c334c6582667932d9f677",
+      "git_blob": "4e99f5b908132a49928c2d7b12d566d99d22f48a",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
@@ -189,6 +189,13 @@
       "path": "docs/research/merge-readiness-20261128/README.md",
       "sha256": "4201ba9c43e186b4930832f35c3528c8044aa4bd051a2a05d7d3158b5418111a",
       "git_blob": "4f8010cd68f490f0be83fdb8e547ee84931fca04",
+      "exact_source_prs": [],
+      "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
+    },
+    {
+      "path": "docs/research/merge-readiness-20261128/audit-realtime-05.md",
+      "sha256": "ea8c838a5017d4d7aedebe6004ec6198b5e2d4bde52b0b127a5be2f50303b42f",
+      "git_blob": "0b133bc8c6570c3ad036305767b4b128664a48eb",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
@@ -1118,8 +1125,8 @@
     },
     {
       "path": "tools/merge_readiness/run_acceptance.py",
-      "sha256": "57ca14d1bacd45bc30a4483fdebb3620d7d20534ca3fa1bc937342640b69b35a",
-      "git_blob": "78a55f7edfd9d2dd7fea0e47c406b810f66e7dd1",
+      "sha256": "7ed62c615c062b2b08d4329762a619b124ddf56dc6a97be9999983f70a1e8ce6",
+      "git_blob": "5a99174c490982c28b8e3aaa1e1c080f7f952557",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
@@ -1134,12 +1141,10 @@
     },
     {
       "path": "tools/realtime_market_feed/acceptance_gates.py",
-      "sha256": "73143573d3fd53745bccc57ac3669819d0220be2be295c3282941dd7de6dbf70",
-      "git_blob": "5f684e0796a477a3a7a6129cf1f20afade1e02fd",
-      "exact_source_prs": [
-        333
-      ],
-      "scope": "REUSED_EXACT_BYTES"
+      "sha256": "56bccf071aa59a3148f9e193f904830c41a58191ca5b5486f264dcb41e5e6698",
+      "git_blob": "0df2917dd758daa757dae849c2df69bdfe497866",
+      "exact_source_prs": [],
+      "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
     {
       "path": "tools/realtime_market_feed/atlas_integration.py",
@@ -1186,12 +1191,10 @@
     },
     {
       "path": "tools/realtime_market_feed/observation_evidence.py",
-      "sha256": "075d395dda2eefd06b9881a02f1c2dcc523817860aafaad2782de882426bedd8",
-      "git_blob": "9fbcfcd160eae6556f3bb9f5c82a0d2c175f58cc",
-      "exact_source_prs": [
-        333
-      ],
-      "scope": "REUSED_EXACT_BYTES"
+      "sha256": "f4bb44c3a622b5e75320099f675ce07cedbd1a2704d7a2900ee7898209b3ef87",
+      "git_blob": "b80e8b6e101a2c523022b383d10dd38ddd7906df",
+      "exact_source_prs": [],
+      "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
     {
       "path": "tools/realtime_market_feed/producer_report.py",
@@ -1220,8 +1223,8 @@
     },
     {
       "path": "tools/realtime_market_feed/service.py",
-      "sha256": "7802e6d83c8ba4ce4fc06c7dbad4b96199269488a458209bd44eebd0c2f2ed8e",
-      "git_blob": "6e1e17581e95ffca651770e005808aa24e595673",
+      "sha256": "306b737d22945d76c615c7c5b5fd4eb25c6a7fdd7031f5403fc39cdefa808a77",
+      "git_blob": "1b17afdbb0af456eef92234052765af0d000cd76",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
@@ -1261,12 +1264,10 @@
     },
     {
       "path": "tools/realtime_market_feed/test_cdr_d14_evidence.py",
-      "sha256": "ab35f0c743eece09f1fbbed46b6a7b6428bb58de7ba7e70e7d34270724918b2e",
-      "git_blob": "c9479c538e6adc2959277ad506c01dd8ee44ab9e",
-      "exact_source_prs": [
-        333
-      ],
-      "scope": "REUSED_EXACT_BYTES"
+      "sha256": "4486b51eabbb5df919a569bb97543e4ce2f84118cc3d8e2105a47ef2096efa7f",
+      "git_blob": "880ab31b89ce5463a8c7f06bb847850cea661294",
+      "exact_source_prs": [],
+      "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
     {
       "path": "tools/realtime_market_feed/test_forward_research.py",
@@ -1293,12 +1294,10 @@
     },
     {
       "path": "tools/realtime_market_feed/test_service.py",
-      "sha256": "953db48f3c65c4e97b7923102e338ddac95cf4e0b7e6829fb46f2e04f8a139b7",
-      "git_blob": "5cf32a014742a36e4169e996870c567c788fb82c",
-      "exact_source_prs": [
-        333
-      ],
-      "scope": "REUSED_EXACT_BYTES"
+      "sha256": "720058cb6174d24e0d1b948f513926d80bd5fcdf1c89939d9b88df6924039fcb",
+      "git_blob": "f03a51d4c11e395459aabc9a3ca2803274301f67",
+      "exact_source_prs": [],
+      "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     }
   ],
   "deferred_files": [

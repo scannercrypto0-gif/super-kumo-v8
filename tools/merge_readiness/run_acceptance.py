@@ -40,6 +40,13 @@ GROUPS = {
     'tests/test_atlas_ops_mcp_pilot.py','tests/test_atlas_ops_mcp_freshness.py','tests/test_atlas_early_observation.py'],
 }
 
+# Audit continuation: changed Realtime behavior and directly affected consumers.
+# Original full-tree610 evidence remains pinned to fc72, never transferred.
+GROUPS['audit-realtime'] = GROUPS['realtime'] + [
+    'tools/realtime_market_feed/test_native_consumers.py',
+    'tools/realtime_market_feed/test_producer_report.py',
+]
+
 
 def git(*args):
     return subprocess.check_output(['git','-C',str(ROOT),*args],text=True).strip()
@@ -104,7 +111,7 @@ def main():
     p.add_argument('--output',type=Path,default=ROOT/'integration-acceptance.json')
     a=p.parse_args()
     if a.prepare:prepare(a.fetch_code)
-    selected=list(GROUPS) if a.group=='all' else [a.group]
+    selected=[g for g in GROUPS if g!='audit-realtime'] if a.group=='all' else [a.group]
     tests=[t for group in selected for t in GROUPS[group]]
     # Add only explicitly owned new integration seams, never arbitrary test files.
     for pattern in ('tools/realtime_market_feed/test_native_consumers.py',

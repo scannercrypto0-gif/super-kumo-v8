@@ -304,3 +304,54 @@ def test_observation_run_events_are_bound_and_full_evidence_is_versioned(tmp_pat
     ordinary=build_report(path)
     assert ordinary["schema"]=="atlas.realtime-market-feed.report.v1"
     assert "events_complete" not in ordinary
+
+
+def test_duplicate_conflict_and_old_final_do_not_feed_progress_watchdog(tmp_path, monkeypatch):
+    from tools.realtime_market_feed import service as module
+    now=[100.0]
+    monkeypatch.setattr(module.time, 'monotonic', lambda:now[0])
+    store=Store(tmp_path/'progress.sqlite')
+    service=module.LiveService(['btcusdt'],store)
+    queued=[]
+    monkeypatch.setattr(service,'_queue_gap_recovery',queued.append)
+    def packet(opened, close='10.5'):
+        return json.dumps({'e':'kline','s':'BTCUSDT','k':{'i':'1m','t':opened,
+            'T':opened+59999,'o':'10','h':'11','l':'9','c':close,'v':'2.5','n':4,'x':True}})
+    try:
+        service._on_message(packet(60000))
+        baseline=service._last_final_bar['BTCUSDT']
+        for raw in (packet(60000),packet(60000,'10.6'),packet(0)):
+            now[0]+=module.FINAL_BAR_PROGRESS_TIMEOUT_SECONDS/2
+            service._on_message(raw)
+            assert service._last_final_bar['BTCUSDT']==baseline
+            assert service._last_application_message==now[0]
+        assert service._receive_stall_reason()=='FINAL_BAR_PROGRESS_TIMEOUT:BTCUSDT'
+        class Socket:
+            closed=False
+            def close(self):self.closed=True
+        class Tick:
+            def wait(self,seconds):return False
+        socket=Socket();result={}
+        service._watch_receive_progress(socket,Tick(),result)
+        assert socket.closed and result['reason']=='FINAL_BAR_PROGRESS_TIMEOUT:BTCUSDT'
+        assert queued==['BTCUSDT']
+        # Durable real advance refreshes the final timer; committed old data did not.
+        service._on_message(packet(120000))
+        assert service._receive_stall_reason() is None
+        assert queued==['BTCUSDT','BTCUSDT']
+    finally:
+        store.db.close()
+
+
+def test_failed_final_commit_cannot_refresh_progress(tmp_path,monkeypatch):
+    from tools.realtime_market_feed import service as module
+    store=Store(tmp_path/'failed-progress.sqlite')
+    service=module.LiveService(['btcusdt'],store)
+    before=dict(service._last_final_bar)
+    store.db.execute('DROP TABLE final_bar_lineage');store.db.commit()
+    try:
+        service._on_message(json.dumps({'e':'kline','s':'BTCUSDT','k':{'i':'1m','t':0,
+            'T':59999,'o':'10','h':'11','l':'9','c':'10.5','v':'2.5','n':4,'x':True}}))
+        assert service._last_final_bar==before
+        assert store.db.execute('SELECT count(*) FROM final_bar').fetchone()[0]==0
+    finally:store.db.close()

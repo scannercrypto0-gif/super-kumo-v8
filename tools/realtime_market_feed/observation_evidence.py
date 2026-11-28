@@ -56,6 +56,43 @@ def _fault_events(events):
     return faults
 
 
+def gap_recovery_scope(event):
+    """Known per-gap events bind symbol and exact half-open minute range.
+
+    Worker errors have no range in the current producer contract, so cannot be
+    promoted to recovered by an unrelated per-gap completion.
+    """
+    if event.get("kind") not in {"GAP_BACKFILL_FAILED", "GAP_BACKFILL_COMPLETED"}:
+        return None
+    try:
+        symbol, start, end, _ = event["detail"].split(":", 3)
+        start, end = int(start), int(end)
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not symbol or not symbol.isalnum() or symbol != symbol.upper():
+        return None
+    if start < 0 or end <= start or start % MINUTE_MS or end % MINUTE_MS:
+        return None
+    return symbol, start, end
+
+
+def recovery_matches(fault, recovery):
+    """Event causality, independent of final data coverage."""
+    if any(type(event.get(key)) is not int for event in (fault, recovery)
+           for key in ('id', 'at_ms', 'monotonic_ms')):
+        return False
+    if (recovery["id"] <= fault["id"] or recovery["at_ms"] < fault["at_ms"]
+        or recovery["monotonic_ms"] < fault["monotonic_ms"]):
+        return False
+    kind = fault.get("kind", "")
+    if kind.startswith("GAP_"):
+        scope = gap_recovery_scope(fault)
+        return (scope is not None and recovery.get("kind") == "GAP_BACKFILL_COMPLETED"
+                and gap_recovery_scope(recovery) == scope)
+    expected = "FINAL_BAR_RECEIVED" if kind == "MESSAGE_REJECTED" else "CONNECTED"
+    return recovery.get("kind") == expected
+
+
 def _file_set_sha(path: Path):
     digest = hashlib.sha256()
     files = [path]
@@ -164,12 +201,8 @@ def build_observation_evidence(database, run_id):
         fault_events=_fault_events(events)
         recovery_groups = {}
         for event in fault_events:
-            recovery_kind = ("GAP_BACKFILL_COMPLETED" if event["kind"].startswith("GAP_")
-                             else "FINAL_BAR_RECEIVED" if event["kind"]=="MESSAGE_REJECTED"
-                             else "CONNECTED")
             recovery = next((candidate for candidate in events
-                if candidate["id"] > event["id"] and candidate["kind"] == recovery_kind
-                and candidate["at_ms"] >= event["at_ms"]),None)
+                if recovery_matches(event, candidate)), None)
             if recovery:
                 group = recovery_groups.setdefault(recovery["id"],
                     {"fault_event_ids":[], "recovery_event_id":recovery["id"]})

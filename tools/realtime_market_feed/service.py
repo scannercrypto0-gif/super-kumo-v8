@@ -361,7 +361,11 @@ class Store:
                         last_final_close_ms=closed, last_receipt_sha256=receipt_sha,
                         last_source_event_sha256=event_digest)
                 self._publish_bounded(observed_ms=received_ms, force=conflicted)
-            return "final_bar"
+            # Only a committed, verified new row beyond the durable watermark
+            # is progress. Duplicate/conflicting/out-of-order finals are traffic.
+            if cur.rowcount == 1 and lineage_verified and (not previous or opened > previous[0]):
+                return "final_bar"
+            return "final_bar_no_progress"
         return "ignored"
 
 

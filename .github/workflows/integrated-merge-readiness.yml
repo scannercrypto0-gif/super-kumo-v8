@@ -44,7 +44,7 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: python -m pip install -e ".[dev]" websocket-client==1.9.2 pytest==9.2.0 pytest-timeout==2.4.0
       - name: Prepare exact code-only dependencies
-        run: python tools/merge_readiness/run_acceptance.py --prepare --fetch-code --group all --output integration-acceptance.json
+        run: python tools/merge_readiness/run_acceptance.py --prepare --fetch-code --group audit-realtime --output integration-acceptance.json
       - name: Parse affected native Windows scripts
         shell: pwsh
         run: |
