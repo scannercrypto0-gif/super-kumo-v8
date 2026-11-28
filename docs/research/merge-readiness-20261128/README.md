@@ -2,6 +2,10 @@
 
 Authority: [owner continuation #205/7236133591](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/205#issuecomment-7236133591), extending [master order](https://github.com/scannercrypto0-gif/super-kumo-v8/issues/205#issuecomment-7190039494). Accountable lead: Integration #271. This is one isolated main-based assembly, not a new product project or a merge authorization.
 
+## Continuation 04 — accepted Core incorporation
+
+The current candidate extends the prior assembly with all six independently bounded accepted336 fixes at1d1dfe913455d043c4269891e2e713b1e57ffc97. [Exact source map, module-origin boundary and final test scope](core-incorporation-04.md). Prior333-per-cell results belong to a0966343 only; use the new final-head CI handoff for this candidate. The frozen296 reference is unchanged and its separate implementations are not falsely described as patched.
+
 ## Result and evidence grades
 
 `READY_FOR_OWNER_MERGE_AUTHORIZATION` is NOT asserted by this document. Final disposition depends on exact-head combined CI, independent scoped Audit and applicable original/host evidence. Code and generated-fixture acceptance cannot satisfy original operational gates.
@@ -14,7 +18,7 @@ Authority: [owner continuation #205/7236133591](https://github.com/scannercrypto
 
 ## Why one main-based assembly is justified
 
-Main is pinned to `0dad5acc17172754b741b0e8a97d911436c9f4c5`. #271 remains a nonmergeable Factory E stack; #331/#334 target that stack. Merging their full ancestry would import unrelated historical development. The candidate includes #330 and #333's exact changes, #337's daughter delta, and the bounded #334/MCP leaf files, plus only the demonstrated missing seams. Existing PRs remain open; no mass merge, force push or branch rewrite occurred.
+Main is pinned to `0dad5acc17172754b741b0e8a97d911436c9f4c5`. #271 remains a nonmergeable Factory E stack; #331/#334 target that stack. Merging their full ancestry would import unrelated historical development. The candidate includes #330 and #333's exact changes, #337's daughter delta, the bounded #334/MCP leaf files, the demonstrated missing seams and now the exact accepted six-fix #336 delta. Existing PRs remain open; no mass merge, force push or branch rewrite occurred.
 
 [Source ledger](../integrated-merge-source-ledger-20261128.json) records frozen source heads and dispositions. #296 is an unmerged reference kernel, NOT already merged. Its exact transitive dependency file hashes and native import origins are checked by the accepted staging/Analyzer loader. #308 context design and #309 retrospective receipt extension are not silently relabeled as forward inputs. Legacy #321/#332 remain held; no second feed.
 

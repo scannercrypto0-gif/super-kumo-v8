@@ -160,6 +160,14 @@ class HistoricalBar:
     checksum: str = field(default="", compare=False)
 
     def __post_init__(self):
+        if (type(self.observation_cutoff_ms) is not int
+                or type(self.bar_close) is not int
+                or self.observation_cutoff_ms < self.bar_close + 1):
+            raise ValueError("Observation cutoff precedes final-bar availability")
+        if (self.ingest_time_ms is not None
+                and (type(self.ingest_time_ms) is not int
+                     or self.observation_cutoff_ms < self.ingest_time_ms)):
+            raise ValueError("Observation cutoff precedes recorded ingestion")
         # recompute and store checksum (dataclass is frozen so we use object.__setattr__)
         cs = self._compute_checksum()
         object.__setattr__(self, "checksum", cs)
@@ -726,6 +734,20 @@ class HistoricalLibrary:
                 "a full integrity chain to produce a verifiable manifest."
             )
         # FIX02 — Blocker 3: bar-level checksum validation
+        invalid_availability = [
+            b.stable_key() for b in bars
+            if (type(b.observation_cutoff_ms) is not int
+                or type(b.bar_close) is not int
+                or b.observation_cutoff_ms < b.bar_close + 1
+                or (b.ingest_time_ms is not None
+                    and (type(b.ingest_time_ms) is not int
+                         or b.observation_cutoff_ms < b.ingest_time_ms)))
+        ]
+        if invalid_availability:
+            raise HistoricalDataError(
+                f"Invalid point-in-time availability for {dataset_id}: "
+                f"{invalid_availability[:5]}"
+            )
         bad_keys = [b.stable_key() for b in bars if not b.verify_checksum()]
         if bad_keys:
             raise HistoricalDataError(
@@ -808,7 +830,23 @@ class HistoricalLibrary:
             raise HistoricalDataError(f"Unknown dataset: {dataset_id}")
         v = version if version is not None else self.latest_version(dataset_id)
         bars, _ = self._datasets[dataset_id][v]
-        eligible = [b for b in bars if b.observation_cutoff_ms <= decision_cutoff_ms]
+        eligible = []
+        for bar in bars:
+            if (type(bar.observation_cutoff_ms) is not int
+                    or type(bar.bar_close) is not int
+                    or bar.observation_cutoff_ms < bar.bar_close + 1
+                    or (bar.ingest_time_ms is not None
+                        and (type(bar.ingest_time_ms) is not int
+                             or bar.observation_cutoff_ms < bar.ingest_time_ms))):
+                raise HistoricalDataError(
+                    f"Invalid point-in-time availability for {bar.stable_key()}"
+                )
+            if not bar.verify_checksum():
+                raise HistoricalDataError(
+                    f"Bar checksum failure in dataset {dataset_id}: {bar.stable_key()}"
+                )
+            if bar.observation_cutoff_ms <= decision_cutoff_ms:
+                eligible.append(bar)
         if require_confirmed_availability:
             eligible = [
                 b for b in eligible

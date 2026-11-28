@@ -5,6 +5,7 @@ Python's system temporary directory; no guard is weakened by redirecting it.
 """
 from __future__ import annotations
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -29,6 +30,12 @@ GROUPS = {
     'tools/realtime_market_feed/test_atlas_integration.py','tools/realtime_market_feed/test_acceptance_gates.py',
     'tools/realtime_market_feed/test_forward_research.py','tools/realtime_market_feed/test_cdr_d11b_evidence_class.py',
     'tools/realtime_market_feed/test_cdr_d14_evidence.py'],
+ 'core': ['tests/test_g1_completion.py::test_pipeline_waits_past_one_second_for_bounded_recovery_page',
+    'tests/test_cdr_d04_reconnect_budget.py','tests/paper_sim/test_engine.py',
+    'tests/test_cdr_d07_empty_recovery.py','tests/test_cdr_d12_ledger_open.py',
+    'tests/test_cdr_d18_availability.py','tests/test_core_source_view.py',
+    'tests/test_sf_ind_02.py','tests/test_sf_strat_01.py','tests/test_sf_research_int_01.py',
+    'tests/test_sf_content_identity.py','tests/test_sf_attempt_ledger.py'],
  'mcp': ['tests/test_atlas_daily_health_evidence.py','tests/test_atlas_ops_watchdog.py',
     'tests/test_atlas_ops_mcp_pilot.py','tests/test_atlas_ops_mcp_freshness.py','tests/test_atlas_early_observation.py'],
 }
@@ -54,6 +61,21 @@ def prepare(fetch=False):
              '--output',str(staged)]
         if fetch:cmd.append('--fetch')
         subprocess.run(cmd,check=True,cwd=ROOT)
+
+
+def verify_accepted_core_bytes():
+    mapping=ROOT/'docs/research/merge-readiness-20261128/core-six-source-map.json'
+    document=json.loads(mapping.read_text(encoding='utf-8'))
+    if document['accepted_core_head']!='1d1dfe913455d043c4269891e2e713b1e57ffc97':
+        raise ValueError('ACCEPTED_CORE_SOURCE_PIN_MISMATCH')
+    for entry in document['accepted_files']:
+        raw=(ROOT/entry['path']).read_bytes()
+        if hashlib.sha256(raw).hexdigest()!=entry['sha256']:
+            raise ValueError('ACCEPTED_CORE_BYTES_MISMATCH:'+entry['path'])
+    return {'accepted_core_head':document['accepted_core_head'],
+            'source_mapping_sha256':hashlib.sha256(mapping.read_bytes()).hexdigest(),
+            'exact_accepted_files':len(document['accepted_files']),
+            'adapted':False,'pinned_296_kernel_changed':False}
 
 
 def verify_code_rollback():
@@ -87,18 +109,20 @@ def main():
     # Add only explicitly owned new integration seams, never arbitrary test files.
     for pattern in ('tools/realtime_market_feed/test_native_consumers.py',
                     'tools/realtime_market_feed/test_producer_report.py',
-                    'tests/test_mcp_producer_link.py','tests/test_mcp_refresh.py'):
+                    'tests/test_mcp_producer_link.py','tests/test_mcp_refresh.py',
+                    'tests/test_integrated_core_origins.py'):
         if (ROOT/pattern).is_file() and a.group=='all':tests.append(pattern)
-    if not all((ROOT/t).is_file() for t in tests):raise ValueError('REQUIRED_TEST_MODULE_MISSING')
+    if not all((ROOT/t.split('::',1)[0]).is_file() for t in tests):raise ValueError('REQUIRED_TEST_MODULE_MISSING')
     env={**os.environ,'PYTHONPATH':os.pathsep.join((str(ROOT/'src'),str(ROOT/'tools'),str(ROOT))),
          'BINANCE_LIVE_TEST':'0','PYTHONDONTWRITEBYTECODE':'1'}
+    core_sources=verify_accepted_core_bytes()
     rollback=verify_code_rollback()
     result=subprocess.run([sys.executable,'-B','-m','pytest','-q','--timeout=300',
                           '--junitxml=integration-junit.xml',*tests],cwd=ROOT,env=env)
     evidence={'schema':'aql.integrated-merge.synthetic-acceptance.v1',
         'evidence_grade':'SYNTHETIC_TESTED','tested_checkout_commit':git('rev-parse','HEAD'),
         'tested_tree':git('rev-parse','HEAD^{tree}'),'python':sys.version.split()[0],
-        'platform':sys.platform,'pytest_exit':result.returncode,'code_rollback':rollback,'test_modules':tests,
+        'platform':sys.platform,'pytest_exit':result.returncode,'core_sources':core_sources,'code_rollback':rollback,'test_modules':tests,
         'dependency_pins':PINS,'host_inspected':False,'original_e2e_run':False,
         'independent_audit_accepted':False,'orders':0,'trading_authority':'NONE'}
     a.output.write_text(json.dumps(evidence,indent=2)+'\n',encoding='utf-8')

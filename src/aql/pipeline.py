@@ -19,7 +19,9 @@ from .health import take_snapshot
 from .lanes import BackgroundLane, JournalConsumer
 from .g1_integrity import ContentConflictError, propagate_conflict
 from .journal.durable_journal import DurableJournal
-from .recovery.gap_recovery import recover_gap
+from .recovery.gap_recovery import (
+    HTTP_REQUEST_TIMEOUT_S, MAX_RECOVERY_REQUESTS, recover_gap,
+)
 from .storage.operational_store import OperationalStore
 
 logging.basicConfig(
@@ -28,6 +30,10 @@ logging.basicConfig(
     datefmt="%Y-%m-%dT%H:%M:%SZ",
 )
 logger = logging.getLogger("aql.pipeline")
+
+# Drain one bounded recovery through its maximum REST page window before
+# leaving durable work for restart. A slow/exhausted recovery remains visible.
+RECOVERY_DRAIN_TIMEOUT_S = MAX_RECOVERY_REQUESTS * HTTP_REQUEST_TIMEOUT_S + 1
 
 
 def _run_gap_recovery(
@@ -263,7 +269,7 @@ def run_pipeline(
                     collector.gap_start_ms, collector.gap_end_ms, stop)
         recovery_lane.submit(recover_ws)
 
-    recovery_lane_status = recovery_lane.finish()
+    recovery_lane_status = recovery_lane.finish(timeout=RECOVERY_DRAIN_TIMEOUT_S)
     consumer_status = consumer.finish()
     if (recovery_lane_status['pending'] or recovery_lane_status['rejected']
             or recovery_lane_status['errors'] or consumer_status['worker_alive']

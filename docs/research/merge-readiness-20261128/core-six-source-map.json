@@ -1,0 +1,167 @@
+{
+  "schema": "aql.integrated-core-six-source-map.v1",
+  "accepted_core_head": "1d1dfe913455d043c4269891e2e713b1e57ffc97",
+  "accepted_core_tree": "41992df27da6384a74d502d896b1f6b14e89ea55",
+  "previous_assembly_head": "a0966343cb9582593144d6e18834b35ce119750f",
+  "main": "0dad5acc17172754b741b0e8a97d911436c9f4c5",
+  "audit_refs": [
+    "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-7236493465",
+    "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/134#issuecomment-7236871431"
+  ],
+  "fixes": {
+    "D03": {
+      "code": [
+        "src/aql/pipeline.py"
+      ],
+      "tests": [
+        "tests/test_g1_completion.py::test_pipeline_waits_past_one_second_for_bounded_recovery_page"
+      ],
+      "scope": "41_SECOND_BOUNDED_DRAIN_NOT_UNIVERSAL_QUEUE_COMPLETION"
+    },
+    "D04": {
+      "code": [
+        "src/aql/collector/binance_collector.py"
+      ],
+      "tests": [
+        "tests/test_cdr_d04_reconnect_budget.py"
+      ],
+      "workflow": [
+        ".github/workflows/g1-tests.yml"
+      ],
+      "scope": "ADVANCING_DURABLE_PROGRESS_NOT_DUPLICATE_SESSION_RESET"
+    },
+    "D05": {
+      "code": [
+        "src/aql/paper_sim/engine.py"
+      ],
+      "tests": [
+        "tests/paper_sim/test_engine.py"
+      ],
+      "scope": "MODELED_ADVERSE_TAKER_NOTIONAL_CAP_NOT_PAPER_ACTIVATION"
+    },
+    "D07": {
+      "code": [
+        "src/aql/recovery/gap_recovery.py"
+      ],
+      "tests": [
+        "tests/test_cdr_d07_empty_recovery.py"
+      ],
+      "scope": "ZERO_ELIGIBLE_EXPECTED_AND_UNRESOLVED_REPORT_NONE"
+    },
+    "D12a": {
+      "code": [
+        "research_wp_r0/attempt_ledger.py"
+      ],
+      "tests": [
+        "tests/test_cdr_d12_ledger_open.py",
+        "tests/test_sf_attempt_ledger.py"
+      ],
+      "scope": "MAIN_LEDGER_REOPEN_POLICY_GUARD_NOT_FROZEN_KERNEL_OVERLAY"
+    },
+    "D18": {
+      "code": [
+        "research_wp_r0/historical_library.py"
+      ],
+      "tests": [
+        "tests/test_cdr_d18_availability.py",
+        "tests/test_sf_ind_02.py",
+        "tests/test_sf_strat_01.py",
+        "tests/test_sf_research_int_01.py",
+        "tests/test_sf_content_identity.py"
+      ],
+      "scope": "MAIN_CONSTRUCTION_REGISTER_SNAPSHOT_CLOSE_AND_INGESTION_NOT_STANDALONE_VALIDATE_BARS_ACCEPTANCE"
+    }
+  },
+  "accepted_files": [
+    {
+      "path": ".github/workflows/g1-tests.yml",
+      "git_blob": "268e1bc3a2b1c11e36b915ef142f2574a7cc1e1f",
+      "sha256": "9c4ed0a5a3140a05824ba43c82327ccd98e7eef96825b40ca0d2e05488a8ba7a"
+    },
+    {
+      "path": "research_wp_r0/attempt_ledger.py",
+      "git_blob": "b1950d5503b48b9302472e556d4eb5f09ea25dfd",
+      "sha256": "cfecbe1ba2ae7aabf81430fd3a9ab786606a081aef815a4eea0030a15983d767"
+    },
+    {
+      "path": "research_wp_r0/historical_library.py",
+      "git_blob": "0f93ede7697c095bddef7bf62f3c8eb1fbe6a7a2",
+      "sha256": "7757efa6722e1ca0dc842897f520315d6644538289c0699429d0b8643241fc69"
+    },
+    {
+      "path": "src/aql/collector/binance_collector.py",
+      "git_blob": "b4b731e2246c9e21cb76145a464fc77c4747a15d",
+      "sha256": "aa3a27a5c1829261a9af6daa173a5a05595b004a8a9fd0a503fae7562d36a452"
+    },
+    {
+      "path": "src/aql/paper_sim/engine.py",
+      "git_blob": "6ef1a35b3e72a438f77b2ae77c3435c83ee15ace",
+      "sha256": "618bd0992c0231c88d3b31456c1390172b15716bdf5a275e8d8d873601c6bdc0"
+    },
+    {
+      "path": "src/aql/pipeline.py",
+      "git_blob": "448c91c8255c920dbd88da60e9f87c3b6643459d",
+      "sha256": "a87173f76be94a289f5b7e2acd96d163245448d27aae9b0f227290c0a0e35889"
+    },
+    {
+      "path": "src/aql/recovery/gap_recovery.py",
+      "git_blob": "31b212c114be301b2a5e8797ad78496e8ce4c5ac",
+      "sha256": "af384bccd6b6bda4229a5b29af2d7be90eea4765b809594fc340ad942df4af58"
+    },
+    {
+      "path": "tests/paper_sim/test_engine.py",
+      "git_blob": "14ebb47b3c559c4a7b1440da3cfb8bd01de9e0d3",
+      "sha256": "c7e175fb759afd25a8104bf6926295764a27e0684857bdf7758ada6adc253c73"
+    },
+    {
+      "path": "tests/test_cdr_d04_reconnect_budget.py",
+      "git_blob": "6179bf296ba15d7738dfd5e70c8eff832a98ae91",
+      "sha256": "b45d5420fb04b9f4571219d15212b96fde25bc634ec7b3f8de7ca3b07823ecd8"
+    },
+    {
+      "path": "tests/test_cdr_d07_empty_recovery.py",
+      "git_blob": "3e9dc291744dcda2cb68605a058abc42900b38fd",
+      "sha256": "c880e2a7dd416689afd9b81ace59ccd6a71ec3fa1984407ee32c4d3eb8052bbe"
+    },
+    {
+      "path": "tests/test_cdr_d12_ledger_open.py",
+      "git_blob": "30cf591cf9bdf263685fdc42e10e2dc50cc156a3",
+      "sha256": "6b691db5722a774fb0bb8f0bcba0f19595b7eecd398c718d4f6b683a1ba6f6d6"
+    },
+    {
+      "path": "tests/test_cdr_d18_availability.py",
+      "git_blob": "06e4a8213f82571b906cd33b3bf9afa2e5c11a4b",
+      "sha256": "7133795441861ae832524abdbd627b95e71dded91a94e2018728d86554b78700"
+    },
+    {
+      "path": "tests/test_g1_completion.py",
+      "git_blob": "e73a4a7d5565b19b7a11a4d2e750c8127b473dbf",
+      "sha256": "1e0a9466668e9e759c3536683fb4510e17464e94789ce9fb0d9497a8cdcc6750"
+    },
+    {
+      "path": "tests/test_sf_content_identity.py",
+      "git_blob": "04e5f777a5df241d6d75f4c231b7ed27b3cb8b39",
+      "sha256": "95857a2569cbd4b10708d57e27d8b8f4a36c5e87dc611bee8ea06aae7e1fe09b"
+    },
+    {
+      "path": "tests/test_sf_ind_02.py",
+      "git_blob": "85025f746ebc8c5d269f123bd64c9bbcb15f1241",
+      "sha256": "ddc9d24c14b59383fbec0b0430553a88bec11d0a8eb355d78da9c000dda9113d"
+    },
+    {
+      "path": "tests/test_sf_research_int_01.py",
+      "git_blob": "199df30a1a8dc78050c10bb5d0cf59bf1a236153",
+      "sha256": "d32ce1593938ace3f5b9d4f6f3b0f49d9c2414e7c6f55b849027d4f07dbeb1c9"
+    },
+    {
+      "path": "tests/test_sf_strat_01.py",
+      "git_blob": "b061cf5f9e00f9a39c92d4740293e9f1f8e6aacb",
+      "sha256": "73f336496e2d050115d7d5d2ace310c5d5cb4162547de488c5c138cd59a7168f"
+    }
+  ],
+  "conflicts": [],
+  "accepted_semantics_adapted": false,
+  "pinned_296_kernel_changed": false,
+  "worktree_bytes_policy": "TARGETED_LF_ATTRIBUTES_EXACT_RAW_BYTES",
+  "frozen_scope_note": "Pinned HistoricalLibrary/AttemptLedger implementations remain distinct; actual forward chain does not invoke their affected APIs. Main collector D04 is not the separate #333 service implementation."
+}

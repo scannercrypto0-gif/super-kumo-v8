@@ -285,6 +285,33 @@ def test_real_pipeline_enters_collection_while_startup_recovery_is_stalled(tmp_p
     assert not result["background_recovery"]["pending"]
 
 
+def test_pipeline_waits_past_one_second_for_bounded_recovery_page(tmp_path):
+    from aql.pipeline import RECOVERY_DRAIN_TIMEOUT_S, run_pipeline
+    from aql.collector.binance_collector import CollectorMetrics
+    from aql.recovery.gap_recovery import RecoveryReport
+
+    class Collector:
+        def __init__(self, symbol, interval, journal, store):
+            self.gap_start_ms = self.gap_end_ms = None
+        def run(self, timeout_s):
+            return CollectorMetrics()
+
+    def delayed_recovery(**kwargs):
+        time.sleep(1.1)
+        return [], RecoveryReport("BTCUSDT","1m",0,60000,0,0,0,0,[],
+                                  "FULL",0,0,None)
+
+    assert RECOVERY_DRAIN_TIMEOUT_S == 41
+    with patch("aql.pipeline.DurableJournal.startup_reconcile",
+               return_value=(0,0,0,[(0,60000)])), \
+         patch("aql.pipeline.BinanceCollector", Collector), \
+         patch("aql.pipeline.recover_gap", side_effect=delayed_recovery):
+        result=run_pipeline(data_dir=str(tmp_path),duration_s=0,
+                            now_ms_fn=lambda:120000)
+    assert result["background_recovery"]["pending"] == 0
+    assert result["background_recovery"]["errors"] == []
+
+
 def test_disposable_postgres_sandbox():
     import os
     if os.environ.get("AQL_DISPOSABLE_POSTGRES_TEST") != "1":

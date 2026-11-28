@@ -74,9 +74,16 @@
       "head": "8d13b455a8a209da59fe65f706b85842ed513cb0",
       "disposition": "DEFERRED_WITH_REASON_LEGACY_MIGRATION_NO_SECOND_FEED",
       "classification": "DEFERRED_WITH_REASON"
+    },
+    {
+      "pr": 336,
+      "head": "1d1dfe913455d043c4269891e2e713b1e57ffc97",
+      "classification": "REQUIRED",
+      "disposition": "REQUIRED_ACCEPTED_SIX_CORE_FIXES_INCLUDED_EXACT_BYTES"
     }
   ],
   "merge_authorized": false,
   "original_data_execution_authorized_by_this_package": false,
-  "trading_authority": "NONE"
+  "trading_authority": "NONE",
+  "continuation_authority": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/205#issuecomment-7237001473"
 }

@@ -4,6 +4,22 @@
   "self_excluded": "docs/research/merge-readiness-20261128/source-files.json",
   "files": [
     {
+      "path": ".gitattributes",
+      "sha256": "a45cb3341e5e7300a4937d7cd5dcd93c398282f3586bbc73d5e3fa3ebcf4af0e",
+      "git_blob": "e5759dcdeeee314eab0e1702f1723b3d637418c9",
+      "exact_source_prs": [],
+      "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
+    },
+    {
+      "path": ".github/workflows/g1-tests.yml",
+      "sha256": "9c4ed0a5a3140a05824ba43c82327ccd98e7eef96825b40ca0d2e05488a8ba7a",
+      "git_blob": "268e1bc3a2b1c11e36b915ef142f2574a7cc1e1f",
+      "exact_source_prs": [
+        336
+      ],
+      "scope": "REUSED_EXACT_BYTES"
+    },
+    {
       "path": ".github/workflows/historical-warehouse.yml",
       "sha256": "e9c6483e8111d25adbadcd688ed7f5026f2d9a019370021e6a73eb98a14c6ff1",
       "git_blob": "984d66d1a14161e1159dbbdaad719fb3e1ea41a5",
@@ -14,8 +30,8 @@
     },
     {
       "path": ".github/workflows/integrated-merge-readiness.yml",
-      "sha256": "26ce63893192af915225764efce6c60a05360b25defca3c5801d489d4318ae1e",
-      "git_blob": "8981a58b3633a21ef3c99a7ced9eeee98636bc2c",
+      "sha256": "bf43722ff8947a33794c956063cd167cbd7289f07da8113aee5bbc42751eec8a",
+      "git_blob": "1459f0e0cfd9bb0f3e1f3b14758645c70139b765",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
@@ -164,15 +180,15 @@
     },
     {
       "path": "docs/research/integrated-merge-source-ledger-20261128.json",
-      "sha256": "4153ab41c02363b657c5ca8e78de7ef036faaa88446066df169acc7561071da5",
-      "git_blob": "e90244f9e75dfe7b03a88869cfd57fae94a01083",
+      "sha256": "ce150f8057879a84cc8c9025a99cea493fb5dd97dfc618d7251fc58f98cb1a4e",
+      "git_blob": "36ae3266ed9c885466ac7cea688a1ad1a20533e5",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
     {
       "path": "docs/research/merge-readiness-20261128/README.md",
-      "sha256": "040f256c2184d5e3110817a80ddead3511fe137811cdeded288891a93530d7d5",
-      "git_blob": "68fed0634d5ed8200b6e3932d1d9a24bbd04745f",
+      "sha256": "4201ba9c43e186b4930832f35c3528c8044aa4bd051a2a05d7d3158b5418111a",
+      "git_blob": "4f8010cd68f490f0be83fdb8e547ee84931fca04",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
@@ -180,6 +196,20 @@
       "path": "docs/research/merge-readiness-20261128/branch-rules-readback.json",
       "sha256": "ac9ca6650e14bcf66ced64833f1c403c329ea9c0597683b428772375ad6440f7",
       "git_blob": "0b71b402af18f0e2dd95fc547c2cf479b18b9b77",
+      "exact_source_prs": [],
+      "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
+    },
+    {
+      "path": "docs/research/merge-readiness-20261128/core-incorporation-04.md",
+      "sha256": "3c7e4e99a965d678241e6d625c9f77d2c630b7e62af28f6f313755667d5c9ab4",
+      "git_blob": "c77ac6405f0878b4d731ee1a204cc7aeab987ca5",
+      "exact_source_prs": [],
+      "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
+    },
+    {
+      "path": "docs/research/merge-readiness-20261128/core-six-source-map.json",
+      "sha256": "b400056a39236f7c1ccc414bf03e605bf25c4084ab082c460ce3ae42a3bf9323",
+      "git_blob": "f850e6be01d6737f48c76cf91ba631c1c688a7d5",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
@@ -249,6 +279,60 @@
       "exact_source_prs": [
         330,
         337
+      ],
+      "scope": "REUSED_EXACT_BYTES"
+    },
+    {
+      "path": "research_wp_r0/attempt_ledger.py",
+      "sha256": "cfecbe1ba2ae7aabf81430fd3a9ab786606a081aef815a4eea0030a15983d767",
+      "git_blob": "b1950d5503b48b9302472e556d4eb5f09ea25dfd",
+      "exact_source_prs": [
+        336
+      ],
+      "scope": "REUSED_EXACT_BYTES"
+    },
+    {
+      "path": "research_wp_r0/historical_library.py",
+      "sha256": "7757efa6722e1ca0dc842897f520315d6644538289c0699429d0b8643241fc69",
+      "git_blob": "0f93ede7697c095bddef7bf62f3c8eb1fbe6a7a2",
+      "exact_source_prs": [
+        336
+      ],
+      "scope": "REUSED_EXACT_BYTES"
+    },
+    {
+      "path": "src/aql/collector/binance_collector.py",
+      "sha256": "aa3a27a5c1829261a9af6daa173a5a05595b004a8a9fd0a503fae7562d36a452",
+      "git_blob": "b4b731e2246c9e21cb76145a464fc77c4747a15d",
+      "exact_source_prs": [
+        336
+      ],
+      "scope": "REUSED_EXACT_BYTES"
+    },
+    {
+      "path": "src/aql/paper_sim/engine.py",
+      "sha256": "618bd0992c0231c88d3b31456c1390172b15716bdf5a275e8d8d873601c6bdc0",
+      "git_blob": "6ef1a35b3e72a438f77b2ae77c3435c83ee15ace",
+      "exact_source_prs": [
+        336
+      ],
+      "scope": "REUSED_EXACT_BYTES"
+    },
+    {
+      "path": "src/aql/pipeline.py",
+      "sha256": "a87173f76be94a289f5b7e2acd96d163245448d27aae9b0f227290c0a0e35889",
+      "git_blob": "448c91c8255c920dbd88da60e9f87c3b6643459d",
+      "exact_source_prs": [
+        336
+      ],
+      "scope": "REUSED_EXACT_BYTES"
+    },
+    {
+      "path": "src/aql/recovery/gap_recovery.py",
+      "sha256": "af384bccd6b6bda4229a5b29af2d7be90eea4765b809594fc340ad942df4af58",
+      "git_blob": "31b212c114be301b2a5e8797ad78496e8ce4c5ac",
+      "exact_source_prs": [
+        336
       ],
       "scope": "REUSED_EXACT_BYTES"
     },
@@ -533,6 +617,15 @@
       "scope": "REUSED_EXACT_BYTES"
     },
     {
+      "path": "tests/paper_sim/test_engine.py",
+      "sha256": "c7e175fb759afd25a8104bf6926295764a27e0684857bdf7758ada6adc253c73",
+      "git_blob": "14ebb47b3c559c4a7b1440da3cfb8bd01de9e0d3",
+      "exact_source_prs": [
+        336
+      ],
+      "scope": "REUSED_EXACT_BYTES"
+    },
+    {
       "path": "tests/test_atlas_daily_health_evidence.py",
       "sha256": "5d501cb82322fca6ef5a3b8774f904fda11ddbcb40104b93e0f351b2886ed71e",
       "git_blob": "2daa2befcaa4f1a66868949e3293de620c12086e",
@@ -578,6 +671,42 @@
       "scope": "REUSED_EXACT_BYTES"
     },
     {
+      "path": "tests/test_cdr_d04_reconnect_budget.py",
+      "sha256": "b45d5420fb04b9f4571219d15212b96fde25bc634ec7b3f8de7ca3b07823ecd8",
+      "git_blob": "6179bf296ba15d7738dfd5e70c8eff832a98ae91",
+      "exact_source_prs": [
+        336
+      ],
+      "scope": "REUSED_EXACT_BYTES"
+    },
+    {
+      "path": "tests/test_cdr_d07_empty_recovery.py",
+      "sha256": "c880e2a7dd416689afd9b81ace59ccd6a71ec3fa1984407ee32c4d3eb8052bbe",
+      "git_blob": "3e9dc291744dcda2cb68605a058abc42900b38fd",
+      "exact_source_prs": [
+        336
+      ],
+      "scope": "REUSED_EXACT_BYTES"
+    },
+    {
+      "path": "tests/test_cdr_d12_ledger_open.py",
+      "sha256": "6b691db5722a774fb0bb8f0bcba0f19595b7eecd398c718d4f6b683a1ba6f6d6",
+      "git_blob": "30cf591cf9bdf263685fdc42e10e2dc50cc156a3",
+      "exact_source_prs": [
+        336
+      ],
+      "scope": "REUSED_EXACT_BYTES"
+    },
+    {
+      "path": "tests/test_cdr_d18_availability.py",
+      "sha256": "7133795441861ae832524abdbd627b95e71dded91a94e2018728d86554b78700",
+      "git_blob": "06e4a8213f82571b906cd33b3bf9afa2e5c11a4b",
+      "exact_source_prs": [
+        336
+      ],
+      "scope": "REUSED_EXACT_BYTES"
+    },
+    {
       "path": "tests/test_daily_warehouse_watchdog_seam.py",
       "sha256": "9d3382fd5cb8f6caff704412de0822616d93b002e1dd9598612aa65b5a9bb227",
       "git_blob": "8983e566c3ae001b905967775c92882e9c5524a3",
@@ -596,6 +725,22 @@
         337
       ],
       "scope": "REUSED_EXACT_BYTES"
+    },
+    {
+      "path": "tests/test_g1_completion.py",
+      "sha256": "1e0a9466668e9e759c3536683fb4510e17464e94789ce9fb0d9497a8cdcc6750",
+      "git_blob": "e73a4a7d5565b19b7a11a4d2e750c8127b473dbf",
+      "exact_source_prs": [
+        336
+      ],
+      "scope": "REUSED_EXACT_BYTES"
+    },
+    {
+      "path": "tests/test_integrated_core_origins.py",
+      "sha256": "42e5606eddeb9a2cea454eeb558b5a7e13baf276c35bee8eb1c1ce057e27dad6",
+      "git_blob": "c509185e1891b61bfd6bc9d0f18eed7fa8522bec",
+      "exact_source_prs": [],
+      "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
     {
       "path": "tests/test_mcp_producer_link.py",
@@ -782,6 +927,42 @@
       "scope": "REUSED_EXACT_BYTES"
     },
     {
+      "path": "tests/test_sf_content_identity.py",
+      "sha256": "95857a2569cbd4b10708d57e27d8b8f4a36c5e87dc611bee8ea06aae7e1fe09b",
+      "git_blob": "04e5f777a5df241d6d75f4c231b7ed27b3cb8b39",
+      "exact_source_prs": [
+        336
+      ],
+      "scope": "REUSED_EXACT_BYTES"
+    },
+    {
+      "path": "tests/test_sf_ind_02.py",
+      "sha256": "ddc9d24c14b59383fbec0b0430553a88bec11d0a8eb355d78da9c000dda9113d",
+      "git_blob": "85025f746ebc8c5d269f123bd64c9bbcb15f1241",
+      "exact_source_prs": [
+        336
+      ],
+      "scope": "REUSED_EXACT_BYTES"
+    },
+    {
+      "path": "tests/test_sf_research_int_01.py",
+      "sha256": "d32ce1593938ace3f5b9d4f6f3b0f49d9c2414e7c6f55b849027d4f07dbeb1c9",
+      "git_blob": "199df30a1a8dc78050c10bb5d0cf59bf1a236153",
+      "exact_source_prs": [
+        336
+      ],
+      "scope": "REUSED_EXACT_BYTES"
+    },
+    {
+      "path": "tests/test_sf_strat_01.py",
+      "sha256": "73f336496e2d050115d7d5d2ace310c5d5cb4162547de488c5c138cd59a7168f",
+      "git_blob": "b061cf5f9e00f9a39c92d4740293e9f1f8e6aacb",
+      "exact_source_prs": [
+        336
+      ],
+      "scope": "REUSED_EXACT_BYTES"
+    },
+    {
       "path": "tests/test_warehouse.py",
       "sha256": "66fd56efe2f3b03a8d5c29c3e421793f0f63617e66b83db07132b35150a465ed",
       "git_blob": "ab0324eef4a1a1966538f67311e8c65c512ec48c",
@@ -937,8 +1118,8 @@
     },
     {
       "path": "tools/merge_readiness/run_acceptance.py",
-      "sha256": "1d7241577c50cd78b4c96c5419ef1382878d0c313aedaf0b457d8142e53b2cfa",
-      "git_blob": "9cb2924e8b3d79f4ebd095f026afb38bef36797e",
+      "sha256": "57ca14d1bacd45bc30a4483fdebb3620d7d20534ca3fa1bc937342640b69b35a",
+      "git_blob": "78a55f7edfd9d2dd7fea0e47c406b810f66e7dd1",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
@@ -1131,5 +1312,6 @@
       "path": ".github/workflows/atlas-ops-watchdog.yml",
       "reason": "REPLACED_BY_COMBINED_MAIN_TARGET_MATRIX"
     }
-  ]
+  ],
+  "continuation": "04_ACCEPTED_CORE_336"
 }
