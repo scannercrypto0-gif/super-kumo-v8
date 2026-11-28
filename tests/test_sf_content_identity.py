@@ -73,7 +73,7 @@ def test_manifest_provenance_sensitivity(field, new):
 @pytest.mark.parametrize("field,new", [
     ("open", 99.), ("high", 102.), ("low", 98.), ("close", 100.25),
     ("volume", 22.), ("ingest_time_ms", None),
-    ("observation_cutoff_ms", 1700000000123), ("source_label", "other"),
+    ("observation_cutoff_ms", 1700000060123), ("source_label", "other"),
 ])
 def test_bar_sensitivity(field,new):
     m,b=value(); changed=list(b); changed[0]=dataclasses.replace(b[0],**{field:new})
