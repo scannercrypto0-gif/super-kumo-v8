@@ -1,10 +1,10 @@
 """
-AQL Gap Recovery ? G1-WP01-MVP
+AQL Gap Recovery — G1-WP01-MVP
 
 Uses Binance REST /api/v3/klines to recover final bars missed during
 WebSocket disconnection.
 
-Rules (execution order ?D):
+Rules (execution order §D):
 - Recovery is idempotent: re-fetching an already-stored bar is a no-op.
 - RECOVERED bars are distinguished from RECEIVED bars via source + state fields.
 - A bar retrieved via recovery is NOT treated as having been available to the
@@ -14,7 +14,7 @@ Rules (execution order ?D):
 
 Weight accounting:
   X-MBX-USED-WEIGHT-1M is the CUMULATIVE rolling 1-minute window weight
-  across ALL requests from this IP ? it is NOT the cost of a single request.
+  across ALL requests from this IP — it is NOT the cost of a single request.
   Per Binance docs, GET /api/v3/klines costs KLINES_WEIGHT_PER_REQUEST=2 per
   call.  We track cost as (requests_made * KLINES_WEIGHT_PER_REQUEST) and
   separately record last_seen_window_weight for observability.
@@ -87,8 +87,8 @@ def _align_to_grid(ts_ms: int, interval_ms: int, direction: str = "ceil") -> int
     """
     Align a timestamp to the nearest Binance bar boundary.
 
-    direction="ceil"  ? next boundary >= ts_ms (used for gap start)
-    direction="floor" ? last boundary <= ts_ms (used for gap end)
+    direction="ceil"  → next boundary >= ts_ms (used for gap start)
+    direction="floor" → last boundary <= ts_ms (used for gap end)
     """
     if direction == "ceil":
         return ((ts_ms + interval_ms - 1) // interval_ms) * interval_ms
@@ -107,8 +107,8 @@ def _fetch_klines(
     Fetch klines from Binance REST.
 
     Returns (rows, window_weight) where:
-      rows          ? raw Binance kline rows
-      window_weight ? value of X-MBX-USED-WEIGHT-1M header (cumulative window,
+      rows          — raw Binance kline rows
+      window_weight — value of X-MBX-USED-WEIGHT-1M header (cumulative window,
                       NOT the cost of this individual request)
     """
     params = {
@@ -228,7 +228,7 @@ def recover_gap(
                     bar.bar_open, aligned_start, aligned_end,
                 )
                 continue
-            # Filter 2: bar must be fully closed ? bar_open + interval_ms <= gap_end_ms.
+            # Filter 2: bar must be fully closed — bar_open + interval_ms <= gap_end_ms.
             # aligned_end is the open time of the last CLOSED bar; a bar at aligned_end
             # closes at aligned_end + interval_ms.  We accept it only when that close
             # time is <= gap_end_ms (i.e. the candle has finished).
@@ -332,4 +332,3 @@ def recover_gap(
     )
 
     return (all_bars if include_existing else recovered_new), report
-
