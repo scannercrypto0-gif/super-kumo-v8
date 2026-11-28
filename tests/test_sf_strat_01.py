@@ -268,9 +268,11 @@ def test_vector_contract_cannot_accept_scalar_result():
 
 def test_recorded_receipt_cannot_be_later_than_declared_availability():
     bars=_bars(10)
-    bars[-1]=dataclasses.replace(bars[-1],ingest_time_ms=bars[-1].bar_close+60001)
+    late=bars[-1].bar_close+60001
+    bars[-1]=dataclasses.replace(bars[-1],ingest_time_ms=late,
+                                  observation_cutoff_ms=late)
     with pytest.raises(ValueError,match="receipt/availability"):
-        binding(bars=bars)
+        binding(bars=bars,cutoff=late)
 
 
 def test_nonfinal_returned_by_custody_adapter_fails_closed():
