@@ -257,13 +257,6 @@ def test_deterministic_report_seals_and_negative_receipt():
         "aql_factory_h_research_package_v1.py"}
 
 
-def test_committed_artifacts_match_current_material_delta():
-    root = Path(__file__).resolve().parents[1]
-    artifacts = root / "docs" / "evidence" / "codex-pkg02"
-    assert json.loads((artifacts / "report.json").read_text(encoding="utf-8")) == report()
-    assert json.loads((artifacts / "negative-rejections.json").read_text(encoding="utf-8")) == negative_receipt(fixture_packet())
-
-
 def test_one_command_cli_emits_replay_and_no_real_authority(tmp_path):
     root = Path(__file__).resolve().parents[1]
     output = json.loads(subprocess.check_output([

@@ -23,6 +23,7 @@ from research_wp_r0.aql_factory_h_execution_comparison_v1 import (  # noqa: E402
 
 
 def seal(packet):
+    packet["scanner_entry_batch_sha256"] = digest(packet["entries"])
     packet["sha256"] = digest({k: v for k, v in packet.items() if k != "sha256"})
     return packet
 

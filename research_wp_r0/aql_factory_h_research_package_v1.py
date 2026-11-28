@@ -12,12 +12,6 @@ from pathlib import Path
 from research_wp_r0.aql_factory_e_research_results_store_v1 import (
     digest,ResultsStoreError,audit_store_layout,
 )
-from research_wp_r0.aql_factory_f_f2_recovery_research_v2 import (
-    validate_recovery_research_input,run_recovery_research_v2,
-)
-from research_wp_r0.aql_factory_h_trade_event_ledger_v1 import (
-    build_trade_event_ledger,verify_trade_event_ledger,
-)
 from research_wp_r0.aql_factory_h_scientific_lab_v1 import (
     evaluate_immutable_ledger,secretary_research_receipt,
 )
@@ -91,6 +85,12 @@ def _store_package(path, body):
 
 def run_factory_h_research(packet, store_path):
     """One complete Factory/Lab research slice; store must be pre-initialized."""
+    from research_wp_r0.aql_factory_h_trade_event_ledger_v1 import (
+        build_trade_event_ledger,verify_trade_event_ledger,
+    )
+    from research_wp_r0.aql_factory_f_f2_recovery_research_v2 import (
+        validate_recovery_research_input,run_recovery_research_v2,
+    )
     validate_recovery_research_input(packet)
     path=Path(store_path)
     _need(path.is_file() and path.suffix==".sqlite" and

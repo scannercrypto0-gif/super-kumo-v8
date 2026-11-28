@@ -1,0 +1,128 @@
+{
+  "schema": "aql.g3.stage-closeout.v1",
+  "package": "PKG-G3-MOMENTUM-PAPER-STAGE-01",
+  "stage": "G3",
+  "official_scope": "02_ROADMAP.md at 90af9794880cbeb00e7e974bfa906ff5e9666183",
+  "source_tested_commit": "3d1efe26454de0cfd674a37ae13832a15b392ccd",
+  "base_main": "90af9794880cbeb00e7e974bfa906ff5e9666183",
+  "branch": "codex/g3-offline-paper-simulation",
+  "execution_go": "Owner chat instruction to continue after technical checks; no PM approval, G0, merge or trading approval asserted.",
+  "status": "IMPLEMENTED_SYNTHETIC_TESTED_CI_PENDING",
+  "stage_closed": false,
+  "owner_stage_signoff": "NOT_GRANTED",
+  "predicates": [
+    {
+      "id": "G3-LIFECYCLE",
+      "scope": "Versioned WATCH/ARMED/TRIGGERED/CLOSED, cancel/expiry/no-fill and valid transitions",
+      "grade": "SYNTHETIC_TESTED",
+      "sources": [
+        "src/aql/paper_sim/engine.py",
+        "tests/paper_sim/test_engine.py"
+      ]
+    },
+    {
+      "id": "G3-REPLAY",
+      "scope": "Frozen identity, native durability, process-exit restart, duplicates/conflicts and per-instance isolation",
+      "grade": "SYNTHETIC_TESTED",
+      "sources": [
+        "src/aql/paper_sim/contracts.py",
+        "src/aql/paper_sim/engine.py",
+        "src/aql/observation/position_journal.py",
+        "tests/paper_sim/test_engine.py"
+      ]
+    },
+    {
+      "id": "G3-COST",
+      "scope": "Per-fill quote-notional fees, half-spread/slippage, assumed maker queue/volume and adverse cost, partial fills, explicit later-open fallback, cash conservation",
+      "grade": "SYNTHETIC_TESTED",
+      "sources": [
+        "src/aql/paper_sim/engine.py",
+        "tests/paper_sim/test_engine.py"
+      ],
+      "assumptions": "All fees/depth/queue/spread/slippage/adverse numbers are configured assumptions, not observations."
+    },
+    {
+      "id": "G3-AMBIGUITY",
+      "scope": "Same-bar stop/target and maker entry/exit order UNKNOWN; no OHLC-touch queue proof; gap, missing depth, finality/clock/future/revised-bar guards",
+      "grade": "SYNTHETIC_TESTED",
+      "sources": [
+        "src/aql/paper_sim/engine.py",
+        "tests/paper_sim/test_engine.py"
+      ]
+    },
+    {
+      "id": "G3-SOURCE",
+      "scope": "Read-only pinned upstream actual native journal/Scanner/G2 read receipt to new G3 adapter, no horizon leakage, no upstream data-store writes",
+      "grade": "SYNTHETIC_TESTED",
+      "sources": [
+        "src/aql/paper_sim/adapter.py",
+        "tests/paper_sim/test_adapter.py",
+        "tests/paper_sim/test_upstream_integration.py"
+      ],
+      "upstream_sha": "d072544427d6b08473c88b2e36d5857cfd8581dc",
+      "boundary": "Two upstream modules loaded only in an isolated test; not copied into this branch or required at runtime. Actual live input explicitly rejected."
+    },
+    {
+      "id": "G3-SOAK",
+      "scope": "Genuine measured bounded offline workload with denominator and durable readback",
+      "grade": "SYNTHETIC_TESTED",
+      "sources": [
+        "src/aql/paper_sim/measure.py",
+        "tests/paper_sim/evidence/local-soak.json"
+      ],
+      "signals": 32,
+      "events": 128,
+      "fills": 64,
+      "seconds": 30.299284199994872,
+      "unexplained_missing": 0,
+      "duplicate_fills": 0,
+      "boundary": "Bounded local synthetic load only, not production, power-loss or 72h certification."
+    }
+  ],
+  "validation": {
+    "local_tests": 41,
+    "passed": 41,
+    "skipped": 0,
+    "junit_sha256": "1420967281532fa6cf0e5633b91e4ecb259d586504bc6a66c9df429b4df0ff24",
+    "cross_platform_ci": "PENDING_PUBLICATION",
+    "independent_audit": "NOT_CLAIMED; candidate is reviewable, not self-awarded independent acceptance"
+  },
+  "reuse": [
+    "Existing DurablePositionJournal/PositionEvent/PositionLedger; opened/closed track an isolated SIMULATION AGGREGATE, not actual venue exposure.",
+    "Existing pinned native G1/Scanner/G2 read contract exercised in new seam test.",
+    "Prior synthetic/accounting and Factory drafts reviewed read-only, not mass-merged; no new Factory DB."
+  ],
+  "ownership": {
+    "open_pr_heads_checked": 107,
+    "new_scope": [
+      "src/aql/paper_sim/",
+      "tests/paper_sim/",
+      ".github/workflows/g3-paper-sim.yml"
+    ],
+    "collision_count": 0,
+    "pr286_head": "d072544427d6b08473c88b2e36d5857cfd8581dc",
+    "pr287_head": "852f6fcce1dbb4dede6259fe8d0498d19ff19078",
+    "reserved_files_changed": false
+  },
+  "safety": [
+    "No network/broker/trader/Secretary routing in simulator runtime",
+    "No production credentials, private E:, original March, April archive or live observation work",
+    "A declared synthetic signal and explicit execution assumptions are required",
+    "No strategy alpha/OOS/promotion claim",
+    "No merge, G0 or operational Paper/live activation"
+  ],
+  "mandatory_remaining_before_claiming_acceptance": [
+    "Run focused CI on Windows and Linux for this exact candidate",
+    "Independent bounded safety acceptance if due under PM package",
+    "Required owner signoff for any official stage closure"
+  ],
+  "limits": [
+    "Long-only, unlevered assumed execution; no short/funding/venue model claimed",
+    "Entry scheduled strictly after frozen decision on first eligible UTC-grid open; no decision-bar fill",
+    "Maker execution time is an interval, not a fabricated precise timestamp",
+    "OHLC cannot prove queue position or intrabar order; unknowns retain quantity/cost exposure with null PnL",
+    "Native fsync-return/chain integrity is not independent custody or hardware power-loss proof",
+    "Per-simulation independent capital, not a shared portfolio",
+    "Journal size/event capacity bounded; no host-wide or real-time scheduling guarantee"
+  ]
+}

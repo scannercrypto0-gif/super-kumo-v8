@@ -105,6 +105,10 @@ class BinanceCollector:
         # Track disconnect window for gap recovery
         self.gap_start_ms: Optional[int] = None
         self.gap_end_ms: Optional[int] = None
+        # Keep the committed-bar watermark across connections so a replay
+        # or a newly committed older bar cannot restore the retry budget.
+        self._latest_committed_open: Optional[int] = None
+        self._session_made_progress = False
 
     def _stream_name(self) -> str:
         return f"{self.symbol.lower()}@kline_{self.interval}"
@@ -151,6 +155,12 @@ class BinanceCollector:
                     self.gap_start_ms = min(self.gap_start_ms if self.gap_start_ms is not None else next_open, next_open)
                     self.gap_end_ms = max(self.gap_end_ms or 0, bar.bar_open)
             self.metrics.last_bar_open = max(previous if previous is not None else bar.bar_open, bar.bar_open)
+            advances_watermark = committed and (
+                self._latest_committed_open is None
+                or bar.bar_open > self._latest_committed_open
+            )
+            if advances_watermark:
+                self._latest_committed_open = bar.bar_open
             if committed:
                 self.metrics.journal_commit_count += 1
                 committed_at = bar.committed_at
@@ -178,6 +188,8 @@ class BinanceCollector:
                     self.metrics.store_insert_count += 1
                 self.journal.mark_persisted(bar.stable_key())
             self.health_state = "STREAMING"
+            if advances_watermark:
+                self._session_made_progress = True
 
             if self.max_bars and self.metrics.journal_commit_count >= self.max_bars:
                 logger.info("Reached max_bars=%d, stopping.", self.max_bars)
@@ -235,10 +247,14 @@ class BinanceCollector:
         register_legacy_writer(self.journal, 'collector-run')
         url = f"{WS_BASE}/{self._stream_name()}"
         self._stop_event.clear()
+        _, self._latest_committed_open = self.journal.get_committed_range(
+            self.symbol, self.interval
+        )
 
         def _run_ws():
             attempt = 0
             while not self._stop_event.is_set():
+                self._session_made_progress = False
                 try:
                     ws = websocket.WebSocketApp(
                         url,
@@ -258,6 +274,9 @@ class BinanceCollector:
 
                 if self._stop_event.is_set():
                     break
+
+                if self._session_made_progress:
+                    attempt = 0
 
                 attempt += 1
                 if attempt >= MAX_RECONNECT_ATTEMPTS:

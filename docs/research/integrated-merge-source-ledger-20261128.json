@@ -1,0 +1,89 @@
+{
+  "schema": "aql.integrated-merge.source-ledger.v1",
+  "main": "0dad5acc17172754b741b0e8a97d911436c9f4c5",
+  "authority": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/205#issuecomment-7236133591",
+  "candidates": [
+    {
+      "pr": 330,
+      "head": "ae60b3e367241fec14753ac78e08147603b7af84",
+      "disposition": "REQUIRED_INCLUDED",
+      "classification": "REQUIRED"
+    },
+    {
+      "pr": 333,
+      "head": "011bc188069613a0acba3eaf3cf69c765b60af12",
+      "disposition": "REQUIRED_INCLUDED",
+      "classification": "REQUIRED"
+    },
+    {
+      "pr": 331,
+      "head": "8c7f37287cc6b0f4514a5604b56c6a24b26b5b63",
+      "disposition": "REQUIRED_ACCEPTED_SCOPE_REUSED",
+      "classification": "REQUIRED"
+    },
+    {
+      "pr": 334,
+      "head": "4617e227d0bf57e85cddeff599e638183064b604",
+      "disposition": "REQUIRED_NARROW_DELTA_INCLUDED_NOT_DUPLICATE_PR",
+      "classification": "REQUIRED"
+    },
+    {
+      "pr": 337,
+      "head": "5617e03c4a1c4c1e472d433e50e3177290301fa1",
+      "disposition": "REQUIRED_INCLUDED_DAUGHTER_DELTA",
+      "classification": "REQUIRED"
+    },
+    {
+      "pr": 296,
+      "head": "eb49308d61ffdfc24ed5032df2cb541f37c48bfe",
+      "disposition": "DEFERRED_WITH_REASON_PINNED_KERNEL_REFERENCE_ONLY",
+      "classification": "DEFERRED_WITH_REASON"
+    },
+    {
+      "pr": 308,
+      "head": "84649a323613bf4415c7abc41e774381aa379428",
+      "disposition": "DEFERRED_WITH_REASON_CONTEXT_DESIGN_NOT_DUE",
+      "classification": "DEFERRED_WITH_REASON"
+    },
+    {
+      "pr": 309,
+      "head": "35972ffe115cbc1fcde5655d56f1484b19452ca0",
+      "disposition": "DEFERRED_WITH_REASON_RETROSPECTIVE_ONLY_NOT_FORWARD_RECEIVER",
+      "classification": "DEFERRED_WITH_REASON"
+    },
+    {
+      "pr": 312,
+      "head": "73d677852725a4af51868c6906b23fc2825db6f0",
+      "disposition": "DEFERRED_WITH_REASON_WORKER_HEALTH_EXISTING_RUNTIME_CONTRACT_NOT_MODIFIED",
+      "classification": "DEFERRED_WITH_REASON"
+    },
+    {
+      "pr": 271,
+      "head": "ed6f0435c84bb14fa508d1cfa07f279b6b4531c7",
+      "disposition": "SUPERSEDED_ASSEMBLY_ONLY_OLD_STACK_NOT_MERGED",
+      "classification": "DEFERRED_WITH_REASON"
+    },
+    {
+      "pr": 321,
+      "head": "ae30699c22ee6df982aff48e0ab4cefaf71b887f",
+      "disposition": "DEFERRED_WITH_REASON_LEGACY_HOLD_NO_SECOND_FEED",
+      "classification": "DEFERRED_WITH_REASON"
+    },
+    {
+      "pr": 332,
+      "head": "8d13b455a8a209da59fe65f706b85842ed513cb0",
+      "disposition": "DEFERRED_WITH_REASON_LEGACY_MIGRATION_NO_SECOND_FEED",
+      "classification": "DEFERRED_WITH_REASON"
+    },
+    {
+      "pr": 336,
+      "head": "1d1dfe913455d043c4269891e2e713b1e57ffc97",
+      "classification": "REQUIRED",
+      "disposition": "REQUIRED_ACCEPTED_SIX_CORE_FIXES_INCLUDED_EXACT_BYTES"
+    }
+  ],
+  "merge_authorized": false,
+  "original_data_execution_authorized_by_this_package": false,
+  "trading_authority": "NONE",
+  "continuation_authority": "https://github.com/scannercrypto0-gif/super-kumo-v8/issues/205#issuecomment-7237001473"
+}

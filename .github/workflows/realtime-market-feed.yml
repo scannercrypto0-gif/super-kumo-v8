@@ -1,0 +1,65 @@
+name: Realtime feed offline tests
+
+on:
+  pull_request:
+    paths:
+      - "tools/realtime_market_feed/**"
+      - ".github/workflows/realtime-market-feed.yml"
+      - "docs/research/realtime-daily-warehouse-integration.md"
+  push:
+    branches: [main, codex/realtime-market-feed-e-20261125]
+    paths:
+      - "tools/realtime_market_feed/**"
+      - ".github/workflows/realtime-market-feed.yml"
+      - "docs/research/realtime-daily-warehouse-integration.md"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python: ["3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: eb49308d61ffdfc24ed5032df2cb541f37c48bfe
+          path: .integration/research-baseline
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: ae60b3e367241fec14753ac78e08147603b7af84
+          path: .integration/warehouse
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: scannercrypto0-gif/super-kumo-v8
+          ref: 8c7f37287cc6b0f4514a5604b56c6a24b26b5b63
+          path: .integration/watchdog
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -r tools/realtime_market_feed/requirements.txt pytest
+      - name: Stage exact audited Analyzer dependencies
+        run: python .integration/research-baseline/tools/first_research_cycle/stage_dependencies.py --output .integration/research-kernel --fetch
+      - name: Run feed and integration fixture suites
+        run: python -m pytest --timeout=60 tools/realtime_market_feed/test_service.py tools/realtime_market_feed/test_backfill.py tools/realtime_market_feed/test_atlas_integration.py tools/realtime_market_feed/test_acceptance_gates.py tools/realtime_market_feed/test_forward_research.py tools/realtime_market_feed/test_cdr_d11b_evidence_class.py tools/realtime_market_feed/test_cdr_d14_evidence.py tools/realtime_market_feed/test_settlement.py -q
+      - name: Build machine-readable isolated evidence
+        run: python -B -m tools.realtime_market_feed.integration_acceptance --output integration-evidence.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: realtime-integration-evidence-${{ matrix.os }}-py${{ matrix.python }}
+          path: integration-evidence.json
+          if-no-files-found: warn

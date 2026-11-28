@@ -1,0 +1,59 @@
+name: ATLAS Queue 5 synthetic readiness
+on:
+  pull_request:
+    paths:
+      - research_wp_r0/aql_queue5_readiness_v1.py
+      - research_wp_r0/aql_core_prospective_readiness_v1.py
+      - research_wp_r0/aql_f1_decision_capture_v1.py
+      - tools/pit_oos_readiness/**
+      - tools/core_prospective_readiness_smoke.py
+      - tools/atlas_queue5_readiness.py
+      - tests/test_aql_f1_decision_capture_v1.py
+      - tests/test_aql_core_prospective_readiness_v1.py
+      - tests/test_queue5_readiness.py
+      - .github/workflows/atlas-queue5-readiness.yml
+permissions:
+  contents: read
+jobs:
+  native-readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install pytest
+      - run: python -B -m pytest tests/test_aql_f1_decision_capture_v1.py tests/test_aql_core_prospective_readiness_v1.py tests/test_queue5_readiness.py tools/pit_oos_readiness/test_promotion.py -q
+        env:
+          PYTHONPATH: .:src:tests
+      - run: python -B tools/atlas_queue5_readiness.py queue5-evidence
+      - uses: actions/upload-artifact@v4
+        with:
+          name: queue5-synthetic-readiness
+          path: queue5-evidence
+          if-no-files-found: error
+  windows-readback:
+    needs: native-readiness
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install pytest
+      - uses: actions/download-artifact@v4
+        with:
+          name: queue5-synthetic-readiness
+          path: queue5-evidence
+      - run: python -B -m pytest tests/test_aql_f1_decision_capture_v1.py tests/test_aql_core_prospective_readiness_v1.py tests/test_queue5_readiness.py tools/pit_oos_readiness/test_promotion.py -q
+        env:
+          PYTHONPATH: .;src;tests
+      - run: python -B tools/atlas_queue5_readiness.py --readback queue5-evidence

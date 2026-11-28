@@ -1,0 +1,21 @@
+name: Historical source offline QA
+on:
+  push:
+    branches: [codex/historical-source-302]
+  pull_request:
+    paths: ['tools/historical_source_qa/**', '.github/workflows/historical-source-qa.yml']
+permissions:
+  contents: read
+jobs:
+  qa:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - run: python -B -m unittest -v tools.historical_source_qa.test_qa

@@ -226,11 +226,11 @@ def test_manifest_rejects_mixed_result_identity_and_binds_seed_range():
     assert manifest.input_bar_hash!=later.input_bar_hash
 
 
-def test_recorded_receipt_cannot_be_later_than_declared_availability():
+def test_ingestion_after_declared_availability_is_rejected_at_bar_boundary():
     bars=input_bars()
-    bars[-1]=dataclasses.replace(bars[-1],ingest_time_ms=bars[-1].bar_close+60001)
-    with pytest.raises(ValueError,match="receipt/availability"):
-        run("OBV_v2",bars)
+    late=bars[-1].bar_close+60001
+    with pytest.raises(ValueError,match="Observation cutoff precedes recorded ingestion"):
+        dataclasses.replace(bars[-1],ingest_time_ms=late)
 
 
 def test_nonfinal_returned_by_custody_adapter_fails_closed():

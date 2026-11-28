@@ -16,3 +16,8 @@ data/
 *.sqlite-shm
 .env
 .env.*
+
+# Isolated integration code dependencies and generated acceptance artifacts
+.integration/
+integration-acceptance.json
+integration-junit.xml

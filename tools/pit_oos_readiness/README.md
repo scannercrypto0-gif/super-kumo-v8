@@ -1,9 +1,11 @@
 # #299 prospective scientific readiness
 
 This offline rehearsal joins Core #290's native presample seal and journal admission
-to Factory #291's cost and exit evaluator and immutable result store. The PR is
-stacked on the exact, unmerged Factory head. Core's two required modules are staged
-from their exact Git objects in a private checkout overlay. Package #298 owns
+to the cost and exit evaluator and immutable result store present in main at
+`122c1cf87b13f1cddac725e8b82169844ea510c9`. That pin includes the entry-batch
+parent check and standalone research-seal dependency accepted in #338. Core's
+two required modules are staged from their exact Git objects in a private
+checkout overlay. Package #298 owns
 `tools/actual_research_batch_bridge/`. This PR owns this directory and its workflow.
 
 ## Reproduce

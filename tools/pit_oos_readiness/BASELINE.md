@@ -10,7 +10,8 @@ Apply [PM OS / G0-GOV-01](https://github.com/scannercrypto0-gif/super-kumo-v8/is
 | Open dependency | Exact head | Use |
 |---|---|---|
 | Core #290 | `612d1444ff36ed08b63fd0a98bb8d4e71f88cd0d` | Presample seal, native plan binding, immutable journal receipt and admission |
-| Factory #291 | `ea4ffd5ce278d93588338122ab6ac1af8ec4da26` | PR base, native A/B/C, costs, comparison and result store |
+| Factory #291 | `ea4ffd5ce278d93588338122ab6ac1af8ec4da26` | Original S7 review base, native A/B/C, costs, comparison and result store |
+| Main Factory integration | `122c1cf87b13f1cddac725e8b82169844ea510c9` | Exact Factory file pin for the main-based candidate; Core staging pin is unchanged |
 | #286 / #289 | `d072544427d6b08473c88b2e36d5857cfd8581dc` / `1ff3d13a3dfd1337bae0659dd03550b764c8799c` | Operational G2 evidence only |
 | #292 / #293 | `ccd906ac6d770e1364889623cd79bb215f7b5c63` / `c01f526e762a014e5ed84ca3cf695b9d77502ab3` | Prior Gateway and Integration evidence |
 | #296 / #297 | `eb49308d61ffdfc24ed5032df2cb541f37c48bfe` / `dd3e149afe73d9d04c9892ad35005b04fb675fff` | Separate retrospective and generated capacity engineering |

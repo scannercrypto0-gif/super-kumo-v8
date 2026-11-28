@@ -124,3 +124,25 @@ At 2026-10-21T06:42:12Z / 09:42:12 Asia/Riyadh (UTC+03:00), GitHub verifies [PR 
 ### G0-REV-01/C addendum to AQL-HO-20261021-003 documentary proposal
 
 Owner approved C documentary remediation on PR #15: sixteen future executable fixtures T29–T44, authoritative revision/reconnect/fencing acceptance, measurement uncertainty and trace criteria, evidence schemas, risks and review log. Existing PR #15 remains Draft, no merge/code/runtime tests; last owner-actually-submitted Work handoff still AQL-HO-20261021-002 / PR #14. G0 OPEN.
+
+## ATLAS-WH-REGISTRY-RECOVERY-001 — 2026-11-21 implementation delta
+
+Owner-pasted brief was prepared-only; subsequent explicit in-chat approval
+submitted the proposed scoped implementation/tests on existing Draft #330.
+Baseline 30854a2b30d0b4ae62914b6a58e1c6065a501387; PM #205/7058793440,
+owner-host #330/7058739302, correction authority #330/7058751093 and prior Audit
+#134/7058424736 reconciled. Included: Registry C and September local handoff.
+Already implemented/reused: exact source-pinned correction and Linux original
+proof. Unresolved: actual E: execution and new independent Audit acceptance.
+Deferred: native Scanner-E custody, daily activation, PIT/trading/G0 and merge.
+Private E: and unavailable cross-chat evidence NOT_ACCESSED. Resulting changes,
+exact successor SHA, CI and scoped Audit request belong to existing PR #330;
+no owner closure or merge is implied. Details: docs/research/warehouse-registry.md.
+
+### ATLAS-WH-REGISTRY-RECOVERY-001 latest-host addendum
+
+Reconciled #330/7058983090 actual September success and #330/7059048243 full-history
+continuation authority; September recovery is ALREADY_DOCUMENTED / reused.
+Host next action is registry-only adoption, no repeated correction/task probe.
+Full-history runtime remains unverified and separate. Original private receipt
+bytes NOT_ACCESSED. Previous September-pending wording is superseded.

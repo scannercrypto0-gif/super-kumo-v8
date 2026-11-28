@@ -4,7 +4,7 @@ from pathlib import Path
 import subprocess
 
 CORE = "612d1444ff36ed08b63fd0a98bb8d4e71f88cd0d"
-FACTORY = "ea4ffd5ce278d93588338122ab6ac1af8ec4da26"
+FACTORY = "122c1cf87b13f1cddac725e8b82169844ea510c9"
 ROOT = Path(__file__).resolve().parents[2]
 OVERLAY = Path(__file__).resolve().parent / ".native"
 CORE_PATHS = (

@@ -1,0 +1,29 @@
+name: ATLAS Generic H real research authority
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tools/atlas_h_generic_secretary_bridge.py'
+      - 'tests/check_generic_h_real_research_authority.py'
+      - '.github/workflows/atlas-h-main-research-authority.yml'
+permissions:
+  contents: read
+jobs:
+  real-research:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run real synthetic chain from checked-in code
+        env:
+          PYTHONPATH: .
+        run: python -B tests/check_generic_h_real_research_authority.py

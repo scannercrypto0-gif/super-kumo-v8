@@ -1,0 +1,108 @@
+{
+  "schema": "aql.warehouse.september-source-diagnosis.v1",
+  "evidence_grade": "DIRECT_PUBLISHER_BYTES_INSPECTED_NOT_OWNER_HOST",
+  "owner_e_drive_access": false,
+  "distinct_source_objects_inspected": 4,
+  "raw_source_bytes_uploaded_to_git": false,
+  "validator_changed": false,
+  "source_reports": [
+    {
+      "status": "STRICT_NATIVE_SOURCE_REJECTED",
+      "source_key": "data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2017-09.zip",
+      "source_zip_sha256": "b4e525fa0549688dca9e09cc24093f50526db2a255d03961791da3bfd7c24d81",
+      "checksum_sha256": "50b17e0903e8f657910c08b76b91fddede36fb8584404ff0bebdde627373f683",
+      "validator_error": "NATIVE_TIME_OR_MARKET_FIELDS",
+      "trading_authority": "NONE",
+      "source_class": "RETROSPECTIVE_NON_PIT",
+      "rows_imported": 0,
+      "member_sha256": "d103edb024d391f67713e2e9377a9b2f3101ac02700b5e0637c20cea7fe7a149",
+      "member_bytes": 6326365,
+      "source_rows": 42780,
+      "failed_rows": 1,
+      "first_failure": {
+        "native_csv_line": 8160,
+        "open_time": "1504713540000",
+        "predicates": [
+          {
+            "field": 6,
+            "value": "1504713600000",
+            "expected": "1504713599999",
+            "delta_native_units": 1,
+            "predicate": "close_time_equals_open_plus_minute_minus_one"
+          }
+        ]
+      },
+      "failures": [
+        {
+          "native_csv_line": 8160,
+          "open_time": "1504713540000",
+          "predicates": [
+            {
+              "field": 6,
+              "value": "1504713600000",
+              "expected": "1504713599999",
+              "delta_native_units": 1,
+              "predicate": "close_time_equals_open_plus_minute_minus_one"
+            }
+          ]
+        }
+      ],
+      "source_open_time_gaps": [
+        [
+          1504713600000,
+          1504738800000
+        ]
+      ],
+      "zip_bytes": 1394854
+    },
+    {
+      "status": "STRICT_NATIVE_SOURCE_REJECTED",
+      "source_key": "data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2017-09-06.zip",
+      "source_zip_sha256": "781905772f8b0366a2a09879fface439f04d41c189e4000e9c960dc7896246a3",
+      "checksum_sha256": "ed5ea4ddfac7bc9115dc60a3d4d8eccc08489f31c4f79ed19cf559c93953637d",
+      "validator_error": "NATIVE_TIME_OR_MARKET_FIELDS",
+      "trading_authority": "NONE",
+      "source_class": "RETROSPECTIVE_NON_PIT",
+      "rows_imported": 0,
+      "member_sha256": "b123ae70f5fd5b944fe4d9bad453009a6bcfd18d1dedc91e1f12656f391cbcad",
+      "member_bytes": 139196,
+      "source_rows": 1021,
+      "failed_rows": 1,
+      "first_failure": {
+        "native_csv_line": 961,
+        "open_time": "1504713600000",
+        "predicates": [
+          {
+            "field": 6,
+            "value": "1504713600000",
+            "expected": "1504713659999",
+            "delta_native_units": -59999,
+            "predicate": "close_time_equals_open_plus_minute_minus_one"
+          }
+        ]
+      },
+      "failures": [
+        {
+          "native_csv_line": 961,
+          "open_time": "1504713600000",
+          "predicates": [
+            {
+              "field": 6,
+              "value": "1504713600000",
+              "expected": "1504713659999",
+              "delta_native_units": -59999,
+              "predicate": "close_time_equals_open_plus_minute_minus_one"
+            }
+          ]
+        }
+      ],
+      "source_open_time_gaps": [
+        [
+          1504713660000,
+          1504738800000
+        ]
+      ],
+      "zip_bytes": 33224
+    }
+  ]
+}

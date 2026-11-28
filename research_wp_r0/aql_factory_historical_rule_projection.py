@@ -8,14 +8,13 @@ independent universe, OOS or scientific acceptance to self-asserted receipts.
 from __future__ import annotations
 
 from collections import Counter
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from types import SimpleNamespace
 import math
 
-from research_wp_r0.aql_factory_authentic_research_admission import (
+from research_wp_r0.aql_factory_research_seal_v1 import (
     ResearchAdmissionError, _check_seal, _digest, _hash, _require, seal,
 )
-from research_wp_r0.aql_p2_factory_real_development import dec
 from research_wp_r0.strategy_definition import StrategyDefinition
 from research_wp_r0.indicator_library_v2 import IndicatorRegistryV2
 
@@ -33,8 +32,10 @@ COST_KEYS = ("fee_entry_bps", "fee_exit_bps", "spread_entry_bps",
 def _decimal(value, name):
     _require(type(value) is str, "COST_" + name.upper())
     try:
-        result = dec(value)
-    except ValueError as exc:
+        result = Decimal(value)
+        if not result.is_finite():
+            raise ValueError("NONFINITE_DECIMAL")
+    except (InvalidOperation, ValueError) as exc:
         raise ResearchAdmissionError("FACTORY_AUTHENTIC_COST_" + name.upper()) from exc
     _require(Decimal(0) <= result <= Decimal(1000), "COST_RANGE_" + name.upper())
     return result

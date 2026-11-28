@@ -179,6 +179,8 @@ def _validate(packet):
           "SELECTED_ATTEMPT_MISSING")
     _need(digest(packet["entries"]) != digest(packet["null_entries"]),
           "NULL_ALIASES_CANDIDATE")
+    _need(packet["scanner_entry_batch_sha256"] == digest(packet["entries"]),
+          "ENTRY_BATCH_PARENT_DRIFT")
     return fees, risk, targets, allocation
 
 
