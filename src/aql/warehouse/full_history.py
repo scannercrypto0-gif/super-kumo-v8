@@ -104,7 +104,9 @@ def continue_history(warehouse, source, *, clock_ms, progress=None, archive_limi
                         counters=dict(archives_this_run=imported, inserted_rows_this_run=inserted),
                         receipt_sha256=path.stem, code_sha256=code_sha,
                         config_sha256=config_sha,
-                        continuation_sha256=seal(CONTINUATION.encode()))
+                        continuation_sha256=seal(CONTINUATION.encode()),
+                        continuation_ref=CONTINUATION,
+                        accepted_prefix_unchanged=True)
         if progress: progress(event)
     report=run(warehouse,source,now_ms=started,archive_limit=archive_limit,
                progress=emit,clock_ms=clock_ms,continue_on_source_error=True)
@@ -149,7 +151,9 @@ def continue_history(warehouse, source, *, clock_ms, progress=None, archive_limi
             registry_sha256=registry.get('snapshot_sha256'),
             registry_watermark=registry.get('event_watermark'),
             code_sha256=code_sha, config_sha256=config_sha,
-            continuation_sha256=seal(CONTINUATION.encode()))
+            continuation_sha256=seal(CONTINUATION.encode()),
+            continuation_ref=CONTINUATION,
+            accepted_prefix_unchanged=True)
     return report
 
 
