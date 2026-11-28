@@ -231,7 +231,7 @@ class EarlyObservationTests(unittest.TestCase):
         lane = result["lanes"]["daily"]
         self.assertEqual(lane["status"], "HEALTHY_PROGRESS")
         self.assertEqual(lane["reason"], "DAILY_SOURCE_RECEIPT_LINKED_TO_REGISTRY")
-        self.assertEqual(lane["reported"]["registry_link"]["registry_source_receipt_sha256"], "3" * 64)
+        self.assertEqual(lane["reported"]["registry_link"]["source_receipt_sha256"], "3" * 64)
         self.assertEqual(lane["reported"]["registry_link"]["source_zip_sha256"], "2" * 64)
         self.assertEqual(lane["reported"]["source_age_ms"], 86_400_000)
         self.assertEqual(lane["reported"]["source_data_freshness"], "FRESH")
@@ -246,6 +246,69 @@ class EarlyObservationTests(unittest.TestCase):
         self.assertEqual(lane["reason"], "DAILY_SOURCE_DATA_STALE")
         self.assertEqual(lane["reported"]["source_age_ms"], 2 * 86_400_000)
         self.assertEqual(lane["reported"]["source_data_freshness"], "STALE")
+
+    def test_daily_wrong_day_linkage_cannot_verify_same_zip(self):
+        report = daily_linked()
+        report["last_success"]["warehouse_linkage"] = daily_linkage(
+            NOW, source_day=NOW - 2 * 86_400_000)
+        with tempfile.TemporaryDirectory() as folder:
+            result = self.build(paths_for(Path(folder), day=report, reg=registry()))
+        lane = result["lanes"]["daily"]
+        self.assertEqual(lane["status"], "UNKNOWN")
+        self.assertEqual(lane["reason"], "DAILY_LINKAGE_DAILY_BINDING")
+
+    def test_daily_checksum_substitution_cannot_verify_same_zip(self):
+        report = daily_linked()
+        report["last_success"]["checksum_sha256"] = "9" * 64
+        with tempfile.TemporaryDirectory() as folder:
+            result = self.build(paths_for(Path(folder), day=report, reg=registry()))
+        lane = result["lanes"]["daily"]
+        self.assertEqual(lane["status"], "UNKNOWN")
+        self.assertEqual(lane["reason"], "DAILY_LINKAGE_DAILY_BINDING")
+
+    def test_daily_import_receipt_mismatch_cannot_verify(self):
+        report = daily_linked()
+        proof = report["last_success"]["warehouse_linkage"]
+        imported = proof["import_receipt"]
+        imported["source_receipt_sha256"] = "f" * 64
+        imported = sealed(imported, "import_receipt_sha256")
+        proof["import_receipt"] = imported
+        report["last_success"]["warehouse_linkage"] = sealed(proof, "linkage_sha256")
+        with tempfile.TemporaryDirectory() as folder:
+            result = self.build(paths_for(Path(folder), day=report, reg=registry()))
+        lane = result["lanes"]["daily"]
+        self.assertEqual(lane["status"], "UNKNOWN")
+        self.assertEqual(lane["reason"], "DAILY_IMPORT_RECEIPT_BINDING")
+
+    def test_daily_bool_exit_code_is_not_success(self):
+        report = daily_linked()
+        report["last_success"]["exit_code"] = False
+        with tempfile.TemporaryDirectory() as folder:
+            result = self.build(paths_for(Path(folder), day=report, reg=registry()))
+        self.assertEqual(result["lanes"]["daily"]["status"], "UNKNOWN")
+        self.assertEqual(result["lanes"]["daily"]["reason"], "DAILY_SOURCE_EVIDENCE_UNVERIFIED")
+
+    def test_daily_unfinalized_source_day_is_not_accepted(self):
+        report = daily()
+        report["last_success"].update({
+            "status": "COMPLETE", "exit_code": 0,
+            "daily_source_evidence_status": "VERIFIED",
+            "daily_worker_receipt_sha256": "4" * 64,
+            "receipts": ["4" * 64], "source_zip_sha256": "2" * 64,
+            "checksum_sha256": "8" * 64, "source_day_ms": NOW,
+        })
+        with tempfile.TemporaryDirectory() as folder:
+            result = self.build(paths_for(Path(folder), day=report, reg=registry()))
+        self.assertEqual(result["lanes"]["daily"]["status"], "UNKNOWN")
+        self.assertEqual(result["lanes"]["daily"]["reason"], "DAILY_SOURCE_EVIDENCE_UNVERIFIED")
+
+    def test_explicit_daily_failure_overrides_stale_report_status(self):
+        report = daily(now=NOW - early.MAX_SNAPSHOT_AGE_MS - 1)
+        report["last_failure"] = {"status": "FAILED"}
+        with tempfile.TemporaryDirectory() as folder:
+            result = self.build(paths_for(Path(folder), day=report))
+        self.assertEqual(result["lanes"]["daily"]["status"], "FAILED")
+        self.assertEqual(result["lanes"]["daily"]["reason"], "DAILY_WORKER_FAILURE_REPORTED")
 
     def test_daily_verified_source_without_matching_registry_stays_unknown(self):
         with tempfile.TemporaryDirectory() as folder:
