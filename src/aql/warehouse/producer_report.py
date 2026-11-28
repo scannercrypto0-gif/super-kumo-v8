@@ -41,7 +41,8 @@ def publish_bounded(report_root, *, protected_root, lane, identity, sequence,
                     observed_ms, published_ms, status, reason, counters,
                     source_sha256=None, receipt_sha256=None,
                     registry_sha256=None, registry_watermark=None,
-                    source_day_ms=None, task_state=None):
+                    source_day_ms=None, task_state=None,
+                    code_sha256=None, config_sha256=None, continuation_sha256=None):
     """Atomic create-only fixed-schema report; no warehouse reads or cleanup.
 
     A deterministic (lane, identity, sequence) path makes replay idempotent;
@@ -63,7 +64,8 @@ def publish_bounded(report_root, *, protected_root, lane, identity, sequence,
         type(v) is int and 0 <= v <= 10**15 for k, v in counters.items()
     ), "PRODUCER_REPORT_COUNTERS")
     _require(all(_hex_or_none(v) for v in
-        (source_sha256, receipt_sha256, registry_sha256)),
+        (source_sha256, receipt_sha256, registry_sha256,
+         code_sha256, config_sha256, continuation_sha256)),
         "PRODUCER_REPORT_DIGEST")
     _require(registry_watermark is None or
              (type(registry_watermark) is int and registry_watermark >= 0),
@@ -90,6 +92,8 @@ def publish_bounded(report_root, *, protected_root, lane, identity, sequence,
                 source_sha256=source_sha256, receipt_sha256=receipt_sha256,
                 registry_sha256=registry_sha256,
                 registry_watermark=registry_watermark,
+                code_sha256=code_sha256, config_sha256=config_sha256,
+                continuation_sha256=continuation_sha256,
                 source_day_ms=source_day_ms, task_state=task_state,
                 source_class="RETROSPECTIVE_NON_PIT",
                 full_history_verified=False if lane == "HISTORY" else None,
