@@ -35,7 +35,7 @@ def import_retained(warehouse, directory, *, observed_ms, archive_limit=10000):
 
 
 def import_one_retained(warehouse, archive, *, source_day_ms, expected_zip_sha256,
-                        expected_checksum_sha256, observed_ms):
+                        expected_checksum_sha256, observed_ms, report_root=None):
     """Admit exactly one pinned retained archive after UTC-day and byte preflight."""
     need(type(source_day_ms) is int and source_day_ms > 0 and source_day_ms % 86_400_000 == 0,
          'DAILY_SOURCE_DAY_INVALID')
@@ -72,7 +72,27 @@ def import_one_retained(warehouse, archive, *, source_day_ms, expected_zip_sha25
                       source_network_calls=0, scheduler_changes=0)
         receipt_path = warehouse.document('receipts', report)
         report['warehouse_receipt_sha256'] = receipt_path.stem
-        return report
+    # Outside the writer lock: no additional warehouse scan or mutation.
+    if report_root is not None:
+        from .producer_report import publish_bounded
+        registry = report.get('registry') or {}
+        publish_bounded(report_root, protected_root=warehouse.root,
+            lane='DAILY', identity=seal(expected_zip_sha256.encode())[:16],
+            sequence=source_day_ms, observed_ms=observed_ms,
+            published_ms=time.time_ns() // 1_000_000,
+            status='SOURCE_IMPORT_COMMITTED', reason='REGISTRY_LINK_PRESENT'
+                if registry.get('snapshot_sha256') else 'REGISTRY_LINK_UNKNOWN',
+            counters=dict(source_rows=imported.get('source_rows', 0),
+                          inserted_rows=imported.get('inserted_rows', 0),
+                          duplicate_rows=imported.get('duplicate_rows', 0),
+                          conflicts=imported.get('conflicts', 0)),
+            source_sha256=imported.get('source_sha256'),
+            receipt_sha256=receipt_path.stem,
+            registry_sha256=registry.get('snapshot_sha256'),
+            registry_watermark=registry.get('event_watermark'),
+            source_day_ms=source_day_ms,
+            task_state=None)  # Task Ready/worker status is not import proof.
+    return report
 
 
 def main():
