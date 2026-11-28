@@ -30,4 +30,3 @@ def test_real_missing_bars_remain_unresolved(monkeypatch):
     assert report.expected_bars == 2
     assert report.unresolved == 2
     assert report.status == "UNRESOLVED_DATA_GAP"
-
