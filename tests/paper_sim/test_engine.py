@@ -167,6 +167,21 @@ def test_missing_depth_unknown_and_cost_stress(tmp_path):
     assert results[1]<results[0]
 
 
+def test_taker_spread_cannot_push_execution_over_notional_cap(tmp_path):
+    policy = Policy(max_notional="100")
+    sim, sid, path = setup_sim(tmp_path, policy=policy)
+    before = path.read_bytes()
+
+    state = sim.apply(sid, "over_cap", candle())
+
+    assert state["phase"] == "UNKNOWN"
+    assert state["reason"] == "MAX_NOTIONAL_EXECUTION_CAP"
+    assert state["filled"] == "0" and state["fills"] == []
+    assert state["net_pnl"] is None
+    assert path.read_bytes() != before  # the rejection is durable and replayable
+    assert PaperSimulator(path).states[sid] == state
+
+
 def test_duplicates_conflicts_gaps_terminal_and_bounds(tmp_path):
     sim,sid,path=setup_sim(tmp_path);before=path.read_bytes()
     with pytest.raises(ValueError):sim.apply(sid,"arm",arm(qty="2"))
@@ -215,3 +230,4 @@ def test_torn_record_and_stale_writer_are_rejected(tmp_path):
     ("maker_fee_bps","1001"),("allow_fallback",1),("version",2),("max_notional","20000")])
 def test_policy_negative_guards(field,value):
     with pytest.raises(ValueError):Policy(**{field:value})
+
