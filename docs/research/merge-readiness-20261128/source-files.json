@@ -937,8 +937,8 @@
     },
     {
       "path": "tools/merge_readiness/run_acceptance.py",
-      "sha256": "2cda538d4ffb78c5ee8dd9a27f81c4b18a0986d1c8c562ab99057ef74abce703",
-      "git_blob": "09e17244d432f41daa7097ed0f260211adfd7dbe",
+      "sha256": "1d7241577c50cd78b4c96c5419ef1382878d0c313aedaf0b457d8142e53b2cfa",
+      "git_blob": "9cb2924e8b3d79f4ebd095f026afb38bef36797e",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },

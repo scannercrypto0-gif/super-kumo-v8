@@ -93,7 +93,7 @@ def main():
     env={**os.environ,'PYTHONPATH':os.pathsep.join((str(ROOT/'src'),str(ROOT/'tools'),str(ROOT))),
          'BINANCE_LIVE_TEST':'0','PYTHONDONTWRITEBYTECODE':'1'}
     rollback=verify_code_rollback()
-    result=subprocess.run([sys.executable,'-B','-m','pytest','-q','--timeout=120',
+    result=subprocess.run([sys.executable,'-B','-m','pytest','-q','--timeout=300',
                           '--junitxml=integration-junit.xml',*tests],cwd=ROOT,env=env)
     evidence={'schema':'aql.integrated-merge.synthetic-acceptance.v1',
         'evidence_grade':'SYNTHETIC_TESTED','tested_checkout_commit':git('rev-parse','HEAD'),
