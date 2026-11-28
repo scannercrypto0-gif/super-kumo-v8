@@ -54,7 +54,7 @@ jobs:
       - name: Stage exact audited Analyzer dependencies
         run: python .integration/research-baseline/tools/first_research_cycle/stage_dependencies.py --output .integration/research-kernel --fetch
       - name: Run feed and integration fixture suites
-        run: python -m pytest --timeout=60 tools/realtime_market_feed/test_service.py tools/realtime_market_feed/test_backfill.py tools/realtime_market_feed/test_atlas_integration.py tools/realtime_market_feed/test_acceptance_gates.py tools/realtime_market_feed/test_forward_research.py -q
+        run: python -m pytest --timeout=60 tools/realtime_market_feed/test_service.py tools/realtime_market_feed/test_backfill.py tools/realtime_market_feed/test_atlas_integration.py tools/realtime_market_feed/test_acceptance_gates.py tools/realtime_market_feed/test_forward_research.py tools/realtime_market_feed/test_cdr_d11b_evidence_class.py tools/realtime_market_feed/test_cdr_d14_evidence.py -q
       - name: Build machine-readable isolated evidence
         run: python -B -m tools.realtime_market_feed.integration_acceptance --output integration-evidence.json
       - uses: actions/upload-artifact@v4

@@ -572,6 +572,13 @@ def _daily_context_binding(context, daily_row, warehouse_root):
     return snapshot, candidates
 
 
+def _warehouse_evidence_class(warehouse_root):
+    """Classify only after native Registry and archive receipts are verified."""
+    root = Path(warehouse_root).resolve()
+    return ("GENERATED_SYNTHETIC_FIXTURE" if _in_temp(root)
+            else "NATIVE_ARCHIVE_READBACK")
+
+
 def build_registry_proposal(reconciliation, daily_query_context, *, warehouse_root=None):
     """Propose only after a read-only native query reproduces bars and Registry."""
     from aql.warehouse.storage import canonical, seal
@@ -582,10 +589,11 @@ def build_registry_proposal(reconciliation, daily_query_context, *, warehouse_ro
         daily_query_context, daily_row, warehouse_root)
     source_pins = sorted({item["source_zip_sha256"] for item in sources})
     receipt_pins = sorted({item["source_receipt_sha256"] for item in sources})
+    evidence_class = _warehouse_evidence_class(warehouse_root)
     proposal = {
         "schema": "aql.realtime-warehouse-reconciliation-proposal.v2",
         "status": "PROPOSED_ONLY",
-        "evidence_class": "GENERATED_SYNTHETIC_FIXTURE",
+        "evidence_class": evidence_class,
         "venue": verified["venue"], "market": verified["market"],
         "bar_key": verified["daily_key"],
         "reconciliation_sha256": verified["reconciliation_sha256"],

@@ -96,7 +96,10 @@ def build_observation_evidence(database, run_id):
         started, stopped = run["started_ms"], run["stopped_ms"]
         if type(started) is not int or type(stopped) is not int:
             raise ValueError("OBSERVATION_RUN_INCOMPLETE")
-        lo, hi = started//MINUTE_MS, stopped//MINUTE_MS
+        # Count only candles whose full minute lies inside the observed
+        # interval. A partial leading or trailing candle is not a data gap.
+        lo = (started + MINUTE_MS - 1)//MINUTE_MS
+        hi = stopped//MINUTE_MS
         per_symbol = {}
         missing = []
         observed = expected = 0
@@ -159,7 +162,7 @@ def build_observation_evidence(database, run_id):
         event_digest = _sha(_canonical(events))
         before = _file_set_sha(path)
         fault_events=_fault_events(events)
-        recoveries = []
+        recovery_groups = {}
         for event in fault_events:
             recovery_kind = ("GAP_BACKFILL_COMPLETED" if event["kind"].startswith("GAP_")
                              else "FINAL_BAR_RECEIVED" if event["kind"]=="MESSAGE_REJECTED"
@@ -168,11 +171,14 @@ def build_observation_evidence(database, run_id):
                 if candidate["id"] > event["id"] and candidate["kind"] == recovery_kind
                 and candidate["at_ms"] >= event["at_ms"]),None)
             if recovery:
-                recoveries.append({"fault_event_id":event["id"],
-                                   "recovery_event_id":recovery["id"]})
+                group = recovery_groups.setdefault(recovery["id"],
+                    {"fault_event_ids":[], "recovery_event_id":recovery["id"]})
+                group["fault_event_ids"].append(event["id"])
+        recoveries = list(recovery_groups.values())
+        recovered_fault_count = sum(len(group["fault_event_ids"]) for group in recoveries)
         fault_count = len(fault_events)
         natural_fault = ("NOT_OBSERVED" if fault_count == 0 else
-                         "OBSERVED_AND_RECOVERED" if len(recoveries) == fault_count else
+                         "OBSERVED_AND_RECOVERED" if recovered_fault_count == fault_count else
                          "OBSERVED_NOT_RECOVERED")
         start_event = next((event for event in events if event["kind"]=="RUN_STARTED"),None)
         stop_event = next((event for event in reversed(events) if event["kind"]=="SERVICE_STOP"),None)
