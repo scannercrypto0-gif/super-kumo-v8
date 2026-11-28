@@ -230,4 +230,3 @@ def test_torn_record_and_stale_writer_are_rejected(tmp_path):
     ("maker_fee_bps","1001"),("allow_fallback",1),("version",2),("max_notional","20000")])
 def test_policy_negative_guards(field,value):
     with pytest.raises(ValueError):Policy(**{field:value})
-
