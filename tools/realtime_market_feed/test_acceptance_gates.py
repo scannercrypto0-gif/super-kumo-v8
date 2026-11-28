@@ -116,7 +116,7 @@ def test_24h_gate_rejects_duplicate_unknown_truncated_and_forged_evidence(tmp_pa
             "COMPLETE_EVENT_SET_REQUIRED"} <= set(result["failures"])
 
     report,path,config=_accepted_report(tmp_path)
-    report["coverage"]["expected_closed_bars"]=1439
+    report["coverage"]["expected_closed_bars"]=1440
     assert "CLOSED_BAR_COVERAGE_INCOMPLETE" in _evaluate(report,path,config)["failures"]
 
     report,path,config=_accepted_report(tmp_path)
