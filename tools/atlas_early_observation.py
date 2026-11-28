@@ -8,6 +8,7 @@ or changes source lanes. This profile is distinct from strict full-watchdog mode
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import json
 import os
 import re
@@ -242,6 +243,68 @@ def _history(item, registry_item, previous, now, clock_ok):
                         doc.get("schema"), doc.get("finished_ms"))
 
 
+def _verify_daily_linkage(doc, last, registry_doc, registry_view, source_day,
+                           worker_receipt, source_zip, checksum):
+    proof = last.get("warehouse_linkage")
+    require(type(proof) is dict, "DAILY_LINKAGE_MISSING")
+    watchdog.sealed_hash(proof, "linkage_sha256", "DAILY_LINKAGE_SEAL")
+    require(proof.get("schema") == "aql.daily.warehouse-linkage.v1"
+            and proof.get("status") == "VERIFIED"
+            and proof.get("trust_scope") == "OWNER_SUPPLIED_PRODUCER_LINKAGE_REPORT_ONLY"
+            and proof.get("observed_at_ms") == doc.get("observed_at_ms")
+            and type(proof.get("producer_code_sha256")) is str
+            and watchdog.HEX64.fullmatch(proof["producer_code_sha256"])
+            and type(proof.get("config_sha256")) is str
+            and watchdog.HEX64.fullmatch(proof["config_sha256"]),
+            "DAILY_LINKAGE_CONTRACT")
+    expected_day = proof.get("source_day_ms")
+    expected_key = proof.get("source_key")
+    expected_archive = (f"BTCUSDT-1m-{datetime.fromtimestamp(source_day / 1000, timezone.utc):%Y-%m-%d}.zip"
+                        if type(source_day) is int else None)
+    require(expected_day == source_day and expected_key == expected_archive
+            and proof.get("worker_receipt_sha256") == worker_receipt
+            and proof.get("source_zip_sha256") == source_zip
+            and proof.get("checksum_sha256") == checksum,
+            "DAILY_LINKAGE_DAILY_BINDING")
+    source_receipt = proof.get("source_receipt")
+    require(type(source_receipt) is dict, "DAILY_SOURCE_RECEIPT_MISSING")
+    watchdog.sealed_hash(source_receipt, "receipt_sha256", "DAILY_SOURCE_RECEIPT_SEAL")
+    require(source_receipt.get("publisher_integrity") == "ZIP_CHECKSUM_MATCH"
+            and source_receipt.get("key") == expected_key
+            and source_receipt.get("source_zip_sha256") == source_zip
+            and source_receipt.get("checksum_sha256") == checksum,
+            "DAILY_SOURCE_RECEIPT_BINDING")
+    import_receipt = proof.get("import_receipt")
+    require(type(import_receipt) is dict, "DAILY_IMPORT_RECEIPT_MISSING")
+    watchdog.sealed_hash(import_receipt, "import_receipt_sha256", "DAILY_IMPORT_RECEIPT_SEAL")
+    require(import_receipt.get("status") == "ARCHIVE_IMPORTED"
+            and import_receipt.get("key") == expected_key
+            and import_receipt.get("source_sha256") == source_zip
+            and import_receipt.get("source_receipt_sha256") == source_receipt["receipt_sha256"],
+            "DAILY_IMPORT_RECEIPT_BINDING")
+    require(proof.get("registry_snapshot_sha256") == registry_view["snapshot_sha256"]
+            and type(proof.get("registry_event_watermark")) is int
+            and proof["registry_event_watermark"] == registry_view["counters"]["event_watermark"],
+            "DAILY_REGISTRY_SNAPSHOT_BINDING")
+    match = next((row for row in registry_doc["sources"]
+                  if row.get("source_zip_sha256") == source_zip
+                  and row.get("source_receipt_sha256") == source_receipt["receipt_sha256"]
+                  and row.get("key") == expected_key), None)
+    require(match is not None, "DAILY_REGISTRY_APPEND_NOT_VERIFIED")
+    return {
+        "source_day_ms": source_day,
+        "source_key": expected_key,
+        "worker_receipt_sha256": worker_receipt,
+        "source_zip_sha256": source_zip,
+        "checksum_sha256": checksum,
+        "source_receipt_sha256": source_receipt["receipt_sha256"],
+        "import_receipt_sha256": import_receipt["import_receipt_sha256"],
+        "registry_snapshot_sha256": registry_view["snapshot_sha256"],
+        "registry_event_watermark": registry_view["counters"]["event_watermark"],
+        "trust_scope": "OWNER_SUPPLIED_PRODUCER_LINKAGE_REPORT_ONLY",
+    }
+
+
 def _daily(item, registry_item, now):
     doc = item["doc"]
     if doc is None:
@@ -260,13 +323,13 @@ def _daily(item, registry_item, now):
         if receipt is not None:
             require(watchdog.HEX64.fullmatch(receipt) is not None, "DAILY_RECEIPT_PIN_INVALID")
         registry_link = None
-        if state is None and (doc.get("task_state") == "Disabled" or doc.get("scheduler_state") == "Disabled"):
+        if doc.get("task_state") == "Disabled" or doc.get("scheduler_state") == "Disabled":
             state, reason = "FAILED", "DAILY_SCHEDULER_DISABLED"
-        if state is None and doc.get("runtime_state") in {"CONFIG_PIN_MISMATCH", "ERROR"}:
+        elif doc.get("runtime_state") in {"CONFIG_PIN_MISMATCH", "ERROR"}:
             state, reason = "FAILED", "DAILY_RUNTIME_PIN_OR_EXECUTION_FAILURE"
-        if state is None and failure is not None:
+        elif failure is not None:
             state, reason = "FAILED", "DAILY_WORKER_FAILURE_REPORTED"
-        if state is None and doc.get("source_freshness") == "STALE":
+        elif doc.get("source_freshness") == "STALE":
             state, reason = "STALE", "DAILY_SOURCE_REPORTED_STALE"
         if state is None and doc.get("cycle_evidence") == "WAIT_FOR_SOURCE":
             next_check = doc.get("next_check_ms")
@@ -280,12 +343,13 @@ def _daily(item, registry_item, now):
             source_day = last.get("source_day_ms")
             receipts = last.get("receipts")
             evidence_ok = (
-                last.get("status") == "COMPLETE" and last.get("exit_code") == 0
+                last.get("status") == "COMPLETE" and type(last.get("exit_code")) is int and last.get("exit_code") == 0
                 and last.get("daily_source_evidence_status") == "VERIFIED"
                 and type(worker_receipt) is str and watchdog.HEX64.fullmatch(worker_receipt)
                 and type(source_zip) is str and watchdog.HEX64.fullmatch(source_zip)
                 and type(checksum) is str and watchdog.HEX64.fullmatch(checksum)
-                and type(source_day) is int and source_day >= 0 and source_day % 86_400_000 == 0
+                and type(source_day) is int and source_day > 0 and source_day % 86_400_000 == 0
+                and type(observed) is int and source_day + 86_400_000 <= observed
                 and type(receipts) is list and len(receipts) == 1 and receipts[0] == worker_receipt)
             if not evidence_ok:
                 state, reason = "UNKNOWN", "DAILY_SOURCE_EVIDENCE_UNVERIFIED"
@@ -306,21 +370,13 @@ def _daily(item, registry_item, now):
                     if registry_state is not None:
                         state, reason = registry_state, "DAILY_REGISTRY_REPORT_STALE_OR_UNTRUSTED"
                     else:
-                        match = next((row for row in registry_doc["sources"]
-                                      if row["source_zip_sha256"] == source_zip), None)
-                        if match is None:
-                            state, reason = "UNKNOWN", "DAILY_REGISTRY_APPEND_NOT_VERIFIED"
-                        else:
-                            registry_link = {
-                                "source_day_ms": source_day,
-                                "worker_receipt_sha256": worker_receipt,
-                                "source_zip_sha256": source_zip,
-                                "checksum_sha256": checksum,
-                                "registry_source_receipt_sha256": match["source_receipt_sha256"],
-                                "registry_snapshot_sha256": registry_view["snapshot_sha256"],
-                                "registry_event_watermark": registry_view["counters"]["event_watermark"],
-                            }
+                        try:
+                            registry_link = _verify_daily_linkage(
+                                doc, last, registry_doc, registry_view, source_day,
+                                worker_receipt, source_zip, checksum)
                             state, reason = "HEALTHY_PROGRESS", "DAILY_SOURCE_RECEIPT_LINKED_TO_REGISTRY"
+                        except ValueError as exc:
+                            state, reason = "UNKNOWN", safe_reason(str(exc))
         source_day = last.get("source_day_ms")
         source_age = observed - source_day if type(observed) is int and type(source_day) is int and 0 <= source_day <= observed else None
         return {"lane": "daily", "status": state, "reason": reason,
