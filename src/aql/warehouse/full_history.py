@@ -78,7 +78,10 @@ def continue_history(warehouse, source, *, clock_ms, progress=None, archive_limi
     need(admitted_gap_ranges(warehouse,catalog_index(warehouse)) == [GAP],
          'ACCEPTED_SEPTEMBER_DERIVATION_REQUIRED')
     imported=0; inserted=0
-    report_identity = seal(CONTINUATION.encode())[:16]
+    started=clock_ms()
+    report_identity = seal(canonical(dict(continuation=CONTINUATION, started_ms=started)))[:16]
+    code_sha = seal(Path(__file__).read_bytes())
+    config_sha = seal(canonical(dict(continuation=CONTINUATION, archive_limit=archive_limit)))
     def emit(event):
         nonlocal imported,inserted
         if event['event'] in ('ARCHIVE_IMPORTED','RETAINED_ARCHIVE_RECONCILED'):
@@ -99,9 +102,10 @@ def continue_history(warehouse, source, *, clock_ms, progress=None, archive_limi
                         observed_ms=observed, published_ms=time.time_ns() // 1_000_000,
                         status='COMMITTED_CHECKPOINT', reason='CONTINUATION_PENDING',
                         counters=dict(archives_this_run=imported, inserted_rows_this_run=inserted),
-                        receipt_sha256=path.stem)
+                        receipt_sha256=path.stem, code_sha256=code_sha,
+                        config_sha256=config_sha,
+                        continuation_sha256=seal(CONTINUATION.encode()))
         if progress: progress(event)
-    started=clock_ms()
     report=run(warehouse,source,now_ms=started,archive_limit=archive_limit,
                progress=emit,clock_ms=clock_ms,continue_on_source_error=True)
     after=protected_snapshot(warehouse)
@@ -143,7 +147,9 @@ def continue_history(warehouse, source, *, clock_ms, progress=None, archive_limi
                           failures=len(report.get('failures') or [])),
             receipt_sha256=path.stem,
             registry_sha256=registry.get('snapshot_sha256'),
-            registry_watermark=registry.get('event_watermark'))
+            registry_watermark=registry.get('event_watermark'),
+            code_sha256=code_sha, config_sha256=config_sha,
+            continuation_sha256=seal(CONTINUATION.encode()))
     return report
 
 
