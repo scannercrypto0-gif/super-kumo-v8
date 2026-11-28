@@ -50,6 +50,7 @@ jobs:
           tests/test_g1_wp04.py
           tests/test_g1_wp04_fix01.py
           tests/test_g1_completion.py
+          tests/test_cdr_d04_reconnect_budget.py
           -v --tb=long
           --junit-xml=test-results-${{ matrix.os }}.xml
         env:
