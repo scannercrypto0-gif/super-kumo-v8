@@ -93,7 +93,8 @@ def test_bad_receipts_and_source_fail_closed(mode):
     bars, _, _ = fixture()
     from research_wp_r0.historical_library import BarQuality
     changes = {"unknown":dict(ingest_time_ms=None),
-               "late":dict(ingest_time_ms=BASE_MS+11*IMS),
+               "late":dict(ingest_time_ms=BASE_MS+11*IMS,
+                           observation_cutoff_ms=BASE_MS+11*IMS),
                "future":dict(observation_cutoff_ms=BASE_MS+11*IMS),
                "nonfinal":dict(quality=BarQuality.NON_FINAL),
                "source":dict(source_label="other")}
