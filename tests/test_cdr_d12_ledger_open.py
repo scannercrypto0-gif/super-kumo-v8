@@ -43,4 +43,3 @@ def test_new_empty_ledger_can_still_start_with_admission_required(tmp_path):
 
     assert ledger.require_admission is True
     assert _policy_and_receipt_count(path) == (1, 0)
-
