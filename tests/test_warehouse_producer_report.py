@@ -18,8 +18,8 @@ def _args(tmp_path, **overrides):
                 observed_ms=START + DAY, published_ms=START + DAY + 100,
                 status="COMMITTED_CHECKPOINT", reason="CONTINUATION_PENDING",
                 counters=dict(archives_this_run=3),
-                full_history_verified=False)
-    args.pop("full_history_verified")
+                continuation_ref="https://github.com/scannercrypto0-gif/super-kumo-v8/pull/330",
+                accepted_prefix_unchanged=True)
     args.update(overrides)
     return args
 
@@ -32,7 +32,11 @@ def test_atomic_report_is_create_only_and_replay_conflict_rejected(tmp_path):
     path = args["report_root"] / one["name"]
     assert seal(path.read_bytes()) == one["sha256"]
     assert len(list(args["report_root"].iterdir())) == 1
-    assert json.loads(path.read_bytes())["full_history_verified"] is False
+    body = json.loads(path.read_bytes())
+    assert body["full_history_verified"] is False
+    assert body["schema"] == "aql.warehouse.full-history-checkpoint.v1"
+    assert body["archives_this_run"] == 3 and body["inserted_rows_this_run"] == 0
+    assert body["observed_at_ms"] == args["observed_ms"]
     with pytest.raises(ValueError, match="REPLAY_CONFLICT"):
         publish_bounded(**{**args, "status": "FULL_HISTORY_VERIFIED"})
     assert seal(path.read_bytes()) == one["sha256"]
@@ -50,7 +54,7 @@ def test_atomic_report_is_create_only_and_replay_conflict_rejected(tmp_path):
 ])
 def test_fail_closed_before_report_creation(tmp_path, changed):
     args = _args(tmp_path)
-    if changed["report_root"] is None if "report_root" in changed else False:
+    if changed.get("report_root", "NOT_SET") is None:
         changed = {"report_root": args["protected_root"]}
     with pytest.raises((TypeError, ValueError)):
         publish_bounded(**{**args, **changed})
@@ -89,6 +93,8 @@ def test_daily_report_only_after_real_synthetic_import_and_registry(tmp_path):
     assert evidence["source_sha256"] == seal(raw)
     assert evidence["receipt_sha256"] == ret["warehouse_receipt_sha256"]
     assert evidence["registry_sha256"] == ret["registry"]["snapshot_sha256"]
+    assert evidence["checksum_sha256"] == seal(checksum)
+    assert evidence["source_receipt_sha256"] in {x["source_receipt_sha256"] for x in ret["registry"]["sources"]}
     assert evidence["publisher_import_registry_verified"] is True
     assert evidence["task_state"] is None
     assert evidence["source_day_ms"] == START
