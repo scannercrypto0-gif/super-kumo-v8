@@ -1,13 +1,13 @@
 """
-AQL Binance Collector — G1-WP01-MVP
+AQL Binance Collector ? G1-WP01-MVP
 
 WebSocket kline stream for Binance Spot public market data.
 No API keys required (public endpoint).
 
 Pipeline:
-  Binance WebSocket → DurableJournal.commit() → OperationalStore.upsert()
+  Binance WebSocket ? DurableJournal.commit() ? OperationalStore.upsert()
 
-Telemetry tracked per execution order §A:
+Telemetry tracked per execution order ?A:
   - source timestamps (Binance k.t / k.T)
   - local ingested_at (wall-clock on message receipt)
   - committed_at (after journal fsync)
@@ -105,6 +105,15 @@ class BinanceCollector:
         # Track disconnect window for gap recovery
         self.gap_start_ms: Optional[int] = None
         self.gap_end_ms: Optional[int] = None
+        # Reconnect quotas are per unhealthy streak, not for the lifetime of
+        # the collector. A session that delivered a finalized bar is evidence
+        # that the previous streak recovered.
+        self._session_had_final_bar = False
+
+    @staticmethod
+    def _attempt_after_session(attempt: int, session_had_final_bar: bool) -> int:
+        """Reset bounded reconnect backoff after a session made real progress."""
+        return 0 if session_had_final_bar else attempt
 
     def _stream_name(self) -> str:
         return f"{self.symbol.lower()}@kline_{self.interval}"
@@ -162,7 +171,7 @@ class BinanceCollector:
                     self.metrics.latency_ws_to_commit_return_samples.append(observed-bar.ingested_at)
                     self.metrics.latency_ws_to_commit_return_samples[:] = self.metrics.latency_ws_to_commit_return_samples[-1000:]
 
-                # Latency: ingested_at → committed_at
+                # Latency: ingested_at ? committed_at
                 if committed_at and bar.ingested_at:
                     lat = committed_at - bar.ingested_at
                     self.metrics.latency_ws_to_commit_samples.append(lat)
@@ -178,6 +187,7 @@ class BinanceCollector:
                     self.metrics.store_insert_count += 1
                 self.journal.mark_persisted(bar.stable_key())
             self.health_state = "STREAMING"
+            self._session_had_final_bar = True
 
             if self.max_bars and self.metrics.journal_commit_count >= self.max_bars:
                 logger.info("Reached max_bars=%d, stopping.", self.max_bars)
@@ -219,7 +229,7 @@ class BinanceCollector:
         if self.gap_start_ms is not None:
             self.gap_end_ms = int(time.time() * 1000)
             logger.info(
-                "Reconnected. Gap window: %d → %d (%d ms)",
+                "Reconnected. Gap window: %d ? %d (%d ms)",
                 self.gap_start_ms,
                 self.gap_end_ms,
                 self.gap_end_ms - self.gap_start_ms,
@@ -248,6 +258,7 @@ class BinanceCollector:
                         on_open=self._on_open,
                     )
                     self._ws = ws
+                    self._session_had_final_bar = False
                     ws.run_forever(
                         sslopt={"cert_reqs": ssl.CERT_REQUIRED},
                         ping_interval=20,
@@ -258,6 +269,8 @@ class BinanceCollector:
 
                 if self._stop_event.is_set():
                     break
+
+                attempt = self._attempt_after_session(attempt, self._session_had_final_bar)
 
                 attempt += 1
                 if attempt >= MAX_RECONNECT_ATTEMPTS:
@@ -297,3 +310,4 @@ class BinanceCollector:
         self._stop_event.set()
         if self._ws:
             self._ws.close()
+
