@@ -459,4 +459,3 @@ def test_sqlite_write_lock_is_bounded_and_uncommitted_bar_not_claimed(tmp_path):
     finally:
         conn.execute("ROLLBACK");conn.close()
     assert not j.replay()
-
