@@ -385,3 +385,25 @@ def test_qualification_keeps_native_denominators_and_blocks_inference(tmp_path):
     assert classify_interval("0.02", "0.04", "0.01", qualified_sample=False) == "INCONCLUSIVE"
     with pytest.raises(ValueError, match="INVALID_CONFIDENCE_INTERVAL"):
         classify_interval("0.04", "0.02", "0.01", qualified_sample=True)
+
+
+def test_paired_block_interval_and_missing_data():
+    from decimal import Decimal
+    from tools.pit_oos_readiness.qualification import paired_uncertainty, statistical_control
+
+    settings = dict(min_slots=12, block_slots=3, resamples=200,
+                    seed=299, alpha="0.05", minimum_effect="0")
+    pairs = [("0.001", "0.003"), ("-0.002", "0.001")] * 6
+    result = paired_uncertainty(pairs, **settings)
+    assert result["verdict"] == "PASS"
+    assert Decimal("0.002") <= Decimal(result["confidence_interval"][0])
+    assert Decimal(result["confidence_interval"][1]) <= Decimal("0.003")
+    assert result["paired_differential_sharpe"] is not None
+    assert paired_uncertainty(pairs, **settings) == result
+    assert paired_uncertainty([(s, b) for b, s in pairs], **settings)["verdict"] == "FAIL"
+    for unqualified in (pairs[:-1], pairs[:-1] + [(None, "0.01")]):
+        result = paired_uncertainty(unqualified, **settings)
+        assert result["confidence_interval"] is None and result["verdict"] == "INCONCLUSIVE"
+    control = statistical_control()
+    assert list(map(Decimal, control["confidence_interval"])) == [0, 0]
+    assert control["paired_differential_sharpe"] is None and control["verdict"] == "INCONCLUSIVE"

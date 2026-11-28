@@ -1,5 +1,6 @@
 """Offline scientific readiness reporting over the existing Factory and Lab outputs."""
 from decimal import Decimal, localcontext
+from random import Random
 
 from research_wp_r0.aql_p2_factory_lab import HORIZONS, build_lab, digest
 
@@ -27,8 +28,8 @@ def paired_lab(protocol, scanner):
         "base_definition_sha256": protocol["baseline_sha256"],
         "shadow_definition_sha256": scanner["strategy_sha256"],
         "embargo_ms": times["embargo_ms"],
-        # The native Lab consumes the complete pre-holdout development population.
-        "train_end_exclusive_ms": times["validation_end_ms"],
+        # Allow the final validation bar acknowledgement before the embargo.
+        "train_end_exclusive_ms": times["validation_end_ms"] + times["step_ms"],
         "holdout_start_ms": times["oos_start_ms"],
         "holdout_end_exclusive_ms": times["oos_end_ms"],
     }
@@ -39,11 +40,10 @@ def paired_lab(protocol, scanner):
         oid = digest(row)
         pid = digest(dict(protocol_sha256=pins["protocol_sha256"], trial_id=pins["trial_id"],
                           opportunity_id=oid))
-        # Native Lab indexes descriptive slots; it does not recompute timing.
-        slot = row["open_ms"]
+        decision = row["ack"]["commit_return_observed_at_ms"]
         pairs.append({"pair_id": pid, "opportunity": dict(
             source, trial_id=pins["trial_id"], opportunity_id=oid,
-            decision_ms=slot, decision_cutoff_ms=slot,
+            decision_ms=decision, decision_cutoff_ms=decision,
             disposition="TRIGGERED" if row["state"] == "ENTRY" else row["state"],
             evidence_class="RETROSPECTIVE_NON_PIT"),
             "arms": [
@@ -79,6 +79,57 @@ def classify_interval(lower, upper, minimum_effect, *, qualified_sample):
     return "INCONCLUSIVE"
 
 
+def paired_uncertainty(pairs, *, min_slots, block_slots, resamples, seed, alpha, minimum_effect):
+    """Evaluate already aligned regular-grid modeled returns using paired moving blocks."""
+    alpha = Decimal(alpha)
+    if (not alpha.is_finite() or not 0 < alpha < 1
+            or not 2 <= block_slots <= min_slots
+            or not 1 <= resamples <= 100_000
+            or alpha * resamples / 2 < 1):
+        raise ValueError("INVALID_FROZEN_UNCERTAINTY_POLICY")
+    n = len(pairs)
+    missing = sum(base is None or shadow is None for base, shadow in pairs)
+    result = dict(slots=n, unknown_slots=missing, confidence_interval=None, paired_differential_sharpe=None,
+                  verdict="INCONCLUSIVE")
+    if missing or n < min_slots or n // block_slots < 2:
+        return result
+    with localcontext() as ctx:
+        ctx.prec = 40
+        deltas = [Decimal(shadow) - Decimal(base) for base, shadow in pairs]
+        if not all(value.is_finite() for value in deltas):
+            raise ValueError("NONFINITE_PAIRED_RETURN")
+        mean = sum(deltas) / n
+        variance = sum((value - mean) ** 2 for value in deltas) / (n - 1)
+        prefix = [Decimal(0)]
+        for value in deltas:
+            prefix.append(prefix[-1] + value)
+        blocks, tail = divmod(n, block_slots)
+        rng = Random(seed)
+        means = []
+        for _ in range(resamples):
+            starts = [rng.randrange(n - block_slots + 1) for _ in range(blocks)]
+            total = sum(prefix[start + block_slots] - prefix[start] for start in starts)
+            if tail:
+                start = rng.randrange(n - block_slots + 1)
+                total += prefix[start + tail] - prefix[start]
+            means.append(total / n)
+        means.sort()
+        rank = int(alpha * resamples / 2)
+        lower, upper = means[rank - 1], means[-rank]
+        return dict(result, confidence_interval=[str(lower), str(upper)],
+                    paired_differential_sharpe=str(mean / variance.sqrt()) if variance else None,
+                    verdict=classify_interval(lower, upper, minimum_effect, qualified_sample=True))
+
+
+def statistical_control():
+    """Use identical synthetic arms to exercise the equal-arm null without market outcomes."""
+    values = [("0.001", "0.001"), ("-0.002", "-0.002")] * 6
+    result = paired_uncertainty(values, min_slots=12, block_slots=3, resamples=200,
+                                seed=299, alpha="0.05", minimum_effect="0")
+    return dict(result, scope="GENERATED_EQUAL_ARM_NEGATIVE_CONTROL",
+                block_slots=3, resamples=200, seed=299, alpha="0.05")
+
+
 def assess(protocol, scanner, report):
     paired = paired_lab(protocol, scanner)
     variants = {}
@@ -101,4 +152,5 @@ def assess(protocol, scanner, report):
         native_report_sha256=report["sha256"], paired_lab=paired, variants=variants,
         alpha=protocol["alpha"], reserved_hypotheses=protocol["hypothesis_budget"],
         adjusted_alpha=protocol["bonferroni_alpha"], venue_coverage=report["coverage"],
+        statistical_negative_control=statistical_control(),
         scientific_verdict="REAL_PIT_OOS_BLOCKED")

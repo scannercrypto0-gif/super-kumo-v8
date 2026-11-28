@@ -84,8 +84,8 @@ def configuration():
     validation_start = train_end + EMBARGO
     validation_end = validation_start + 48 * STEP
     times = dict(freeze_at_ms=4000, first_eligible_open_ms=STEP, train_end_ms=train_end,
-                 validation_end_ms=validation_end, oos_start_ms=validation_end + EMBARGO,
-                 oos_end_ms=validation_end + EMBARGO + 2 * STEP,
+                 validation_end_ms=validation_end, oos_start_ms=validation_end + EMBARGO + STEP,
+                 oos_end_ms=validation_end + EMBARGO + 3 * STEP,
                  step_ms=STEP, embargo_ms=EMBARGO)
     rights = dict(mode="FIXTURE_ONLY", provider="MOCK_PROVIDER_299", version="fixture-v1",
                   terms_as_of_ms=1000, expires_at_ms=times["oos_end_ms"] + STEP,

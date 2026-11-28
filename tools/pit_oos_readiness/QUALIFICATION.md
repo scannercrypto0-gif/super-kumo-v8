@@ -54,7 +54,7 @@ Use a fresh output directory. The decision binds the protocol, freeze, ordered c
 - Freeze a moving-block interval method, grid, block length, seed and resample count from development only. Select a block length that covers overlap and estimated serial dependence. Use the same time indices for both arms. Allocate alpha over the full frozen family and retain failed and unscanned trials. An adjusted interval entirely above the minimum material effect supports PASS and entirely below supports FAIL on that efficacy criterion. An overlapping interval or inadequate sample is INCONCLUSIVE. Independent admissibility, risk and cost gates are additionally required.
 - Pin regime definitions using only decision-time information. Report matched counts and outcome coverage for each predeclared regime and cost case without reselecting exits. Reconcile incomplete data, negative controls, cost components and repeated attempts before review.
 
-The statistical planning formulas specify a proposal. The existing fixture exercises the interval decision classifier and deliberately withholds empirical Sharpe, confidence intervals and power because its samples are synthetic and insufficient. There is no empirical venue-liquidity claim.
+The statistical planning formulas specify a proposal. The statistical helper exercises moving-block confidence bounds, the decision classifier and an equal-arm negative control on generated paired returns. The trade rehearsal withholds empirical Sharpe, confidence intervals and power because its samples are synthetic and insufficient. There is no empirical venue-liquidity claim.
 
 ## External proof and sign-off
 
