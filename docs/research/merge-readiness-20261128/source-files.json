@@ -194,8 +194,8 @@
     },
     {
       "path": "docs/research/merge-readiness-20261128/audit-realtime-05.md",
-      "sha256": "ea8c838a5017d4d7aedebe6004ec6198b5e2d4bde52b0b127a5be2f50303b42f",
-      "git_blob": "0b133bc8c6570c3ad036305767b4b128664a48eb",
+      "sha256": "6d07393cbc014fce4548c437403a6085c424cccc8c0a98d68231531ced67ef03",
+      "git_blob": "4e64648ed781f8ea7733d30d96f610824d8fd693",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
