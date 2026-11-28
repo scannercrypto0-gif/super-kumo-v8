@@ -70,7 +70,7 @@ def protected_snapshot(warehouse):
     return dict(august=august,september=dict(rows=rows,shard_sha256=hashes))
 
 
-def continue_history(warehouse, source, *, clock_ms, progress=None, archive_limit=10000, task_inspection=None):
+def continue_history(warehouse, source, *, clock_ms, progress=None, archive_limit=10000, task_inspection=None, report_root=None):
     need(warehouse.root.is_dir() and warehouse.path('catalog/warehouse-policy.json').is_file(),
          'EXISTING_WAREHOUSE_REQUIRED_NO_REBUILD')
     before=protected_snapshot(warehouse)
@@ -78,17 +78,28 @@ def continue_history(warehouse, source, *, clock_ms, progress=None, archive_limi
     need(admitted_gap_ranges(warehouse,catalog_index(warehouse)) == [GAP],
          'ACCEPTED_SEPTEMBER_DERIVATION_REQUIRED')
     imported=0; inserted=0
+    report_identity = seal(CONTINUATION.encode())[:16]
     def emit(event):
         nonlocal imported,inserted
         if event['event'] in ('ARCHIVE_IMPORTED','RETAINED_ARCHIVE_RECONCILED'):
             imported+=1; inserted+=event['inserted_rows']
             if imported % 3 == 0:
                 need(protected_snapshot(warehouse) == before,'ACCEPTED_PREFIX_CHANGED')
-                warehouse.document('receipts',dict(schema='aql.warehouse.full-history-checkpoint.v1',
+                checkpoint = dict(schema='aql.warehouse.full-history-checkpoint.v1',
                     continuation_ref=CONTINUATION,archives_this_run=imported,
                     inserted_rows_this_run=inserted,accepted_prefix_unchanged=True,
                     last_source_key=event['key'],source_class='RETROSPECTIVE_NON_PIT',
-                    full_history_verified=False,trading_authority='NONE'))
+                    full_history_verified=False,trading_authority='NONE')
+                path = warehouse.document('receipts', checkpoint)
+                if report_root is not None:
+                    from .producer_report import publish_bounded
+                    observed = clock_ms()
+                    publish_bounded(report_root, protected_root=warehouse.root,
+                        lane='HISTORY', identity=report_identity, sequence=imported,
+                        observed_ms=observed, published_ms=time.time_ns() // 1_000_000,
+                        status='COMMITTED_CHECKPOINT', reason='CONTINUATION_PENDING',
+                        counters=dict(archives_this_run=imported, inserted_rows_this_run=inserted),
+                        receipt_sha256=path.stem)
         if progress: progress(event)
     started=clock_ms()
     report=run(warehouse,source,now_ms=started,archive_limit=archive_limit,
@@ -119,6 +130,20 @@ def continue_history(warehouse, source, *, clock_ms, progress=None, archive_limi
     with warehouse.writer():
         path=warehouse.document('receipts',report)
     report['receipt_file']=path.name
+    if report_root is not None:
+        from .producer_report import publish_bounded
+        registry = report.get('registry') or {}
+        publish_bounded(report_root, protected_root=warehouse.root,
+            lane='HISTORY', identity=report_identity, sequence=10**15,
+            observed_ms=report['finished_ms'], published_ms=time.time_ns() // 1_000_000,
+            status=state, reason='BOUNDED_CONTINUATION_COMPLETE',
+            counters=dict(archives_this_run=imported, inserted_rows_this_run=inserted,
+                          gaps=len(report.get('internal_gaps') or []),
+                          conflicts=len(report.get('conflicting_candidates') or []),
+                          failures=len(report.get('failures') or [])),
+            receipt_sha256=path.stem,
+            registry_sha256=registry.get('snapshot_sha256'),
+            registry_watermark=registry.get('event_watermark'))
     return report
 
 
