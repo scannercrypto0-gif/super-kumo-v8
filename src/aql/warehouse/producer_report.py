@@ -42,7 +42,8 @@ def publish_bounded(report_root, *, protected_root, lane, identity, sequence,
                     source_sha256=None, receipt_sha256=None,
                     registry_sha256=None, registry_watermark=None,
                     source_day_ms=None, task_state=None,
-                    code_sha256=None, config_sha256=None, continuation_sha256=None):
+                    code_sha256=None, config_sha256=None, continuation_sha256=None,
+                    continuation_ref=None, accepted_prefix_unchanged=False):
     """Atomic create-only fixed-schema report; no warehouse reads or cleanup.
 
     A deterministic (lane, identity, sequence) path makes replay idempotent;
@@ -70,6 +71,11 @@ def publish_bounded(report_root, *, protected_root, lane, identity, sequence,
     _require(registry_watermark is None or
              (type(registry_watermark) is int and registry_watermark >= 0),
              "PRODUCER_REPORT_WATERMARK")
+    _require(continuation_ref is None or (type(continuation_ref) is str and
+             continuation_ref.startswith('https://github.com/scannercrypto0-gif/super-kumo-v8/')
+             and len(continuation_ref) <= 250), 'PRODUCER_REPORT_CONTINUATION')
+    _require(type(accepted_prefix_unchanged) is bool,
+             'PRODUCER_REPORT_PREFIX')
     _require(source_day_ms is None or
              (type(source_day_ms) is int and source_day_ms > 0
               and source_day_ms % 86400000 == 0),
@@ -85,7 +91,8 @@ def publish_bounded(report_root, *, protected_root, lane, identity, sequence,
              "PRODUCER_REPORT_ROOT_OVERLAP")
     _require(root.is_dir(), "PRODUCER_REPORT_ROOT_MUST_PREEXIST")
     _require(root.stat().st_nlink >= 1, "PRODUCER_REPORT_ROOT_INVALID")
-    body = dict(schema="aql.mcp.producer-bounded-report.v1",
+    body = dict(schema=("aql.warehouse.full-history-checkpoint.v1"
+                        if lane == "HISTORY" else "aql.mcp.producer-bounded-report.v1"),
                 lane=lane, producer_identity=identity, sequence=sequence,
                 observation_ms=observed_ms, published_ms=published_ms,
                 status=status, reason=reason, counters=counters,
@@ -100,7 +107,14 @@ def publish_bounded(report_root, *, protected_root, lane, identity, sequence,
                 publisher_import_registry_verified=bool(
                     lane == "DAILY" and source_sha256 and receipt_sha256 and
                     registry_sha256 and registry_watermark is not None),
-                trading_authority="NONE")
+                trading_authority="NONE",
+                evidence_grade="PRODUCER_REPORTED_NOT_INDEPENDENTLY_REVALIDATED")
+    if lane == "HISTORY":
+        body.update(continuation_ref=continuation_ref or "",
+                    accepted_prefix_unchanged=accepted_prefix_unchanged,
+                    archives_this_run=counters.get("archives_this_run", 0),
+                    inserted_rows_this_run=counters.get("inserted_rows_this_run", 0),
+                    observed_at_ms=observed_ms)
     raw = json.dumps(body, sort_keys=True, separators=(",", ":"),
                      allow_nan=False).encode("utf-8")
     _require(len(raw) <= MAX_REPORT_BYTES, "PRODUCER_REPORT_SIZE")
@@ -123,7 +137,8 @@ def publish_bounded(report_root, *, protected_root, lane, identity, sequence,
         try:
             os.link(temp_name, destination)
         except FileExistsError:
-            _require(destination.read_bytes() == raw,
+            _require(destination.is_file() and destination.stat().st_nlink == 1
+                     and destination.read_bytes() == raw,
                      "PRODUCER_REPORT_REPLAY_CONFLICT")
         return dict(name=destination.name, sha256=digest,
                     replay=False)
