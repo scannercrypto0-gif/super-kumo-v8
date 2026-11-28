@@ -4,10 +4,10 @@ Owner supplied the work order in Work chat28Nov2026, selectedBprovisionally, and
 
 ## Frozen engineering integration point
 
-- #338 HEAD5bebd7a6e44d23c3af0ccb0cc5c0cf7238666546/treee372aac8ebe53bc52e6c5f0dfde3dcb5c433d82e; OPEN/UNMERGED, main0dad5acc17172754b741b0e8a97d911436c9f4c5. No actual owner merge approval or native GitHubAPPROVE observed.
+- At intake #338 HEAD5bebd7a6e44d23c3af0ccb0cc5c0cf7238666546/treee372aac8ebe53bc52e6c5f0dfde3dcb5c433d82e was OPEN/UNMERGED against main0dad5acc. During016 implementation GitHub recorded merge by scannercrypto0-gif at28Nov11:47:54UTC (14:47:54Riyadh), commit122c1cf87b13f1cddac725e8b82169844ea510c9. Main now contains exactly the accepted treee372aac8ebe53bc52e6c5f0dfde3dcb5c433d82e. Native reviewer drazezsebaey-art APPROVED exact5bebd7a6. Work did not execute that merge; this actual readback supersedes the initial intake status.
 - Independent final scoped engineering acceptance #134/7238439239, handoff #338/7238439945. Six Core fixes and boundedD08/D14b/D14a/D16/Warehouse/Daily/MCP/generatedreceiver dispositions preserved;125/89four-cell evidence remains exact priorhead, not relabeled new fulltree evidence. No accepted audit/test repeated without changed scope.
 - Incorporated source330ae60b3e,3318c7f3728,333accepted source lineage,3344617e227,3375617e03c are recorded in338's existing provenance. No wholesale restacking, rebuild, warehouse replacement or completed-history download.
-- This daughter candidate is based on frozen338, so operational engineering does not mutate its accepted head. It must follow338 or be revalidated against the actual eventual merge tree. No merge executed.
+- This candidate originally isolated the operational delta above frozen338. After the observed merge it is reconciled with main122c1cf8 and retargeted to main; only its six new files differ. No accepted implementation changed; the new016operationaldelta requires its own review/merge authority. Work did not merge a PR.
 
 ## FullHistory diagnosis — no unproved source fix
 
