@@ -200,3 +200,47 @@ def test_other_run_commit_cannot_settle_original_observation(case):
     store=service.Store(root/'source.sqlite');store.active_run_id='other-run'
     store.ingest(packet(END-60000),received_ms=current[0]);store.db.close()
     with pytest.raises(ValueError,match='COMMIT_RUN_UNBOUND'):finish(case)
+
+
+@pytest.mark.parametrize('offset',[40000,120000])
+def test_commit_visible_after_clock_sample_but_beyond_monotonic_cutoff(case,monkeypatch,offset):
+    root,_,current=case
+    current[:]=[END+offset,MONO+86_400_000+offset]
+    original=protocol.collect
+    injected=[False]
+    endpoint_before=(root/'endpoint.json').read_bytes()
+    def race(database,plan,wall_cutoff,mono_cutoff):
+        # finalize already sampled in-bound wall/mono. A genuine Store commit
+        # becomes visible before the reader begins its SQLite snapshot, with
+        # wall time unchanged but monotonic timestamp one millisecond too late.
+        if not injected[0]:
+            injected[0]=True
+            with patch.object(service.time,'monotonic_ns',lambda:(current[1]+1)*1_000_000):
+                deliver(case)
+        return original(database,plan,wall_cutoff,mono_cutoff)
+    monkeypatch.setattr(protocol,'collect',race)
+    with pytest.raises(ValueError,match='COMMIT_RUN_UNBOUND'):finish(case)
+    assert injected[0] and not (root/'final.json').exists()
+    assert (root/'endpoint.json').read_bytes()==endpoint_before
+
+
+def test_endpoint_membership_uses_logical_cutoffs_not_capture_uncertainty(case):
+    root,_,current=case
+    current[:]=[END,MONO+86_400_000]
+    with patch.object(service.time,'monotonic_ns',lambda:(current[1]+1)*1_000_000):
+        deliver(case)
+    # Capture is permitted up to2s after endpoint; that uncertainty does not
+    # admit a post-endpoint commit into original endpoint coverage.
+    current[:]=[END+1,MONO+86_400_001]
+    with pytest.raises(ValueError,match='COMMIT_RUN_UNBOUND'):
+        protocol.capture_endpoint(root/'source.sqlite',root/'plan.json',root/'new-endpoint.json')
+    assert not (root/'new-endpoint.json').exists()
+
+
+def test_endpoint_exact_wall_and_monotonic_boundary_is_inclusive(case):
+    root,_,current=case
+    current[:]=[END,MONO+86_400_000];deliver(case)
+    endpoint=protocol.capture_endpoint(root/'source.sqlite',root/'plan.json',root/'exact-endpoint.json')
+    assert endpoint['body']['coverage_at_endpoint']==1440
+    assert endpoint['body']['snapshot']['cutoff_ms']==END
+    assert endpoint['body']['snapshot']['cutoff_monotonic_ms']==MONO+86_400_000

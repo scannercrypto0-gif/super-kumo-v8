@@ -119,8 +119,14 @@ def plan_read(path):
     return plan
 
 
-def collect(database, plan, cutoff):
-    p=plan['body'];source=p['source'];db=open_source(database)
+def collect(database, plan, cutoff, monotonic_cutoff):
+    p=plan['body'];source=p['source']
+    need(type(cutoff) is int and type(monotonic_cutoff) is int
+         and source['started_ms']<=cutoff<=p['deadline_ms']
+         and source['started_monotonic_ms']<=monotonic_cutoff<=
+             source['started_monotonic_ms']+86_400_000+ALLOWANCE_MS,
+         'SETTLEMENT_SNAPSHOT_CUTOFF')
+    db=open_source(database)
     deadline=time.monotonic()+5
     db.set_progress_handler(lambda:int(time.monotonic()>deadline),1000)
     try:
@@ -143,7 +149,8 @@ def collect(database, plan, cutoff):
             missing.extend([symbol.upper(),o,o+60000] for o in range(
                 p['eligible_start_ms'],p['eligible_end_ms'],60000) if o not in seen)
         events=[dict(r) for r in db.execute('''SELECT id,run_id,at_ms,monotonic_ms,kind,detail
-            FROM service_event WHERE run_id=? AND at_ms<=? ORDER BY id LIMIT ?''',(source['run_id'],cutoff,MAX_ROWS+1))]
+            FROM service_event WHERE run_id=? AND at_ms<=? AND monotonic_ms<=? ORDER BY id LIMIT ?''',
+            (source['run_id'],cutoff,monotonic_cutoff,MAX_ROWS+1))]
         need(len(events)<=MAX_ROWS and all(len(e['detail'])<=4096 for e in events), 'SETTLEMENT_EVENT_LIMIT')
         prior_id=prior_wall=prior_mono=-1
         for event in events:
@@ -151,6 +158,7 @@ def collect(database, plan, cutoff):
                  and event['id']>prior_id and event['at_ms']>=prior_wall
                  and event['monotonic_ms']>=prior_mono
                  and source['started_ms']<=event['at_ms']<=cutoff
+                 and source['started_monotonic_ms']<=event['monotonic_ms']<=monotonic_cutoff
                  and abs((event['at_ms']-source['started_ms'])-
                          (event['monotonic_ms']-source['started_monotonic_ms']))<=2000,
                  'SETTLEMENT_EVENT_CLOCK')
@@ -163,7 +171,8 @@ def collect(database, plan, cutoff):
                  if event['kind']=='FINAL_BAR_RECEIVED'}
         need(all((row['symbol']+':'+str(row['open_ms']),row['received_ms']) in commits
                  for row in rows), 'SETTLEMENT_COMMIT_RUN_UNBOUND')
-        return {'rows':rows,'missing':missing,'conflict_event_ids':conflicts,'events':events}
+        return {'cutoff_ms':cutoff,'cutoff_monotonic_ms':monotonic_cutoff,
+            'rows':rows,'missing':missing,'conflict_event_ids':conflicts,'events':events}
     finally:db.close()
 
 
@@ -173,9 +182,10 @@ def capture_endpoint(database, plan_path, destination):
     need(end<=now<=end+2000 and end_mono<=mono<=end_mono+2000, 'SETTLEMENT_ENDPOINT_CAPTURE_WINDOW')
     need(abs((now-p['source']['started_ms'])-(mono-p['source']['started_monotonic_ms']))<=2000,
          'SETTLEMENT_ENDPOINT_CLOCK')
-    snapshot=collect(database,plan,end)
+    snapshot=collect(database,plan,end,end_mono)
     return publish(destination, {'schema':'atlas.ws.observation-endpoint.v1',
-        'plan_sha256':plan['sha256'],'observed_endpoint_ms':end,'captured_ms':now,
+        'plan_sha256':plan['sha256'],'observed_endpoint_ms':end,
+        'observed_endpoint_monotonic_ms':end_mono,'captured_ms':now,
         'captured_monotonic_ms':mono,'snapshot':snapshot,
         'coverage_at_endpoint':len(snapshot['rows']),'verifier_code_sha256':CODE_SHA256})
 
@@ -186,6 +196,7 @@ def build_final(database, plan, endpoint, now, mono):
          'SETTLEMENT_ENDPOINT_PIN')
     end_mono=p['source']['started_monotonic_ms']+86_400_000
     need(e['observed_endpoint_ms']==p['endpoint_ms']
+         and e['observed_endpoint_monotonic_ms']==end_mono
          and p['endpoint_ms']<=e['captured_ms']<=p['endpoint_ms']+2000
          and end_mono<=e['captured_monotonic_ms']<=end_mono+2000,
          'SETTLEMENT_ENDPOINT_CLOCK')
@@ -194,8 +205,8 @@ def build_final(database, plan, endpoint, now, mono):
     need(mono>=e['captured_monotonic_ms'] and now>=e['captured_ms'] and
          abs((now-e['captured_ms'])-(mono-e['captured_monotonic_ms']))<=2000,
          'SETTLEMENT_CLOCK')
-    snapshot=collect(database,plan,now)
-    original=collect(database,plan,p['endpoint_ms'])
+    snapshot=collect(database,plan,now,mono)
+    original=collect(database,plan,p['endpoint_ms'],end_mono)
     need(original==e['snapshot'],'SETTLEMENT_ENDPOINT_SOURCE_CHANGED')
     # Original receipt stays untouched; post-T events never become observation
     # rotation/fault recovery evidence. This module only classifies coverage.

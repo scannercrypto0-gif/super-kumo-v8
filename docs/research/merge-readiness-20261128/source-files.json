@@ -220,8 +220,8 @@
     },
     {
       "path": "docs/research/merge-readiness-20261128/settlement-policy-06.md",
-      "sha256": "43e93864f2640f2bb001e436baa6058c5a832d00207b6b5602103b9b9793d0d6",
-      "git_blob": "100f35175bb9a148383e10a184f2fc1fab7c1903",
+      "sha256": "fd8a61199d6da740acaacd8a4b001b78d9375555b803332d483c9ce42aa6ba61",
+      "git_blob": "342fdc1816b246b16a02b202cffc5c5115284426",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
@@ -1235,8 +1235,8 @@
     },
     {
       "path": "tools/realtime_market_feed/settlement.py",
-      "sha256": "dede1f53c26dd4a1c12b517211adfaa5f0b62c37ee956cd70df4e70d5fffbf1d",
-      "git_blob": "13eaec469741305285eee302f5f9a32206b6f7aa",
+      "sha256": "c0e3a97505f1a99ef4d0b7b19f79ba4e2be7a2f9d8ba963a048d4fb2d495e0ca",
+      "git_blob": "f2b7d68776eac4af8f119e4cf95c1f29c0b0c4fc",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     },
@@ -1313,8 +1313,8 @@
     },
     {
       "path": "tools/realtime_market_feed/test_settlement.py",
-      "sha256": "19247fe3727fa297b4dd12ea81a99d844c97cfd878a10a0751c8c9ed0dcf7abd",
-      "git_blob": "f908c219f48daf506a7b6f25d1a8ebb01dde04c6",
+      "sha256": "5a3a68e8ae5e4daacd27fce474c2ed643a5d56e9a28fc4e146e9f26e4f2886b2",
+      "git_blob": "4c1723fad0be5b611327e2def9224bfa4643075f",
       "exact_source_prs": [],
       "scope": "ASSEMBLY_DELTA_REVIEW_REQUIRED"
     }
