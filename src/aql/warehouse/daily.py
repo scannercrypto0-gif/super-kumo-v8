@@ -77,6 +77,10 @@ def import_one_retained(warehouse, archive, *, source_day_ms, expected_zip_sha25
         from .producer_report import publish_bounded
         registry = report.get('registry') or {}
         publish_bounded(report_root, protected_root=warehouse.root,
+            code_sha256=seal(Path(__file__).read_bytes()),
+            config_sha256=seal(json.dumps(dict(day=source_day_ms,
+                zip=expected_zip_sha256, checksum=expected_checksum_sha256),
+                sort_keys=True, separators=(',', ':')).encode()),
             lane='DAILY', identity=seal(expected_zip_sha256.encode())[:16],
             sequence=source_day_ms, observed_ms=observed_ms,
             published_ms=time.time_ns() // 1_000_000,
