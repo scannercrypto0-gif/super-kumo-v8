@@ -108,6 +108,7 @@ def main():
     p.add_argument('--source-day-ms', type=int)
     p.add_argument('--expected-zip-sha256')
     p.add_argument('--expected-checksum-sha256')
+    p.add_argument('--bounded-report-root',type=Path,help='existing isolated MCP report directory; one archive only')
     a = p.parse_args()
     warehouse = HistoricalWarehouse(a.root)
     if a.archive is not None:
@@ -116,8 +117,10 @@ def main():
         result = import_one_retained(warehouse, a.archive, source_day_ms=a.source_day_ms,
             expected_zip_sha256=a.expected_zip_sha256,
             expected_checksum_sha256=a.expected_checksum_sha256,
-            observed_ms=time.time_ns() // 1_000_000)
+            observed_ms=time.time_ns() // 1_000_000,
+            report_root=a.bounded_report_root)
     else:
+        need(a.bounded_report_root is None, 'DAILY_BULK_REPORT_NOT_SUPPORTED')
         need(a.source_day_ms is None and a.expected_zip_sha256 is None
              and a.expected_checksum_sha256 is None, 'DAILY_BULK_MODE_PIN_ARGS_DENIED')
         result = import_retained(warehouse, a.input_directory,
