@@ -1,4 +1,3 @@
-
 """Private Windows one-shot preparation: standard library, zero market calls.
 
 Diagnose reads only. The gate is invoked by the companion PowerShell wrapper
