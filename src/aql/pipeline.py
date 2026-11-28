@@ -1,7 +1,7 @@
 """
 AQL G1-WP01 Pipeline entry point.
 
-Orchestrates: BinanceCollector ? DurableJournal ? OperationalStore + GapRecovery.
+Orchestrates: BinanceCollector → DurableJournal → OperationalStore + GapRecovery.
 
 Usage (live 10-min run):
     python -m aql.pipeline --symbol BTCUSDT --interval 1m --duration 600
@@ -50,13 +50,13 @@ def _run_gap_recovery(
 
     Sequence (mandatory, per G1-WP01 fix order):
       1. journal.commit(bar, background=True) - durable local record first
-      2. store.upsert(bar)          ? write to operational store
-      3. journal.mark_persisted()   ? ONLY if upsert confirmed insertion/presence
+      2. store.upsert(bar)          — write to operational store
+      3. journal.mark_persisted()   — ONLY if upsert confirmed insertion/presence
 
     mark_persisted is never called if upsert raises or returns False due to
     an unconfirmed row.  (Note: upsert returns False for duplicates, which
     are already in the store; we still mark those persisted since the data
-    IS durably stored ? we just didn't add a new row.)
+    IS durably stored — we just didn't add a new row.)
     """
     # Legacy recovery is not a registered v2 writer. Refuse before reading
     # unrelated store coverage or issuing REST, even for matching source rows.
@@ -114,10 +114,10 @@ def _run_gap_recovery(
                 bar.stable_key(), exc,
             )
             errors += 1
-            # Do NOT call mark_persisted ? store write unconfirmed
+            # Do NOT call mark_persisted — store write unconfirmed
             continue
 
-        # Step 3: Mark persisted ? only when store write is confirmed.
+        # Step 3: Mark persisted — only when store write is confirmed.
         # upsert() returns True for new rows, False for duplicates (already present).
         # In both cases the data IS in the store, so mark as PERSISTED.
         try:
@@ -218,13 +218,13 @@ def run_pipeline(
             )
             if startup_replay_errors > 0:
                 logger.error(
-                    "Startup reconciliation: %d bar(s) failed to replay into store ? "
+                    "Startup reconciliation: %d bar(s) failed to replay into store — "
                     "unresolved backlog exists",
                     startup_replay_errors,
                 )
             # Run REST recovery for every detected gap (internal + trailing).
             # A failed REST fetch is captured in the RecoveryReport (status=HTTP_ERROR)
-            # and carried in startup_recovery_results ? never silently swallowed.
+            # and carried in startup_recovery_results — never silently swallowed.
             for gap_start, gap_end in startup_gaps:
                 def recover(stop, start=gap_start, end=gap_end):
                     if not stop.is_set():
@@ -390,4 +390,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
