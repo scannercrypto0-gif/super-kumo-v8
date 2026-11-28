@@ -231,7 +231,7 @@ class EarlyObservationTests(unittest.TestCase):
         lane = result["lanes"]["daily"]
         self.assertEqual(lane["status"], "HEALTHY_PROGRESS")
         self.assertEqual(lane["reason"], "DAILY_SOURCE_RECEIPT_LINKED_TO_REGISTRY")
-        self.assertEqual(lane["reported"]["registry_link"]["source_receipt_sha256"], "3" * 64)
+        self.assertEqual(lane["reported"]["registry_link"]["source_receipt_sha256"], daily_source_receipt(NOW - 86_400_000)["receipt_sha256"])
         self.assertEqual(lane["reported"]["registry_link"]["source_zip_sha256"], "2" * 64)
         self.assertEqual(lane["reported"]["source_age_ms"], 86_400_000)
         self.assertEqual(lane["reported"]["source_data_freshness"], "FRESH")
