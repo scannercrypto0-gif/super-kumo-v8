@@ -208,6 +208,10 @@ def monitor(config, *, cycles=2, now=lambda:time.time_ns()//1_000_000,
                     if now()-orphan['observed_ms']>=2100000:
                         state['prune_pending'].append(orphan);state['orphans'].remove(orphan)
                         state_write(out,state);prune(out,state)
+                # Cleanup can unlink paths from the earlier sequence inventory.
+                # Re-read the bounded owned set before computing current usage;
+                # keep the reserved sequence above to avoid name reuse.
+                files=inventory(out)
                 # Reserve peak space before publishing; never delete unowned data.
                 early.require(sum(p.stat().st_size for p in files)+2*early.MAX_FILE_BYTES<=QUOTA,
                               'MONITOR_DISK_QUOTA')

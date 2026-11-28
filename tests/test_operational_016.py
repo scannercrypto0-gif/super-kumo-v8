@@ -110,3 +110,54 @@ def test_exclusive_lock_and_output_quota_are_enforced(tmp_path):
     candidate=out/'early-000000000000.json';candidate.write_bytes(b'x'*(op.QUOTA+1))
     with pytest.raises(ValueError,match='DISK_QUOTA'):op.monitor(c,cycles=1)
     assert candidate.stat().st_size==op.QUOTA+1
+
+
+def test_deferred_prune_restart_reinventories_before_capacity_check(tmp_path):
+    c=config(tmp_path);now=[op.time.time_ns()//1000000];out=Path(c['output_root'])
+    op.monitor(c,cycles=2,now=lambda:now[0],wait=lambda s:now.__setitem__(0,now[0]+s*1000))
+    state,_=op.wd.read_json(out/'monitor-state.json')
+    old=state['pairs'].pop(0);latest=state['pairs'][-1]
+    latest_bytes=(out/latest['snapshot_name']).read_bytes()
+    state['prune_pending'].append(old);op.state_write(out,state)
+    # Simulate crash after manifest deletion but before snapshot unlink/intent clear.
+    (out/old['manifest_name']).unlink()
+    now[0]+=300000
+    result=op.monitor(c,cycles=1,now=lambda:now[0])
+    assert result[0]['status']=='REFRESH_PUBLISHED_REPORT_ONLY'
+    assert result[0]['sequence']==2
+    assert not (out/old['snapshot_name']).exists()
+    assert (out/latest['snapshot_name']).read_bytes()==latest_bytes
+    restored,_=op.wd.read_json(out/'monitor-state.json')
+    assert not restored['prune_pending'] and restored['last_error'] is None
+
+
+def test_aged_orphan_prune_reinventories_and_continues_same_cycle(tmp_path,monkeypatch):
+    c=config(tmp_path);now=[op.time.time_ns()//1000000];out=Path(c['output_root'])
+    original=op.refresh.atomic_new
+    def interrupted(path,value):
+        if '.manifest.' in str(path):raise OSError('INJECTED_PARTIAL_PUBLICATION')
+        return original(path,value)
+    monkeypatch.setattr(op.refresh,'atomic_new',interrupted)
+    assert op.monitor(c,cycles=1,now=lambda:now[0])[0]['status']=='MONITOR_BLOCKED'
+    orphan=out/'early-000000000000.json';assert orphan.exists()
+    monkeypatch.setattr(op.refresh,'atomic_new',original)
+    now[0]+=2100000
+    result=op.monitor(c,cycles=1,now=lambda:now[0])
+    assert result[0]['status']=='REFRESH_PUBLISHED_REPORT_ONLY'
+    assert result[0]['sequence']==1 and not orphan.exists()
+    assert result[0]['mcp_readback']['tools']==2
+    state,_=op.wd.read_json(out/'monitor-state.json')
+    assert not state['orphans'] and not state['prune_pending'] and state['last_error'] is None
+
+
+def test_deferred_prune_rejects_tampered_owned_snapshot(tmp_path):
+    c=config(tmp_path);out=Path(c['output_root'])
+    op.monitor(c,cycles=1)
+    state,_=op.wd.read_json(out/'monitor-state.json');old=state['pairs'].pop(0)
+    state['prune_pending'].append(old);op.state_write(out,state)
+    target=out/old['snapshot_name'];raw=target.read_bytes()+b' '
+    target.write_bytes(raw)
+    result=op.monitor(c,cycles=1)
+    assert result[0]['status']=='MONITOR_BLOCKED'
+    assert target.read_bytes()==raw
+    assert not (out/'early-000000000001.manifest.json').exists()
