@@ -25,7 +25,60 @@ def sealed(doc, field):
     return doc
 
 
+def daily_source_key(source_day):
+    archive_date = time.strftime("%Y-%m-%d", time.gmtime(source_day / 1000))
+    return f"BTCUSDT-1m-{archive_date}.zip"
+
+
+def daily_source_receipt(source_day, source_zip="2" * 64, checksum="8" * 64):
+    return sealed({
+        "schema": "aql.warehouse.source-receipt.v1",
+        "key": daily_source_key(source_day),
+        "source_zip_sha256": source_zip,
+        "checksum_sha256": checksum,
+        "publisher_integrity": "ZIP_CHECKSUM_MATCH",
+    }, "receipt_sha256")
+
+
+def daily_import_receipt(source_day, source_zip="2" * 64, receipt_sha256=None):
+    source_receipt = daily_source_receipt(source_day, source_zip)
+    return sealed({
+        "schema": "aql.research.warehouse-report.v1",
+        "status": "ARCHIVE_IMPORTED",
+        "key": daily_source_key(source_day),
+        "source_sha256": source_zip,
+        "source_receipt_sha256": receipt_sha256 or source_receipt["receipt_sha256"],
+    }, "import_receipt_sha256")
+
+
+def daily_linkage(now=NOW, source_day=None, source_zip="2" * 64,
+                  checksum="8" * 64, worker_receipt="4" * 64):
+    day = now - 86_400_000 if source_day is None else source_day
+    source = daily_source_receipt(day, source_zip, checksum)
+    imported = daily_import_receipt(day, source_zip, source["receipt_sha256"])
+    reg = registry()
+    return sealed({
+        "schema": "aql.daily.warehouse-linkage.v1",
+        "status": "VERIFIED",
+        "trust_scope": "OWNER_SUPPLIED_PRODUCER_LINKAGE_REPORT_ONLY",
+        "observed_at_ms": now,
+        "producer_code_sha256": "a" * 64,
+        "config_sha256": "b" * 64,
+        "source_day_ms": day,
+        "source_key": daily_source_key(day),
+        "worker_receipt_sha256": worker_receipt,
+        "source_zip_sha256": source_zip,
+        "checksum_sha256": checksum,
+        "source_receipt": source,
+        "import_receipt": imported,
+        "registry_snapshot_sha256": reg["snapshot_sha256"],
+        "registry_event_watermark": reg["event_watermark"],
+    }, "linkage_sha256")
+
+
 def registry(now=NOW, watermark=10, rows=100):
+    source_day = NOW - 86_400_000
+    source = daily_source_receipt(source_day)
     return sealed({
         "schema": "aql.warehouse.registry-snapshot.v1",
         "version": 1,
@@ -38,7 +91,9 @@ def registry(now=NOW, watermark=10, rows=100):
         "internal_gaps": [],
         "archive_unavailable_boundaries": [],
         "conflicts": [],
-        "sources": [{"source_zip_sha256": "2" * 64, "source_receipt_sha256": "3" * 64,
+        "sources": [{"source_zip_sha256": "2" * 64,
+                     "source_receipt_sha256": source["receipt_sha256"],
+                     "key": daily_source_key(source_day),
                      "rows": rows, "first_open_ms": now - rows * 60_000,
                      "last_open_ms": now - 60_000}],
         "source_class": "RETROSPECTIVE_NON_PIT",
@@ -90,13 +145,15 @@ def daily_linked(now=NOW, *, source_zip="2" * 64, source_day=None):
     report = daily(now)
     day = now - 86_400_000 if source_day is None else source_day
     worker_receipt = "4" * 64
+    checksum = "8" * 64
     report["last_success"].update({
         "source_day_ms": day,
         "daily_source_evidence_status": "VERIFIED",
         "daily_worker_receipt_sha256": worker_receipt,
         "receipts": [worker_receipt],
         "source_zip_sha256": source_zip,
-        "checksum_sha256": "8" * 64,
+        "checksum_sha256": checksum,
+        "warehouse_linkage": daily_linkage(now, day, source_zip, checksum, worker_receipt),
     })
     return report
 
