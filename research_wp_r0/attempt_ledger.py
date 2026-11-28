@@ -81,10 +81,12 @@ class AttemptLedger:
             # Existing legacy/incomplete schemas must not be silently migrated.
             db.execute("SELECT plan_digest,plan_bytes FROM frozen_plan_policy WHERE id=1").fetchone()
             self._read(db)
+            if require_admission and not bool(stored[0]):
+                raise ValueError(
+                    "Cannot change durable admission policy while opening an existing ledger; "
+                    "use explicit frozen-plan enrollment"
+                )
             self.require_admission = bool(stored[0])
-            if require_admission and not self.require_admission:
-                db.execute("UPDATE ledger_policy SET require_admission=1 WHERE id=1")
-                self.require_admission = True
             db.execute("COMMIT")
         finally:
             if db.in_transaction: db.execute("ROLLBACK")
@@ -319,3 +321,4 @@ def prepare_durable_candidate(ledger, *args, **kwargs):
     ledger.record_attempt({**prepared.__dict__, "state": "INPUTS",
                            "inputs": inputs.payload.decode(), "inputs_digest": inputs.digest})
     return prepared, inputs
+
